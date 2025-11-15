@@ -26,14 +26,12 @@ class ProfileWithHistoryScreen extends StatefulWidget {
   State<ProfileWithHistoryScreen> createState() => _ProfileWithHistoryScreenState();
 }
 
-class _ProfileWithHistoryScreenState extends State<ProfileWithHistoryScreen>
-    with SingleTickerProviderStateMixin {
+class _ProfileWithHistoryScreenState extends State<ProfileWithHistoryScreen> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final UniversalIntentService _intentService = UniversalIntentService();
   final LocationService _locationService = LocationService();
 
-  late TabController _tabController;
   Map<String, dynamic>? _userProfile;
   List<Map<String, dynamic>> _searchHistory = [];
   List<String> _selectedInterests = [];
@@ -51,7 +49,6 @@ class _ProfileWithHistoryScreenState extends State<ProfileWithHistoryScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
     _loadUserData();
     _setupProfileListener(); // Listen for real-time profile updates
 
@@ -91,7 +88,6 @@ class _ProfileWithHistoryScreenState extends State<ProfileWithHistoryScreen>
 
   @override
   void dispose() {
-    _tabController.dispose();
     _profileSubscription?.cancel();
     super.dispose();
   }
@@ -1016,92 +1012,9 @@ class _ProfileWithHistoryScreenState extends State<ProfileWithHistoryScreen>
                       ),
                     ),
                     
-                    // Tab Bar with Filter Icon
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: isGlass
-                                    ? Colors.white.withValues(alpha: 0.7)
-                                    : (isDarkMode ? Colors.grey[900] : Colors.grey[100]),
-                                borderRadius: BorderRadius.circular(12),
-                                border: isGlass
-                                    ? Border.all(
-                                        color: Colors.white.withValues(alpha: 0.2),
-                                        width: 1,
-                                      )
-                                    : null,
-                              ),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(12),
-                                child: BackdropFilter(
-                                  filter: isGlass
-                                      ? ImageFilter.blur(sigmaX: 10, sigmaY: 10)
-                                      : ImageFilter.blur(sigmaX: 0, sigmaY: 0),
-                                  child: TabBar(
-                                    controller: _tabController,
-                                    labelColor: Theme.of(context).primaryColor,
-                                    unselectedLabelColor: isDarkMode ? Colors.grey[500] : Colors.grey[600],
-                                    indicatorColor: Theme.of(context).primaryColor,
-                                    indicatorWeight: 3,
-                                    indicator: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(12),
-                                      color: Theme.of(context).primaryColor.withValues(alpha: 0.15),
-                                    ),
-                                    tabs: const [
-                                      Tab(text: 'History'),
-                                      Tab(text: 'Live Connect'),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          // Filter Icon Button
-                          Container(
-                            decoration: BoxDecoration(
-                              color: (_filterByExactLocation || _filterByInterests)
-                                  ? Theme.of(context).primaryColor
-                                  : (isGlass
-                                      ? Colors.white.withValues(alpha: 0.7)
-                                      : (isDarkMode ? Colors.grey[900] : Colors.grey[100])),
-                              borderRadius: BorderRadius.circular(12),
-                              border: isGlass
-                                  ? Border.all(
-                                      color: Colors.white.withValues(alpha: 0.2),
-                                      width: 1,
-                                    )
-                                  : null,
-                            ),
-                            child: IconButton(
-                              onPressed: _showFilterDialog,
-                              icon: Icon(
-                                Icons.filter_list,
-                                color: (_filterByExactLocation || _filterByInterests)
-                                    ? Colors.white
-                                    : (isDarkMode ? Colors.grey[400] : Colors.grey[700]),
-                              ),
-                              tooltip: 'Filter',
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-
-                    // Tab Content
+                    // History Content
                     Expanded(
-                      child: TabBarView(
-                        controller: _tabController,
-                        children: [
-                          _buildHistoryTab(isDarkMode, isGlass),
-                          _buildLiveConnectTab(isDarkMode, isGlass),
-                        ],
-                      ),
+                      child: _buildHistoryTab(isDarkMode, isGlass),
                     ),
                   ],
                 ),

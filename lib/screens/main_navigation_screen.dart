@@ -5,7 +5,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'universal_matching_screen.dart';
 import 'conversations_screen.dart';
-import 'live_connect_screen.dart';
+import 'live_connect_tab_screen.dart';
+import 'live_connect_demo_screen.dart'; // DEMO IMPORT
 import 'profile_with_history_screen.dart';
 import 'performance_debug_screen.dart';
 import '../services/notification_service.dart';
@@ -29,7 +30,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
   final List<Widget> _screens = [
     const UniversalMatchingScreen(),
     const ConversationsScreen(),
-    const LiveConnectScreen(),
+    const LiveConnectDemoScreen(), // TEMPORARY: Using demo screen for testing
     const ProfileWithHistoryScreen(),
   ];
 

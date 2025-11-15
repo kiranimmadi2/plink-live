@@ -20,11 +20,13 @@ import 'profile_view_screen.dart';
 class EnhancedChatScreen extends StatefulWidget {
   final UserProfile otherUser;
   final String? initialMessage;
+  final String? chatId; // Optional chatId from Live Connect
 
   const EnhancedChatScreen({
     Key? key,
     required this.otherUser,
     this.initialMessage,
+    this.chatId, // Accept chatId from Live Connect
   }) : super(key: key);
 
   @override
@@ -146,14 +148,19 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
 
   Future<void> _initializeConversation() async {
     try {
-      // Use ConversationService to get or create conversation
-      final conversationId = await _conversationService.getOrCreateConversation(widget.otherUser);
+      // If chatId is provided from Live Connect, use it directly
+      // Otherwise, use ConversationService to get or create conversation
+      final conversationId = widget.chatId ??
+          await _conversationService.getOrCreateConversation(widget.otherUser);
+
       if (mounted) {
         setState(() {
           _conversationId = conversationId;
         });
       }
       _markMessagesAsRead();
+
+      print('EnhancedChatScreen: Conversation initialized with ID: $conversationId');
     } catch (e) {
       print('Error initializing conversation: $e');
       if (mounted) {
