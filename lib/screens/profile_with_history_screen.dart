@@ -46,6 +46,13 @@ class _ProfileWithHistoryScreenState extends State<ProfileWithHistoryScreen> {
 
   StreamSubscription<DocumentSnapshot>? _profileSubscription;
 
+  // Profile edit mode
+  bool _isEditMode = false;
+  List<String> _selectedConnectionTypes = [];
+  List<Map<String, String>> _selectedActivities = [];
+  String _aboutMe = '';
+  final TextEditingController _aboutMeController = TextEditingController();
+
   @override
   void initState() {
     super.initState();
@@ -89,6 +96,7 @@ class _ProfileWithHistoryScreenState extends State<ProfileWithHistoryScreen> {
   @override
   void dispose() {
     _profileSubscription?.cancel();
+    _aboutMeController.dispose();
     super.dispose();
   }
 
@@ -195,6 +203,22 @@ class _ProfileWithHistoryScreenState extends State<ProfileWithHistoryScreen> {
           _userProfile = userData;
           // Load user's saved interests
           _selectedInterests = List<String>.from(userData?['interests'] ?? []);
+          // Load connection types, activities, and about me
+          _selectedConnectionTypes = List<String>.from(userData?['connectionTypes'] ?? []);
+          _aboutMe = userData?['aboutMe'] ?? '';
+          _aboutMeController.text = _aboutMe;
+
+          // Load activities
+          final activitiesData = userData?['activities'] as List<dynamic>?;
+          if (activitiesData != null) {
+            _selectedActivities = activitiesData.map((item) {
+              final map = item as Map<String, dynamic>;
+              return {
+                'name': map['name']?.toString() ?? '',
+                'level': map['level']?.toString() ?? 'intermediate',
+              };
+            }).toList();
+          }
         });
 
         // Debug: Log what we're getting from database
@@ -616,7 +640,7 @@ class _ProfileWithHistoryScreenState extends State<ProfileWithHistoryScreen> {
 
   Future<void> _logout() async {
     HapticFeedback.mediumImpact();
-    
+
     final shouldLogout = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -649,6 +673,94 @@ class _ProfileWithHistoryScreenState extends State<ProfileWithHistoryScreen> {
       }
     }
   }
+
+  void _toggleEditMode() {
+    setState(() {
+      _isEditMode = !_isEditMode;
+    });
+  }
+
+  Future<void> _saveProfile() async {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) return;
+
+    try {
+      // Convert activities to map format
+      final activitiesData = _selectedActivities.map((activity) => {
+        'name': activity['name'],
+        'level': activity['level'],
+      }).toList();
+
+      await _firestore.collection('users').doc(userId).update({
+        'connectionTypes': _selectedConnectionTypes,
+        'activities': activitiesData,
+        'aboutMe': _aboutMeController.text.trim(),
+        'interests': _selectedInterests,
+      });
+
+      if (mounted) {
+        setState(() {
+          _isEditMode = false;
+          _aboutMe = _aboutMeController.text.trim();
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Profile updated successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        // Reload profile
+        _loadUserData();
+      }
+    } catch (e) {
+      print('Error updating profile: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to update profile: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  // Available connection types
+  final List<String> _availableConnectionTypes = [
+    'Friendship',
+    'Dating',
+    'Professional Networking',
+    'Activity Partner',
+    'Event Companion',
+  ];
+
+  // Available activities
+  final List<String> _availableActivities = [
+    'Gym',
+    'Hiking',
+    'Coding',
+    'Running',
+    'Swimming',
+    'Cycling',
+    'Yoga',
+    'Reading',
+    'Photography',
+    'Cooking',
+    'Dancing',
+    'Music',
+    'Gaming',
+    'Travel',
+    'gaming',
+
+  ];
+
+  final List<String> _activityLevels = [
+    'beginner',
+    'intermediate',
+    'advanced',
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -783,239 +895,247 @@ class _ProfileWithHistoryScreenState extends State<ProfileWithHistoryScreen> {
                     ],
                   ),
                 )
-              : Column(
-                  children: [
-                    const SizedBox(height: kToolbarHeight + 20),
-                    // Profile Header
-                    Container(
-                      margin: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: isGlass
-                            ? Colors.white.withValues(alpha: 0.7)
-                            : (isDarkMode ? Colors.grey[900] : Colors.white),
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: isGlass
-                            ? []
-                            : [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.05),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                        border: isGlass
-                            ? Border.all(
-                                color: Colors.white.withValues(alpha: 0.2),
-                                width: 1,
-                              )
-                            : null,
-                      ),
+              : CustomScrollView(
+                  slivers: [
+                    SliverToBoxAdapter(
                       child: Column(
                         children: [
-                          Row(
-                            children: [
-                              // Profile Photo
-                              UserAvatar(
-                                profileImageUrl: _userProfile?['profileImageUrl'] ?? _userProfile?['photoUrl'],
-                                radius: 40,
-                                fallbackText: _userProfile?['name'] ?? 'User',
-                              ),
-                              const SizedBox(width: 20),
-                              // User Info
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      _userProfile?['name'] ?? 'Unknown User',
-                                      style: TextStyle(
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.bold,
-                                        color: isDarkMode ? Colors.white : Colors.black,
+                          const SizedBox(height: kToolbarHeight + 30),
+                          // Profile Header
+                          Container(
+                            margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                            padding: const EdgeInsets.all(24),
+                            decoration: BoxDecoration(
+                              color: isGlass
+                                  ? Colors.white.withValues(alpha: 0.7)
+                                  : (isDarkMode ? Colors.grey[900] : Colors.white),
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: isGlass
+                                  ? []
+                                  : [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: 0.08),
+                                        blurRadius: 16,
+                                        offset: const Offset(0, 4),
                                       ),
+                                    ],
+                              border: isGlass
+                                  ? Border.all(
+                                      color: Colors.white.withValues(alpha: 0.3),
+                                      width: 1.5,
+                                    )
+                                  : null,
+                            ),
+                            child: Column(
+                              children: [
+                                Row(
+                                  children: [
+                                    // Profile Photo
+                                    UserAvatar(
+                                      profileImageUrl: _userProfile?['profileImageUrl'] ?? _userProfile?['photoUrl'],
+                                      radius: 50,
+                                      fallbackText: _userProfile?['name'] ?? 'User',
                                     ),
-                                    const SizedBox(height: 4),
-                                    Row(
-                                      children: [
-                                        Icon(
-                                          Icons.email_outlined,
-                                          size: 14,
-                                          color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Expanded(
-                                          child: Text(
-                                            _userProfile?['email'] ?? _auth.currentUser?.email ?? 'No email',
-                                            style: TextStyle(
-                                              fontSize: 13,
-                                              color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                                            ),
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 4),
-                                    GestureDetector(
-                                      onTap: () async {
-                                        // Manual location update
-                                        if (!mounted) return;
-
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(content: Text('Updating location...')),
-                                        );
-
-                                        try {
-                                          // User manually clicked to update location, so NOT silent
-                                          final success = await _locationService.updateUserLocation(silent: false);
-
-                                          // Check mounted after async operation
-                                          if (!mounted) return;
-
-                                          if (success) {
-                                            // Short delay for Firestore propagation
-                                            await Future.delayed(const Duration(milliseconds: 500));
-
-                                            // Check mounted again after delay
-                                            if (!mounted) return;
-
-                                            _loadUserData();
-
-                                            if (mounted) {
-                                              ScaffoldMessenger.of(context).showSnackBar(
-                                                const SnackBar(
-                                                  content: Text('Location updated successfully'),
-                                                  backgroundColor: Colors.green,
-                                                ),
-                                              );
-                                            }
-                                          } else {
-                                            if (mounted) {
-                                              ScaffoldMessenger.of(context).showSnackBar(
-                                                const SnackBar(
-                                                  content: Text('Could not update location'),
-                                                  backgroundColor: Colors.red,
-                                                ),
-                                              );
-                                            }
-                                          }
-                                        } catch (e) {
-                                          print('Error during manual location update: $e');
-                                          if (mounted) {
-                                            ScaffoldMessenger.of(context).showSnackBar(
-                                              const SnackBar(
-                                                content: Text('Location update failed'),
-                                                backgroundColor: Colors.red,
-                                              ),
-                                            );
-                                          }
-                                        }
-                                      },
+                                    const SizedBox(width: 20),
+                                    // User Info
+                                    Expanded(
                                       child: Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
+                                          Text(
+                                            _userProfile?['name'] ?? 'Unknown User',
+                                            style: TextStyle(
+                                              fontSize: 22,
+                                              fontWeight: FontWeight.w700,
+                                              color: isDarkMode ? Colors.white : Colors.black,
+                                              letterSpacing: 0.3,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 8),
                                           Row(
                                             children: [
                                               Icon(
-                                                Icons.location_on_outlined,
-                                                size: 14,
+                                                Icons.email_outlined,
+                                                size: 16,
                                                 color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
                                               ),
-                                              const SizedBox(width: 4),
-                                              Flexible(
+                                              const SizedBox(width: 6),
+                                              Expanded(
                                                 child: Text(
-                                                  _userProfile?['displayLocation'] ??
-                                                  _userProfile?['city'] ??
-                                                  _userProfile?['location'] ??
-                                                  'Tap to set location',
+                                                  _userProfile?['email'] ?? _auth.currentUser?.email ?? 'No email',
                                                   style: TextStyle(
-                                                    fontSize: 13,
-                                                    color: (_userProfile?['displayLocation'] == null &&
-                                                            _userProfile?['city'] == null &&
-                                                            _userProfile?['location'] == null)
-                                                        ? Theme.of(context).primaryColor
-                                                        : isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                                                    decoration: (_userProfile?['displayLocation'] == null &&
-                                                                _userProfile?['city'] == null &&
-                                                                _userProfile?['location'] == null)
-                                                        ? TextDecoration.underline
-                                                        : null,
+                                                    fontSize: 14,
+                                                    color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
                                                   ),
                                                   overflow: TextOverflow.ellipsis,
-                                                  maxLines: 1,
                                                 ),
                                               ),
                                             ],
                                           ),
-                                          // Location freshness indicator
-                                          if (_userProfile?['locationUpdatedAt'] != null)
-                                            FutureBuilder<int?>(
-                                              future: _locationService.getLocationAgeInHours(),
-                                              builder: (context, snapshot) {
-                                                if (snapshot.hasData && snapshot.data != null) {
-                                                  final hours = snapshot.data!;
-                                                  String timeText;
-                                                  Color indicatorColor;
+                                          const SizedBox(height: 6),
+                                          GestureDetector(
+                                            onTap: () async {
+                                              // Manual location update
+                                              if (!mounted) return;
 
-                                                  if (hours < 1) {
-                                                    timeText = 'Updated recently';
-                                                    indicatorColor = Colors.green;
-                                                  } else if (hours < 24) {
-                                                    timeText = 'Updated ${hours}h ago';
-                                                    indicatorColor = Colors.green;
-                                                  } else if (hours < 48) {
-                                                    timeText = 'Updated 1 day ago';
-                                                    indicatorColor = Colors.orange;
-                                                  } else {
-                                                    final days = (hours / 24).floor();
-                                                    timeText = 'Updated $days days ago';
-                                                    indicatorColor = Colors.red;
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                const SnackBar(content: Text('Updating location...')),
+                                              );
+
+                                              try {
+                                                // User manually clicked to update location, so NOT silent
+                                                final success = await _locationService.updateUserLocation(silent: false);
+
+                                                // Check mounted after async operation
+                                                if (!mounted) return;
+
+                                                if (success) {
+                                                  // Short delay for Firestore propagation
+                                                  await Future.delayed(const Duration(milliseconds: 500));
+
+                                                  // Check mounted again after delay
+                                                  if (!mounted) return;
+
+                                                  _loadUserData();
+
+                                                  if (mounted) {
+                                                    ScaffoldMessenger.of(context).showSnackBar(
+                                                      const SnackBar(
+                                                        content: Text('Location updated successfully'),
+                                                        backgroundColor: Colors.green,
+                                                      ),
+                                                    );
                                                   }
-
-                                                  return Padding(
-                                                    padding: const EdgeInsets.only(left: 18, top: 2),
-                                                    child: Row(
-                                                      children: [
-                                                        Container(
-                                                          width: 6,
-                                                          height: 6,
-                                                          decoration: BoxDecoration(
-                                                            shape: BoxShape.circle,
-                                                            color: indicatorColor,
-                                                          ),
-                                                        ),
-                                                        const SizedBox(width: 4),
-                                                        Text(
-                                                          timeText,
-                                                          style: TextStyle(
-                                                            fontSize: 10,
-                                                            color: isDarkMode ? Colors.grey[500] : Colors.grey[500],
-                                                          ),
-                                                        ),
-                                                      ],
+                                                } else {
+                                                  if (mounted) {
+                                                    ScaffoldMessenger.of(context).showSnackBar(
+                                                      const SnackBar(
+                                                        content: Text('Could not update location'),
+                                                        backgroundColor: Colors.red,
+                                                      ),
+                                                    );
+                                                  }
+                                                }
+                                              } catch (e) {
+                                                print('Error during manual location update: $e');
+                                                if (mounted) {
+                                                  ScaffoldMessenger.of(context).showSnackBar(
+                                                    const SnackBar(
+                                                      content: Text('Location update failed'),
+                                                      backgroundColor: Colors.red,
                                                     ),
                                                   );
                                                 }
-                                                return const SizedBox.shrink();
-                                              },
+                                              }
+                                            },
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Row(
+                                                  children: [
+                                                    Icon(
+                                                      Icons.location_on_outlined,
+                                                      size: 16,
+                                                      color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                                                    ),
+                                                    const SizedBox(width: 6),
+                                                    Flexible(
+                                                      child: Text(
+                                                        _userProfile?['displayLocation'] ??
+                                                        _userProfile?['city'] ??
+                                                        _userProfile?['location'] ??
+                                                        'Tap to set location',
+                                                        style: TextStyle(
+                                                          fontSize: 14,
+                                                          color: (_userProfile?['displayLocation'] == null &&
+                                                                  _userProfile?['city'] == null &&
+                                                                  _userProfile?['location'] == null)
+                                                              ? Theme.of(context).primaryColor
+                                                              : isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                                                          decoration: (_userProfile?['displayLocation'] == null &&
+                                                                      _userProfile?['city'] == null &&
+                                                                      _userProfile?['location'] == null)
+                                                              ? TextDecoration.underline
+                                                              : null,
+                                                        ),
+                                                        overflow: TextOverflow.ellipsis,
+                                                        maxLines: 1,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                                // Location freshness indicator
+                                                if (_userProfile?['locationUpdatedAt'] != null)
+                                                  FutureBuilder<int?>(
+                                                    future: _locationService.getLocationAgeInHours(),
+                                                    builder: (context, snapshot) {
+                                                      if (snapshot.hasData && snapshot.data != null) {
+                                                        final hours = snapshot.data!;
+                                                        String timeText;
+                                                        Color indicatorColor;
+
+                                                        if (hours < 1) {
+                                                          timeText = 'Updated recently';
+                                                          indicatorColor = Colors.green;
+                                                        } else if (hours < 24) {
+                                                          timeText = 'Updated ${hours}h ago';
+                                                          indicatorColor = Colors.green;
+                                                        } else if (hours < 48) {
+                                                          timeText = 'Updated 1 day ago';
+                                                          indicatorColor = Colors.orange;
+                                                        } else {
+                                                          final days = (hours / 24).floor();
+                                                          timeText = 'Updated $days days ago';
+                                                          indicatorColor = Colors.red;
+                                                        }
+
+                                                        return Padding(
+                                                          padding: const EdgeInsets.only(left: 22, top: 4),
+                                                          child: Row(
+                                                            children: [
+                                                              Container(
+                                                                width: 7,
+                                                                height: 7,
+                                                                decoration: BoxDecoration(
+                                                                  shape: BoxShape.circle,
+                                                                  color: indicatorColor,
+                                                                ),
+                                                              ),
+                                                              const SizedBox(width: 6),
+                                                              Text(
+                                                                timeText,
+                                                                style: TextStyle(
+                                                                  fontSize: 12,
+                                                                  color: isDarkMode ? Colors.grey[500] : Colors.grey[500],
+                                                                  fontWeight: FontWeight.w500,
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        );
+                                                      }
+                                                      return const SizedBox.shrink();
+                                                    },
+                                                  ),
+                                              ],
                                             ),
+                                          ),
                                         ],
                                       ),
                                     ),
                                   ],
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
+
+                          // Profile Detail Sections removed
                         ],
                       ),
                     ),
-                    
+
                     // History Content
-                    Expanded(
-                      child: _buildHistoryTab(isDarkMode, isGlass),
-                    ),
+                    ..._buildHistorySliver(isDarkMode, isGlass),
                   ],
                 ),
           ],
@@ -1023,42 +1143,516 @@ class _ProfileWithHistoryScreenState extends State<ProfileWithHistoryScreen> {
     );
   }
 
-  Widget _buildHistoryTab(bool isDarkMode, bool isGlass) {
+  Widget _buildConnectionTypesSection(bool isDarkMode, bool isGlass) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: isGlass
+            ? Colors.white.withValues(alpha: 0.7)
+            : (isDarkMode ? Colors.grey[900] : Colors.white),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: isGlass
+            ? []
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+        border: isGlass
+            ? Border.all(
+                color: Colors.white.withValues(alpha: 0.2),
+                width: 1,
+              )
+            : null,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.favorite_outline,
+                size: 20,
+                color: Theme.of(context).primaryColor,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Looking to connect for:',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: isDarkMode ? Colors.white : Colors.black,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (_isEditMode)
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _availableConnectionTypes.map((type) {
+                final isSelected = _selectedConnectionTypes.contains(type);
+                return FilterChip(
+                  label: Text(type),
+                  selected: isSelected,
+                  onSelected: (selected) {
+                    setState(() {
+                      if (selected) {
+                        _selectedConnectionTypes.add(type);
+                      } else {
+                        _selectedConnectionTypes.remove(type);
+                      }
+                    });
+                  },
+                  selectedColor: Theme.of(context).primaryColor.withValues(alpha: 0.3),
+                  checkmarkColor: Theme.of(context).primaryColor,
+                );
+              }).toList(),
+            )
+          else
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _selectedConnectionTypes.map((type) {
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: _getConnectionTypeColor(type),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    type,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActivitiesSection(bool isDarkMode, bool isGlass) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: isGlass
+            ? Colors.white.withValues(alpha: 0.7)
+            : (isDarkMode ? Colors.grey[900] : Colors.white),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: isGlass
+            ? []
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+        border: isGlass
+            ? Border.all(
+                color: Colors.white.withValues(alpha: 0.2),
+                width: 1,
+              )
+            : null,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.sports_soccer,
+                    size: 20,
+                    color: Theme.of(context).primaryColor,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Activities:',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: isDarkMode ? Colors.white : Colors.black,
+                    ),
+                  ),
+                ],
+              ),
+              if (_isEditMode)
+                IconButton(
+                  icon: const Icon(Icons.add, size: 20),
+                  onPressed: () => _showAddActivityDialog(),
+                  tooltip: 'Add Activity',
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (_isEditMode)
+            ..._selectedActivities.map((activity) {
+              return Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF9B59B6).withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF9B59B6)),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            activity['name']!,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: isDarkMode ? Colors.white : Colors.black,
+                            ),
+                          ),
+                          Text(
+                            'Level: ${activity['level']!}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.delete, size: 20, color: Colors.red),
+                      onPressed: () {
+                        setState(() {
+                          _selectedActivities.remove(activity);
+                        });
+                      },
+                    ),
+                  ],
+                ),
+              );
+            }).toList()
+          else
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _selectedActivities.map((activity) {
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF9B59B6),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    activity['name']!,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAboutSection(bool isDarkMode, bool isGlass) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: isGlass
+            ? Colors.white.withValues(alpha: 0.7)
+            : (isDarkMode ? Colors.grey[900] : Colors.white),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: isGlass
+            ? []
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+        border: isGlass
+            ? Border.all(
+                color: Colors.white.withValues(alpha: 0.2),
+                width: 1,
+              )
+            : null,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'About:',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: isDarkMode ? Colors.white : Colors.black,
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (_isEditMode)
+            TextField(
+              controller: _aboutMeController,
+              maxLines: 4,
+              decoration: InputDecoration(
+                hintText: 'Tell us about yourself...',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                filled: true,
+                fillColor: isDarkMode ? Colors.grey[800] : Colors.grey[100],
+              ),
+              style: TextStyle(
+                fontSize: 15,
+                color: isDarkMode ? Colors.white : Colors.black,
+              ),
+            )
+          else
+            Text(
+              _aboutMe,
+              style: TextStyle(
+                fontSize: 15,
+                height: 1.5,
+                color: isDarkMode ? Colors.white70 : Colors.black87,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInterestsSection(bool isDarkMode, bool isGlass) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: isGlass
+            ? Colors.white.withValues(alpha: 0.7)
+            : (isDarkMode ? Colors.grey[900] : Colors.white),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: isGlass
+            ? []
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+        border: isGlass
+            ? Border.all(
+                color: Colors.white.withValues(alpha: 0.2),
+                width: 1,
+              )
+            : null,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Interests & Hobbies:',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: isDarkMode ? Colors.white : Colors.black,
+                ),
+              ),
+              if (_isEditMode)
+                IconButton(
+                  icon: const Icon(Icons.edit, size: 20),
+                  onPressed: _showInterestsDialog,
+                  tooltip: 'Edit Interests',
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _selectedInterests.map((interest) {
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF00D67D),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  interest,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAddActivityDialog() {
+    String? selectedActivity;
+    String selectedLevel = 'intermediate';
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Add Activity'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DropdownButtonFormField<String>(
+                    decoration: const InputDecoration(
+                      labelText: 'Select Activity',
+                      border: OutlineInputBorder(),
+                    ),
+                    value: selectedActivity,
+                    items: _availableActivities.map((activity) {
+                      return DropdownMenuItem(
+                        value: activity,
+                        child: Text(activity),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      setDialogState(() {
+                        selectedActivity = value;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  DropdownButtonFormField<String>(
+                    decoration: const InputDecoration(
+                      labelText: 'Skill Level',
+                      border: OutlineInputBorder(),
+                    ),
+                    value: selectedLevel,
+                    items: _activityLevels.map((level) {
+                      return DropdownMenuItem(
+                        value: level,
+                        child: Text(level.substring(0, 1).toUpperCase() + level.substring(1)),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      setDialogState(() {
+                        selectedLevel = value!;
+                      });
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    if (selectedActivity != null) {
+                      setState(() {
+                        _selectedActivities.add({
+                          'name': selectedActivity!,
+                          'level': selectedLevel,
+                        });
+                      });
+                      Navigator.pop(context);
+                    }
+                  },
+                  child: const Text('Add'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Color _getConnectionTypeColor(String type) {
+    switch (type) {
+      case 'Professional Networking':
+        return const Color(0xFF4A90E2);
+      case 'Activity Partner':
+        return const Color(0xFF00D67D);
+      case 'Event Companion':
+        return const Color(0xFFFFB800);
+      case 'Friendship':
+        return const Color(0xFFFF6B9D);
+      case 'Dating':
+        return const Color(0xFFFF4444);
+      default:
+        return const Color(0xFF00D67D);
+    }
+  }
+
+  List<Widget> _buildHistorySliver(bool isDarkMode, bool isGlass) {
     if (_searchHistory.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.history,
-              size: 60,
-              color: isDarkMode ? Colors.grey[700] : Colors.grey[300],
+      return [
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 100),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.history,
+                  size: 60,
+                  color: isDarkMode ? Colors.grey[700] : Colors.grey[300],
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'No search history',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: isDarkMode ? Colors.grey[600] : Colors.grey,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Your searches will appear here',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: isDarkMode ? Colors.grey[700] : Colors.grey[500],
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            Text(
-              'No search history',
-              style: TextStyle(
-                fontSize: 16,
-                color: isDarkMode ? Colors.grey[600] : Colors.grey,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Your searches will appear here',
-              style: TextStyle(
-                fontSize: 14,
-                color: isDarkMode ? Colors.grey[700] : Colors.grey[500],
-              ),
-            ),
-          ],
+          ),
         ),
-      );
+      ];
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: _searchHistory.length,
-      itemBuilder: (context, index) {
+    return [
+      SliverPadding(
+        padding: const EdgeInsets.all(16),
+        sliver: SliverList(
+          delegate: SliverChildBuilderDelegate(
+            (context, index) {
         final intent = _searchHistory[index];
         final createdAt = intent['createdAt'];
         String timeAgo = 'Recently';
@@ -1132,57 +1726,109 @@ class _ProfileWithHistoryScreenState extends State<ProfileWithHistoryScreen> {
             }
           },
           child: Container(
-            margin: const EdgeInsets.only(bottom: 8),
+            margin: const EdgeInsets.only(bottom: 12),
             decoration: BoxDecoration(
-              color: isGlass
-                  ? Colors.white.withValues(alpha: 0.5)
-                  : (isDarkMode ? Colors.grey[850] : Colors.white),
-              borderRadius: BorderRadius.circular(12),
-              border: isGlass
-                  ? Border.all(
-                      color: Colors.white.withValues(alpha: 0.2),
-                      width: 1,
-                    )
-                  : null,
-              boxShadow: isGlass
-                  ? []
-                  : [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.05),
-                        blurRadius: 5,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: isGlass
+                    ? [
+                        Colors.white.withValues(alpha: 0.7),
+                        Colors.white.withValues(alpha: 0.5),
+                      ]
+                    : isDarkMode
+                        ? [
+                            const Color(0xFF2D2D2D),
+                            const Color(0xFF252525),
+                          ]
+                        : [
+                            Colors.white,
+                            const Color(0xFFFAFAFA),
+                          ],
+              ),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: isGlass
+                    ? Colors.white.withValues(alpha: 0.3)
+                    : (isDarkMode ? Colors.grey[800]! : Colors.grey[200]!),
+                width: 1.5,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF00D67D).withValues(alpha: 0.1),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: isDarkMode ? 0.3 : 0.08),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(16),
               child: BackdropFilter(
-                filter: isGlass
-                    ? ImageFilter.blur(sigmaX: 10, sigmaY: 10)
-                    : ImageFilter.blur(sigmaX: 0, sigmaY: 0),
-                child: ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  title: Text(
-                    intent['title'] ?? intent['embeddingText'] ?? 'Search',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w500,
-                      color: isDarkMode ? Colors.white : Colors.black,
+                    filter: isGlass
+                        ? ImageFilter.blur(sigmaX: 10, sigmaY: 10)
+                        : ImageFilter.blur(sigmaX: 0, sigmaY: 0),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Title
+                          Text(
+                            intent['title'] ?? intent['embeddingText'] ?? 'Search',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: isDarkMode ? Colors.white : Colors.black,
+                              height: 1.3,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+
+                          const SizedBox(height: 6),
+
+                          // Time with icon
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.access_time_rounded,
+                                size: 14,
+                                color: isDarkMode ? Colors.grey[500] : Colors.grey[500],
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                timeAgo,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  subtitle: Text(
-                    'Role: ${intent['userRole'] ?? 'Unknown'} • $timeAgo',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: isDarkMode ? Colors.grey[500] : Colors.grey[600],
-                    ),
-                  ),
-                ),
               ),
             ),
           ),
         );
-      },
-    );
+            },
+            childCount: _searchHistory.length,
+          ),
+        ),
+      ),
+    ];
+  }
+
+  Widget _buildHistoryTab(bool isDarkMode, bool isGlass) {
+    // This method is kept for compatibility but uses the sliver version
+    return const SizedBox.shrink();
   }
 
   Widget _buildLiveConnectTab(bool isDarkMode, bool isGlass) {

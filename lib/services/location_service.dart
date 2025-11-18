@@ -35,9 +35,13 @@ class LocationService {
   }
 
   // Get current location SILENTLY in background (no user prompts)
-  Future<Position?> getCurrentLocation({bool silent = true}) async {
+  // highAccuracy: if true, uses HIGH accuracy (slower but precise)
+  Future<Position?> getCurrentLocation({
+    bool silent = true,
+    bool highAccuracy = false,
+  }) async {
     try {
-      print('LocationService: Starting getCurrentLocation (silent=$silent), isWeb=$kIsWeb');
+      print('LocationService: Starting getCurrentLocation (silent=$silent, highAccuracy=$highAccuracy), isWeb=$kIsWeb');
 
       // Check if location services are enabled
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
@@ -86,44 +90,81 @@ class LocationService {
 
       if (permission == LocationPermission.whileInUse ||
           permission == LocationPermission.always) {
-        // SILENT BACKGROUND FETCH: Try to get location quickly without blocking UI
-        print('LocationService: Getting position silently with fallback strategy...');
 
-        // Strategy 1: Try last known position FIRST (instant, no GPS wait)
-        try {
-          print('LocationService: Trying last known position first...');
-          final lastPosition = await Geolocator.getLastKnownPosition();
-          if (lastPosition != null) {
-            print('LocationService: Got last known position lat=${lastPosition.latitude}, lng=${lastPosition.longitude}');
-            // Continue fetching fresh location in background, but return this immediately
-            _fetchFreshLocationInBackground();
-            return lastPosition;
+        // HIGH ACCURACY MODE: User wants precise location
+        if (highAccuracy) {
+          print('LocationService: Using HIGH accuracy mode (may take longer)...');
+          try {
+            final position = await Geolocator.getCurrentPosition(
+              desiredAccuracy: LocationAccuracy.best,
+              timeLimit: const Duration(seconds: 60),
+            );
+            print('LocationService: Got HIGH accuracy position lat=${position.latitude}, lng=${position.longitude}, accuracy=${position.accuracy}m');
+            return position;
+          } catch (e) {
+            print('LocationService: High accuracy failed: $e, falling back to medium...');
+            // Fall through to medium accuracy
           }
-        } catch (e) {
-          print('LocationService: Last known position failed: $e');
         }
 
-        // Strategy 2: Try medium accuracy with moderate timeout (balanced)
+        // BALANCED MODE: Try for good accuracy without taking too long
+        print('LocationService: Getting position with balanced strategy...');
+
+        // For user-initiated requests (not silent), skip last known position
+        // to ensure we get fresh data
+        if (silent) {
+          // Strategy 1: Try last known position FIRST (instant, no GPS wait)
+          // ONLY for background silent updates
+          try {
+            print('LocationService: Trying last known position first...');
+            final lastPosition = await Geolocator.getLastKnownPosition();
+            if (lastPosition != null) {
+              print('LocationService: Got last known position lat=${lastPosition.latitude}, lng=${lastPosition.longitude}');
+              // Continue fetching fresh location in background, but return this immediately
+              _fetchFreshLocationInBackground();
+              return lastPosition;
+            }
+          } catch (e) {
+            print('LocationService: Last known position failed: $e');
+          }
+        }
+
+        // Strategy 2: Try HIGH accuracy first for user-initiated requests
+        if (!silent) {
+          try {
+            print('LocationService: Trying high accuracy with 45s timeout (user-initiated)...');
+            final position = await Geolocator.getCurrentPosition(
+              desiredAccuracy: LocationAccuracy.high,
+              timeLimit: const Duration(seconds: 45),
+            );
+            print('LocationService: Got high accuracy position lat=${position.latitude}, lng=${position.longitude}, accuracy=${position.accuracy}m');
+            return position;
+          } catch (e) {
+            print('LocationService: High accuracy failed: $e, trying medium...');
+          }
+        }
+
+        // Strategy 3: Try medium accuracy with moderate timeout (balanced)
         try {
           print('LocationService: Trying medium accuracy with 30s timeout...');
           final position = await Geolocator.getCurrentPosition(
             desiredAccuracy: LocationAccuracy.medium,
             timeLimit: const Duration(seconds: 30),
           );
-          print('LocationService: Got medium accuracy position lat=${position.latitude}, lng=${position.longitude}');
+          print('LocationService: Got medium accuracy position lat=${position.latitude}, lng=${position.longitude}, accuracy=${position.accuracy}m');
           return position;
         } catch (e) {
           print('LocationService: Medium accuracy failed: $e');
         }
 
-        // Strategy 3: Try low accuracy as fallback (works even with weak GPS)
+        // Strategy 4: Try low accuracy as fallback (works even with weak GPS)
         try {
           print('LocationService: Trying low accuracy with 20s timeout...');
           final position = await Geolocator.getCurrentPosition(
             desiredAccuracy: LocationAccuracy.low,
             timeLimit: const Duration(seconds: 20),
           );
-          print('LocationService: Got low accuracy position lat=${position.latitude}, lng=${position.longitude}');
+          print('LocationService: Got low accuracy position lat=${position.latitude}, lng=${position.longitude}, accuracy=${position.accuracy}m');
           return position;
         } catch (e) {
           print('LocationService: Low accuracy failed: $e');
@@ -138,7 +179,7 @@ class LocationService {
         try {
           print('LocationService: Trying web fallback...');
           final position = await Geolocator.getCurrentPosition(
-            desiredAccuracy: LocationAccuracy.medium,
+            desiredAccuracy: highAccuracy ? LocationAccuracy.best : LocationAccuracy.medium,
           );
           print('LocationService: Web fallback success lat=${position.latitude}, lng=${position.longitude}');
           return position;
@@ -548,9 +589,12 @@ class LocationService {
   }
 
   // Force refresh location - SILENT background process (user can call manually from settings)
-  Future<bool> forceRefreshLocation({bool silent = true}) async {
+  Future<bool> forceRefreshLocation({
+    bool silent = true,
+    bool highAccuracy = false,
+  }) async {
     try {
-      print('LocationService: Force refreshing location (silent=$silent)...');
+      print('LocationService: Force refreshing location (silent=$silent, highAccuracy=$highAccuracy)...');
       final userId = _auth.currentUser?.uid;
       if (userId == null) {
         print('LocationService: No authenticated user');
@@ -580,10 +624,13 @@ class LocationService {
 
       if (permission == LocationPermission.whileInUse ||
           permission == LocationPermission.always) {
-        // Get fresh location SILENTLY with fallback strategy
-        final position = await getCurrentLocation(silent: silent);
+        // Get fresh location with specified accuracy
+        final position = await getCurrentLocation(
+          silent: silent,
+          highAccuracy: highAccuracy,
+        );
         if (position != null) {
-          print('LocationService: Got GPS position: ${position.latitude}, ${position.longitude}');
+          print('LocationService: Got GPS position: ${position.latitude}, ${position.longitude}, accuracy=${position.accuracy}m');
 
           // Update user location SILENTLY
           return await updateUserLocation(position: position, silent: silent);
@@ -599,5 +646,26 @@ class LocationService {
       // Fail silently
       return false;
     }
+  }
+
+  // Get current location accuracy (in meters)
+  Future<double?> getCurrentLocationAccuracy() async {
+    try {
+      final position = await Geolocator.getLastKnownPosition();
+      return position?.accuracy;
+    } catch (e) {
+      print('LocationService: Error getting location accuracy: $e');
+      return null;
+    }
+  }
+
+  // Get location permission status
+  Future<LocationPermission> getPermissionStatus() async {
+    return await Geolocator.checkPermission();
+  }
+
+  // Check if location services are enabled
+  Future<bool> isLocationServiceEnabled() async {
+    return await Geolocator.isLocationServiceEnabled();
   }
 }

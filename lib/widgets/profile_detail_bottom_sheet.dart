@@ -7,6 +7,7 @@ class ProfileDetailBottomSheet extends StatelessWidget {
   final VoidCallback? onConnect;
   final VoidCallback? onMessage;
   final VoidCallback? onPin;
+  final VoidCallback? onEdit;
 
   const ProfileDetailBottomSheet({
     Key? key,
@@ -14,6 +15,7 @@ class ProfileDetailBottomSheet extends StatelessWidget {
     this.onConnect,
     this.onMessage,
     this.onPin,
+    this.onEdit,
   }) : super(key: key);
 
   @override
@@ -100,6 +102,33 @@ class ProfileDetailBottomSheet extends StatelessWidget {
       ),
       child: Stack(
         children: [
+          // Edit Button (top right)
+          if (onEdit != null)
+            Positioned(
+              top: 16,
+              right: 16,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.2),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: IconButton(
+                  onPressed: onEdit,
+                  icon: Icon(
+                    Icons.edit,
+                    color: Theme.of(context).primaryColor,
+                  ),
+                  iconSize: 20,
+                ),
+              ),
+            ),
           // Profile Photo
           Center(
             child: Column(
@@ -189,8 +218,8 @@ class ProfileDetailBottomSheet extends StatelessWidget {
                     ],
                   ],
                 ),
-                // Distance
-                if (user.formattedDistance != null) ...[
+                // Distance (only show if greater than 0)
+                if (user.formattedDistance != null && user.distance != null && user.distance! > 0) ...[
                   const SizedBox(height: 8),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -297,11 +326,11 @@ class ProfileDetailBottomSheet extends StatelessWidget {
                   vertical: 8,
                 ),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF00D67D),
+                  color: const Color(0xFF9B59B6),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  '${activity.name} • ${activity.level}',
+                  activity.name,
                   style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,

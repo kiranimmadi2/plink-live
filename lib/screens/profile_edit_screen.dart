@@ -30,13 +30,108 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _locationController = TextEditingController();
-  
+  final _bioController = TextEditingController();
+
   User? user;
   String? _currentPhotoUrl;
   File? _selectedImage;
   bool _isLoading = false;
   bool _isUpdating = false;
   bool _isUpdatingLocation = false;
+
+  // Additional profile fields
+  String? _selectedGender;
+  String? _selectedOccupation;
+  DateTime? _selectedDateOfBirth;
+  List<String> _selectedInterests = [];
+  List<String> _selectedConnectionTypes = [];
+
+  final List<String> _genderOptions = ['Male', 'Female', 'Non-binary', 'Prefer not to say'];
+  final List<String> _occupationOptions = [
+    'Accountant',
+    'Actor/Actress',
+    'Architect',
+    'Artist',
+    'Attorney/Lawyer',
+    'Banker',
+    'Barber/Hairstylist',
+    'Bartender',
+    'Business Owner',
+    'Chef/Cook',
+    'Civil Engineer',
+    'Consultant',
+    'Content Creator',
+    'Customer Service',
+    'Data Analyst',
+    'Data Scientist',
+    'Dentist',
+    'Designer (Graphic/UI/UX)',
+    'Developer/Programmer',
+    'Doctor/Physician',
+    'Driver/Delivery',
+    'Electrician',
+    'Engineer',
+    'Entrepreneur',
+    'Farmer',
+    'Financial Advisor',
+    'Firefighter',
+    'Fitness Trainer',
+    'Flight Attendant',
+    'Freelancer',
+    'HR Manager',
+    'Interior Designer',
+    'Journalist',
+    'Marketing Manager',
+    'Mechanic',
+    'Military/Armed Forces',
+    'Musician',
+    'Nurse',
+    'Paramedic',
+    'Pharmacist',
+    'Photographer',
+    'Pilot',
+    'Plumber',
+    'Police Officer',
+    'Product Manager',
+    'Professor/Lecturer',
+    'Project Manager',
+    'Psychologist',
+    'Real Estate Agent',
+    'Receptionist',
+    'Researcher',
+    'Restaurant Manager',
+    'Retail Worker',
+    'Sales Manager',
+    'Scientist',
+    'Security Guard',
+    'Social Media Manager',
+    'Social Worker',
+    'Software Engineer',
+    'Student',
+    'Teacher',
+    'Therapist',
+    'Translator',
+    'Veterinarian',
+    'Video Editor',
+    'Waiter/Waitress',
+    'Web Developer',
+    'Writer/Author',
+    'Other',
+  ];
+  final List<String> _availableInterests = [
+    'Fitness', 'Hiking', 'Nutrition', 'Wellness', 'Running',
+    'Tech', 'Business', 'Travel', 'Music', 'Movies',
+    'Cooking', 'Wine', 'Food Photography', 'Culture',
+    'Design', 'Art', 'Photography', 'Gaming', 'Sports',
+    'Reading', 'Writing', 'Dancing', 'Yoga', 'Meditation',
+  ];
+  final List<String> _connectionTypeOptions = [
+    'Professional Networking',
+    'Activity Partner',
+    'Event Companion',
+    'Friendship',
+    'Dating',
+  ];
 
   @override
   void initState() {
@@ -57,10 +152,40 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       
       if (profileData != null) {
         _nameController.text = profileData['name'] ?? '';
-        // _phoneController.text = profileData['phone'] ?? ''; // Phone field hidden
-        // Use city field if available, fallback to location field
+        _phoneController.text = profileData['phone'] ?? '';
         _locationController.text = profileData['city'] ?? profileData['location'] ?? '';
+        _bioController.text = profileData['bio'] ?? '';
         _currentPhotoUrl = profileData['photoUrl'];
+
+        // Validate gender value matches dropdown options
+        final gender = profileData['gender'];
+        if (gender != null && _genderOptions.contains(gender)) {
+          _selectedGender = gender;
+        }
+
+        // Validate occupation value matches dropdown options
+        final occupation = profileData['occupation'];
+        if (occupation != null && _occupationOptions.contains(occupation)) {
+          _selectedOccupation = occupation;
+        } else if (occupation != null) {
+          // Try to find case-insensitive match
+          _selectedOccupation = _occupationOptions.firstWhere(
+            (opt) => opt.toLowerCase() == occupation.toLowerCase(),
+            orElse: () => 'Other',
+          );
+        }
+
+        _selectedInterests = List<String>.from(profileData['interests'] ?? []);
+        _selectedConnectionTypes = List<String>.from(profileData['connectionTypes'] ?? []);
+
+        // Parse date of birth if exists
+        if (profileData['dateOfBirth'] != null) {
+          if (profileData['dateOfBirth'] is Timestamp) {
+            _selectedDateOfBirth = (profileData['dateOfBirth'] as Timestamp).toDate();
+          } else if (profileData['dateOfBirth'] is String) {
+            _selectedDateOfBirth = DateTime.tryParse(profileData['dateOfBirth']);
+          }
+        }
       } else {
         // Fallback to Auth data
         _nameController.text = user!.displayName ?? '';
@@ -135,26 +260,51 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       await user!.reload();
       user = _authService.currentUser;
       
+      // Calculate age from date of birth
+      int? age;
+      if (_selectedDateOfBirth != null) {
+        age = DateTime.now().year - _selectedDateOfBirth!.year;
+        if (DateTime.now().month < _selectedDateOfBirth!.month ||
+            (DateTime.now().month == _selectedDateOfBirth!.month &&
+                DateTime.now().day < _selectedDateOfBirth!.day)) {
+          age--;
+        }
+      }
+
       // Update Firestore directly
       await _firestore.collection('users').doc(user!.uid).set({
         'uid': user!.uid,
         'name': _nameController.text.trim(),
         'email': user!.email ?? '',
         'photoUrl': photoUrl,
-        // 'phone': _phoneController.text.trim(), // Phone field hidden
+        'phone': _phoneController.text.trim(),
         'location': _locationController.text.trim(),
-        'city': _locationController.text.trim(), // Save to both fields for compatibility
+        'city': _locationController.text.trim(),
+        'bio': _bioController.text.trim(),
+        'occupation': _selectedOccupation,
+        'gender': _selectedGender,
+        'dateOfBirth': _selectedDateOfBirth?.toIso8601String(),
+        'age': age,
+        'interests': _selectedInterests,
+        'connectionTypes': _selectedConnectionTypes,
         'lastSeen': FieldValue.serverTimestamp(),
         'isOnline': true,
       }, SetOptions(merge: true));
-      
+
       // Also update via UserManager for cache
       await _userManager.updateProfile({
         'name': _nameController.text.trim(),
         'photoUrl': photoUrl,
-        // 'phone': _phoneController.text.trim(), // Phone field hidden
+        'phone': _phoneController.text.trim(),
         'location': _locationController.text.trim(),
         'city': _locationController.text.trim(),
+        'bio': _bioController.text.trim(),
+        'occupation': _selectedOccupation,
+        'gender': _selectedGender,
+        'dateOfBirth': _selectedDateOfBirth?.toIso8601String(),
+        'age': age,
+        'interests': _selectedInterests,
+        'connectionTypes': _selectedConnectionTypes,
       });
       
       print('Profile updated successfully');
@@ -372,6 +522,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     _nameController.dispose();
     _phoneController.dispose();
     _locationController.dispose();
+    _bioController.dispose();
     super.dispose();
   }
 
@@ -476,7 +627,20 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                       enabled: false,
                     ),
                     const SizedBox(height: 16),
-                    
+
+                    // Phone Number Field
+                    TextFormField(
+                      controller: _phoneController,
+                      decoration: const InputDecoration(
+                        labelText: 'Phone Number',
+                        prefixIcon: Icon(Icons.phone),
+                        border: OutlineInputBorder(),
+                        hintText: '+1 234 567 8900',
+                      ),
+                      keyboardType: TextInputType.phone,
+                    ),
+                    const SizedBox(height: 16),
+
                     // Location Field
                     TextFormField(
                       controller: _locationController,
@@ -500,6 +664,185 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                                 onPressed: _updateLocation,
                                 tooltip: 'Detect my location',
                               ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Bio / About Me
+                    TextFormField(
+                      controller: _bioController,
+                      decoration: const InputDecoration(
+                        labelText: 'About Me',
+                        prefixIcon: Icon(Icons.info_outline),
+                        border: OutlineInputBorder(),
+                        hintText: 'Tell us about yourself...',
+                      ),
+                      maxLines: 3,
+                      maxLength: 300,
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Gender Selection
+                    DropdownButtonFormField<String>(
+                      value: _selectedGender,
+                      decoration: const InputDecoration(
+                        labelText: 'Gender',
+                        prefixIcon: Icon(Icons.person_outline),
+                        border: OutlineInputBorder(),
+                      ),
+                      isExpanded: true,
+                      items: _genderOptions.map((gender) {
+                        return DropdownMenuItem(
+                          value: gender,
+                          child: Text(gender),
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        setState(() => _selectedGender = value);
+                      },
+                      hint: const Text('Select your gender'),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Date of Birth
+                    InkWell(
+                      onTap: () async {
+                        final DateTime? picked = await showDatePicker(
+                          context: context,
+                          initialDate: _selectedDateOfBirth ?? DateTime(2000),
+                          firstDate: DateTime(1950),
+                          lastDate: DateTime.now(),
+                        );
+                        if (picked != null) {
+                          setState(() => _selectedDateOfBirth = picked);
+                        }
+                      },
+                      child: InputDecorator(
+                        decoration: const InputDecoration(
+                          labelText: 'Date of Birth',
+                          prefixIcon: Icon(Icons.calendar_today),
+                          border: OutlineInputBorder(),
+                        ),
+                        child: Text(
+                          _selectedDateOfBirth != null
+                              ? '${_selectedDateOfBirth!.day}/${_selectedDateOfBirth!.month}/${_selectedDateOfBirth!.year}'
+                              : 'Select your date of birth',
+                          style: TextStyle(
+                            color: _selectedDateOfBirth != null ? null : Colors.grey,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Occupation Dropdown
+                    DropdownButtonFormField<String>(
+                      value: _selectedOccupation,
+                      decoration: const InputDecoration(
+                        labelText: 'Occupation',
+                        prefixIcon: Icon(Icons.work_outline),
+                        border: OutlineInputBorder(),
+                      ),
+                      isExpanded: true,
+                      items: _occupationOptions.map((occupation) {
+                        return DropdownMenuItem(
+                          value: occupation,
+                          child: Text(occupation),
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        setState(() => _selectedOccupation = value);
+                      },
+                      hint: const Text('Select your occupation'),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Interests Section
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Interests & Hobbies',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: _availableInterests.map((interest) {
+                              final isSelected = _selectedInterests.contains(interest);
+                              return FilterChip(
+                                label: Text(interest),
+                                selected: isSelected,
+                                onSelected: (selected) {
+                                  setState(() {
+                                    if (selected) {
+                                      _selectedInterests.add(interest);
+                                    } else {
+                                      _selectedInterests.remove(interest);
+                                    }
+                                  });
+                                },
+                                selectedColor: Theme.of(context).primaryColor.withOpacity(0.3),
+                                checkmarkColor: Theme.of(context).primaryColor,
+                              );
+                            }).toList(),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Looking for / Connection Types
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Looking to Connect For',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: _connectionTypeOptions.map((type) {
+                              final isSelected = _selectedConnectionTypes.contains(type);
+                              return FilterChip(
+                                label: Text(type),
+                                selected: isSelected,
+                                onSelected: (selected) {
+                                  setState(() {
+                                    if (selected) {
+                                      _selectedConnectionTypes.add(type);
+                                    } else {
+                                      _selectedConnectionTypes.remove(type);
+                                    }
+                                  });
+                                },
+                                selectedColor: Theme.of(context).primaryColor.withOpacity(0.3),
+                                checkmarkColor: Theme.of(context).primaryColor,
+                              );
+                            }).toList(),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 24),

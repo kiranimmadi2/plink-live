@@ -1,14 +1,23 @@
 import 'dart:ui';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../providers/theme_provider.dart';
 import '../widgets/glassmorphic_container.dart';
 import '../services/auth_service.dart';
 import 'profile_edit_screen.dart';
 import 'performance_debug_screen.dart';
 import 'login_screen.dart';
+import 'change_password_screen.dart';
+import 'location_settings_screen.dart';
+import 'terms_of_service_screen.dart';
+import 'privacy_policy_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -24,20 +33,49 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _showOnlineStatus = true;
   bool _isLoading = false;
 
+  // Notification preferences
+  bool _messageNotifications = true;
+  bool _matchNotifications = true;
+  bool _connectionRequestNotifications = true;
+  bool _promotionalNotifications = false;
+
   @override
   void initState() {
     super.initState();
-    _loadOnlineStatusPreference();
+    _loadUserPreferences();
   }
 
-  Future<void> _loadOnlineStatusPreference() async {
+  Future<void> _loadUserPreferences() async {
     final user = _auth.currentUser;
     if (user != null) {
       final doc = await _firestore.collection('users').doc(user.uid).get();
       if (doc.exists && mounted) {
+        final data = doc.data() ?? {};
         setState(() {
-          _showOnlineStatus = doc.data()?['showOnlineStatus'] ?? true;
+          _showOnlineStatus = data['showOnlineStatus'] ?? true;
+          _messageNotifications = data['messageNotifications'] ?? true;
+          _matchNotifications = data['matchNotifications'] ?? true;
+          _connectionRequestNotifications = data['connectionRequestNotifications'] ?? true;
+          _promotionalNotifications = data['promotionalNotifications'] ?? false;
         });
+      }
+    }
+  }
+
+  Future<void> _updatePreference(String key, dynamic value) async {
+    final user = _auth.currentUser;
+    if (user != null) {
+      try {
+        await _firestore.collection('users').doc(user.uid).update({key: value});
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to update setting: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     }
   }
@@ -195,135 +233,55 @@ class _SettingsScreenState extends State<SettingsScreen> {
               bottom: 16,
             ),
             children: [
-              // Online Status Section - Top Priority Feature
-              Container(
-                margin: const EdgeInsets.only(bottom: 24),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      ThemeProvider.iosGreen.withValues(alpha: 0.8),
-                      ThemeProvider.iosBlue.withValues(alpha: 0.8),
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: (isDark ? Colors.green : ThemeProvider.iosGreen).withValues(alpha: 0.3),
-                      blurRadius: 20,
-                      offset: const Offset(0, 10),
-                    ),
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(20),
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                    child: Container(
-                      padding: const EdgeInsets.all(20),
+              // Online Status Section
+              _buildSettingsCard(
+                isDark: isDark,
+                isGlass: isGlass,
+                children: [
+                  ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    leading: Container(
+                      padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: isGlass 
-                          ? Colors.white.withValues(alpha: 0.2)
-                          : (isDark ? Colors.white.withValues(alpha: 0.1) : Colors.white.withValues(alpha: 0.9)),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.3),
-                          width: 1.5,
-                        ),
-                      ),
-                      child: Column(
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.3),
-                                  borderRadius: BorderRadius.circular(15),
-                                ),
-                                child: Icon(
-                                  _showOnlineStatus 
-                                    ? CupertinoIcons.circle_fill 
-                                    : CupertinoIcons.circle,
-                                  color: _showOnlineStatus ? Colors.green : Colors.grey,
-                                  size: 28,
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Active Status',
-                                      style: TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                        color: isDark || isGlass ? Colors.white : Colors.black87,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      _showOnlineStatus 
-                                        ? 'Others can see when you\'re active'
-                                        : 'Your activity status is hidden',
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        color: isDark || isGlass 
-                                          ? Colors.white.withValues(alpha: 0.8)
-                                          : Colors.black54,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              Transform.scale(
-                                scale: 1.1,
-                                child: CupertinoSwitch(
-                                  value: _showOnlineStatus,
-                                  onChanged: _isLoading ? null : _updateOnlineStatusPreference,
-                                  activeColor: ThemeProvider.iosGreen,
-                                ),
-                              ),
-                            ],
-                          ),
-                          if (_showOnlineStatus) ...[
-                            const SizedBox(height: 16),
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.2),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    CupertinoIcons.info_circle_fill,
-                                    color: isDark || isGlass ? Colors.white70 : Colors.black54,
-                                    size: 20,
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Text(
-                                      'When active status is on, your contacts will see when you\'re online and when you were last active',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: isDark || isGlass 
-                                          ? Colors.white.withValues(alpha: 0.7)
-                                          : Colors.black54,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
+                        gradient: LinearGradient(
+                          colors: [
+                            ThemeProvider.iosGreen.withValues(alpha: 0.3),
+                            ThemeProvider.iosBlue.withValues(alpha: 0.3),
                           ],
-                        ],
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        _showOnlineStatus
+                          ? CupertinoIcons.circle_fill
+                          : CupertinoIcons.circle,
+                        color: _showOnlineStatus ? ThemeProvider.iosGreen : Colors.grey,
+                        size: 22,
+                      ),
+                    ),
+                    title: const Text(
+                      'Active Status',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    subtitle: Text(
+                      _showOnlineStatus
+                        ? 'Others can see when you\'re active'
+                        : 'Your activity status is hidden',
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                    trailing: Transform.scale(
+                      scale: 0.9,
+                      child: CupertinoSwitch(
+                        value: _showOnlineStatus,
+                        onChanged: _isLoading ? null : _updateOnlineStatusPreference,
+                        activeColor: ThemeProvider.iosGreen,
                       ),
                     ),
                   ),
-                ),
+                ],
               ),
               
               // Theme Section
@@ -340,9 +298,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 children: [
                   _buildThemeOption(
                     context,
-                    title: 'iOS 16 Glassmorphism',
-                    subtitle: 'Premium glass effect with blur',
-                    icon: CupertinoIcons.sparkles,
+                    title: 'White Theme',
+                    subtitle: 'Clean and bright appearance',
+                    icon: CupertinoIcons.sun_max_fill,
                     isSelected: isGlass,
                     onTap: () {
                       themeProvider.setTheme(AppThemeMode.glassmorphism);
@@ -407,14 +365,60 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     subtitle: const Text('Password and authentication'),
                     trailing: const Icon(CupertinoIcons.chevron_forward),
                     onTap: () {
-                      // TODO: Navigate to security settings
+                      _showSecurityOptions(context);
+                    },
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: const Icon(Icons.block_outlined),
+                    title: const Text('Blocked Users'),
+                    subtitle: const Text('Manage blocked accounts'),
+                    trailing: const Icon(CupertinoIcons.chevron_forward),
+                    onTap: () {
+                      _showBlockedUsers(context);
                     },
                   ),
                 ],
               ),
-              
+
               const SizedBox(height: 24),
-              
+
+              // Call Settings Section (Voice calling is important feature)
+              _buildSectionHeader(
+                icon: CupertinoIcons.phone_fill,
+                title: 'Calls',
+                color: ThemeProvider.iosGreen,
+                isDark: isDark,
+              ),
+              const SizedBox(height: 12),
+              _buildSettingsCard(
+                isDark: isDark,
+                isGlass: isGlass,
+                children: [
+                  SwitchListTile(
+                    secondary: const Icon(Icons.phone_callback_outlined),
+                    title: const Text('Allow Incoming Calls'),
+                    subtitle: const Text('Receive voice calls from matches'),
+                    value: true,
+                    onChanged: (value) {
+                      _updatePreference('allowIncomingCalls', value);
+                    },
+                  ),
+                  const Divider(height: 1),
+                  SwitchListTile(
+                    secondary: const Icon(Icons.vibration_outlined),
+                    title: const Text('Call Vibration'),
+                    subtitle: const Text('Vibrate for incoming calls'),
+                    value: true,
+                    onChanged: (value) {
+                      _updatePreference('callVibration', value);
+                    },
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 24),
+
               // Notifications Section
               _buildSectionHeader(
                 icon: CupertinoIcons.bell_fill,
@@ -431,9 +435,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     secondary: const Icon(Icons.message_outlined),
                     title: const Text('Message Notifications'),
                     subtitle: const Text('New messages from matches'),
-                    value: true,
+                    value: _messageNotifications,
                     onChanged: (value) {
-                      // TODO: Handle notification toggle
+                      setState(() => _messageNotifications = value);
+                      _updatePreference('messageNotifications', value);
                     },
                   ),
                   const Divider(height: 1),
@@ -441,9 +446,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     secondary: const Icon(Icons.favorite_outline),
                     title: const Text('Match Notifications'),
                     subtitle: const Text('Someone matched with you'),
-                    value: true,
+                    value: _matchNotifications,
                     onChanged: (value) {
-                      // TODO: Handle notification toggle
+                      setState(() => _matchNotifications = value);
+                      _updatePreference('matchNotifications', value);
+                    },
+                  ),
+                  const Divider(height: 1),
+                  SwitchListTile(
+                    secondary: const Icon(Icons.people_outline),
+                    title: const Text('Connection Requests'),
+                    subtitle: const Text('New connection requests'),
+                    value: _connectionRequestNotifications,
+                    onChanged: (value) {
+                      setState(() => _connectionRequestNotifications = value);
+                      _updatePreference('connectionRequestNotifications', value);
                     },
                   ),
                   const Divider(height: 1),
@@ -451,9 +468,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     secondary: const Icon(Icons.campaign_outlined),
                     title: const Text('Promotional'),
                     subtitle: const Text('Updates and offers'),
-                    value: false,
+                    value: _promotionalNotifications,
                     onChanged: (value) {
-                      // TODO: Handle notification toggle
+                      setState(() => _promotionalNotifications = value);
+                      _updatePreference('promotionalNotifications', value);
                     },
                   ),
                 ],
@@ -489,7 +507,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     subtitle: const Text('Manage location settings'),
                     trailing: const Icon(CupertinoIcons.chevron_forward),
                     onTap: () {
-                      // TODO: Location settings
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const LocationSettingsScreen(),
+                        ),
+                      );
                     },
                   ),
                   const Divider(height: 1),
@@ -499,7 +522,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     subtitle: const Text('Network usage and storage'),
                     trailing: const Icon(CupertinoIcons.chevron_forward),
                     onTap: () {
-                      // TODO: Storage settings
+                      _showStorageOptions(context);
+                    },
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: const Icon(Icons.cleaning_services_outlined),
+                    title: const Text('Clear Cache'),
+                    subtitle: const Text('Free up storage space'),
+                    trailing: const Icon(CupertinoIcons.chevron_forward),
+                    onTap: () {
+                      _showClearCacheDialog(context);
                     },
                   ),
                   const Divider(height: 1),
@@ -556,24 +589,53 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const Divider(height: 1),
                   ListTile(
                     leading: const Icon(Icons.description_outlined),
-                    title: const Text('Terms & Privacy'),
-                    subtitle: const Text('Terms of service and privacy policy'),
+                    title: const Text('Terms of Service'),
+                    subtitle: const Text('Read our terms of service'),
                     trailing: const Icon(CupertinoIcons.chevron_forward),
                     onTap: () {
-                      // TODO: Terms page
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const TermsOfServiceScreen(),
+                        ),
+                      );
                     },
                   ),
-                ],
-              ),
-              
-              const SizedBox(height: 24),
-              
-              // Logout Button
-              _buildSettingsCard(
-                isDark: isDark,
-                isGlass: isGlass,
-                children: [
-                  _buildLogoutButton(context, authService),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: const Icon(Icons.privacy_tip_outlined),
+                    title: const Text('Privacy Policy'),
+                    subtitle: const Text('Read our privacy policy'),
+                    trailing: const Icon(CupertinoIcons.chevron_forward),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const PrivacyPolicyScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: const Icon(Icons.feedback_outlined),
+                    title: const Text('Send Feedback'),
+                    subtitle: const Text('Help us improve the app'),
+                    trailing: const Icon(CupertinoIcons.chevron_forward),
+                    onTap: () {
+                      _showFeedbackDialog(context);
+                    },
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: const Icon(Icons.bug_report_outlined),
+                    title: const Text('Report a Problem'),
+                    subtitle: const Text('Let us know if something isn\'t working'),
+                    trailing: const Icon(CupertinoIcons.chevron_forward),
+                    onTap: () {
+                      _showReportProblemDialog(context);
+                    },
+                  ),
                 ],
               ),
               
@@ -767,6 +829,655 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         );
       },
+    );
+  }
+
+  // Blocked Users
+  void _showBlockedUsers(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => Scaffold(
+          appBar: AppBar(
+            title: const Text('Blocked Users'),
+          ),
+          body: StreamBuilder<QuerySnapshot>(
+            stream: _firestore
+                .collection('users')
+                .doc(_auth.currentUser?.uid)
+                .collection('blocked')
+                .snapshots(),
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              final blockedUsers = snapshot.data!.docs;
+
+              if (blockedUsers.isEmpty) {
+                return const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.block, size: 64, color: Colors.grey),
+                      SizedBox(height: 16),
+                      Text(
+                        'No Blocked Users',
+                        style: TextStyle(fontSize: 18, color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              return ListView.builder(
+                itemCount: blockedUsers.length,
+                itemBuilder: (context, index) {
+                  final blockedUser = blockedUsers[index];
+                  return ListTile(
+                    leading: CircleAvatar(
+                      child: Text(blockedUser['name']?[0] ?? 'U'),
+                    ),
+                    title: Text(blockedUser['name'] ?? 'Unknown'),
+                    trailing: TextButton(
+                      onPressed: () async {
+                        await _firestore
+                            .collection('users')
+                            .doc(_auth.currentUser?.uid)
+                            .collection('blocked')
+                            .doc(blockedUser.id)
+                            .delete();
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('User unblocked'),
+                            ),
+                          );
+                        }
+                      },
+                      child: const Text('Unblock'),
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Security Options
+  void _showSecurityOptions(BuildContext context) {
+    final authService = AuthService();
+    final hasPassword = authService.hasPasswordProvider();
+    final signInMethod = authService.getPrimarySignInMethod();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Security'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ListTile(
+              leading: Icon(
+                Icons.lock_outline,
+                color: hasPassword ? null : Colors.grey,
+              ),
+              title: Text(
+                'Change Password',
+                style: TextStyle(
+                  color: hasPassword ? null : Colors.grey,
+                ),
+              ),
+              subtitle: Text(
+                hasPassword
+                    ? 'Update your password'
+                    : signInMethod == 'google.com'
+                        ? 'You signed in with Google'
+                        : 'Not available for your account type',
+              ),
+              trailing: Icon(
+                Icons.chevron_right,
+                color: hasPassword ? null : Colors.grey,
+              ),
+              enabled: hasPassword,
+              onTap: hasPassword
+                  ? () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const ChangePasswordScreen(),
+                        ),
+                      );
+                    }
+                  : () {
+                      // Show explanation for Google users
+                      if (signInMethod == 'google.com') {
+                        Navigator.pop(context);
+                        showDialog(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: const Text('Google Account'),
+                            content: const Text(
+                              'You signed in with Google. To change your password, please:\n\n'
+                              '1. Go to myaccount.google.com\n'
+                              '2. Navigate to Security\n'
+                              '3. Select "Password"\n'
+                              '4. Follow Google\'s password change process\n\n'
+                              'Your Google password will automatically work with this app.',
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context),
+                                child: const Text('Got it'),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+                    },
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.logout, color: Colors.orange),
+              title: const Text(
+                'Logout',
+                style: TextStyle(color: Colors.orange),
+              ),
+              subtitle: Text(
+                _auth.currentUser?.email ?? '',
+                style: const TextStyle(fontSize: 12),
+              ),
+              trailing: const Icon(Icons.chevron_right, color: Colors.orange),
+              onTap: () {
+                Navigator.pop(context);
+                _showLogoutDialog(context, authService);
+              },
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.delete_forever, color: Colors.red),
+              title: const Text(
+                'Delete Account',
+                style: TextStyle(color: Colors.red),
+              ),
+              subtitle: const Text(
+                'Permanently delete',
+                style: TextStyle(fontSize: 12),
+              ),
+              trailing: const Icon(Icons.chevron_right, color: Colors.red),
+              onTap: () {
+                Navigator.pop(context);
+                _showDeleteAccountDialog(context);
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Logout confirmation dialog
+  void _showLogoutDialog(BuildContext context, AuthService authService) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Logout'),
+        content: const Text('Are you sure you want to logout?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await authService.signOut();
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
+                (route) => false,
+              );
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.orange),
+            child: const Text('Logout'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Delete Account
+  void _showDeleteAccountDialog(BuildContext context) {
+    final TextEditingController confirmController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Account'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'This action cannot be undone. All your data will be permanently deleted.',
+              style: TextStyle(color: Colors.red),
+            ),
+            const SizedBox(height: 20),
+            const Text('Type "DELETE" to confirm:'),
+            const SizedBox(height: 10),
+            TextField(
+              controller: confirmController,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                hintText: 'DELETE',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              if (confirmController.text == 'DELETE') {
+                try {
+                  // Delete user data from Firestore
+                  final userId = _auth.currentUser?.uid;
+                  if (userId != null) {
+                    await _firestore.collection('users').doc(userId).delete();
+                  }
+
+                  // Delete authentication account
+                  await _auth.currentUser?.delete();
+
+                  if (context.mounted) {
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(builder: (_) => const LoginScreen()),
+                      (route) => false,
+                    );
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Failed to delete account: $e'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                }
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Please type DELETE to confirm'),
+                    backgroundColor: Colors.orange,
+                  ),
+                );
+              }
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete Forever'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Storage & Cache Management
+  Future<void> _showStorageOptions(BuildContext context) async {
+    // Show loading dialog while calculating
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const AlertDialog(
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('Calculating storage...'),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      // Calculate actual storage
+      final appDir = await getApplicationDocumentsDirectory();
+      final cacheDir = await getTemporaryDirectory();
+
+      final appSize = await _getDirectorySize(appDir);
+      final cacheSize = await _getDirectorySize(cacheDir);
+      final totalSize = appSize + cacheSize;
+
+      if (context.mounted) {
+        Navigator.pop(context); // Close loading
+
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Storage & Data'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.folder_outlined),
+                  title: const Text('App Data'),
+                  subtitle: Text('${(appSize / (1024 * 1024)).toStringAsFixed(2)} MB'),
+                ),
+                const Divider(),
+                ListTile(
+                  leading: const Icon(Icons.cached_outlined),
+                  title: const Text('Cache'),
+                  subtitle: Text('${(cacheSize / (1024 * 1024)).toStringAsFixed(2)} MB'),
+                ),
+                const Divider(),
+                ListTile(
+                  leading: const Icon(Icons.storage_outlined),
+                  title: const Text('Total Storage'),
+                  subtitle: Text(
+                    '${(totalSize / (1024 * 1024)).toStringAsFixed(2)} MB',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Close'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        Navigator.pop(context); // Close loading
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error calculating storage: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _showClearCacheDialog(BuildContext context) async {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Clear Cache'),
+        content: const Text(
+          'This will clear temporary files and cached images. Your account data will not be affected.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+
+              // Show loading indicator
+              showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (context) => const Center(
+                  child: CircularProgressIndicator(),
+                ),
+              );
+
+              try {
+                double freedSpace = 0;
+
+                // Clear cached network images
+                await CachedNetworkImage.evictFromCache('');
+                final imageCache = PaintingBinding.instance.imageCache;
+                imageCache.clear();
+                imageCache.clearLiveImages();
+
+                // Clear app cache directory
+                final cacheDir = await getTemporaryDirectory();
+                if (cacheDir.existsSync()) {
+                  final cacheSize = await _getDirectorySize(cacheDir);
+                  freedSpace = cacheSize / (1024 * 1024); // Convert to MB
+
+                  // Delete cache files
+                  await _deleteDirectory(cacheDir);
+                }
+
+                if (context.mounted) {
+                  Navigator.pop(context); // Close loading
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'Cache cleared successfully! Freed ${freedSpace.toStringAsFixed(2)} MB',
+                      ),
+                      backgroundColor: Colors.green,
+                      duration: const Duration(seconds: 3),
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  Navigator.pop(context); // Close loading
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error clearing cache: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text('Clear'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<int> _getDirectorySize(Directory directory) async {
+    int size = 0;
+    try {
+      if (directory.existsSync()) {
+        directory.listSync(recursive: true, followLinks: false).forEach((entity) {
+          if (entity is File) {
+            size += entity.lengthSync();
+          }
+        });
+      }
+    } catch (e) {
+      print('Error calculating directory size: $e');
+    }
+    return size;
+  }
+
+  Future<void> _deleteDirectory(Directory directory) async {
+    try {
+      if (directory.existsSync()) {
+        await directory.delete(recursive: true);
+        // Recreate the directory
+        await directory.create(recursive: true);
+      }
+    } catch (e) {
+      print('Error deleting directory: $e');
+    }
+  }
+
+  // Feedback & Report
+  void _showFeedbackDialog(BuildContext context) {
+    final TextEditingController feedbackController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Send Feedback'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('We\'d love to hear your thoughts!'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: feedbackController,
+              maxLines: 5,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                hintText: 'Share your feedback here...',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              if (feedbackController.text.isNotEmpty) {
+                try {
+                  await _firestore.collection('feedback').add({
+                    'userId': _auth.currentUser?.uid,
+                    'userEmail': _auth.currentUser?.email,
+                    'feedback': feedbackController.text,
+                    'timestamp': FieldValue.serverTimestamp(),
+                    'type': 'feedback',
+                  });
+
+                  if (context.mounted) {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Thank you for your feedback!'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Failed to send feedback: $e'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                }
+              }
+            },
+            child: const Text('Send'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showReportProblemDialog(BuildContext context) {
+    final TextEditingController problemController = TextEditingController();
+    String selectedCategory = 'Bug';
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            title: const Text('Report a Problem'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<String>(
+                  value: selectedCategory,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    labelText: 'Problem Type',
+                  ),
+                  items: ['Bug', 'Crash', 'Feature Request', 'Other']
+                      .map((category) => DropdownMenuItem(
+                            value: category,
+                            child: Text(category),
+                          ))
+                      .toList(),
+                  onChanged: (value) {
+                    setDialogState(() => selectedCategory = value!);
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: problemController,
+                  maxLines: 5,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    hintText: 'Describe the problem...',
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () async {
+                  if (problemController.text.isNotEmpty) {
+                    try {
+                      await _firestore.collection('feedback').add({
+                        'userId': _auth.currentUser?.uid,
+                        'userEmail': _auth.currentUser?.email,
+                        'problem': problemController.text,
+                        'category': selectedCategory,
+                        'timestamp': FieldValue.serverTimestamp(),
+                        'type': 'problem',
+                      });
+
+                      if (context.mounted) {
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Report submitted. We\'ll look into it!'),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Failed to submit report: $e'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    }
+                  }
+                },
+                child: const Text('Submit'),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 }

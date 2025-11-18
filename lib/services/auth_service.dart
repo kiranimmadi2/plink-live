@@ -279,4 +279,114 @@ class AuthService {
       throw Exception('Email update failed: ${e.toString()}');
     }
   }
+
+  /// Check if the current user has email/password authentication
+  bool hasPasswordProvider() {
+    final user = currentUser;
+    if (user == null) return false;
+
+    // Check if user has password provider
+    for (var provider in user.providerData) {
+      if (provider.providerId == 'password') {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// Get the primary sign-in method for the current user
+  String? getPrimarySignInMethod() {
+    final user = currentUser;
+    if (user == null || user.providerData.isEmpty) return null;
+    return user.providerData.first.providerId;
+  }
+
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    try {
+      final user = currentUser;
+      if (user == null || user.email == null) {
+        throw Exception('No user is currently signed in');
+      }
+
+      // Check if user has password authentication
+      if (!hasPasswordProvider()) {
+        final provider = getPrimarySignInMethod();
+        if (provider == 'google.com') {
+          throw Exception('You signed in with Google. Please use Google to manage your password.');
+        } else {
+          throw Exception('Password change is only available for email/password accounts.');
+        }
+      }
+
+      // Validate password length
+      if (newPassword.length < 6) {
+        throw Exception('Password must be at least 6 characters');
+      }
+
+      // Re-authenticate user with current password
+      final credential = EmailAuthProvider.credential(
+        email: user.email!,
+        password: currentPassword,
+      );
+
+      await user.reauthenticateWithCredential(credential);
+
+      // Update password in Firebase Auth
+      await user.updatePassword(newPassword);
+
+      // Store password change metadata in Firestore
+      await _recordPasswordChange(user.uid);
+    } on FirebaseAuthException catch (e) {
+      String message;
+      switch (e.code) {
+        case 'wrong-password':
+          message = 'Current password is incorrect';
+          break;
+        case 'weak-password':
+          message = 'The new password is too weak';
+          break;
+        case 'requires-recent-login':
+          message = 'Please log out and log in again to change password';
+          break;
+        default:
+          message = e.message ?? 'An error occurred changing password';
+      }
+      throw Exception(message);
+    } catch (e) {
+      if (e is Exception) {
+        rethrow;
+      }
+      throw Exception('Password change failed: ${e.toString()}');
+    }
+  }
+
+  /// Record password change event in Firestore for security tracking
+  Future<void> _recordPasswordChange(String userId) async {
+    try {
+      final now = FieldValue.serverTimestamp();
+
+      // Update user document with last password change
+      await FirebaseFirestore.instance.collection('users').doc(userId).update({
+        'lastPasswordChange': now,
+        'passwordChangeCount': FieldValue.increment(1),
+      });
+
+      // Record security event
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .collection('securityEvents')
+          .add({
+        'type': 'password_change',
+        'timestamp': now,
+        'success': true,
+      });
+    } catch (e) {
+      // Don't fail the password change if logging fails
+      print('Failed to record password change: $e');
+    }
+  }
 }

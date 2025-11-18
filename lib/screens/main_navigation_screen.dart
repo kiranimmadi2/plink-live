@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:badges/badges.dart' as badges;
@@ -6,7 +7,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'universal_matching_screen.dart';
 import 'conversations_screen.dart';
 import 'live_connect_tab_screen.dart';
-import 'live_connect_demo_screen.dart'; // DEMO IMPORT
 import 'profile_with_history_screen.dart';
 import 'performance_debug_screen.dart';
 import '../services/notification_service.dart';
@@ -30,7 +30,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
   final List<Widget> _screens = [
     const UniversalMatchingScreen(),
     const ConversationsScreen(),
-    const LiveConnectDemoScreen(), // TEMPORARY: Using demo screen for testing
+    const LiveConnectTabScreen(), // Production Live Connect screen with enhanced features
     const ProfileWithHistoryScreen(),
   ];
 
@@ -140,82 +140,110 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: isDarkMode
+              ? [
+                  Colors.black.withValues(alpha: 0.3),
+                  Colors.black.withValues(alpha: 0.9),
+                ]
+              : [
+                  Colors.white.withValues(alpha: 0.3),
+                  Colors.white.withValues(alpha: 0.95),
+                ],
+          ),
+          border: Border(
+            top: BorderSide(
+              color: isDarkMode
+                ? Colors.white.withValues(alpha: 0.1)
+                : Colors.black.withValues(alpha: 0.1),
+              width: 0.5,
+            ),
+          ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
-              blurRadius: 10,
-              offset: const Offset(0, -5),
+              color: Colors.black.withValues(alpha: 0.15),
+              blurRadius: 20,
+              offset: const Offset(0, -10),
             ),
           ],
         ),
-        child: BottomNavigationBar(
-          currentIndex: _currentIndex,
-          onTap: (index) {
-            HapticFeedback.lightImpact();
-            setState(() {
-              _currentIndex = index;
-            });
-          },
-          type: BottomNavigationBarType.fixed,
-          backgroundColor: isDarkMode ? const Color(0xFF1A1A1A) : Colors.white,
-          selectedItemColor: Theme.of(context).primaryColor,
-          unselectedItemColor: isDarkMode ? Colors.grey[600] : Colors.grey,
-          selectedFontSize: 12,
-          unselectedFontSize: 12,
-          items: [
-            const BottomNavigationBarItem(
-              icon: Icon(Icons.explore_outlined),
-              activeIcon: Icon(Icons.explore),
-              label: 'Discover',
+        child: ClipRRect(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+            child: BottomNavigationBar(
+              currentIndex: _currentIndex,
+              onTap: (index) {
+                HapticFeedback.lightImpact();
+                setState(() {
+                  _currentIndex = index;
+                });
+              },
+              type: BottomNavigationBarType.fixed,
+              backgroundColor: Colors.transparent,
+              selectedItemColor: Theme.of(context).primaryColor,
+              unselectedItemColor: isDarkMode ? Colors.grey[500] : Colors.grey[600],
+              selectedFontSize: 11,
+              unselectedFontSize: 10,
+              selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600),
+              elevation: 0,
+              items: [
+                const BottomNavigationBarItem(
+                  icon: Icon(Icons.explore_outlined, size: 22),
+                  activeIcon: Icon(Icons.explore, size: 24),
+                  label: 'Discover',
+                ),
+                BottomNavigationBarItem(
+                  icon: _unreadMessageCount > 0
+                      ? badges.Badge(
+                          badgeContent: Text(
+                            _unreadMessageCount > 99
+                                ? '99+'
+                                : _unreadMessageCount.toString(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                            ),
+                          ),
+                          badgeStyle: const badges.BadgeStyle(
+                            badgeColor: Colors.red,
+                          ),
+                          child: const Icon(Icons.message_outlined, size: 22),
+                        )
+                      : const Icon(Icons.message_outlined, size: 22),
+                  activeIcon: _unreadMessageCount > 0
+                      ? badges.Badge(
+                          badgeContent: Text(
+                            _unreadMessageCount > 99
+                                ? '99+'
+                                : _unreadMessageCount.toString(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                            ),
+                          ),
+                          badgeStyle: const badges.BadgeStyle(
+                            badgeColor: Colors.red,
+                          ),
+                          child: const Icon(Icons.message, size: 24),
+                        )
+                      : const Icon(Icons.message, size: 24),
+                  label: 'Messages',
+                ),
+                const BottomNavigationBarItem(
+                  icon: Icon(Icons.people_outline, size: 22),
+                  activeIcon: Icon(Icons.people, size: 24),
+                  label: 'Live Connect',
+                ),
+                const BottomNavigationBarItem(
+                  icon: Icon(Icons.person_outline, size: 22),
+                  activeIcon: Icon(Icons.person, size: 24),
+                  label: 'Profile',
+                ),
+              ],
             ),
-            BottomNavigationBarItem(
-              icon: _unreadMessageCount > 0
-                  ? badges.Badge(
-                      badgeContent: Text(
-                        _unreadMessageCount > 99 
-                            ? '99+' 
-                            : _unreadMessageCount.toString(),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                        ),
-                      ),
-                      badgeStyle: const badges.BadgeStyle(
-                        badgeColor: Colors.red,
-                      ),
-                      child: const Icon(Icons.message_outlined),
-                    )
-                  : const Icon(Icons.message_outlined),
-              activeIcon: _unreadMessageCount > 0
-                  ? badges.Badge(
-                      badgeContent: Text(
-                        _unreadMessageCount > 99 
-                            ? '99+' 
-                            : _unreadMessageCount.toString(),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                        ),
-                      ),
-                      badgeStyle: const badges.BadgeStyle(
-                        badgeColor: Colors.red,
-                      ),
-                      child: const Icon(Icons.message),
-                    )
-                  : const Icon(Icons.message),
-              label: 'Messages',
-            ),
-            const BottomNavigationBarItem(
-              icon: Icon(Icons.people_outline),
-              activeIcon: Icon(Icons.people),
-              label: 'Live Connect',
-            ),
-            const BottomNavigationBarItem(
-              icon: Icon(Icons.person_outline),
-              activeIcon: Icon(Icons.person),
-              label: 'Profile',
-            ),
-          ],
+          ),
         ),
       ),
     );

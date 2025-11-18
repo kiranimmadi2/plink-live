@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -15,6 +16,7 @@ import '../services/unified_intent_processor.dart';
 import '../services/realtime_matching_service.dart';
 import 'profile_with_history_screen.dart';
 import '../services/photo_cache_service.dart';
+import '../widgets/animated_gradient_background.dart';
 
 class UniversalMatchingScreen extends StatefulWidget {
   const UniversalMatchingScreen({Key? key}) : super(key: key);
@@ -29,10 +31,13 @@ class _UniversalMatchingScreenState extends State<UniversalMatchingScreen> {
   final UnifiedIntentProcessor _unifiedProcessor = UnifiedIntentProcessor();
   final RealtimeMatchingService _realtimeService = RealtimeMatchingService();
   final TextEditingController _intentController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final PhotoCacheService _photoCache = PhotoCacheService();
-  
+
   bool _isProcessing = false;
+  bool _isSearchFocused = false;
+  bool _hasText = false;
   List<Map<String, dynamic>> _matches = [];
   List<Map<String, dynamic>> _userIntents = [];
   Map<String, dynamic>? _currentIntent;
@@ -46,11 +51,29 @@ class _UniversalMatchingScreenState extends State<UniversalMatchingScreen> {
     _loadUserIntents();
     _loadUserProfile();
     _realtimeService.initialize();
+
+    // Listen to focus changes
+    _searchFocusNode.addListener(() {
+      if (_searchFocusNode.hasFocus) {
+        HapticFeedback.selectionClick();
+      }
+      setState(() {
+        _isSearchFocused = _searchFocusNode.hasFocus;
+      });
+    });
+
+    // Listen to text changes
+    _intentController.addListener(() {
+      setState(() {
+        _hasText = _intentController.text.isNotEmpty;
+      });
+    });
   }
 
   @override
   void dispose() {
     _intentController.dispose();
+    _searchFocusNode.dispose();
     _realtimeService.dispose();
     super.dispose();
   }
@@ -242,211 +265,395 @@ class _UniversalMatchingScreenState extends State<UniversalMatchingScreen> {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    
+
     return Scaffold(
-      backgroundColor: isDarkMode ? Colors.black : Colors.white,
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: isDarkMode ? Colors.black : Colors.white,
-        centerTitle: false,
-        title: Text(
-          'Supper',
-          style: TextStyle(
-            color: isDarkMode ? Colors.white : Colors.black,
-            fontWeight: FontWeight.w600,
-            fontSize: 20,
-          ),
-        ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: GestureDetector(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const ProfileWithHistoryScreen(),
-                  ),
-                ).then((_) => _loadUserProfile());
-              },
-              child: UserAvatar(
-                profileImageUrl: _auth.currentUser?.photoURL,
-                radius: 18,
-                fallbackText: _currentUserName,
+      extendBodyBehindAppBar: true,
+      backgroundColor: Colors.transparent,
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(60),
+        child: AppBar(
+          elevation: 0,
+          backgroundColor: Colors.transparent,
+          centerTitle: false,
+          title: ShaderMask(
+            shaderCallback: (bounds) => LinearGradient(
+              colors: isDarkMode
+                ? [Colors.white, Colors.grey[400]!]
+                : [Colors.black, Colors.grey[800]!],
+            ).createShader(bounds),
+            child: const Text(
+              'Supper',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+                fontSize: 24,
+                letterSpacing: 0.5,
               ),
             ),
           ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // Main content area
-          Expanded(
-            child: _isProcessing
-                ? const Center(
-                    child: CircularProgressIndicator(),
-                  )
-                : _matches.isNotEmpty
-                    ? _buildMatchesList(isDarkMode)
-                    : _buildHomeState(isDarkMode),
-          ),
-          
-          // Search input at bottom
-          Container(
-            padding: EdgeInsets.only(
-              left: 20,
-              right: 20,
-              bottom: MediaQuery.of(context).padding.bottom + 20,
-              top: 16,
-            ),
-            decoration: BoxDecoration(
-              color: isDarkMode ? Colors.black : Colors.white,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Suggestions
-                if (_suggestions.isNotEmpty)
-                  Container(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    height: 40,
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: _suggestions.length,
-                      itemBuilder: (context, index) {
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: InkWell(
-                            onTap: () {
-                              _intentController.text = _suggestions[index];
-                              _processIntent();
-                            },
-                            child: Chip(
-                              label: Text(
-                                _suggestions[index],
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: isDarkMode ? Colors.white : Colors.black87,
-                                ),
-                              ),
-                              backgroundColor: isDarkMode ? Colors.grey[800] : Colors.grey[200],
-                            ),
-                          ),
-                        );
-                      },
+          actions: [
+            Padding(
+              padding: const EdgeInsets.only(right: 16),
+              child: GestureDetector(
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ProfileWithHistoryScreen(),
                     ),
-                  ),
-                
-                // Search input
-                Container(
+                  ).then((_) => _loadUserProfile());
+                },
+                child: Container(
                   decoration: BoxDecoration(
-                    color: isDarkMode ? Colors.grey[900] : Colors.grey[100],
-                    borderRadius: BorderRadius.circular(30),
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      colors: [
+                        Theme.of(context).primaryColor,
+                        Theme.of(context).primaryColor.withValues(alpha: 0.6),
+                      ],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Theme.of(context).primaryColor.withValues(alpha: 0.3),
+                        blurRadius: 8,
+                        spreadRadius: 2,
+                      ),
+                    ],
                   ),
-                  child: TextField(
-                    controller: _intentController,
-                    textInputAction: TextInputAction.search,
-                    style: TextStyle(
-                      color: isDarkMode ? Colors.white : Colors.black,
-                      fontSize: 16,
-                    ),
-                    decoration: InputDecoration(
-                      hintText: 'Find Anything Supper',
-                      hintStyle: TextStyle(
-                        color: isDarkMode ? Colors.grey[600] : Colors.grey[500],
-                        fontSize: 16,
-                      ),
-                      border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 16,
-                      ),
-                      suffixIcon: GestureDetector(
-                        onTap: _isProcessing ? null : _processIntent,
-                        child: Container(
-                          margin: const EdgeInsets.only(right: 8),
-                          child: CircleAvatar(
-                            radius: 20,
-                            backgroundColor: Theme.of(context).primaryColor,
-                            child: _isProcessing
-                                ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      color: Colors.white,
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : const Icon(
-                                    Icons.arrow_upward,
-                                    color: Colors.white,
-                                    size: 20,
-                                  ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    onChanged: (value) {
-                      if (value.length >= 2) {
-                        _loadSuggestions(value);
-                      } else {
-                        setState(() {
-                          _suggestions = [];
-                        });
-                      }
-                    },
-                    onSubmitted: (_) => _processIntent(),
+                  padding: const EdgeInsets.all(2),
+                  child: UserAvatar(
+                    profileImageUrl: _auth.currentUser?.photoURL,
+                    radius: 20,
+                    fallbackText: _currentUserName,
                   ),
                 ),
-              ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
+      ),
+      body: AnimatedGradientBackground(
+        isDarkMode: isDarkMode,
+        child: Column(
+          children: [
+            // Main content area
+            Expanded(
+              child: _isProcessing
+                  ? Center(
+                      child: Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: isDarkMode
+                            ? Colors.white.withValues(alpha: 0.1)
+                            : Colors.black.withValues(alpha: 0.05),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: CircularProgressIndicator(
+                          color: Theme.of(context).primaryColor,
+                          strokeWidth: 3,
+                        ),
+                      ),
+                    )
+                  : _matches.isNotEmpty
+                      ? _buildMatchesList(isDarkMode)
+                      : _buildHomeState(isDarkMode),
+            ),
+
+            // Search input at bottom
+            Container(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                bottom: MediaQuery.of(context).padding.bottom + 12,
+                top: 16,
+              ),
+              decoration: const BoxDecoration(
+                color: Colors.transparent,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                      // Suggestions
+                      if (_suggestions.isNotEmpty)
+                        Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          height: 36,
+                          child: ListView.builder(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: _suggestions.length,
+                            itemBuilder: (context, index) {
+                              return Padding(
+                                padding: const EdgeInsets.only(right: 8),
+                                child: InkWell(
+                                  onTap: () {
+                                    HapticFeedback.lightImpact();
+                                    _intentController.text = _suggestions[index];
+                                    _processIntent();
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: [
+                                          Theme.of(context).primaryColor.withValues(alpha: 0.2),
+                                          Theme.of(context).primaryColor.withValues(alpha: 0.1),
+                                        ],
+                                      ),
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(
+                                        color: Theme.of(context).primaryColor.withValues(alpha: 0.3),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      _suggestions[index],
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w500,
+                                        color: Theme.of(context).primaryColor,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+
+                      // Search input with auto-expanding design
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 250),
+                        curve: Curves.easeOutCubic,
+                        constraints: const BoxConstraints(
+                          minHeight: 52,
+                          maxHeight: 120,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.6),
+                          borderRadius: BorderRadius.circular(26),
+                          border: Border.all(
+                            color: _isSearchFocused
+                                ? Theme.of(context).primaryColor
+                                : Colors.blue.withValues(alpha: 0.5),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            const SizedBox(width: 20),
+                            Expanded(
+                              child: TextField(
+                                controller: _intentController,
+                                focusNode: _searchFocusNode,
+                                textInputAction: TextInputAction.newline,
+                                keyboardType: TextInputType.multiline,
+                                minLines: 1,
+                                maxLines: null,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w400,
+                                  height: 1.4,
+                                ),
+                                cursorColor: Theme.of(context).primaryColor,
+                                decoration: InputDecoration(
+                                  hintText: 'Find Anything Supper',
+                                  hintStyle: TextStyle(
+                                    color: Colors.grey[400],
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w400,
+                                  ),
+                                  border: InputBorder.none,
+                                  enabledBorder: InputBorder.none,
+                                  focusedBorder: InputBorder.none,
+                                  fillColor: Colors.transparent,
+                                  filled: true,
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    vertical: 16,
+                                  ),
+                                  isDense: true,
+                                ),
+                                onChanged: (value) {
+                                  if (value.length >= 2) {
+                                    _loadSuggestions(value);
+                                  } else {
+                                    setState(() {
+                                      _suggestions = [];
+                                    });
+                                  }
+                                },
+                                onSubmitted: (_) => _processIntent(),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            // Send button
+                            GestureDetector(
+                              onTap: _isProcessing ? null : () {
+                                HapticFeedback.mediumImpact();
+                                _processIntent();
+                              },
+                              child: Container(
+                                width: 40,
+                                height: 40,
+                                margin: const EdgeInsets.only(right: 6, bottom: 6),
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Theme.of(context).primaryColor,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Theme.of(context).primaryColor.withValues(alpha: 0.4),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: _isProcessing
+                                    ? const Padding(
+                                        padding: EdgeInsets.all(11),
+                                        child: CircularProgressIndicator(
+                                          color: Colors.white,
+                                          strokeWidth: 2.5,
+                                        ),
+                                      )
+                                    : const Icon(
+                                        Icons.arrow_upward_rounded,
+                                        color: Colors.white,
+                                        size: 22,
+                                      ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildHomeState(bool isDarkMode) {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            'Hello ${_currentUserName.split(' ')[0].toUpperCase()},',
-            style: TextStyle(
-              fontSize: 20,
-              color: isDarkMode ? Colors.grey[500] : Colors.grey[600],
-              fontWeight: FontWeight.w400,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Find Your Need',
-            style: TextStyle(
-              fontSize: 32,
-              fontWeight: FontWeight.bold,
-              color: Theme.of(context).primaryColor,
-            ),
-          ),
-          if (_errorMessage != null) ...[
-            const SizedBox(height: 20),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: Colors.red.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Greeting with subtle animation
+            TweenAnimationBuilder(
+              tween: Tween<double>(begin: 0, end: 1),
+              duration: const Duration(milliseconds: 600),
+              builder: (context, double value, child) {
+                return Opacity(
+                  opacity: value,
+                  child: Transform.translate(
+                    offset: Offset(0, 20 * (1 - value)),
+                    child: child,
+                  ),
+                );
+              },
               child: Text(
-                _errorMessage!,
+                'Hello ${_currentUserName.split(' ')[0].toUpperCase()},',
                 style: TextStyle(
-                  color: Colors.red,
-                  fontSize: 14,
+                  fontSize: 22,
+                  color: isDarkMode ? Colors.grey[400] : Colors.grey[700],
+                  fontWeight: FontWeight.w500,
+                  letterSpacing: 1,
                 ),
-                textAlign: TextAlign.center,
               ),
             ),
+            const SizedBox(height: 20),
+            // "Find Your Need" with gradient text
+            TweenAnimationBuilder(
+              tween: Tween<double>(begin: 0, end: 1),
+              duration: const Duration(milliseconds: 800),
+              builder: (context, double value, child) {
+                return Opacity(
+                  opacity: value,
+                  child: Transform.scale(
+                    scale: 0.8 + (0.2 * value),
+                    child: child,
+                  ),
+                );
+              },
+              child: ShaderMask(
+                shaderCallback: (bounds) => LinearGradient(
+                  colors: [
+                    Theme.of(context).primaryColor,
+                    const Color(0xFF06B6D4),
+                    const Color(0xFF8B5CF6),
+                  ],
+                  stops: const [0.0, 0.5, 1.0],
+                ).createShader(bounds),
+                child: const Text(
+                  'Find Your Need',
+                  style: TextStyle(
+                    fontSize: 40,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                    letterSpacing: -0.5,
+                    height: 1.2,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+            if (_errorMessage != null) ...[
+              const SizedBox(height: 32),
+              TweenAnimationBuilder(
+                tween: Tween<double>(begin: 0, end: 1),
+                duration: const Duration(milliseconds: 400),
+                builder: (context, double value, child) {
+                  return Opacity(
+                    opacity: value,
+                    child: child,
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.red.withValues(alpha: 0.15),
+                        Colors.red.withValues(alpha: 0.08),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: Colors.red.withValues(alpha: 0.3),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.info_outline_rounded,
+                        color: Colors.red[400],
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          _errorMessage!,
+                          style: TextStyle(
+                            color: Colors.red[400],
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }

@@ -41,6 +41,8 @@ class ExtendedUserProfile {
   final String? aboutMe;
   final bool isOnline;
   final Timestamp? lastSeen;
+  final int? age;
+  final String? gender; // 'Male', 'Female', 'Other', 'Prefer not to say'
 
   // Calculated field
   double? distance; // Will be calculated based on current user's location
@@ -60,6 +62,8 @@ class ExtendedUserProfile {
     this.aboutMe,
     this.isOnline = false,
     this.lastSeen,
+    this.age,
+    this.gender,
     this.distance,
   });
 
@@ -88,6 +92,8 @@ class ExtendedUserProfile {
       aboutMe: map['aboutMe'],
       isOnline: map['isOnline'] ?? false,
       lastSeen: map['lastSeen'] as Timestamp?,
+      age: map['age'] as int?,
+      gender: map['gender'] as String?,
     );
   }
 
@@ -107,6 +113,8 @@ class ExtendedUserProfile {
       'aboutMe': aboutMe,
       'isOnline': isOnline,
       'lastSeen': lastSeen,
+      'age': age,
+      'gender': gender,
     };
   }
 

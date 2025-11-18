@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/gestures.dart';
 import '../services/auth_service.dart';
+import 'terms_of_service_screen.dart';
+import 'privacy_policy_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -20,6 +23,7 @@ class _LoginScreenState extends State<LoginScreen>
   bool _obscurePassword = true;
   bool _isSignUpMode = false;
   bool _rememberMe = false;
+  bool _acceptTerms = false;
   String _passwordStrength = '';
   Color _passwordStrengthColor = Colors.grey;
   
@@ -109,6 +113,12 @@ class _LoginScreenState extends State<LoginScreen>
 
   Future<void> _handleAuth() async {
     if (_formKey.currentState!.validate()) {
+      // Check terms acceptance for signup
+      if (_isSignUpMode && !_acceptTerms) {
+        _showErrorSnackBar('Please accept the Terms of Service and Privacy Policy to continue');
+        return;
+      }
+
       setState(() {
         _isLoading = true;
       });
@@ -467,33 +477,104 @@ class _LoginScreenState extends State<LoginScreen>
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Row(
-          children: [
-            SizedBox(
-              height: 24,
-              width: 24,
-              child: Checkbox(
-                value: _rememberMe,
-                onChanged: (value) {
-                  setState(() {
-                    _rememberMe = value ?? false;
-                  });
-                },
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(4),
-                ),
+        // Remember me for login, Terms acceptance for signup
+        _isSignUpMode
+            ? Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    height: 24,
+                    width: 24,
+                    child: Checkbox(
+                      value: _acceptTerms,
+                      onChanged: (value) {
+                        setState(() {
+                          _acceptTerms = value ?? false;
+                        });
+                      },
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: RichText(
+                      text: TextSpan(
+                        style: TextStyle(
+                          color: Colors.grey[700],
+                          fontSize: 13,
+                        ),
+                        children: [
+                          const TextSpan(text: 'I agree to the '),
+                          TextSpan(
+                            text: 'Terms of Service',
+                            style: const TextStyle(
+                              color: Colors.blue,
+                              fontWeight: FontWeight.w600,
+                              decoration: TextDecoration.underline,
+                            ),
+                            recognizer: TapGestureRecognizer()
+                              ..onTap = () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const TermsOfServiceScreen(),
+                                  ),
+                                );
+                              },
+                          ),
+                          const TextSpan(text: ' and '),
+                          TextSpan(
+                            text: 'Privacy Policy',
+                            style: const TextStyle(
+                              color: Colors.blue,
+                              fontWeight: FontWeight.w600,
+                              decoration: TextDecoration.underline,
+                            ),
+                            recognizer: TapGestureRecognizer()
+                              ..onTap = () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const PrivacyPolicyScreen(),
+                                  ),
+                                );
+                              },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              )
+            : Row(
+                children: [
+                  SizedBox(
+                    height: 24,
+                    width: 24,
+                    child: Checkbox(
+                      value: _rememberMe,
+                      onChanged: (value) {
+                        setState(() {
+                          _rememberMe = value ?? false;
+                        });
+                      },
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Remember me',
+                    style: TextStyle(
+                      color: Colors.grey[700],
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              'Remember me',
-              style: TextStyle(
-                color: Colors.grey[700],
-                fontSize: 14,
-              ),
-            ),
-          ],
-        ),
         TextButton(
           onPressed: _forgotPassword,
           child: const Text(
