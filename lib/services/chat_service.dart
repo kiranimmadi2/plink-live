@@ -120,7 +120,7 @@ class ChatService {
             'id': chatId,
 
             // Participants - CRITICAL for security rules and queries
-            'participantIds': [myUid, otherUid],
+            'participants': [myUid, otherUid],
 
             // Participant details for quick UI display (matches existing format)
             'participantNames': {
@@ -189,7 +189,7 @@ class ChatService {
   Stream<QuerySnapshot> getUserChats(String userId) {
     return _firestore
         .collection('conversations')
-        .where('participantIds', arrayContains: userId)
+        .where('participants', arrayContains: userId)
         .orderBy('lastMessageTime', descending: true)
         .snapshots();
   }

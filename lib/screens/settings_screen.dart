@@ -31,6 +31,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   bool _showOnlineStatus = true;
+  bool _discoveryModeEnabled = true;
   bool _isLoading = false;
 
   // Notification preferences
@@ -53,6 +54,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         final data = doc.data() ?? {};
         setState(() {
           _showOnlineStatus = data['showOnlineStatus'] ?? true;
+          _discoveryModeEnabled = data['discoveryModeEnabled'] ?? true;
           _messageNotifications = data['messageNotifications'] ?? true;
           _matchNotifications = data['matchNotifications'] ?? true;
           _connectionRequestNotifications = data['connectionRequestNotifications'] ?? true;
@@ -344,6 +346,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         context,
                         MaterialPageRoute(
                           builder: (context) => const ProfileEditScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  const Divider(height: 1),
+                  SwitchListTile(
+                    secondary: const Icon(Icons.visibility_outlined),
+                    title: const Text('Discoverable on Live Connect'),
+                    subtitle: const Text('Allow others to find you in nearby people'),
+                    value: _discoveryModeEnabled,
+                    onChanged: (value) {
+                      setState(() => _discoveryModeEnabled = value);
+                      _updatePreference('discoveryModeEnabled', value);
+
+                      // Show feedback
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            value
+                              ? 'You are now discoverable on Live Connect'
+                              : 'You are now hidden from Live Connect searches',
+                          ),
+                          backgroundColor: value ? Colors.green : Colors.orange,
+                          duration: const Duration(seconds: 2),
                         ),
                       );
                     },

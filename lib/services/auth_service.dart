@@ -36,6 +36,13 @@ class AuthService {
             'createdAt': FieldValue.serverTimestamp(),
             'lastSeen': FieldValue.serverTimestamp(),
             'isOnline': true,
+            'discoveryModeEnabled': true, // Enable Live Connect discovery by default
+            'interests': [], // Initialize empty interests
+            'connections': [], // Initialize empty connections
+            'connectionCount': 0,
+            'blockedUsers': [], // Initialize empty blocked users
+            'connectionTypes': [], // Initialize empty connection types
+            'activities': [], // Initialize empty activities
           });
         } else {
           // Just update last seen
@@ -93,6 +100,13 @@ class AuthService {
           'lastSeen': FieldValue.serverTimestamp(),
           'createdAt': FieldValue.serverTimestamp(),
           'isOnline': true,
+          'discoveryModeEnabled': true, // Enable Live Connect discovery by default
+          'interests': [], // Initialize empty interests
+          'connections': [], // Initialize empty connections
+          'connectionCount': 0,
+          'blockedUsers': [], // Initialize empty blocked users
+          'connectionTypes': [], // Initialize empty connection types
+          'activities': [], // Initialize empty activities
         }, SetOptions(merge: true));
       }
       
@@ -151,6 +165,10 @@ class AuthService {
         String? photoUrl = user.photoURL ?? googleUser.photoUrl;
         photoUrl = PhotoUrlHelper.getHighQualityGooglePhoto(photoUrl);
         
+        // Check if this is a new user or existing user
+        final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+        final isNewUser = !doc.exists;
+
         await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
           'uid': user.uid,
           'name': user.displayName ?? googleUser.displayName ?? '',
@@ -158,8 +176,18 @@ class AuthService {
           'profileImageUrl': photoUrl,
           'photoUrl': photoUrl, // Keep for backward compatibility
           'lastSeen': FieldValue.serverTimestamp(),
-          'createdAt': FieldValue.serverTimestamp(),
+          if (isNewUser) 'createdAt': FieldValue.serverTimestamp(),
           'isOnline': true,
+          // Only set these for new users to avoid overwriting existing values
+          if (isNewUser) ...{
+            'discoveryModeEnabled': true, // Enable Live Connect discovery by default
+            'interests': [], // Initialize empty interests
+            'connections': [], // Initialize empty connections
+            'connectionCount': 0,
+            'blockedUsers': [], // Initialize empty blocked users
+            'connectionTypes': [], // Initialize empty connection types
+            'activities': [], // Initialize empty activities
+          },
         }, SetOptions(merge: true));
         
         // Also update the auth profile with fixed URL

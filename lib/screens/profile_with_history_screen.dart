@@ -9,6 +9,7 @@ import 'package:timeago/timeago.dart' as timeago;
 import 'package:provider/provider.dart';
 import '../services/universal_intent_service.dart';
 import '../services/location_service.dart';
+import '../services/activity_migration_service.dart';
 import '../widgets/user_avatar.dart';
 import '../providers/theme_provider.dart';
 import 'login_screen.dart';
@@ -16,7 +17,6 @@ import 'profile_edit_screen.dart';
 import 'profile_view_screen.dart';
 import 'settings_screen.dart';
 import 'enhanced_chat_screen.dart';
-import 'live_connect_screen.dart';
 import '../models/user_profile.dart';
 
 class ProfileWithHistoryScreen extends StatefulWidget {
@@ -31,6 +31,7 @@ class _ProfileWithHistoryScreenState extends State<ProfileWithHistoryScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final UniversalIntentService _intentService = UniversalIntentService();
   final LocationService _locationService = LocationService();
+  final ActivityMigrationService _migrationService = ActivityMigrationService();
 
   Map<String, dynamic>? _userProfile;
   List<Map<String, dynamic>> _searchHistory = [];
@@ -49,7 +50,7 @@ class _ProfileWithHistoryScreenState extends State<ProfileWithHistoryScreen> {
   // Profile edit mode
   bool _isEditMode = false;
   List<String> _selectedConnectionTypes = [];
-  List<Map<String, String>> _selectedActivities = [];
+  List<String> _selectedActivities = []; // Store only activity names, no level
   String _aboutMe = '';
   final TextEditingController _aboutMeController = TextEditingController();
 
@@ -73,6 +74,7 @@ class _ProfileWithHistoryScreenState extends State<ProfileWithHistoryScreen> {
     if (userId == null) return;
 
     // Listen for real-time profile changes (like location updates from background service)
+    // Use distinct() to prevent unnecessary rebuilds when data hasn't actually changed
     _profileSubscription = _firestore
         .collection('users')
         .doc(userId)
@@ -82,15 +84,41 @@ class _ProfileWithHistoryScreenState extends State<ProfileWithHistoryScreen> {
 
       if (snapshot.exists) {
         final userData = snapshot.data();
-        setState(() {
-          _userProfile = userData;
-          // Update selected interests if they changed
-          _selectedInterests = List<String>.from(userData?['interests'] ?? []);
-        });
 
-        print('ProfileScreen: Profile updated from Firestore - city=${userData?['city']}, location=${userData?['location']}');
+        // OPTIMIZATION: Only call setState if data actually changed
+        // This prevents unnecessary rebuilds that cause frame drops
+        final newCity = userData?['city'];
+        final newLocation = userData?['location'];
+        final newInterests = List<String>.from(userData?['interests'] ?? []);
+
+        final oldCity = _userProfile?['city'];
+        final oldLocation = _userProfile?['location'];
+
+        // Check if anything meaningful changed
+        final cityChanged = newCity != oldCity;
+        final locationChanged = newLocation != oldLocation;
+        final interestsChanged = !_listEquals(newInterests, _selectedInterests);
+
+        if (cityChanged || locationChanged || interestsChanged || _userProfile == null) {
+          setState(() {
+            _userProfile = userData;
+            _selectedInterests = newInterests;
+          });
+
+          // Only log in debug mode
+          // debugPrint('ProfileScreen: Profile updated - city=$newCity');
+        }
       }
     });
+  }
+
+  // Helper to compare lists
+  bool _listEquals(List<String> a, List<String> b) {
+    if (a.length != b.length) return false;
+    for (int i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
   }
 
   @override
@@ -102,8 +130,6 @@ class _ProfileWithHistoryScreenState extends State<ProfileWithHistoryScreen> {
 
   Future<void> _updateLocationIfNeeded() async {
     try {
-      print('ProfileScreen: Checking if location needs update...');
-
       // Check if widget is still mounted before proceeding
       if (!mounted) return;
 
@@ -118,7 +144,6 @@ class _ProfileWithHistoryScreenState extends State<ProfileWithHistoryScreen> {
 
       if (userDoc.exists) {
         final data = userDoc.data();
-        print('ProfileScreen: Current location data - displayLocation=${data?['displayLocation']}, city=${data?['city']}, location=${data?['location']}');
 
         // Update location if it's not set or if it says generic location
         if (data?['displayLocation'] == null ||
@@ -129,13 +154,10 @@ class _ProfileWithHistoryScreenState extends State<ProfileWithHistoryScreen> {
              data?['city'] == '' ||
              data?['city'] == 'Location detected' ||
              data?['city'] == 'Location detected (Web)')) {
-          print('ProfileScreen: Location needs update, calling updateUserLocation...');
 
           // Update location SILENTLY in background without blocking UI
           // Run this as fire-and-forget to prevent blocking
           _locationService.updateUserLocation(silent: true).then((success) {
-            print('ProfileScreen: Location update result=$success');
-
             if (!mounted) return; // Check mounted before continuing
 
             if (success) {
@@ -147,15 +169,11 @@ class _ProfileWithHistoryScreenState extends State<ProfileWithHistoryScreen> {
               });
             }
           }).catchError((error) {
-            print('ProfileScreen: Location update error: $error');
+            debugPrint('ProfileScreen: Location update error: $error');
           });
-        } else {
-          print('ProfileScreen: Location already set: ${data?['displayLocation']}');
         }
       } else {
         // Document doesn't exist, create it with location
-        print('ProfileScreen: User document does not exist, creating with location...');
-
         // Update location SILENTLY in background
         _locationService.updateUserLocation(silent: true).then((success) {
           if (!mounted) return;
@@ -168,11 +186,11 @@ class _ProfileWithHistoryScreenState extends State<ProfileWithHistoryScreen> {
             });
           }
         }).catchError((error) {
-          print('ProfileScreen: Location creation error: $error');
+          debugPrint('ProfileScreen: Location creation error: $error');
         });
       }
     } catch (e) {
-      print('ProfileScreen: Error updating location: $e');
+      debugPrint('ProfileScreen: Error updating location: $e');
       // Don't crash the app, just log the error
     }
   }
@@ -212,17 +230,20 @@ class _ProfileWithHistoryScreenState extends State<ProfileWithHistoryScreen> {
           final activitiesData = userData?['activities'] as List<dynamic>?;
           if (activitiesData != null) {
             _selectedActivities = activitiesData.map((item) {
-              final map = item as Map<String, dynamic>;
-              return {
-                'name': map['name']?.toString() ?? '',
-                'level': map['level']?.toString() ?? 'intermediate',
-              };
+              // Extract only the activity name
+              if (item is Map) {
+                return item['name']?.toString() ?? '';
+              } else if (item is String) {
+                return item;
+              } else {
+                return item.toString();
+              }
             }).toList();
           }
         });
 
-        // Debug: Log what we're getting from database
-        print('User profile loaded: city=${userData?['city']}, location=${userData?['location']}, interests=$_selectedInterests');
+        // Debug logging disabled for production
+        // print('User profile loaded: city=${userData?['city']}, location=${userData?['location']}, interests=$_selectedInterests');
 
         // Always load nearby people (filters can be applied via filter dialog)
         _loadNearbyPeople();
@@ -685,11 +706,8 @@ class _ProfileWithHistoryScreenState extends State<ProfileWithHistoryScreen> {
     if (userId == null) return;
 
     try {
-      // Convert activities to map format
-      final activitiesData = _selectedActivities.map((activity) => {
-        'name': activity['name'],
-        'level': activity['level'],
-      }).toList();
+      // Activities are already simple strings
+      final activitiesData = _selectedActivities;
 
       await _firestore.collection('users').doc(userId).update({
         'connectionTypes': _selectedConnectionTypes,
@@ -754,12 +772,6 @@ class _ProfileWithHistoryScreenState extends State<ProfileWithHistoryScreen> {
     'Travel',
     'gaming',
 
-  ];
-
-  final List<String> _activityLevels = [
-    'beginner',
-    'intermediate',
-    'advanced',
   ];
 
   @override
@@ -1295,6 +1307,13 @@ class _ProfileWithHistoryScreenState extends State<ProfileWithHistoryScreen> {
                   onPressed: () => _showAddActivityDialog(),
                   tooltip: 'Add Activity',
                 ),
+              // Migration button - always visible to fix old data
+              IconButton(
+                icon: const Icon(Icons.cleaning_services, size: 20),
+                onPressed: () => _migrateActivities(),
+                tooltip: 'Fix Activities (Remove Level)',
+                color: Colors.orange,
+              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -1311,25 +1330,13 @@ class _ProfileWithHistoryScreenState extends State<ProfileWithHistoryScreen> {
                 child: Row(
                   children: [
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            activity['name']!,
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: isDarkMode ? Colors.white : Colors.black,
-                            ),
-                          ),
-                          Text(
-                            'Level: ${activity['level']!}',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                            ),
-                          ),
-                        ],
+                      child: Text(
+                        activity,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: isDarkMode ? Colors.white : Colors.black,
+                        ),
                       ),
                     ),
                     IconButton(
@@ -1349,18 +1356,65 @@ class _ProfileWithHistoryScreenState extends State<ProfileWithHistoryScreen> {
               spacing: 8,
               runSpacing: 8,
               children: _selectedActivities.map((activity) {
-                return Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF9B59B6),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    activity['name']!,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
+                return GestureDetector(
+                  onLongPress: () {
+                    // Show delete confirmation
+                    showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('Delete Activity'),
+                        content: Text('Remove "$activity" from activities?'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('Cancel'),
+                          ),
+                          TextButton(
+                            onPressed: () async {
+                              Navigator.pop(context);
+                              setState(() {
+                                _selectedActivities.remove(activity);
+                              });
+                              // Update Firestore
+                              try {
+                                await FirebaseFirestore.instance
+                                    .collection('users')
+                                    .doc(FirebaseAuth.instance.currentUser?.uid)
+                                    .update({
+                                  'activities': _selectedActivities,
+                                });
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('Deleted $activity')),
+                                  );
+                                }
+                              } catch (e) {
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('Error deleting activity: $e')),
+                                  );
+                                }
+                              }
+                            },
+                            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF9B59B6),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      activity,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
                 );
@@ -1515,7 +1569,6 @@ class _ProfileWithHistoryScreenState extends State<ProfileWithHistoryScreen> {
 
   void _showAddActivityDialog() {
     String? selectedActivity;
-    String selectedLevel = 'intermediate';
 
     showDialog(
       context: context,
@@ -1545,25 +1598,6 @@ class _ProfileWithHistoryScreenState extends State<ProfileWithHistoryScreen> {
                       });
                     },
                   ),
-                  const SizedBox(height: 16),
-                  DropdownButtonFormField<String>(
-                    decoration: const InputDecoration(
-                      labelText: 'Skill Level',
-                      border: OutlineInputBorder(),
-                    ),
-                    value: selectedLevel,
-                    items: _activityLevels.map((level) {
-                      return DropdownMenuItem(
-                        value: level,
-                        child: Text(level.substring(0, 1).toUpperCase() + level.substring(1)),
-                      );
-                    }).toList(),
-                    onChanged: (value) {
-                      setDialogState(() {
-                        selectedLevel = value!;
-                      });
-                    },
-                  ),
                 ],
               ),
               actions: [
@@ -1575,10 +1609,7 @@ class _ProfileWithHistoryScreenState extends State<ProfileWithHistoryScreen> {
                   onPressed: () {
                     if (selectedActivity != null) {
                       setState(() {
-                        _selectedActivities.add({
-                          'name': selectedActivity!,
-                          'level': selectedLevel,
-                        });
+                        _selectedActivities.add(selectedActivity!);
                       });
                       Navigator.pop(context);
                     }
@@ -1591,6 +1622,86 @@ class _ProfileWithHistoryScreenState extends State<ProfileWithHistoryScreen> {
         );
       },
     );
+  }
+
+  Future<void> _migrateActivities() async {
+    // Show loading dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const AlertDialog(
+        content: Row(
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(width: 20),
+            Text('Migrating activities...'),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      final result = await _migrationService.migrateCurrentUserActivities();
+
+      if (mounted) {
+        Navigator.pop(context); // Close loading dialog
+
+        if (result['success']) {
+          // Reload profile data
+          await _loadUserData();
+
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Migration Complete'),
+              content: Text(
+                'Successfully migrated ${result['migrated']} activities.\n\n'
+                'Activities are now in the new format without level information.\n\n'
+                'Please restart the app to see the changes.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('OK'),
+                ),
+              ],
+            ),
+          );
+        } else {
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Migration Failed'),
+              content: Text(result['message']),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('OK'),
+                ),
+              ],
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context); // Close loading dialog
+
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Error'),
+            content: Text('Failed to migrate activities: $e'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      }
+    }
   }
 
   Color _getConnectionTypeColor(String type) {

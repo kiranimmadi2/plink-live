@@ -16,11 +16,19 @@ class CacheService {
   // LRU cache for match results
   final LinkedHashMap<String, CachedMatches> _matchCache = LinkedHashMap();
 
+  // LRU cache for messages
+  final LinkedHashMap<String, CachedMessages> _messageCache = LinkedHashMap();
+  static const int _maxMessageCacheSize = 20; // Cache last 20 conversations
+  static const int _messagesPerConversation = 50; // Store last 50 messages per conversation
+  static const Duration _messageCacheDuration = Duration(minutes: 10);
+
   // Statistics
   int _embeddingHits = 0;
   int _embeddingMisses = 0;
   int _matchHits = 0;
   int _matchMisses = 0;
+  int _messageHits = 0;
+  int _messageMisses = 0;
 
   /// Store embedding in cache
   void cacheEmbedding(String text, List<double> embedding) {
@@ -152,10 +160,83 @@ class CacheService {
     _matchMisses = 0;
   }
 
+  /// Store messages in cache
+  void cacheMessages(String conversationId, List<Map<String, dynamic>> messages) {
+    try {
+      // Remove if already exists
+      if (_messageCache.containsKey(conversationId)) {
+        _messageCache.remove(conversationId);
+      }
+
+      // Add to cache (only store last N messages)
+      final messagesToCache = messages.take(_messagesPerConversation).toList();
+      _messageCache[conversationId] = CachedMessages(
+        messages: messagesToCache,
+        timestamp: DateTime.now(),
+      );
+
+      // Enforce cache size limit
+      _enforceMessageCacheLimit();
+    } catch (e) {
+      debugPrint('Error caching messages: $e');
+    }
+  }
+
+  /// Retrieve messages from cache
+  List<Map<String, dynamic>>? getCachedMessages(String conversationId) {
+    try {
+      final cached = _messageCache[conversationId];
+
+      if (cached == null) {
+        _messageMisses++;
+        return null;
+      }
+
+      // Check if cache is still valid
+      final age = DateTime.now().difference(cached.timestamp);
+      if (age > _messageCacheDuration) {
+        _messageCache.remove(conversationId);
+        _messageMisses++;
+        return null;
+      }
+
+      // Move to end (most recently used)
+      _messageCache.remove(conversationId);
+      _messageCache[conversationId] = cached;
+
+      _messageHits++;
+      return cached.messages;
+    } catch (e) {
+      debugPrint('Error retrieving cached messages: $e');
+      return null;
+    }
+  }
+
+  /// Invalidate message cache for a specific conversation
+  void invalidateMessageCache(String conversationId) {
+    _messageCache.remove(conversationId);
+  }
+
+  /// Clear message cache
+  void clearMessageCache() {
+    _messageCache.clear();
+    _messageHits = 0;
+    _messageMisses = 0;
+  }
+
+  /// Enforce message cache size limit (LRU eviction)
+  void _enforceMessageCacheLimit() {
+    while (_messageCache.length > _maxMessageCacheSize) {
+      // Remove oldest (first) entry
+      _messageCache.remove(_messageCache.keys.first);
+    }
+  }
+
   /// Clear all caches
   void clearAll() {
     clearEmbeddingCache();
     clearMatchCache();
+    clearMessageCache();
   }
 
   /// Get cache statistics
@@ -175,6 +256,14 @@ class CacheService {
         'misses': _matchMisses,
         'hit_rate': _matchHits + _matchMisses > 0
             ? _matchHits / (_matchHits + _matchMisses)
+            : 0.0,
+      },
+      'message_cache': {
+        'size': _messageCache.length,
+        'hits': _messageHits,
+        'misses': _messageMisses,
+        'hit_rate': _messageHits + _messageMisses > 0
+            ? _messageHits / (_messageHits + _messageMisses)
             : 0.0,
       },
     };
@@ -243,6 +332,17 @@ class CachedMatches {
   CachedMatches({
     required this.matchedPostIds,
     required this.score,
+    required this.timestamp,
+  });
+}
+
+/// Cached messages data class
+class CachedMessages {
+  final List<Map<String, dynamic>> messages;
+  final DateTime timestamp;
+
+  CachedMessages({
+    required this.messages,
     required this.timestamp,
   });
 }

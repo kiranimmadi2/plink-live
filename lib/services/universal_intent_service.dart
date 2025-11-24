@@ -4,7 +4,9 @@ import 'package:google_generative_ai/google_generative_ai.dart';
 import 'dart:convert';
 import 'dart:math' as math;
 import 'gemini_service.dart';
+import 'unified_post_service.dart';
 import '../config/api_config.dart';
+import '../models/post_model.dart';
 
 class UniversalIntentService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -60,7 +62,7 @@ class UniversalIntentService {
     return matches.take(10).toList();
   }
 
-  // Process user intent and find matches
+  // UPDATED: Process user intent and find matches using UnifiedPostService
   Future<Map<String, dynamic>> processIntentAndMatch(String userInput) async {
     try {
       final userId = _auth.currentUser?.uid;
@@ -70,33 +72,78 @@ class UniversalIntentService {
       final userDoc = await _firestore.collection('users').doc(userId).get();
       final userProfile = userDoc.data() ?? {};
 
-      // Build the prompt for Gemini to understand intent
-      final prompt = _buildIntentPrompt(userInput, userProfile);
-      
-      // Get structured intent from Gemini
-      final content = [Content.text(prompt)];
-      final response = await _model.generateContent(content);
-      final geminiResponse = response.text ?? '';
-      final intentData = _parseGeminiResponse(geminiResponse);
-      
-      // Store the intent with embeddings
-      final storedIntent = await _storeIntent(intentData, userId);
-      
-      // Find complementary matches
-      final matches = await _findComplementaryMatches(intentData);
-      
+      print('📝 Processing intent: $userInput');
+
+      // Import and use UnifiedPostService
+      final unifiedService = UnifiedPostService();
+
+      // Create post using unified service (stores in posts collection only)
+      final result = await unifiedService.createPost(
+        originalPrompt: userInput,
+        location: userProfile['location'],
+        latitude: userProfile['latitude']?.toDouble(),
+        longitude: userProfile['longitude']?.toDouble(),
+      );
+
+      if (result['success'] != true) {
+        throw Exception(result['message'] ?? 'Failed to create post');
+      }
+
+      final postId = result['postId'];
+      print('✅ Post created: $postId');
+
+      // Find matches using unified service
+      final matches = await unifiedService.findMatches(postId);
+      print('🔍 Found ${matches.length} matches');
+
+      // Convert matches to format expected by UI
+      final matchesWithProfile = await _enrichMatchesWithProfiles(matches);
+
       return {
         'success': true,
-        'intent': storedIntent,
-        'matches': matches,
+        'intent': result['post'],
+        'postId': postId,
+        'matches': matchesWithProfile,
       };
     } catch (e) {
-      print('Error processing intent: $e');
+      print('❌ Error processing intent: $e');
       return {
         'success': false,
         'error': e.toString(),
       };
     }
+  }
+
+  // Helper to enrich matches with user profiles
+  Future<List<Map<String, dynamic>>> _enrichMatchesWithProfiles(List<PostModel> matches) async {
+    List<Map<String, dynamic>> enrichedMatches = [];
+
+    for (var match in matches) {
+      // Get user profile
+      final userDoc = await _firestore.collection('users').doc(match.userId).get();
+
+      if (userDoc.exists) {
+        final userProfile = userDoc.data();
+
+        enrichedMatches.add({
+          'id': match.id,
+          'userId': match.userId,
+          'title': match.title,
+          'description': match.description,
+          'originalPrompt': match.originalPrompt,
+          'intentAnalysis': match.intentAnalysis,
+          'location': match.location,
+          'latitude': match.latitude,
+          'longitude': match.longitude,
+          'price': match.price,
+          'matchScore': match.similarityScore ?? 0.0,
+          'userProfile': userProfile,
+          'createdAt': match.createdAt,
+        });
+      }
+    }
+
+    return enrichedMatches;
   }
 
   String _buildIntentPrompt(String userInput, Map<String, dynamic> userProfile) {
@@ -439,92 +486,57 @@ Examples:
     }
   }
 
-  // Get user's active intents
+  // UPDATED: Get user's active posts (changed from user_intents to posts)
   Future<List<Map<String, dynamic>>> getUserIntents(String userId) async {
     try {
-      // Temporary fix: Remove orderBy until index is created
-      // Once index is created, uncomment the orderBy line
+      print('📋 Getting user posts from posts collection');
+
       final querySnapshot = await _firestore
-          .collection('user_intents')
+          .collection('posts')
           .where('userId', isEqualTo: userId)
-          .where('status', isEqualTo: 'active')
-          // .orderBy('createdAt', descending: true)  // Uncomment after creating index
+          .where('isActive', isEqualTo: true)
+          .orderBy('createdAt', descending: true)
           .get();
-      
-      // Sort in memory as a temporary workaround
-      final docs = querySnapshot.docs;
-      docs.sort((a, b) {
-        final aTime = (a.data()['createdAt'] as Timestamp?) ?? Timestamp.now();
-        final bTime = (b.data()['createdAt'] as Timestamp?) ?? Timestamp.now();
-        return bTime.compareTo(aTime); // Descending order
-      });
-      
-      return docs.map((doc) {
+
+      return querySnapshot.docs.map((doc) {
         final data = doc.data() as Map<String, dynamic>;
         data['id'] = doc.id;
         return data;
       }).toList();
     } catch (e) {
-      print('Error getting user intents: $e');
+      print('❌ Error getting user posts: $e');
       return [];
     }
   }
 
-  // Deactivate an intent (soft delete - keeps record but marks as inactive)
+  // UPDATED: Deactivate a post (uses posts collection)
   Future<void> deactivateIntent(String intentId) async {
     try {
-      await _firestore.collection('user_intents').doc(intentId).update({
-        'status': 'inactive',
-        'deactivatedAt': FieldValue.serverTimestamp(),
-      });
-      
-      // Update user's active intents count
-      final intentDoc = await _firestore
-          .collection('user_intents')
-          .doc(intentId)
-          .get();
-      
-      if (intentDoc.exists) {
-        final userId = intentDoc.data()!['userId'];
-        await _firestore.collection('users').doc(userId).update({
-          'activeIntents': FieldValue.increment(-1),
-        });
-      }
+      print('🗑️ Deactivating post: $intentId');
+      final unifiedService = UnifiedPostService();
+      await unifiedService.deactivatePost(intentId);
+      print('✅ Post deactivated');
     } catch (e) {
-      print('Error deactivating intent: $e');
+      print('❌ Error deactivating post: $e');
     }
   }
 
-  // Permanently delete an intent from database
+  // UPDATED: Permanently delete a post (uses posts collection)
   Future<bool> deleteIntent(String intentId) async {
     try {
-      // Get the intent document first to get user ID
-      final intentDoc = await _firestore
-          .collection('user_intents')
-          .doc(intentId)
-          .get();
-      
-      if (!intentDoc.exists) {
-        print('Intent not found: $intentId');
-        return false;
+      print('🗑️ Deleting post: $intentId');
+      final unifiedService = UnifiedPostService();
+      final result = await unifiedService.deletePost(intentId);
+
+      if (result) {
+        print('✅ Post deleted successfully');
+      } else {
+        print('⚠️ Post deletion failed');
       }
-      
-      final userId = intentDoc.data()!['userId'];
-      
-      // Delete the intent document
-      await _firestore.collection('user_intents').doc(intentId).delete();
-      
-      // Update user's active intents count if the intent was active
-      if (intentDoc.data()!['status'] == 'active') {
-        await _firestore.collection('users').doc(userId).update({
-          'activeIntents': FieldValue.increment(-1),
-        });
-      }
-      
-      print('Intent deleted successfully: $intentId');
-      return true;
+
+      return result;
     } catch (e) {
-      print('Error deleting intent: $e');
+      print('❌ Error deleting post: $e');
       return false;
     }
   }

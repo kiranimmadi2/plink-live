@@ -5,18 +5,17 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../services/universal_intent_service.dart';
-import '../services/progressive_intent_service.dart';
 import '../models/user_profile.dart';
 import 'enhanced_chat_screen.dart';
 import '../widgets/user_avatar.dart';
-import '../widgets/simple_intent_dialog.dart';
 import '../widgets/conversational_clarification_dialog.dart';
 import '../widgets/match_card_with_actions.dart';
 import '../services/unified_intent_processor.dart';
 import '../services/realtime_matching_service.dart';
 import 'profile_with_history_screen.dart';
 import '../services/photo_cache_service.dart';
-import '../widgets/animated_gradient_background.dart';
+import '../widgets/floating_particles.dart';
+import '../widgets/liquid_wave_orb.dart';
 
 class UniversalMatchingScreen extends StatefulWidget {
   const UniversalMatchingScreen({Key? key}) : super(key: key);
@@ -27,7 +26,6 @@ class UniversalMatchingScreen extends StatefulWidget {
 
 class _UniversalMatchingScreenState extends State<UniversalMatchingScreen> {
   final UniversalIntentService _intentService = UniversalIntentService();
-  final ProgressiveIntentService _progressiveService = ProgressiveIntentService();
   final UnifiedIntentProcessor _unifiedProcessor = UnifiedIntentProcessor();
   final RealtimeMatchingService _realtimeService = RealtimeMatchingService();
   final TextEditingController _intentController = TextEditingController();
@@ -44,6 +42,11 @@ class _UniversalMatchingScreenState extends State<UniversalMatchingScreen> {
   String? _errorMessage;
   String _currentUserName = '';
   List<String> _suggestions = [];
+
+  // Voice orb state management
+  VoiceOrbState _voiceOrbState = VoiceOrbState.idle;
+  String _voiceTranscription = '';
+  int _voiceConversationIndex = 0;
 
   @override
   void initState() {
@@ -235,21 +238,10 @@ class _UniversalMatchingScreenState extends State<UniversalMatchingScreen> {
   
   // Load smart suggestions as user types
   Future<void> _loadSuggestions(String input) async {
-    if (input.length < 2) {
-      setState(() {
-        _suggestions = [];
-      });
-      return;
-    }
-    
-    try {
-      final suggestions = await _progressiveService.getSmartSuggestions(input);
-      setState(() {
-        _suggestions = suggestions;
-      });
-    } catch (e) {
-      print('Error loading suggestions: $e');
-    }
+    // Suggestions disabled - progressive_intent_service removed
+    setState(() {
+      _suggestions = [];
+    });
   }
 
   String _formatDistance(double distanceInKm) {
@@ -259,6 +251,105 @@ class _UniversalMatchingScreenState extends State<UniversalMatchingScreen> {
       return '${distanceInKm.toStringAsFixed(1)}km away';
     } else {
       return '${distanceInKm.toStringAsFixed(0)}km away';
+    }
+  }
+
+  // Handle voice orb tap - all interaction happens inline
+  void _handleVoiceOrbTap() {
+    HapticFeedback.mediumImpact();
+
+    if (_voiceOrbState == VoiceOrbState.idle) {
+      // Start listening
+      setState(() {
+        _voiceOrbState = VoiceOrbState.listening;
+        _voiceTranscription = '';
+      });
+
+      // Simulate listening for 2 seconds
+      Future.delayed(const Duration(seconds: 2), () {
+        if (mounted && _voiceOrbState == VoiceOrbState.listening) {
+          _processVoiceInput();
+        }
+      });
+    } else if (_voiceOrbState == VoiceOrbState.listening) {
+      // Stop listening early
+      _processVoiceInput();
+    } else {
+      // Reset to idle
+      setState(() {
+        _voiceOrbState = VoiceOrbState.idle;
+        _voiceTranscription = '';
+        _voiceConversationIndex = 0;
+      });
+    }
+  }
+
+  // Process voice input (mock demo)
+  void _processVoiceInput() {
+    setState(() {
+      _voiceOrbState = VoiceOrbState.processing;
+    });
+
+    // Simulate processing
+    Future.delayed(const Duration(milliseconds: 1500), () {
+      if (mounted) {
+        _showVoiceResponse();
+      }
+    });
+  }
+
+  // Show voice response (mock demo)
+  void _showVoiceResponse() {
+    // Mock conversation
+    final List<Map<String, String>> mockConversation = [
+      {'user': 'Hello, I need help', 'ai': 'Hi! What can I help you find today?'},
+      {'user': 'Looking for a bike', 'ai': 'Great! What\'s your budget?'},
+      {'user': 'Under 200 dollars', 'ai': 'Perfect! Searching for bikes under \$200...'},
+    ];
+
+    if (_voiceConversationIndex < mockConversation.length) {
+      final conversation = mockConversation[_voiceConversationIndex];
+
+      setState(() {
+        _voiceOrbState = VoiceOrbState.speaking;
+        _voiceTranscription = conversation['ai']!;
+      });
+
+      _voiceConversationIndex++;
+
+      // Return to idle after response
+      Future.delayed(const Duration(seconds: 3), () {
+        if (mounted) {
+          setState(() {
+            _voiceOrbState = VoiceOrbState.idle;
+          });
+
+          // Clear transcription after a bit
+          Future.delayed(const Duration(seconds: 2), () {
+            if (mounted) {
+              setState(() {
+                _voiceTranscription = '';
+              });
+            }
+          });
+        }
+      });
+    } else {
+      // Conversation finished
+      setState(() {
+        _voiceOrbState = VoiceOrbState.idle;
+        _voiceTranscription = 'All done! Tap again to restart.';
+        _voiceConversationIndex = 0;
+      });
+
+      // Clear after a moment
+      Future.delayed(const Duration(seconds: 3), () {
+        if (mounted) {
+          setState(() {
+            _voiceTranscription = '';
+          });
+        }
+      });
     }
   }
 
@@ -333,10 +424,21 @@ class _UniversalMatchingScreenState extends State<UniversalMatchingScreen> {
           ],
         ),
       ),
-      body: AnimatedGradientBackground(
-        isDarkMode: isDarkMode,
-        child: Column(
-          children: [
+      body: Stack(
+        children: [
+          // Pure black background
+          Container(
+            color: Colors.black,
+          ),
+          // Subtle floating particles
+          const Positioned.fill(
+            child: FloatingParticles(
+              particleCount: 12,
+            ),
+          ),
+          // Main content
+          Column(
+            children: [
             // Main content area
             Expanded(
               child: _isProcessing
@@ -531,6 +633,7 @@ class _UniversalMatchingScreenState extends State<UniversalMatchingScreen> {
             ),
           ],
         ),
+        ],
       ),
     );
   }
@@ -556,7 +659,7 @@ class _UniversalMatchingScreenState extends State<UniversalMatchingScreen> {
                 );
               },
               child: Text(
-                'Hello ${_currentUserName.split(' ')[0].toUpperCase()},',
+                'Hello ${_currentUserName.split(' ')[0].toUpperCase()}',
                 style: TextStyle(
                   fontSize: 22,
                   color: isDarkMode ? Colors.grey[400] : Colors.grey[700],
@@ -565,39 +668,26 @@ class _UniversalMatchingScreenState extends State<UniversalMatchingScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 20),
-            // "Find Your Need" with gradient text
+            const SizedBox(height: 40),
+            // Voice Orb - Interactive element (all states happen here)
             TweenAnimationBuilder(
               tween: Tween<double>(begin: 0, end: 1),
               duration: const Duration(milliseconds: 800),
+              curve: Curves.easeOutCubic,
               builder: (context, double value, child) {
                 return Opacity(
                   opacity: value,
                   child: Transform.scale(
-                    scale: 0.8 + (0.2 * value),
+                    scale: 0.7 + (0.3 * value),
                     child: child,
                   ),
                 );
               },
-              child: ShaderMask(
-                shaderCallback: (bounds) => LinearGradient(
-                  colors: [
-                    Theme.of(context).primaryColor,
-                    const Color(0xFF06B6D4),
-                    const Color(0xFF8B5CF6),
-                  ],
-                  stops: const [0.0, 0.5, 1.0],
-                ).createShader(bounds),
-                child: const Text(
-                  'Find Your Need',
-                  style: TextStyle(
-                    fontSize: 40,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.white,
-                    letterSpacing: -0.5,
-                    height: 1.2,
-                  ),
-                  textAlign: TextAlign.center,
+              child: GestureDetector(
+                onTap: _handleVoiceOrbTap,
+                child: LiquidWaveOrb(
+                  state: _voiceOrbState,
+                  size: 250,
                 ),
               ),
             ),

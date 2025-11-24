@@ -196,20 +196,17 @@ If the intent is clear enough to find matches (even if not perfect), set needsCl
 
   Future<Map<String, dynamic>> _processIntent(String intent) async {
     try {
-      // Process with universal intent service
+      // UPDATED: Use universal intent service (which now uses UnifiedPostService internally)
       final result = await _universalService.processIntent(intent);
-      
-      // Store the processed intent
-      await _storeProcessedIntent(intent, result);
-      
-      // Find matches
-      final matches = await _universalService.findMatches(result['intent']);
-      
+
+      // No longer storing in processed_intents collection - data is in posts collection
+
       return {
         'success': true,
         'intent': result['intent'],
-        'matches': matches,
-        'message': 'Found ${matches.length} matches',
+        'postId': result['postId'],
+        'matches': result['matches'] ?? [],
+        'message': 'Found ${(result['matches'] ?? []).length} matches',
       };
     } catch (e) {
       return {
@@ -220,18 +217,8 @@ If the intent is clear enough to find matches (even if not perfect), set needsCl
     }
   }
 
-  Future<void> _storeProcessedIntent(String originalInput, Map<String, dynamic> result) async {
-    final userId = _auth.currentUser?.uid;
-    if (userId == null) return;
-
-    await _firestore.collection('processed_intents').add({
-      'userId': userId,
-      'originalInput': originalInput,
-      'processedIntent': result['intent'],
-      'timestamp': FieldValue.serverTimestamp(),
-      'hasMatches': result['matches']?.isNotEmpty ?? false,
-    });
-  }
+  // REMOVED: No longer need to store in processed_intents collection
+  // All data is now in posts collection
 
   Map<String, dynamic> _parseJson(String jsonStr) {
     try {

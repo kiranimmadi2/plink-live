@@ -22,16 +22,53 @@ class _ConversationsScreenState extends State<ConversationsScreen>
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final TextEditingController _searchController = TextEditingController();
-  
-  
+  final ConversationService _conversationService = ConversationService();
+
   late TabController _tabController;
   bool _isSearching = false;
   String _searchQuery = '';
+  bool _isCleaningUp = false;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 1, vsync: this);  // Changed to 1 tab only
+    _runCleanup();
+  }
+
+  /// Run cleanup for orphaned conversations
+  /// Deferred to run AFTER first frame to prevent frame drops
+  Future<void> _runCleanup() async {
+    // Defer cleanup to after UI is rendered to prevent frame skipping
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    if (!mounted) return;
+
+    try {
+      setState(() {
+        _isCleaningUp = true;
+      });
+
+      final deletedCount = await _conversationService.deleteOrphanedConversations();
+
+      if (deletedCount > 0 && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Cleaned up $deletedCount invalid conversation${deletedCount > 1 ? 's' : ''}'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error during cleanup: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isCleaningUp = false;
+        });
+      }
+    }
   }
 
   @override
@@ -163,38 +200,109 @@ class _ConversationsScreenState extends State<ConversationsScreen>
     if (currentUserId == null) {
       return const Center(child: Text('Please login to see conversations'));
     }
-    
+
+    // Show loading indicator while cleaning up orphaned conversations
+    if (_isCleaningUp) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text(
+              'Checking conversations...',
+              style: TextStyle(
+                color: isDarkMode ? Colors.grey[600] : Colors.grey,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return StreamBuilder<QuerySnapshot>(
       stream: _firestore
           .collection('conversations')
           .where('participants', arrayContains: currentUserId)
           .snapshots(),
       builder: (context, snapshot) {
+        // Debug logging disabled for production performance
+        // Uncomment for debugging: debugPrint('ConversationsScreen: rebuild, state=${snapshot.connectionState}');
+
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
-        
+
         if (snapshot.hasError) {
+          // Log the error for debugging
+          debugPrint('ConversationsScreen: Error: ${snapshot.error}');
+
           // Handle permission errors gracefully
           final error = snapshot.error.toString();
           if (error.contains('permission-denied') || error.contains('PERMISSION_DENIED')) {
-            // If permission denied, show empty state instead of error
-            return _buildEmptyState(isDarkMode);
+            // Show error with option to retry instead of just empty state
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.error_outline,
+                    size: 80,
+                    color: Colors.orange,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Permission Error',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: isDarkMode ? Colors.white : Colors.black,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 40),
+                    child: Text(
+                      'Unable to load conversations. Please try logging out and logging back in.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: isDarkMode ? Colors.grey[600] : Colors.grey,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      setState(() {}); // Trigger rebuild to retry
+                    },
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Retry'),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
           }
-          
-          // For other errors, show a more user-friendly message
+
+          // For other errors, show a more detailed error message
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(
-                  Icons.chat_bubble_outline,
+                  Icons.error_outline,
                   size: 80,
-                  color: isDarkMode ? Colors.grey[700] : Colors.grey[300],
+                  color: Colors.red,
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'No conversations yet',
+                  'Error Loading Conversations',
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -202,24 +310,47 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                   ),
                 ),
                 const SizedBox(height: 8),
-                Text(
-                  'Start a new conversation',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: isDarkMode ? Colors.grey[600] : Colors.grey,
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 40),
+                  child: Text(
+                    error.length > 100 ? '${error.substring(0, 100)}...' : error,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isDarkMode ? Colors.grey[600] : Colors.grey,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 24),
-                ElevatedButton.icon(
-                  onPressed: _showNewChatDialog,
-                  icon: const Icon(Icons.message),
-                  label: const Text('New Message'),
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        setState(() {}); // Trigger rebuild to retry
+                      },
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Retry'),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 12),
+                    OutlinedButton.icon(
+                      onPressed: _showNewChatDialog,
+                      icon: const Icon(Icons.message),
+                      label: const Text('New Chat'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -232,9 +363,16 @@ class _ConversationsScreenState extends State<ConversationsScreen>
 
         // Parse and sort conversations manually
         final List<ConversationModel> conversations = [];
+
         for (var doc in snapshot.data!.docs) {
           try {
             final conv = ConversationModel.fromFirestore(doc);
+
+            // Note: Orphaned conversations (where user doesn't exist) are handled:
+            // 1. On app start via _runCleanup()
+            // 2. When user taps the conversation (it will be deleted gracefully)
+            // This keeps the UI responsive without async validation in the builder
+
             // Show all conversations, even those without messages
             if (_searchQuery.isEmpty) {
               conversations.add(conv);
@@ -245,10 +383,10 @@ class _ConversationsScreenState extends State<ConversationsScreen>
               }
             }
           } catch (e) {
-            print('Error parsing conversation: $e');
+            debugPrint('ConversationsScreen: Error parsing conversation ${doc.id}: $e');
           }
         }
-        
+
         // Sort by lastMessageTime
         conversations.sort((a, b) {
           if (a.lastMessageTime == null) return 1;
@@ -336,21 +474,19 @@ class _ConversationsScreenState extends State<ConversationsScreen>
     return InkWell(
       onTap: () async {
         HapticFeedback.lightImpact();
-        
+
         try {
           final otherUserDoc = await _firestore
               .collection('users')
               .doc(otherUserId)
               .get();
-          
+
           if (otherUserDoc.exists) {
             final otherUser = UserProfile.fromMap(
               otherUserDoc.data()!,
               otherUserId,
             );
-            
-            print('Navigating to chat with: ${otherUser.name} (${otherUser.uid})');
-            
+
             Navigator.push(
               context,
               MaterialPageRoute(
@@ -360,22 +496,35 @@ class _ConversationsScreenState extends State<ConversationsScreen>
               ),
             );
           } else {
-            print('User document not found for ID: $otherUserId');
+            // User no longer exists - delete this orphaned conversation
+            // Delete the orphaned conversation
+            await _firestore
+                .collection('conversations')
+                .doc(conversation.id)
+                .delete();
+
+            // Show a friendly message
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('This conversation is no longer available'),
+                  backgroundColor: Colors.orange,
+                  duration: const Duration(seconds: 2),
+                ),
+              );
+            }
+          }
+        } catch (e) {
+          debugPrint('Error loading user data: $e');
+          if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('User not found'),
-                backgroundColor: Colors.red,
+                content: Text('Unable to load conversation'),
+                backgroundColor: Colors.orange,
+                duration: const Duration(seconds: 2),
               ),
             );
           }
-        } catch (e) {
-          print('Error loading user data: $e');
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error loading chat'),
-              backgroundColor: Colors.red,
-            ),
-          );
         }
       },
       child: Container(

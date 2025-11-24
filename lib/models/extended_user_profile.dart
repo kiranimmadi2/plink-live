@@ -2,26 +2,25 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 class Activity {
   final String name;
-  final String level; // 'beginner', 'intermediate', 'advanced'
 
   Activity({
     required this.name,
-    this.level = 'intermediate',
   });
 
   Map<String, dynamic> toMap() {
     return {
       'name': name,
-      'level': level,
     };
   }
 
   factory Activity.fromMap(Map<String, dynamic> map) {
     return Activity(
       name: map['name'] ?? '',
-      level: map['level'] ?? 'intermediate',
     );
   }
+
+  @override
+  String toString() => name;
 }
 
 class ExtendedUserProfile {
@@ -44,6 +43,12 @@ class ExtendedUserProfile {
   final int? age;
   final String? gender; // 'Male', 'Female', 'Other', 'Prefer not to say'
 
+  // Discovery and Privacy
+  final bool discoveryModeEnabled; // Controls visibility in Live Connect
+  final List<String> blockedUsers;
+  final List<String> connections;
+  final int connectionCount;
+
   // Calculated field
   double? distance; // Will be calculated based on current user's location
 
@@ -64,17 +69,28 @@ class ExtendedUserProfile {
     this.lastSeen,
     this.age,
     this.gender,
+    this.discoveryModeEnabled = true,
+    this.blockedUsers = const [],
+    this.connections = const [],
+    this.connectionCount = 0,
     this.distance,
   });
 
   factory ExtendedUserProfile.fromMap(Map<String, dynamic> map, String uid) {
-    // Parse activities from map
+    // Parse activities from map - handle both String and Map formats
     List<Activity> activities = [];
     if (map['activities'] != null) {
       final activitiesData = map['activities'] as List<dynamic>;
-      activities = activitiesData
-          .map((item) => Activity.fromMap(item as Map<String, dynamic>))
-          .toList();
+      activities = activitiesData.map((item) {
+        // Handle both String format (legacy) and Map format (new)
+        if (item is String) {
+          return Activity(name: item); // Convert String to Activity
+        } else if (item is Map<String, dynamic>) {
+          return Activity.fromMap(item);
+        } else {
+          return Activity(name: 'Unknown'); // Fallback
+        }
+      }).toList();
     }
 
     return ExtendedUserProfile(
@@ -94,6 +110,10 @@ class ExtendedUserProfile {
       lastSeen: map['lastSeen'] as Timestamp?,
       age: map['age'] as int?,
       gender: map['gender'] as String?,
+      discoveryModeEnabled: map['discoveryModeEnabled'] ?? true,
+      blockedUsers: List<String>.from(map['blockedUsers'] ?? []),
+      connections: List<String>.from(map['connections'] ?? []),
+      connectionCount: map['connectionCount'] ?? 0,
     );
   }
 
@@ -109,12 +129,16 @@ class ExtendedUserProfile {
       'interests': interests,
       'verified': verified,
       'connectionTypes': connectionTypes,
-      'activities': activities.map((a) => a.toMap()).toList(),
+      'activities': activities.map((a) => a.name).toList(), // Store as simple strings
       'aboutMe': aboutMe,
       'isOnline': isOnline,
       'lastSeen': lastSeen,
       'age': age,
       'gender': gender,
+      'discoveryModeEnabled': discoveryModeEnabled,
+      'blockedUsers': blockedUsers,
+      'connections': connections,
+      'connectionCount': connectionCount,
     };
   }
 

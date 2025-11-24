@@ -19,6 +19,9 @@ import 'services/notification_service.dart';
 import 'services/conversation_service.dart';
 import 'services/location_service.dart';
 import 'services/connectivity_service.dart';
+import 'services/database_cleanup_service.dart';
+import 'services/user_migration_service.dart';
+import 'services/conversation_migration_service.dart';
 import 'providers/theme_provider.dart';
 import 'utils/app_optimizer.dart';
 import 'utils/memory_manager.dart';
@@ -77,7 +80,48 @@ void main() async {
   UserManager().initialize();
   await NotificationService().initialize();
   await ConnectivityService().initialize();
-  
+
+  // REMOVED: Database cleanup was deleting the posts collection
+  // The posts collection is actively used and should NOT be deleted
+
+  // Run user migration (adds missing fields to existing users)
+  try {
+    final UserMigrationService migrationService = UserMigrationService();
+    await migrationService.checkAndRunMigration();
+  } catch (e) {
+    debugPrint('⚠️ User migration error (non-fatal): $e');
+  }
+
+  // Run conversation migration (fixes corrupted participants arrays)
+  // This ensures all conversations appear in the Messages screen
+  try {
+    final ConversationMigrationService conversationMigrationService = ConversationMigrationService();
+
+    // Only run if migration hasn't been completed before
+    final isCompleted = await conversationMigrationService.isMigrationCompleted();
+    if (!isCompleted) {
+      debugPrint('🔧 Running conversation migration...');
+      final result = await conversationMigrationService.runMigration();
+
+      if (result['success']) {
+        debugPrint('✅ Conversation migration completed successfully');
+        debugPrint('   - Scanned: ${result['scanned']} conversations');
+        debugPrint('   - Fixed: ${result['fixed']} conversations');
+        if (result['errors'].isNotEmpty) {
+          debugPrint('   - Errors: ${result['errors'].length}');
+        }
+      } else {
+        debugPrint('⚠️ Conversation migration completed with errors');
+        debugPrint('   - Fixed: ${result['fixed']} conversations');
+        debugPrint('   - Errors: ${result['errors']}');
+      }
+    } else {
+      debugPrint('✓ Conversation migration already completed');
+    }
+  } catch (e) {
+    debugPrint('⚠️ Conversation migration error (non-fatal): $e');
+  }
+
   runApp(const MyApp());
 }
 
@@ -104,17 +148,27 @@ class MyApp extends StatelessWidget {
   }
 }
 
-class AuthWrapper extends StatelessWidget {
+class AuthWrapper extends StatefulWidget {
   const AuthWrapper({super.key});
 
   @override
+  State<AuthWrapper> createState() => _AuthWrapperState();
+}
+
+class _AuthWrapperState extends State<AuthWrapper> {
+  final AuthService _authService = AuthService();
+  final ProfileService _profileService = ProfileService();
+  final LocationService _locationService = LocationService();
+  final ConversationService _conversationService = ConversationService();
+
+  // Flags to ensure initialization happens only ONCE per session
+  bool _hasInitializedServices = false;
+  String? _lastInitializedUserId;
+
+  @override
   Widget build(BuildContext context) {
-    final authService = AuthService();
-    final profileService = ProfileService();
-    final locationService = LocationService();
-    
     return StreamBuilder<User?>(
-      stream: authService.authStateChanges,
+      stream: _authService.authStateChanges,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
@@ -123,26 +177,55 @@ class AuthWrapper extends StatelessWidget {
             ),
           );
         }
-        
+
         if (snapshot.hasData && snapshot.data != null) {
-          // Ensure profile exists when user is logged in
-          profileService.ensureProfileExists();
+          final currentUserId = snapshot.data!.uid;
 
-          // Initialize location service SILENTLY in background (asks permission only on first app launch)
-          locationService.initializeLocation();
+          // CRITICAL: Only initialize services ONCE per user session
+          // This prevents duplicate calls on StreamBuilder rebuilds
+          if (!_hasInitializedServices || _lastInitializedUserId != currentUserId) {
+            _hasInitializedServices = true;
+            _lastInitializedUserId = currentUserId;
 
-          // Start periodic background location updates SILENTLY (every 10 minutes with rate limiting)
-          locationService.startPeriodicLocationUpdates();
+            // Defer heavy initialization to after first frame renders
+            // This prevents frame skipping during app startup
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              _initializeUserServices();
+            });
+          }
 
-          // Clean up any duplicate conversations on login
-          ConversationService().cleanupDuplicateConversations();
-          
           return const MainNavigationScreen();
         }
+
+        // Reset flags when user logs out
+        _hasInitializedServices = false;
+        _lastInitializedUserId = null;
 
         return const LoginScreen();
       },
     );
   }
+
+  /// Initialize all user-dependent services
+  /// Called ONCE per user session, deferred to after first frame
+  Future<void> _initializeUserServices() async {
+    try {
+      // Ensure profile exists
+      await _profileService.ensureProfileExists();
+
+      // Small delay to prevent overwhelming the main thread
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      // Initialize location SILENTLY in background
+      _locationService.initializeLocation();
+
+      // Start periodic location updates (has internal guard against duplicates)
+      _locationService.startPeriodicLocationUpdates();
+
+      // Clean up duplicate conversations (runs in background)
+      _conversationService.cleanupDuplicateConversations();
+    } catch (e) {
+      debugPrint('AuthWrapper: Error initializing services: $e');
+    }
+  }
 }
-uns

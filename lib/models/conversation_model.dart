@@ -82,12 +82,12 @@ class ConversationModel {
 
   Map<String, dynamic> toFirestore() {
     return {
-      'participantIds': participantIds,
+      'participants': participantIds,
       'participantNames': participantNames,
       'participantPhotos': participantPhotos,
       'lastMessage': lastMessage,
-      'lastMessageTime': lastMessageTime != null 
-          ? Timestamp.fromDate(lastMessageTime!) 
+      'lastMessageTime': lastMessageTime != null
+          ? Timestamp.fromDate(lastMessageTime!)
           : null,
       'lastMessageSenderId': lastMessageSenderId,
       'unreadCount': unreadCount,
@@ -98,7 +98,7 @@ class ConversationModel {
       'createdAt': Timestamp.fromDate(createdAt),
       'lastSeen': lastSeen.map(
         (key, value) => MapEntry(
-          key, 
+          key,
           value != null ? Timestamp.fromDate(value!) : null
         ),
       ),

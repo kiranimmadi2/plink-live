@@ -29,29 +29,11 @@ class RealtimeMatchingService {
     if (userId == null) return;
 
     _isInitialized = true;
-    
-    // Listen for new intents from other users
-    _listenForNewIntents(userId);
-    
+
     // Listen for new posts from other users
     _listenForNewPosts(userId);
-    
-    debugPrint('RealtimeMatchingService initialized');
-  }
 
-  void _listenForNewIntents(String currentUserId) {
-    _intentListener = _firestore
-        .collection('intents')
-        .where('userId', isNotEqualTo: currentUserId)
-        .where('createdAt', isGreaterThan: Timestamp.now())
-        .snapshots()
-        .listen((snapshot) async {
-      for (var change in snapshot.docChanges) {
-        if (change.type == DocumentChangeType.added) {
-          await _checkIntentMatch(change.doc, currentUserId);
-        }
-      }
-    });
+    debugPrint('RealtimeMatchingService initialized');
   }
 
   void _listenForNewPosts(String currentUserId) {
@@ -68,6 +50,8 @@ class RealtimeMatchingService {
         }
       }
     });
+
+    debugPrint('✅ Listening for new posts in real-time');
   }
 
   Future<void> _checkIntentMatch(DocumentSnapshot newIntent, String currentUserId) async {
@@ -130,19 +114,54 @@ class RealtimeMatchingService {
       if (userPosts.docs.isEmpty) return;
 
       final newPostData = newPost.data() as Map<String, dynamic>;
-      final newEmbedding = List<double>.from(newPostData['embedding'] ?? []);
-      
-      if (newEmbedding.isEmpty) return;
+      var newEmbedding = List<double>.from(newPostData['embedding'] ?? []);
+
+      // UPDATED: If embedding missing, generate it now
+      if (newEmbedding.isEmpty) {
+        debugPrint('⚠️ New post ${newPost.id} missing embedding, generating...');
+        try {
+          final text = '${newPostData['title'] ?? ''} ${newPostData['description'] ?? ''}';
+          newEmbedding = await _geminiService.generateEmbedding(text);
+
+          // Update document with embedding
+          await newPost.reference.update({
+            'embedding': newEmbedding,
+            'embeddingUpdatedAt': FieldValue.serverTimestamp(),
+          });
+
+          debugPrint('✅ Embedding generated and saved for ${newPost.id}');
+        } catch (e) {
+          debugPrint('❌ Failed to generate embedding: $e');
+          return; // Skip this post if embedding generation fails
+        }
+      }
 
       for (var userPost in userPosts.docs) {
         final userPostData = userPost.data() as Map<String, dynamic>;
-        final userEmbedding = List<double>.from(userPostData['embedding'] ?? []);
-        
-        if (userEmbedding.isEmpty) continue;
+        var userEmbedding = List<double>.from(userPostData['embedding'] ?? []);
+
+        // UPDATED: Generate embedding if missing for user's post too
+        if (userEmbedding.isEmpty) {
+          debugPrint('⚠️ User post ${userPost.id} missing embedding, generating...');
+          try {
+            final text = '${userPostData['title'] ?? ''} ${userPostData['description'] ?? ''}';
+            userEmbedding = await _geminiService.generateEmbedding(text);
+
+            await userPost.reference.update({
+              'embedding': userEmbedding,
+              'embeddingUpdatedAt': FieldValue.serverTimestamp(),
+            });
+
+            debugPrint('✅ Embedding generated for user post ${userPost.id}');
+          } catch (e) {
+            debugPrint('❌ Failed to generate embedding: $e');
+            continue; // Skip this comparison
+          }
+        }
 
         // Calculate similarity
         final similarity = _geminiService.calculateSimilarity(userEmbedding, newEmbedding);
-        
+
         if (similarity > 0.75) {
           // Match found! Send notification
           await _sendMatchNotification(
@@ -155,7 +174,7 @@ class RealtimeMatchingService {
         }
       }
     } catch (e) {
-      debugPrint('Error checking post match: $e');
+      debugPrint('❌ Error checking post match: $e');
     }
   }
 

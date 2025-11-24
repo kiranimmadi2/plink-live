@@ -43,8 +43,6 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   String? _selectedGender;
   String? _selectedOccupation;
   DateTime? _selectedDateOfBirth;
-  List<String> _selectedInterests = [];
-  List<String> _selectedConnectionTypes = [];
 
   final List<String> _genderOptions = ['Male', 'Female', 'Non-binary', 'Prefer not to say'];
   final List<String> _occupationOptions = [
@@ -118,20 +116,6 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     'Writer/Author',
     'Other',
   ];
-  final List<String> _availableInterests = [
-    'Fitness', 'Hiking', 'Nutrition', 'Wellness', 'Running',
-    'Tech', 'Business', 'Travel', 'Music', 'Movies',
-    'Cooking', 'Wine', 'Food Photography', 'Culture',
-    'Design', 'Art', 'Photography', 'Gaming', 'Sports',
-    'Reading', 'Writing', 'Dancing', 'Yoga', 'Meditation',
-  ];
-  final List<String> _connectionTypeOptions = [
-    'Professional Networking',
-    'Activity Partner',
-    'Event Companion',
-    'Friendship',
-    'Dating',
-  ];
 
   @override
   void initState() {
@@ -174,9 +158,6 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
             orElse: () => 'Other',
           );
         }
-
-        _selectedInterests = List<String>.from(profileData['interests'] ?? []);
-        _selectedConnectionTypes = List<String>.from(profileData['connectionTypes'] ?? []);
 
         // Parse date of birth if exists
         if (profileData['dateOfBirth'] != null) {
@@ -285,8 +266,6 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         'gender': _selectedGender,
         'dateOfBirth': _selectedDateOfBirth?.toIso8601String(),
         'age': age,
-        'interests': _selectedInterests,
-        'connectionTypes': _selectedConnectionTypes,
         'lastSeen': FieldValue.serverTimestamp(),
         'isOnline': true,
       }, SetOptions(merge: true));
@@ -303,8 +282,6 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         'gender': _selectedGender,
         'dateOfBirth': _selectedDateOfBirth?.toIso8601String(),
         'age': age,
-        'interests': _selectedInterests,
-        'connectionTypes': _selectedConnectionTypes,
       });
       
       print('Profile updated successfully');
@@ -755,98 +732,8 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                       },
                       hint: const Text('Select your occupation'),
                     ),
-                    const SizedBox(height: 16),
-
-                    // Interests Section
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Interests & Hobbies',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: _availableInterests.map((interest) {
-                              final isSelected = _selectedInterests.contains(interest);
-                              return FilterChip(
-                                label: Text(interest),
-                                selected: isSelected,
-                                onSelected: (selected) {
-                                  setState(() {
-                                    if (selected) {
-                                      _selectedInterests.add(interest);
-                                    } else {
-                                      _selectedInterests.remove(interest);
-                                    }
-                                  });
-                                },
-                                selectedColor: Theme.of(context).primaryColor.withOpacity(0.3),
-                                checkmarkColor: Theme.of(context).primaryColor,
-                              );
-                            }).toList(),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Looking for / Connection Types
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Looking to Connect For',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: _connectionTypeOptions.map((type) {
-                              final isSelected = _selectedConnectionTypes.contains(type);
-                              return FilterChip(
-                                label: Text(type),
-                                selected: isSelected,
-                                onSelected: (selected) {
-                                  setState(() {
-                                    if (selected) {
-                                      _selectedConnectionTypes.add(type);
-                                    } else {
-                                      _selectedConnectionTypes.remove(type);
-                                    }
-                                  });
-                                },
-                                selectedColor: Theme.of(context).primaryColor.withOpacity(0.3),
-                                checkmarkColor: Theme.of(context).primaryColor,
-                              );
-                            }).toList(),
-                          ),
-                        ],
-                      ),
-                    ),
                     const SizedBox(height: 24),
-                    
+
                     // Update Button
                     SizedBox(
                       width: double.infinity,

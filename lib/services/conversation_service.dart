@@ -11,6 +11,67 @@ class ConversationService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
+  /// Validate and fix conversation participants array if corrupted
+  /// Returns true if the conversation was fixed, false if it was already valid
+  Future<bool> _validateAndFixParticipants(String conversationId) async {
+    try {
+      final doc = await _firestore
+          .collection('conversations')
+          .doc(conversationId)
+          .get();
+
+      if (!doc.exists) {
+        // print('ConversationService: VALIDATION - Conversation does not exist: $conversationId');
+        return false;
+      }
+
+      final data = doc.data()!;
+      final participants = data['participants'] as List<dynamic>?;
+
+      // Extract expected user IDs from conversation ID
+      final expectedUserIds = conversationId.split('_');
+      if (expectedUserIds.length != 2) {
+        // print('ConversationService: VALIDATION - Invalid conversation ID format: $conversationId');
+        return false;
+      }
+
+      // Check if participants array needs fixing
+      bool needsFix = false;
+
+      if (participants == null || participants.isEmpty) {
+        // print('ConversationService: VALIDATION - Participants array is null or empty');
+        needsFix = true;
+      } else if (participants.length != 2) {
+        // print('ConversationService: VALIDATION - Participants array has wrong length: ${participants.length}');
+        needsFix = true;
+      } else {
+        // Check if both expected users are in the array
+        final participantsList = participants.cast<String>();
+        for (final userId in expectedUserIds) {
+          if (!participantsList.contains(userId)) {
+            // print('ConversationService: VALIDATION - Missing user $userId in participants array');
+            needsFix = true;
+            break;
+          }
+        }
+      }
+
+      if (needsFix) {
+        // print('ConversationService: VALIDATION - Fixing participants array for $conversationId');
+        await doc.reference.update({
+          'participants': expectedUserIds,
+        });
+        // print('ConversationService: VALIDATION - Fixed! Updated to: $expectedUserIds');
+        return true;
+      }
+
+      return false;
+    } catch (e) {
+      // print('ConversationService: VALIDATION ERROR for $conversationId: $e');
+      return false;
+    }
+  }
+
   // Generate consistent conversation ID between two users
   String generateConversationId(String userId1, String userId2) {
     // Always sort user IDs to ensure consistency
@@ -23,12 +84,15 @@ class ConversationService {
   Future<String> getOrCreateConversation(UserProfile otherUser) async {
     final currentUserId = _auth.currentUser?.uid;
     if (currentUserId == null) {
+      // print('ConversationService: ERROR - No authenticated user');
       throw Exception('No authenticated user');
     }
 
     // Generate consistent conversation ID
     final conversationId = generateConversationId(currentUserId, otherUser.uid);
-    
+    // print('ConversationService: Getting or creating conversation: $conversationId');
+    // print('ConversationService: Current user: $currentUserId, Other user: ${otherUser.uid}');
+
     try {
       // First, try to get existing conversation
       final conversationDoc = await _firestore
@@ -37,16 +101,28 @@ class ConversationService {
           .get();
 
       if (conversationDoc.exists) {
-        // Conversation exists, update participant info if needed
+        // print('ConversationService: Conversation already exists: $conversationId');
+
+        // IMPORTANT: Validate and fix participants array if corrupted
+        // This ensures the conversation will appear in the Messages screen
+        final wasFixed = await _validateAndFixParticipants(conversationId);
+        if (wasFixed) {
+          // print('ConversationService: ⚠️ Fixed corrupted participants array for $conversationId');
+        }
+
+        // Update participant info if needed
         await _updateParticipantInfo(conversationId, currentUserId, otherUser);
         return conversationId;
       }
 
+      // print('ConversationService: Conversation does not exist, creating new one: $conversationId');
       // Conversation doesn't exist, create it
       await _createConversation(conversationId, currentUserId, otherUser);
+      // print('ConversationService: Conversation created successfully: $conversationId');
       return conversationId;
-      
+
     } catch (e) {
+      // print('ConversationService: ERROR creating/getting conversation: $e');
       throw e;
     }
   }
@@ -57,21 +133,43 @@ class ConversationService {
     String currentUserId,
     UserProfile otherUser,
   ) async {
+    // print('ConversationService: Creating conversation document...');
+
+    // VALIDATION: Ensure user IDs are valid and different
+    if (currentUserId.isEmpty || otherUser.uid.isEmpty) {
+      throw Exception('Invalid user IDs: currentUserId=$currentUserId, otherUserId=${otherUser.uid}');
+    }
+
+    if (currentUserId == otherUser.uid) {
+      throw Exception('Cannot create conversation with self: userId=$currentUserId');
+    }
+
     final currentUserDoc = await _firestore
         .collection('users')
         .doc(currentUserId)
         .get();
-    
+
     final currentUserData = currentUserDoc.data() ?? {};
-    final currentUserName = currentUserData['name'] ?? 
-                            _auth.currentUser?.displayName ?? 
+    final currentUserName = currentUserData['name'] ??
+                            _auth.currentUser?.displayName ??
                             'User';
-    final currentUserPhoto = currentUserData['photoUrl'] ?? 
+    final currentUserPhoto = currentUserData['photoUrl'] ??
                             _auth.currentUser?.photoURL;
 
-    await _firestore.collection('conversations').doc(conversationId).set({
+    // print('ConversationService: Current user name: $currentUserName');
+    // print('ConversationService: Other user name: ${otherUser.name}');
+    // print('ConversationService: Participants: [$currentUserId, ${otherUser.uid}]');
+
+    // CRITICAL: Create participants array with both user IDs
+    final participantsArray = [currentUserId, otherUser.uid];
+
+    // VALIDATION: Ensure participants array has exactly 2 unique user IDs
+    assert(participantsArray.length == 2, 'Participants array must have exactly 2 users');
+    assert(participantsArray[0] != participantsArray[1], 'Participants must be different users');
+
+    final conversationData = {
       'id': conversationId,
-      'participantIds': [currentUserId, otherUser.uid],
+      'participants': participantsArray,
       'participantNames': {
         currentUserId: currentUserName,
         otherUser.uid: otherUser.name,
@@ -99,7 +197,15 @@ class ConversationService {
       },
       'isArchived': false,
       'isMuted': false,
-    });
+    };
+
+    try {
+      await _firestore.collection('conversations').doc(conversationId).set(conversationData);
+      // print('ConversationService: Conversation document created successfully');
+    } catch (e) {
+      // print('ConversationService: ERROR creating conversation document: $e');
+      throw e;
+    }
   }
 
   // Update participant information in existing conversation
@@ -112,13 +218,17 @@ class ConversationService {
         .collection('users')
         .doc(currentUserId)
         .get();
-    
+
     final currentUserData = currentUserDoc.data() ?? {};
-    final currentUserName = currentUserData['name'] ?? 
-                            _auth.currentUser?.displayName ?? 
+    final currentUserName = currentUserData['name'] ??
+                            _auth.currentUser?.displayName ??
                             'User';
-    final currentUserPhoto = currentUserData['photoUrl'] ?? 
+    final currentUserPhoto = currentUserData['photoUrl'] ??
                             _auth.currentUser?.photoURL;
+
+    // IMPORTANT: Validate participants array before updating other info
+    // This is a safety check in case the array was corrupted
+    await _validateAndFixParticipants(conversationId);
 
     // Update participant info to ensure it's current
     await _firestore.collection('conversations').doc(conversationId).update({
@@ -243,7 +353,7 @@ class ConversationService {
           .get();
       
       if (conversationDoc.exists) {
-        final participantIds = List<String>.from(conversationDoc.data()!['participantIds']);
+        final participantIds = List<String>.from(conversationDoc.data()!['participants']);
         final otherUserIds = participantIds.where((id) => id != currentUserId);
         
         final updates = <String, dynamic>{};
@@ -269,24 +379,14 @@ class ConversationService {
 
     return _firestore
         .collection('conversations')
-        .where('participantIds', arrayContains: currentUserId)
+        .where('participants', arrayContains: currentUserId)
+        .orderBy('lastMessageTime', descending: true)
+        .limit(50) // Only load last 50 conversations
         .snapshots()
         .map((snapshot) {
-          final conversations = snapshot.docs
+          return snapshot.docs
               .map((doc) => ConversationModel.fromFirestore(doc))
               .toList();
-          
-          // Sort by lastMessageTime (conversations with messages first)
-          conversations.sort((a, b) {
-            if (a.lastMessageTime == null && b.lastMessageTime == null) {
-              return b.createdAt.compareTo(a.createdAt);
-            }
-            if (a.lastMessageTime == null) return 1;
-            if (b.lastMessageTime == null) return -1;
-            return b.lastMessageTime!.compareTo(a.lastMessageTime!);
-          });
-          
-          return conversations;
         });
   }
 
@@ -298,14 +398,14 @@ class ConversationService {
     try {
       final conversations = await _firestore
           .collection('conversations')
-          .where('participantIds', arrayContains: currentUserId)
+          .where('participants', arrayContains: currentUserId)
           .get();
 
       // Group conversations by participants
       final Map<String, List<QueryDocumentSnapshot>> groupedConversations = {};
       
       for (var doc in conversations.docs) {
-        final participants = List<String>.from(doc.data()['participantIds']);
+        final participants = List<String>.from(doc.data()['participants']);
         participants.sort();
         final key = participants.join('_');
         
@@ -389,5 +489,118 @@ class ConversationService {
     await _firestore.collection('conversations').doc(conversationId).update({
       'lastSeen.${currentUserId}': FieldValue.serverTimestamp(),
     });
+  }
+
+  /// Delete orphaned conversations where one or more participants no longer exist
+  /// Returns the number of conversations deleted
+  Future<int> deleteOrphanedConversations() async {
+    final currentUserId = _auth.currentUser?.uid;
+    if (currentUserId == null) {
+      // print('ConversationService: No authenticated user for cleanup');
+      return 0;
+    }
+
+    int deletedCount = 0;
+
+    try {
+      // print('ConversationService: Starting orphaned conversations cleanup...');
+
+      // Get all conversations for current user
+      final conversationsSnapshot = await _firestore
+          .collection('conversations')
+          .where('participants', arrayContains: currentUserId)
+          .get();
+
+      // print('ConversationService: Found ${conversationsSnapshot.docs.length} conversations to check');
+
+      for (var conversationDoc in conversationsSnapshot.docs) {
+        try {
+          final data = conversationDoc.data();
+          final participants = List<String>.from(data['participants'] ?? []);
+
+          // Check if all participants exist in users collection
+          bool hasOrphanedUser = false;
+
+          for (var userId in participants) {
+            final userDoc = await _firestore
+                .collection('users')
+                .doc(userId)
+                .get();
+
+            if (!userDoc.exists) {
+              // print('ConversationService: Found orphaned user: $userId in conversation ${conversationDoc.id}');
+              hasOrphanedUser = true;
+              break;
+            }
+          }
+
+          // Delete conversation if it has orphaned users
+          if (hasOrphanedUser) {
+            // print('ConversationService: Deleting orphaned conversation: ${conversationDoc.id}');
+
+            // Delete all messages in the conversation first
+            final messagesSnapshot = await _firestore
+                .collection('conversations')
+                .doc(conversationDoc.id)
+                .collection('messages')
+                .get();
+
+            final batch = _firestore.batch();
+            for (var messageDoc in messagesSnapshot.docs) {
+              batch.delete(messageDoc.reference);
+            }
+
+            // Delete the conversation document
+            batch.delete(conversationDoc.reference);
+
+            await batch.commit();
+            deletedCount++;
+            // print('ConversationService: Successfully deleted orphaned conversation: ${conversationDoc.id}');
+          }
+        } catch (e) {
+          // print('ConversationService: Error processing conversation ${conversationDoc.id}: $e');
+        }
+      }
+
+      // print('ConversationService: Cleanup complete. Deleted $deletedCount orphaned conversations');
+      return deletedCount;
+    } catch (e) {
+      // print('ConversationService: Error during orphaned conversations cleanup: $e');
+      return deletedCount;
+    }
+  }
+
+  /// Check if a specific conversation is orphaned (has non-existent users)
+  Future<bool> isConversationOrphaned(String conversationId) async {
+    try {
+      final conversationDoc = await _firestore
+          .collection('conversations')
+          .doc(conversationId)
+          .get();
+
+      if (!conversationDoc.exists) {
+        return true; // Consider non-existent conversations as orphaned
+      }
+
+      final data = conversationDoc.data()!;
+      final participants = List<String>.from(data['participants'] ?? []);
+
+      // Check if all participants exist
+      for (var userId in participants) {
+        final userDoc = await _firestore
+            .collection('users')
+            .doc(userId)
+            .get();
+
+        if (!userDoc.exists) {
+          return true; // Found an orphaned user
+        }
+      }
+
+      return false; // All participants exist
+    } catch (e) {
+      // print('ConversationService: Error checking if conversation is orphaned: $e');
+      return false;
+    }
   }
 }

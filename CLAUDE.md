@@ -1,142 +1,353 @@
-- How the app should work
+# CLAUDE.md
 
-User Input
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-The user types a prompt in the app (example:
+## Project Overview
 
-“iPhone”
+**Supper** is a Flutter-based AI-powered matching app that connects people for various purposes (marketplace, dating, friendship, jobs, lost & found, etc.) through intelligent intent understanding and semantic matching.
 
-“Looking for hiking partner in NYC”
+### Core Technology Stack
+- **Flutter 3.35.7** (Dart 3.9.2)
+- **Firebase**: Authentication, Firestore, Storage, Cloud Messaging
+- **Google Gemini AI**: Intent analysis, semantic embeddings, natural language understanding
+- **WebRTC**: Real-time peer-to-peer communication
 
-“Lost my dog”
+## Development Commands
 
-“Need a part-time designer”
-).
+### Running the App
+```bash
+flutter run              # Run on connected device/emulator
+flutter run -d chrome    # Run on web
+flutter run --release    # Production build
+```
 
-The system saves this as a post and uses it to search for matches at the same time.
+### Testing
+```bash
+flutter test                                # Run all tests
+flutter test test/widget_test.dart          # Run specific test
+flutter test test/performance/              # Run performance tests
+```
 
-Understanding the Meaning
+### Building
+```bash
+flutter build apk                           # Android APK
+flutter build appbundle                     # Android App Bundle (for Play Store)
+flutter build ios                           # iOS build (requires macOS)
+flutter build web                           # Web build
+```
 
-The system extracts intent (e.g., selling, buying, looking, offering, lost, found, hiring, job-seeking, dating, friendship).
+### Cleaning & Dependencies
+```bash
+flutter clean                              # Clean build artifacts
+flutter pub get                            # Install dependencies
+flutter pub upgrade                        # Update dependencies
+flutter pub outdated                       # Check for outdated packages
+```
 
-If the intent is unclear, the system should ask the user a clarifying question:
+## Architecture Overview
 
-If user types just “iPhone” → ask: “Do you want to buy or sell an iPhone?”
+### Key Architectural Principles
 
-If user types “Looking for a friend” → ask: “Do you want a male, female, or anyone as a friend?”
+1. **AI-Driven Intent Understanding**: No hardcoded categories. The system uses Gemini AI to understand user intent dynamically from natural language input.
 
-If user types “Room” → ask: “Are you looking to rent or offering a room?”
+2. **Semantic Matching**: Posts are matched using vector embeddings and cosine similarity, not keyword matching. The matching algorithm considers:
+   - Intent complementarity (buyer ↔ seller, lost ↔ found, etc.)
+   - Semantic similarity of embeddings (70% weight)
+   - Location proximity (15% weight)
+   - Price compatibility (when applicable)
 
-Real-Time Matching
+3. **Single Source of Truth**: All user posts are stored in the `posts` collection only. Old collections (`user_intents`, `intents`, `processed_intents`) are automatically deleted on first app launch.
 
-The system compares the user’s clarified intent + details against all existing prompts in the database.
+### Core Services Architecture
 
-Matching is based on intent + details + location + price (if applicable).
+#### Intent & Matching Pipeline
+```
+User Input → UnifiedIntentProcessor → Gemini AI Analysis → UnifiedPostService
+                                                                ↓
+                                           posts/{postId} (with embedding)
+                                                                ↓
+                                        UnifiedMatchingService (semantic search)
+                                                                ↓
+                                              Matched Profiles
+```
 
-Example rules:
+**Key Services:**
+- `UniversalIntentService`: Processes user input and creates posts
+- `UnifiedIntentProcessor`: Handles clarification dialogs when intent is ambiguous
+- `UnifiedPostService`: ⭐ PRIMARY service for all post operations (create, find matches, delete)
+- `UnifiedMatchingService`: Performs semantic matching using AI embeddings
+- `GeminiService`: Interacts with Google Gemini API for embeddings and intent analysis
 
-Seller ↔ Buyer
+#### Data Flow
+1. User types natural language prompt (e.g., "iPhone", "looking for friend in NYC")
+2. System analyzes intent using Gemini AI
+3. If ambiguous, shows clarification dialog
+4. Creates post with AI-generated embedding in `posts` collection
+5. Finds matches using semantic similarity
+6. Returns matched user profiles
 
-Lost ↔ Found
+### Database Structure
 
-Job Seeker ↔ Job Poster
+#### Firestore Collections
 
-Friend ↔ Friend
+**posts/** - Single source of truth for all user posts
+```javascript
+{
+  userId: string,
+  originalPrompt: string,           // What user typed
+  title: string,                    // AI-generated
+  description: string,              // AI-generated
+  intentAnalysis: {                 // AI understanding (no hardcoded categories!)
+    primary_intent: string,
+    action_type: "seeking" | "offering" | "neutral",
+    domain: string,
+    entities: {...},
+    complementary_intents: [...],
+    search_keywords: [...]
+  },
+  embedding: number[],              // 768-dim vector for semantic search
+  keywords: string[],
+  location: string,
+  latitude: number,
+  longitude: number,
+  price: number,
+  priceMin: number,
+  priceMax: number,
+  isActive: boolean,
+  createdAt: timestamp,
+  expiresAt: timestamp,
+  clarificationAnswers: {...}
+}
+```
 
-If price is included, match based on range (min to max).
+**users/** - User profiles
+```javascript
+{
+  uid: string,
+  name: string,
+  email: string,
+  photoUrl: string,
+  bio: string,
+  location: string,
+  latitude: number,
+  longitude: number,
+  interests: string[],
+  isOnline: boolean,
+  lastSeen: timestamp
+}
+```
 
-If location is included, match based on nearby area.
+**conversations/** - Chat conversations
+```javascript
+{
+  participants: [userId1, userId2],
+  lastMessage: string,
+  lastMessageTime: timestamp,
+  unreadCount: {userId: number},
+  messages/{messageId}: {
+    senderId: string,
+    receiverId: string,
+    text: string,
+    imageUrl: string,
+    timestamp: timestamp,
+    read: boolean
+  }
+}
+```
 
-Profile Display
+**calls/** - Voice call state (ZEGOCLOUD + Firestore signaling)
+```javascript
+{
+  callId: string,
+  callerId: string,
+  callerName: string,
+  callerPhoto: string,
+  receiverId: string,
+  receiverName: string,
+  receiverPhoto: string,
+  type: "audio",                    // Always "audio" (voice-only)
+  state: "calling" | "ringing" | "accepted" | "connected" | "ended" | "rejected",
+  channelName: string,              // ZEGO channel ID
+  timestamp: ISO string
+}
+```
 
-Show matched profiles immediately.
+### Screen Navigation Structure
 
-Each profile card shows:
+Main navigation (bottom tabs):
+1. **Discover** (`UniversalMatchingScreen`) - Create posts and find matches
+2. **Messages** (`ConversationsScreen`) - Chat conversations
+3. **Live Connect** (`LiveConnectTabScreen`) - Browse nearby people with filters
+4. **Profile** (`ProfileWithHistoryScreen`) - User profile and post history
 
-Photo
+## Critical Implementation Details
 
-Name
+### Voice Calling (IMPORTANT)
 
-Location
+**Current Issue**: When user A calls user B, both users see their own profile instead of the other person's profile during the call. This needs to be fixed.
 
-Their original prompt
+**Key Points:**
+- **Voice-only calling** - NO video calling feature should be implemented
+- Firestore for call signaling
+- FCM for push notifications
+- Configuration in `lib/config/zego_config.dart`
 
-Direct Connection
+### AI Configuration
 
-The user can directly chat or call the matched person.
+API keys and model settings are centralized in `lib/config/api_config.dart`:
+- Gemini Flash model for intent analysis
+- Text-embedding-004 for semantic embeddings (768 dimensions)
+- **IMPORTANT**: In production, API keys should be moved to environment variables or secure storage
 
-No approval or acceptance is needed.
+### Automatic Data Migration
 
-IMPORTANT: Only VOICE CALLING is needed - NO VIDEO CALLING feature should be implemented.
+On first app launch, `DatabaseCleanupService` automatically:
+- Deletes old collections (`user_intents`, `intents`, `processed_intents`, `embeddings`)
+- Marks cleanup as complete in SharedPreferences
+- Never runs again (one-time operation)
+- Handles errors gracefully (non-fatal)
 
-Clarification Loop
+### Location Services
 
-If at any point the system cannot understand the intent fully, it should ask follow-up questions to make the meaning precise.
+- Background location updates every 10 minutes (rate-limited)
+- Silent permission requests (only asks on first launch)
+- Privacy-protected: shows city name only, not exact GPS
+- Auto-refreshes stale location (>24 hours old)
 
-This loop should be simple and conversational, like ChatGPT.
+### Performance Optimizations
 
-Examples
+The app uses several optimization strategies:
+- **Firestore offline persistence** with unlimited cache (enabled in `main.dart`)
+- **Photo caching** via `PhotoCacheService` and `CachedNetworkImage`
+- **Embedding caching** for 24 hours
+- **Memory management** via `MemoryManager`
+- **Lazy loading** with pagination (20 items per page)
+- **Single status stream** to avoid duplicate Firestore queries
 
-Marketplace
-User types: “iPhone.”
-System asks: “Do you want to buy or sell an iPhone?”
-If user answers “Sell” → System matches with buyers.
-If user answers “Buy” → System matches with sellers.
+## Common Development Patterns
 
-Dating
-User types: “Looking for someone to date in NYC.”
-System asks: “Do you prefer male, female, or anyone?”
-If user answers “Female” → System matches with females who posted interest in dating in NYC.
+### Creating a Post
+```dart
+import 'package:supper/services/unified_post_service.dart';
 
-Friendship
-User types: “Looking for a friend in Paris.”
-System notices no gender mentioned → asks: “Do you want male, female, or anyone as a friend?”
+final service = UnifiedPostService();
+final result = await service.createPost(
+  originalPrompt: "selling iPhone 13",
+  price: 800,
+  currency: "USD",
+);
 
-Jobs
-User types: “Designer.”
-System asks: “Are you offering a job for a designer or looking for a job as a designer?”
-Based on answer, matches with opposite role.
+if (result['success']) {
+  final postId = result['postId'];
+  // Handle success
+}
+```
 
-Lost & Found
-User types: “Golden retriever Central Park.”
-System asks: “Did you lose or find a golden retriever in Central Park?”
-If user answers “Lost” → match with users who posted “Found golden retriever in Central Park.”
+### Finding Matches
+```dart
+final matches = await UnifiedPostService().findMatches(postId);
+// Returns List<PostModel> sorted by similarity score
+```
 
-Price-based Matching
-User types: “Selling bicycle $200.”
-System matches with buyers who entered a price range including $200.
-User types: “Want bicycle max $250.”
-→ Matches seller with bicycle priced at $200.
+### Understanding Intent with Clarification
+```dart
+final clarification = await UnifiedIntentProcessor().checkClarificationNeeded(userInput);
 
-What I need from you
+if (clarification['needsClarification'] == true) {
+  // Show clarification dialog to user
+  final answer = await ConversationalClarificationDialog.show(
+    context,
+    originalInput: userInput,
+    question: clarification['question'],
+    options: List<String>.from(clarification['options']),
+  );
+}
+```
 
-Write the step-by-step flow including how clarification questions are asked when needed.
+### Location Updates
+```dart
+import 'package:supper/services/location_service.dart';
 
-Show how the database should store user prompts (intent, text, location, price if mentioned, profile).
+final locationService = LocationService();
 
-Explain how the matching logic works across unlimited scenarios (without hardcoding categories).
+// Get current location (silent, no UI)
+await locationService.updateUserLocation();
 
-Show how the clarification loop should function before storing and searching.
+// Check if location needs refresh
+await locationService.checkAndRefreshStaleLocation();
+```
 
-Explain how the chat and call system connects matched users instantly.
+## Important Constraints & Guidelines
 
-Keep the design scalable for millions of users and real-time global use.
+### What NOT to Do
+- ❌ Never hardcode categories or intents - rely on AI understanding
+- ❌ Never create video calling features (voice-only)
+- ❌ Never query without `limit()` in Firestore (performance)
+- ❌ Never commit API keys to version control
+- ❌ Never use compound WHERE clauses without Firestore indexes
+- ❌ Never store data in old collections (`user_intents`, `intents`, etc.)
+- ❌ Never show exact GPS coordinates (privacy)
 
-If something is unclear, ask me questions before finalizing your answer.
+### What TO Do
+- ✅ Use `UnifiedPostService` for all post operations
+- ✅ Use semantic matching (embeddings + similarity)
+- ✅ Handle errors gracefully with user-friendly messages
+- ✅ Validate all user input using `PostValidator`
+- ✅ Use `StreamBuilder` for real-time updates
+- ✅ Cache frequently accessed data
+- ✅ Use pagination for large lists
+- ✅ Test on both iOS and Android
 
-⚡ This way, the system can handle any real-world scenario by:
+## Firestore Indexes Required
 
-Understanding intent,
+The app requires composite indexes for certain queries. See `FIRESTORE_INDEXES.md` and `FIRESTORE_INDEX_SETUP.md` for details.
 
-Asking clarifying questions when needed,
+Common indexes:
+- `conversations`: `participants` (array) + `lastMessageTime` (desc)
+- `posts`: `userId` (asc) + `isActive` (asc) + `createdAt` (desc)
+- `messages`: `timestamp` (desc) + `read` (asc)
 
-Matching in real time,
+## Testing & Debugging
 
-Enabling instant connection.
+### Performance Testing
+See `PERFORMANCE_TESTING_GUIDE.md` for scroll performance benchmarks.
 
-## IMPORTANT PROJECT NOTES
+### Debug Tools
+- `PerformanceDebugScreen` - Monitor app performance
+- `DatabaseCleanupService.getCleanupStatus()` - Check migration status
+- Firebase Console - Monitor Firestore usage and indexes
 
-### Voice Calling Implementation
-- The app uses VOICE CALLING ONLY - no video calling feature
-- Voice call works and UI is functioning correctly
-- Current issue to fix: When user A calls user B, user A sees their own profile instead of user B's profile at the start. Same issue for user B - they see their own profile instead of user A's profile. This needs to be fixed so each user sees the OTHER person's profile during the call.
+### Common Issues
+
+**Posts not matching:**
+- Verify post has `embedding` field (auto-generated)
+- Check `isActive: true` and `expiresAt` > now
+- Ensure complementary intents exist (buyer needs seller)
+
+**Location not updating:**
+- Check permissions granted
+- Verify location service initialized
+- Location updates every 10 minutes (rate-limited)
+
+**Call profile issue:**
+- See "Voice Calling (IMPORTANT)" section above for current bug to fix
+
+## Additional Documentation
+
+- `QUICK_START_GUIDE.md` - New data storage system guide
+- `DATA_STORAGE_FIX_SUMMARY.md` - Technical migration details
+- `CALL_FLOW_DOCUMENTATION.md` - Voice calling specification
+- `WEBRTC_SETUP.md` - WebRTC configuration
+- `SMART_MATCHING_EXPLAINED.md` - Matching algorithm details
+- `LIVE_CONNECT_IMPLEMENTATION_GUIDE.md` - Live Connect feature docs
+
+## Project Status
+
+Current branch: `feature/live-connect-enhanced`
+Version: 1.0.0+1
+
+### Recent Changes (from git log)
+- Enhanced Live Connect features with filters
+- Unified data storage system (posts collection only)
+- Improved matching algorithm
+- Voice calling implementation (with known profile display bug)
