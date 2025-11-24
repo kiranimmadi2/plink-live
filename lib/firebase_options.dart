@@ -3,6 +3,7 @@
 import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, kIsWeb, TargetPlatform;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
@@ -27,59 +28,59 @@ class DefaultFirebaseOptions {
     }
   }
 
-  static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyC-KetUmpRDpRreOhqV85bDIrZBDBf0NLw',
-    authDomain: 'suuper2.firebaseapp.com',
-    projectId: 'suuper2',
-    storageBucket: 'suuper2.firebasestorage.app',
-    messagingSenderId: '1027499426345',
-    appId: '1:1027499426345:web:258ebdd50cc9cd51375238',
-  );
+  static FirebaseOptions get web => FirebaseOptions(
+        apiKey: dotenv.env['FIREBASE_WEB_API_KEY'] ?? '',
+        authDomain: dotenv.env['FIREBASE_WEB_AUTH_DOMAIN'] ?? '',
+        projectId: dotenv.env['FIREBASE_WEB_PROJECT_ID'] ?? '',
+        storageBucket: dotenv.env['FIREBASE_WEB_STORAGE_BUCKET'] ?? '',
+        messagingSenderId: dotenv.env['FIREBASE_WEB_MESSAGING_SENDER_ID'] ?? '',
+        appId: dotenv.env['FIREBASE_WEB_APP_ID'] ?? '',
+      );
 
-  static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyCr0I1xu3pMGTB7ngUvs0jtZc5uqnI8I8w',
-    appId: '1:1027499426345:android:1b44360b28008567375238',
-    messagingSenderId: '1027499426345',
-    projectId: 'suuper2',
-    storageBucket: 'suuper2.firebasestorage.app',
-  );
+  static FirebaseOptions get android => FirebaseOptions(
+        apiKey: dotenv.env['FIREBASE_ANDROID_API_KEY'] ?? '',
+        appId: dotenv.env['FIREBASE_ANDROID_APP_ID'] ?? '',
+        messagingSenderId: dotenv.env['FIREBASE_WEB_MESSAGING_SENDER_ID'] ?? '',
+        projectId: dotenv.env['FIREBASE_WEB_PROJECT_ID'] ?? '',
+        storageBucket: dotenv.env['FIREBASE_WEB_STORAGE_BUCKET'] ?? '',
+      );
 
   // Placeholder configurations for other platforms
   // These will use the same configuration as Android for now
   // You can update these when you add support for these platforms
-  static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyCr0I1xu3pMGTB7ngUvs0jtZc5uqnI8I8w',
-    appId: '1:1027499426345:ios:placeholder',
-    messagingSenderId: '1027499426345',
-    projectId: 'suuper2',
-    storageBucket: 'suuper2.firebasestorage.app',
-    iosBundleId: 'com.plink.supper',
-  );
+  static FirebaseOptions get ios => FirebaseOptions(
+        apiKey: dotenv.env['FIREBASE_IOS_API_KEY'] ?? '',
+        appId: dotenv.env['FIREBASE_IOS_APP_ID'] ?? '',
+        messagingSenderId: dotenv.env['FIREBASE_WEB_MESSAGING_SENDER_ID'] ?? '',
+        projectId: dotenv.env['FIREBASE_WEB_PROJECT_ID'] ?? '',
+        storageBucket: dotenv.env['FIREBASE_WEB_STORAGE_BUCKET'] ?? '',
+        iosBundleId: dotenv.env['FIREBASE_IOS_BUNDLE_ID'] ?? '',
+      );
 
-  static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyCr0I1xu3pMGTB7ngUvs0jtZc5uqnI8I8w',
-    appId: '1:1027499426345:ios:placeholder',
-    messagingSenderId: '1027499426345',
-    projectId: 'suuper2',
-    storageBucket: 'suuper2.firebasestorage.app',
-    iosBundleId: 'com.plink.supper',
-  );
+  static FirebaseOptions get macos => FirebaseOptions(
+        apiKey: dotenv.env['FIREBASE_IOS_API_KEY'] ?? '',
+        appId: dotenv.env['FIREBASE_IOS_APP_ID'] ?? '',
+        messagingSenderId: dotenv.env['FIREBASE_WEB_MESSAGING_SENDER_ID'] ?? '',
+        projectId: dotenv.env['FIREBASE_WEB_PROJECT_ID'] ?? '',
+        storageBucket: dotenv.env['FIREBASE_WEB_STORAGE_BUCKET'] ?? '',
+        iosBundleId: dotenv.env['FIREBASE_IOS_BUNDLE_ID'] ?? '',
+      );
 
-  static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'AIzaSyCr0I1xu3pMGTB7ngUvs0jtZc5uqnI8I8w',
-    appId: '1:1027499426345:web:258ebdd50cc9cd51375238',
-    messagingSenderId: '1027499426345',
-    projectId: 'suuper2',
-    authDomain: 'suuper2.firebaseapp.com',
-    storageBucket: 'suuper2.firebasestorage.app',
-  );
+  static FirebaseOptions get windows => FirebaseOptions(
+        apiKey: dotenv.env['FIREBASE_ANDROID_API_KEY'] ?? '',
+        appId: dotenv.env['FIREBASE_WEB_APP_ID'] ?? '',
+        messagingSenderId: dotenv.env['FIREBASE_WEB_MESSAGING_SENDER_ID'] ?? '',
+        projectId: dotenv.env['FIREBASE_WEB_PROJECT_ID'] ?? '',
+        authDomain: dotenv.env['FIREBASE_WEB_AUTH_DOMAIN'] ?? '',
+        storageBucket: dotenv.env['FIREBASE_WEB_STORAGE_BUCKET'] ?? '',
+      );
 
-  static const FirebaseOptions linux = FirebaseOptions(
-    apiKey: 'AIzaSyCr0I1xu3pMGTB7ngUvs0jtZc5uqnI8I8w',
-    appId: '1:1027499426345:web:258ebdd50cc9cd51375238',
-    messagingSenderId: '1027499426345',
-    projectId: 'suuper2',
-    authDomain: 'suuper2.firebaseapp.com',
-    storageBucket: 'suuper2.firebasestorage.app',
-  );
+  static FirebaseOptions get linux => FirebaseOptions(
+        apiKey: dotenv.env['FIREBASE_ANDROID_API_KEY'] ?? '',
+        appId: dotenv.env['FIREBASE_WEB_APP_ID'] ?? '',
+        messagingSenderId: dotenv.env['FIREBASE_WEB_MESSAGING_SENDER_ID'] ?? '',
+        projectId: dotenv.env['FIREBASE_WEB_PROJECT_ID'] ?? '',
+        authDomain: dotenv.env['FIREBASE_WEB_AUTH_DOMAIN'] ?? '',
+        storageBucket: dotenv.env['FIREBASE_WEB_STORAGE_BUCKET'] ?? '',
+      );
 }

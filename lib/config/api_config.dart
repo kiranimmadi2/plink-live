@@ -1,13 +1,13 @@
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 /// Centralized API configuration
 /// This file contains all API keys and configurations used throughout the app
 class ApiConfig {
   // Private constructor to prevent instantiation
   ApiConfig._();
 
-  /// Google Gemini API Key
-  /// IMPORTANT: In production, use environment variables or secure storage
-  /// Never commit API keys to version control
-  static const String geminiApiKey = 'AIzaSyCSShfO46TT8DnYTGKzJ_-M4uQVGPlhscA';
+  /// Google Gemini API Key - loaded from environment variables
+  static String get geminiApiKey => dotenv.env['GEMINI_API_KEY'] ?? '';
 
   /// Gemini model names
   static const String geminiFlashModel = 'gemini-1.5-flash-latest';

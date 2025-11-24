@@ -9,6 +9,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'firebase_options.dart';
 import 'screens/login_screen.dart';
 import 'screens/main_navigation_screen.dart';
@@ -29,6 +30,9 @@ import 'utils/memory_manager.dart';
 // Background message handler - MUST be top-level function
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  // Load environment variables first
+  await dotenv.load(fileName: ".env");
+
   // Initialize Firebase if not already initialized
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
@@ -39,7 +43,10 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
+  // Load environment variables FIRST (before any other initialization)
+  await dotenv.load(fileName: ".env");
+
   // Set system UI overlay style
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
@@ -47,13 +54,13 @@ void main() async {
       systemNavigationBarColor: Colors.transparent,
     ),
   );
-  
+
   // Set preferred orientations
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
-  
+
   // Initialize Firebase with optimizations
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
