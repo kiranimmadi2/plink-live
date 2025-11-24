@@ -6,7 +6,7 @@ import 'package:geocoding/geocoding.dart';
 import '../services/location_service.dart';
 
 class LocationSettingsScreen extends StatefulWidget {
-  const LocationSettingsScreen({Key? key}) : super(key: key);
+  const LocationSettingsScreen({super.key});
 
   @override
   State<LocationSettingsScreen> createState() => _LocationSettingsScreenState();
@@ -94,12 +94,15 @@ class _LocationSettingsScreenState extends State<LocationSettingsScreen> {
       // Update Firestore
       final userId = _auth.currentUser?.uid;
       if (userId != null) {
-        await FirebaseFirestore.instance.collection('users').doc(userId).update({
-          'location': locationName,
-          'latitude': position.latitude,
-          'longitude': position.longitude,
-          'locationUpdatedAt': FieldValue.serverTimestamp(),
-        });
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userId)
+            .update({
+              'location': locationName,
+              'latitude': position.latitude,
+              'longitude': position.longitude,
+              'locationUpdatedAt': FieldValue.serverTimestamp(),
+            });
 
         setState(() {
           _currentLocation = locationName;
@@ -120,10 +123,7 @@ class _LocationSettingsScreenState extends State<LocationSettingsScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -164,10 +164,7 @@ class _LocationSettingsScreenState extends State<LocationSettingsScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
         );
       }
     }
@@ -254,10 +251,14 @@ class _LocationSettingsScreenState extends State<LocationSettingsScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          _locationEnabled ? 'Location Enabled' : 'Location Not Set',
+                          _locationEnabled
+                              ? 'Location Enabled'
+                              : 'Location Not Set',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
-                            color: _locationEnabled ? Colors.green : Colors.grey,
+                            color: _locationEnabled
+                                ? Colors.green
+                                : Colors.grey,
                           ),
                         ),
                         if (_currentLocation != null) ...[
@@ -283,11 +284,15 @@ class _LocationSettingsScreenState extends State<LocationSettingsScreen> {
                         width: 20,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.white,
+                          ),
                         ),
                       )
                     : const Icon(Icons.my_location),
-                label: Text(_locationEnabled ? 'Update Location' : 'Enable Location'),
+                label: Text(
+                  _locationEnabled ? 'Update Location' : 'Enable Location',
+                ),
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
@@ -331,10 +336,16 @@ class _LocationSettingsScreenState extends State<LocationSettingsScreen> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  _buildPrivacyPoint('Only city/area is visible to other users'),
+                  _buildPrivacyPoint(
+                    'Only city/area is visible to other users',
+                  ),
                   _buildPrivacyPoint('Exact GPS coordinates are never shared'),
-                  _buildPrivacyPoint('You can update or clear your location anytime'),
-                  _buildPrivacyPoint('Location is used only for matching nearby users'),
+                  _buildPrivacyPoint(
+                    'You can update or clear your location anytime',
+                  ),
+                  _buildPrivacyPoint(
+                    'Location is used only for matching nearby users',
+                  ),
                 ],
               ),
             ),
@@ -352,12 +363,7 @@ class _LocationSettingsScreenState extends State<LocationSettingsScreen> {
         children: [
           const Icon(Icons.check_circle, size: 16, color: Colors.green),
           const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              text,
-              style: const TextStyle(fontSize: 14),
-            ),
-          ),
+          Expanded(child: Text(text, style: const TextStyle(fontSize: 14))),
         ],
       ),
     );

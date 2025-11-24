@@ -3,10 +3,11 @@ import '../services/connection_service.dart';
 import '../widgets/user_avatar.dart';
 
 class ConnectionRequestsScreen extends StatefulWidget {
-  const ConnectionRequestsScreen({Key? key}) : super(key: key);
+  const ConnectionRequestsScreen({super.key});
 
   @override
-  State<ConnectionRequestsScreen> createState() => _ConnectionRequestsScreenState();
+  State<ConnectionRequestsScreen> createState() =>
+      _ConnectionRequestsScreenState();
 }
 
 class _ConnectionRequestsScreenState extends State<ConnectionRequestsScreen> {
@@ -17,10 +18,7 @@ class _ConnectionRequestsScreenState extends State<ConnectionRequestsScreen> {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Connection Requests'),
-        elevation: 0,
-      ),
+      appBar: AppBar(title: const Text('Connection Requests'), elevation: 0),
       body: StreamBuilder<List<Map<String, dynamic>>>(
         stream: _connectionService.getPendingRequestsStream(),
         builder: (context, snapshot) {
@@ -164,7 +162,9 @@ class _ConnectionRequestsScreenState extends State<ConnectionRequestsScreen> {
                                     style: TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.w600,
-                                      color: isDarkMode ? Colors.white : Colors.black,
+                                      color: isDarkMode
+                                          ? Colors.white
+                                          : Colors.black,
                                     ),
                                   ),
                                 ),
@@ -173,7 +173,9 @@ class _ConnectionRequestsScreenState extends State<ConnectionRequestsScreen> {
                                     timeAgo,
                                     style: TextStyle(
                                       fontSize: 12,
-                                      color: isDarkMode ? Colors.grey[500] : Colors.grey[600],
+                                      color: isDarkMode
+                                          ? Colors.grey[500]
+                                          : Colors.grey[600],
                                     ),
                                   ),
                               ],
@@ -183,7 +185,9 @@ class _ConnectionRequestsScreenState extends State<ConnectionRequestsScreen> {
                               message ?? 'Wants to connect with you',
                               style: TextStyle(
                                 fontSize: 14,
-                                color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                                color: isDarkMode
+                                    ? Colors.grey[400]
+                                    : Colors.grey[600],
                               ),
                             ),
                             const SizedBox(height: 12),
@@ -193,15 +197,20 @@ class _ConnectionRequestsScreenState extends State<ConnectionRequestsScreen> {
                                 Expanded(
                                   child: ElevatedButton(
                                     onPressed: () async {
-                                      final result = await _connectionService.acceptConnectionRequest(requestId);
+                                      final result = await _connectionService
+                                          .acceptConnectionRequest(requestId);
 
                                       if (mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
                                           SnackBar(
                                             content: Row(
                                               children: [
                                                 Icon(
-                                                  result['success'] ? Icons.check_circle : Icons.error_outline,
+                                                  result['success']
+                                                      ? Icons.check_circle
+                                                      : Icons.error_outline,
                                                   color: Colors.white,
                                                 ),
                                                 const SizedBox(width: 12),
@@ -209,7 +218,8 @@ class _ConnectionRequestsScreenState extends State<ConnectionRequestsScreen> {
                                                   child: Text(
                                                     result['success']
                                                         ? 'You are now connected with $senderName'
-                                                        : result['message'] ?? 'Failed to accept request',
+                                                        : result['message'] ??
+                                                              'Failed to accept request',
                                                   ),
                                                 ),
                                               ],
@@ -224,15 +234,18 @@ class _ConnectionRequestsScreenState extends State<ConnectionRequestsScreen> {
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: const Color(0xFF00D67D),
                                       foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(vertical: 10),
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 10,
+                                      ),
                                       shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(12),
                                       ),
                                       elevation: 0,
                                     ),
-                                    child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: const [
+                                    child: const Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
                                         Icon(Icons.check, size: 18),
                                         SizedBox(width: 6),
                                         Text(
@@ -250,15 +263,19 @@ class _ConnectionRequestsScreenState extends State<ConnectionRequestsScreen> {
                                 Expanded(
                                   child: OutlinedButton(
                                     onPressed: () async {
-                                      final result = await _connectionService.rejectConnectionRequest(requestId);
+                                      final result = await _connectionService
+                                          .rejectConnectionRequest(requestId);
 
                                       if (mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
                                           SnackBar(
                                             content: Text(
                                               result['success']
                                                   ? 'Request rejected'
-                                                  : result['message'] ?? 'Failed to reject request',
+                                                  : result['message'] ??
+                                                        'Failed to reject request',
                                             ),
                                             backgroundColor: result['success']
                                                 ? Colors.grey[700]
@@ -269,16 +286,25 @@ class _ConnectionRequestsScreenState extends State<ConnectionRequestsScreen> {
                                     },
                                     style: OutlinedButton.styleFrom(
                                       foregroundColor: Colors.red.shade600,
-                                      side: BorderSide(color: Colors.red.shade600),
-                                      padding: const EdgeInsets.symmetric(vertical: 10),
+                                      side: BorderSide(
+                                        color: Colors.red.shade600,
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 10,
+                                      ),
                                       shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(12),
                                       ),
                                     ),
                                     child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
                                       children: [
-                                        Icon(Icons.close, size: 18, color: Colors.red.shade600),
+                                        Icon(
+                                          Icons.close,
+                                          size: 18,
+                                          color: Colors.red.shade600,
+                                        ),
                                         const SizedBox(width: 6),
                                         Text(
                                           'Reject',

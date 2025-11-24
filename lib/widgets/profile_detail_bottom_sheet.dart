@@ -12,17 +12,18 @@ class ProfileDetailBottomSheet extends StatefulWidget {
   final bool isOwnProfile; // True if viewing own profile
 
   const ProfileDetailBottomSheet({
-    Key? key,
+    super.key,
     required this.user,
     this.onConnect,
     this.onMessage,
     this.onEdit,
     this.connectionStatus,
     this.isOwnProfile = false,
-  }) : super(key: key);
+  });
 
   @override
-  State<ProfileDetailBottomSheet> createState() => _ProfileDetailBottomSheetState();
+  State<ProfileDetailBottomSheet> createState() =>
+      _ProfileDetailBottomSheetState();
 }
 
 class _ProfileDetailBottomSheetState extends State<ProfileDetailBottomSheet>
@@ -59,7 +60,8 @@ class _ProfileDetailBottomSheetState extends State<ProfileDetailBottomSheet>
     // Calculate content height based on available sections
     final hasConnectionTypes = widget.user.connectionTypes.isNotEmpty;
     final hasActivities = widget.user.activities.isNotEmpty;
-    final hasAbout = widget.user.aboutMe != null && widget.user.aboutMe!.isNotEmpty;
+    final hasAbout =
+        widget.user.aboutMe != null && widget.user.aboutMe!.isNotEmpty;
     final hasInterests = widget.user.interests.isNotEmpty;
 
     // Calculate initial size based on content
@@ -110,10 +112,7 @@ class _ProfileDetailBottomSheetState extends State<ProfileDetailBottomSheet>
                 height: 4,
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [
-                      Colors.grey[500]!,
-                      Colors.grey[400]!,
-                    ],
+                    colors: [Colors.grey[500]!, Colors.grey[400]!],
                   ),
                   borderRadius: BorderRadius.circular(2),
                 ),
@@ -131,7 +130,6 @@ class _ProfileDetailBottomSheetState extends State<ProfileDetailBottomSheet>
                       _buildPremiumHeader(context, isDarkMode),
 
                       const SizedBox(height: 24), // Increased spacing
-
                       // Content sections (chips with gradients)
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -150,7 +148,9 @@ class _ProfileDetailBottomSheetState extends State<ProfileDetailBottomSheet>
                             // Activities
                             if (hasActivities) ...[
                               _buildGradientChipsSection(
-                                widget.user.activities.map((a) => a.name).toList(),
+                                widget.user.activities
+                                    .map((a) => a.name)
+                                    .toList(),
                                 _getActivityGradient,
                               ),
                               const SizedBox(height: 8), // Increased spacing
@@ -386,14 +386,8 @@ class _ProfileDetailBottomSheetState extends State<ProfileDetailBottomSheet>
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: isDarkMode
-                ? [
-                    const Color(0xFF2A2A3E),
-                    const Color(0xFF252538),
-                  ]
-                : [
-                    const Color(0xFFF8F9FA),
-                    const Color(0xFFF1F3F4),
-                  ],
+                ? [const Color(0xFF2A2A3E), const Color(0xFF252538)]
+                : [const Color(0xFFF8F9FA), const Color(0xFFF1F3F4)],
           ),
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
@@ -431,7 +425,9 @@ class _ProfileDetailBottomSheetState extends State<ProfileDetailBottomSheet>
               style: TextStyle(
                 fontSize: 15,
                 height: 1.6,
-                color: isDarkMode ? Colors.white.withOpacity(0.9) : const Color(0xFF1C1C1E),
+                color: isDarkMode
+                    ? Colors.white.withOpacity(0.9)
+                    : const Color(0xFF1C1C1E),
               ),
             ),
           ],
@@ -546,11 +542,7 @@ class _ProfileDetailBottomSheetState extends State<ProfileDetailBottomSheet>
                       child: const Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(
-                            Icons.favorite,
-                            size: 20,
-                            color: Colors.white,
-                          ),
+                          Icon(Icons.favorite, size: 20, color: Colors.white),
                           SizedBox(width: 8),
                           Text(
                             'Connect',
@@ -576,10 +568,7 @@ class _ProfileDetailBottomSheetState extends State<ProfileDetailBottomSheet>
                       gradient: const LinearGradient(
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
-                        colors: [
-                          Color(0xFF3B82F6),
-                          Color(0xFF8B5CF6),
-                        ],
+                        colors: [Color(0xFF3B82F6), Color(0xFF8B5CF6)],
                       ),
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
@@ -593,7 +582,9 @@ class _ProfileDetailBottomSheetState extends State<ProfileDetailBottomSheet>
                     child: Container(
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: isDarkMode ? const Color(0xFF1C1C1E) : Colors.white,
+                        color: isDarkMode
+                            ? const Color(0xFF1C1C1E)
+                            : Colors.white,
                         borderRadius: BorderRadius.circular(14),
                       ),
                       child: ShaderMask(
@@ -646,9 +637,7 @@ class _ProfileDetailBottomSheetState extends State<ProfileDetailBottomSheet>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: gradientColors,
-        ),
+        gradient: LinearGradient(colors: gradientColors),
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
@@ -698,7 +687,9 @@ class _ProfileDetailBottomSheetState extends State<ProfileDetailBottomSheet>
 
     // Age
     if (widget.user.age != null) {
-      infoItems.add(_buildInfoItem(Icons.cake_outlined, '${widget.user.age} yrs'));
+      infoItems.add(
+        _buildInfoItem(Icons.cake_outlined, '${widget.user.age} yrs'),
+      );
     }
 
     // Gender
@@ -721,17 +712,19 @@ class _ProfileDetailBottomSheetState extends State<ProfileDetailBottomSheet>
     for (int i = 0; i < infoItems.length; i++) {
       rowChildren.add(infoItems[i]);
       if (i < infoItems.length - 1) {
-        rowChildren.add(Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: Container(
-            width: 4,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.4),
-              shape: BoxShape.circle,
+        rowChildren.add(
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Container(
+              width: 4,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.4),
+                shape: BoxShape.circle,
+              ),
             ),
           ),
-        ));
+        );
       }
     }
 
@@ -803,31 +796,29 @@ class ShimmerPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [
-          Colors.transparent,
-          Colors.white.withOpacity(0.03),
-          Colors.white.withOpacity(0.08),
-          Colors.white.withOpacity(0.03),
-          Colors.transparent,
-        ],
-        stops: const [0.0, 0.35, 0.5, 0.65, 1.0],
-        transform: GradientRotation(math.pi / 4),
-      ).createShader(
-        Rect.fromLTWH(
-          -size.width + (size.width * 3 * progress),
-          0,
-          size.width,
-          size.height,
-        ),
-      );
+      ..shader =
+          LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Colors.transparent,
+              Colors.white.withOpacity(0.03),
+              Colors.white.withOpacity(0.08),
+              Colors.white.withOpacity(0.03),
+              Colors.transparent,
+            ],
+            stops: const [0.0, 0.35, 0.5, 0.65, 1.0],
+            transform: const GradientRotation(math.pi / 4),
+          ).createShader(
+            Rect.fromLTWH(
+              -size.width + (size.width * 3 * progress),
+              0,
+              size.width,
+              size.height,
+            ),
+          );
 
-    canvas.drawRect(
-      Rect.fromLTWH(0, 0, size.width, size.height),
-      paint,
-    );
+    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), paint);
   }
 
   @override

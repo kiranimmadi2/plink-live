@@ -5,14 +5,17 @@ import 'connectivity_service.dart';
 
 class GeocodingService {
   // Using OpenStreetMap's Nominatim API (free, no API key required)
-  static const String nominatimUrl = 'https://nominatim.openstreetmap.org/reverse';
-  
+  static const String nominatimUrl =
+      'https://nominatim.openstreetmap.org/reverse';
+
   // Alternative: Using Google's Geocoding API (requires API key)
-  static const String googleGeocodingUrl = 'https://maps.googleapis.com/maps/api/geocode/json';
-  
+  static const String googleGeocodingUrl =
+      'https://maps.googleapis.com/maps/api/geocode/json';
+
   // For production, you should use your own API key
-  static const String googleApiKey = 'YOUR_GOOGLE_MAPS_API_KEY'; // Replace with actual key
-  
+  static const String googleApiKey =
+      'YOUR_GOOGLE_MAPS_API_KEY'; // Replace with actual key
+
   /// Get detailed address from coordinates using multiple services
   static Future<Map<String, dynamic>?> getAddressFromCoordinates(
     double latitude,
@@ -20,18 +23,21 @@ class GeocodingService {
   ) async {
     try {
       print('GeocodingService: Getting address for $latitude, $longitude');
-      
+
       // Check connectivity first
       final connectivityService = ConnectivityService();
       if (!connectivityService.hasConnection) {
         print('GeocodingService: No internet connection, cannot geocode');
         return null; // Cannot get address without internet
       }
-      
+
       // For web, try multiple geocoding services
       if (kIsWeb) {
         // Try BigDataCloud API first (no CORS issues, free)
-        final bigDataResult = await _getBigDataCloudAddress(latitude, longitude);
+        final bigDataResult = await _getBigDataCloudAddress(
+          latitude,
+          longitude,
+        );
         if (bigDataResult != null) {
           return bigDataResult;
         }
@@ -48,7 +54,7 @@ class GeocodingService {
         // Return null if all real geocoding services fail
         return null;
       }
-      
+
       // For mobile platforms, try Nominatim
       final nominatimResult = await _getNominatimAddress(latitude, longitude);
       if (nominatimResult != null) {
@@ -64,9 +70,12 @@ class GeocodingService {
       return null;
     }
   }
-  
+
   /// Get default location data when services fail
-  static Map<String, dynamic> _getDefaultLocation(double latitude, double longitude) {
+  static Map<String, dynamic> _getDefaultLocation(
+    double latitude,
+    double longitude,
+  ) {
     return {
       'formatted': 'Location detected',
       'area': '',
@@ -79,7 +88,7 @@ class GeocodingService {
       'display': 'Location detected',
     };
   }
-  
+
   /// Get address using OpenStreetMap Nominatim API
   static Future<Map<String, dynamic>?> _getNominatimAddress(
     double latitude,
@@ -89,59 +98,64 @@ class GeocodingService {
       final url = Uri.parse(
         '$nominatimUrl?lat=$latitude&lon=$longitude&format=json&addressdetails=1',
       );
-      
-      final response = await http.get(
-        url,
-        headers: {
-          'Accept': 'application/json',
-          'User-Agent': 'Supper App/1.0', // Required by Nominatim
-        },
-      ).timeout(const Duration(seconds: 10));
-      
+
+      final response = await http
+          .get(
+            url,
+            headers: {
+              'Accept': 'application/json',
+              'User-Agent': 'Supper App/1.0', // Required by Nominatim
+            },
+          )
+          .timeout(const Duration(seconds: 10));
+
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         print('GeocodingService: Nominatim response: $data');
-        
+
         final address = data['address'] ?? {};
-        
+
         // Extract detailed location components
         String area = '';
         String city = '';
         String state = '';
         String pincode = '';
         String country = '';
-        
+
         // Get area (most specific locality)
-        area = address['suburb'] ?? 
-               address['neighbourhood'] ?? 
-               address['hamlet'] ?? 
-               address['locality'] ?? 
-               address['road'] ?? '';
-        
+        area =
+            address['suburb'] ??
+            address['neighbourhood'] ??
+            address['hamlet'] ??
+            address['locality'] ??
+            address['road'] ??
+            '';
+
         // Get city
-        city = address['city'] ?? 
-               address['town'] ?? 
-               address['village'] ?? 
-               address['municipality'] ?? 
-               address['district'] ?? '';
-        
+        city =
+            address['city'] ??
+            address['town'] ??
+            address['village'] ??
+            address['municipality'] ??
+            address['district'] ??
+            '';
+
         // Get state
-        state = address['state'] ?? 
-                address['state_district'] ?? '';
-        
+        state = address['state'] ?? address['state_district'] ?? '';
+
         // Get pincode
         pincode = address['postcode'] ?? '';
-        
+
         // Get country
         country = address['country'] ?? '';
-        
+
         // Build formatted address like e-commerce apps
         String formattedAddress = '';
-        
+
         if (area.isNotEmpty) {
           formattedAddress = area;
         }
-        
+
         if (city.isNotEmpty && city != area) {
           if (formattedAddress.isNotEmpty) {
             formattedAddress += ', $city';
@@ -149,15 +163,15 @@ class GeocodingService {
             formattedAddress = city;
           }
         }
-        
+
         if (pincode.isNotEmpty) {
           formattedAddress += ' - $pincode';
         }
-        
+
         if (state.isNotEmpty && !formattedAddress.contains(state)) {
           formattedAddress += ', $state';
         }
-        
+
         // Create detailed location object
         return {
           'formatted': formattedAddress,
@@ -171,18 +185,23 @@ class GeocodingService {
           'display': _createDisplayAddress(area, city, state, pincode),
         };
       }
-      
+
       return null;
     } catch (e) {
       print('GeocodingService: Nominatim error: $e');
       return null;
     }
   }
-  
+
   /// Create display address like Swiggy/Flipkart
-  static String _createDisplayAddress(String area, String city, String state, String pincode) {
+  static String _createDisplayAddress(
+    String area,
+    String city,
+    String state,
+    String pincode,
+  ) {
     String display = '';
-    
+
     // Priority: Area name if available
     if (area.isNotEmpty) {
       display = area;
@@ -192,20 +211,20 @@ class GeocodingService {
     } else if (city.isNotEmpty) {
       display = city;
     }
-    
+
     // Add pincode if available
     if (pincode.isNotEmpty && display.isNotEmpty) {
       display += ' $pincode';
     }
-    
+
     // If still empty, use state
     if (display.isEmpty && state.isNotEmpty) {
       display = state;
     }
-    
+
     return display.isNotEmpty ? display : 'Location detected';
   }
-  
+
   /// Get address using BigDataCloud API (works well with web, no CORS)
   static Future<Map<String, dynamic>?> _getBigDataCloudAddress(
     double latitude,
@@ -216,24 +235,24 @@ class GeocodingService {
         'https://api.bigdatacloud.net/data/reverse-geocode-client'
         '?latitude=$latitude&longitude=$longitude&localityLanguage=en',
       );
-      
+
       final response = await http.get(url).timeout(const Duration(seconds: 10));
-      
+
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        print('GeocodingService: BigDataCloud response: ${data}');
-        
+        print('GeocodingService: BigDataCloud response: $data');
+
         // Extract location details
         String area = data['locality'] ?? '';
         String city = data['city'] ?? data['locality'] ?? '';
         String state = data['principalSubdivision'] ?? '';
         String pincode = data['postcode'] ?? '';
         String country = data['countryName'] ?? '';
-        
+
         // Get more specific area from localityInfo
         if (data['localityInfo'] != null) {
           final localityInfo = data['localityInfo'];
-          if (localityInfo['administrative'] != null && 
+          if (localityInfo['administrative'] != null &&
               localityInfo['administrative'].isNotEmpty) {
             final admins = localityInfo['administrative'] as List;
             // Get the most specific administrative area
@@ -245,7 +264,7 @@ class GeocodingService {
             }
           }
         }
-        
+
         // Build formatted address
         String formattedAddress = '';
         if (area.isNotEmpty) {
@@ -257,7 +276,7 @@ class GeocodingService {
         if (pincode.isNotEmpty) {
           formattedAddress += ' $pincode';
         }
-        
+
         return {
           'formatted': formattedAddress,
           'area': area,
@@ -267,17 +286,19 @@ class GeocodingService {
           'country': country,
           'latitude': latitude,
           'longitude': longitude,
-          'display': formattedAddress.isNotEmpty ? formattedAddress : 'Location detected',
+          'display': formattedAddress.isNotEmpty
+              ? formattedAddress
+              : 'Location detected',
         };
       }
-      
+
       return null;
     } catch (e) {
       print('GeocodingService: BigDataCloud error: $e');
       return null;
     }
   }
-  
+
   /// Get address using OpenCage API (requires free API key)
   static Future<Map<String, dynamic>?> _getOpenCageAddress(
     double latitude,
@@ -286,24 +307,24 @@ class GeocodingService {
     try {
       // You can get a free API key from https://opencagedata.com/
       const apiKey = 'YOUR_OPENCAGE_API_KEY'; // Replace with actual key
-      
+
       if (apiKey == 'YOUR_OPENCAGE_API_KEY') {
         return null; // Skip if no API key
       }
-      
+
       final url = Uri.parse(
         'https://api.opencagedata.com/geocode/v1/json'
         '?q=$latitude+$longitude&key=$apiKey&language=en&pretty=1',
       );
-      
+
       final response = await http.get(url).timeout(const Duration(seconds: 10));
-      
+
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['results'] != null && data['results'].isNotEmpty) {
           final result = data['results'][0];
           final components = result['components'] ?? {};
-          
+
           return {
             'formatted': result['formatted'] ?? '',
             'area': components['suburb'] ?? components['neighbourhood'] ?? '',
@@ -313,28 +334,30 @@ class GeocodingService {
             'country': components['country'] ?? '',
             'latitude': latitude,
             'longitude': longitude,
-            'display': result['formatted']?.split(',').take(2).join(',') ?? 'Location detected',
+            'display':
+                result['formatted']?.split(',').take(2).join(',') ??
+                'Location detected',
           };
         }
       }
-      
+
       return null;
     } catch (e) {
       print('GeocodingService: OpenCage error: $e');
       return null;
     }
   }
-  
+
   /// Fallback: Get approximate location using IP address (for web)
   static Future<Map<String, dynamic>?> _getIPBasedLocation() async {
     try {
       // Using ipapi.co (free, works with HTTPS)
       final url = Uri.parse('https://ipapi.co/json/');
       final response = await http.get(url).timeout(const Duration(seconds: 5));
-      
+
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        
+
         return {
           'formatted': '${data['city']}, ${data['region']}',
           'area': data['city'] ?? '',
@@ -347,14 +370,14 @@ class GeocodingService {
           'display': '${data['city'] ?? 'Location'}, ${data['region'] ?? ''}',
         };
       }
-      
+
       return null;
     } catch (e) {
       print('GeocodingService: IP location error: $e');
       return null;
     }
   }
-  
+
   /// Search for location by text query (for search functionality)
   static Future<List<Map<String, dynamic>>> searchLocation(String query) async {
     try {
@@ -365,21 +388,23 @@ class GeocodingService {
         '&addressdetails=1'
         '&limit=5',
       );
-      
-      final response = await http.get(
-        url,
-        headers: {
-          'Accept': 'application/json',
-          'User-Agent': 'Supper App/1.0',
-        },
-      ).timeout(const Duration(seconds: 10));
-      
+
+      final response = await http
+          .get(
+            url,
+            headers: {
+              'Accept': 'application/json',
+              'User-Agent': 'Supper App/1.0',
+            },
+          )
+          .timeout(const Duration(seconds: 10));
+
       if (response.statusCode == 200) {
         final List<dynamic> results = json.decode(response.body);
-        
+
         return results.map((result) {
           final address = result['address'] ?? {};
-          
+
           return {
             'formatted': result['display_name'] ?? '',
             'area': address['suburb'] ?? address['neighbourhood'] ?? '',
@@ -389,11 +414,12 @@ class GeocodingService {
             'country': address['country'] ?? '',
             'latitude': double.tryParse(result['lat'] ?? '0') ?? 0.0,
             'longitude': double.tryParse(result['lon'] ?? '0') ?? 0.0,
-            'display': result['display_name']?.split(',').take(3).join(',') ?? '',
+            'display':
+                result['display_name']?.split(',').take(3).join(',') ?? '',
           };
         }).toList();
       }
-      
+
       return [];
     } catch (e) {
       print('GeocodingService: Search error: $e');

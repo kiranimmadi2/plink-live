@@ -58,9 +58,7 @@ class ConversationService {
 
       if (needsFix) {
         // print('ConversationService: VALIDATION - Fixing participants array for $conversationId');
-        await doc.reference.update({
-          'participants': expectedUserIds,
-        });
+        await doc.reference.update({'participants': expectedUserIds});
         // print('ConversationService: VALIDATION - Fixed! Updated to: $expectedUserIds');
         return true;
       }
@@ -120,10 +118,9 @@ class ConversationService {
       await _createConversation(conversationId, currentUserId, otherUser);
       // print('ConversationService: Conversation created successfully: $conversationId');
       return conversationId;
-
     } catch (e) {
       // print('ConversationService: ERROR creating/getting conversation: $e');
-      throw e;
+      rethrow;
     }
   }
 
@@ -137,11 +134,15 @@ class ConversationService {
 
     // VALIDATION: Ensure user IDs are valid and different
     if (currentUserId.isEmpty || otherUser.uid.isEmpty) {
-      throw Exception('Invalid user IDs: currentUserId=$currentUserId, otherUserId=${otherUser.uid}');
+      throw Exception(
+        'Invalid user IDs: currentUserId=$currentUserId, otherUserId=${otherUser.uid}',
+      );
     }
 
     if (currentUserId == otherUser.uid) {
-      throw Exception('Cannot create conversation with self: userId=$currentUserId');
+      throw Exception(
+        'Cannot create conversation with self: userId=$currentUserId',
+      );
     }
 
     final currentUserDoc = await _firestore
@@ -150,11 +151,10 @@ class ConversationService {
         .get();
 
     final currentUserData = currentUserDoc.data() ?? {};
-    final currentUserName = currentUserData['name'] ??
-                            _auth.currentUser?.displayName ??
-                            'User';
-    final currentUserPhoto = currentUserData['photoUrl'] ??
-                            _auth.currentUser?.photoURL;
+    final currentUserName =
+        currentUserData['name'] ?? _auth.currentUser?.displayName ?? 'User';
+    final currentUserPhoto =
+        currentUserData['photoUrl'] ?? _auth.currentUser?.photoURL;
 
     // print('ConversationService: Current user name: $currentUserName');
     // print('ConversationService: Other user name: ${otherUser.name}');
@@ -164,8 +164,14 @@ class ConversationService {
     final participantsArray = [currentUserId, otherUser.uid];
 
     // VALIDATION: Ensure participants array has exactly 2 unique user IDs
-    assert(participantsArray.length == 2, 'Participants array must have exactly 2 users');
-    assert(participantsArray[0] != participantsArray[1], 'Participants must be different users');
+    assert(
+      participantsArray.length == 2,
+      'Participants array must have exactly 2 users',
+    );
+    assert(
+      participantsArray[0] != participantsArray[1],
+      'Participants must be different users',
+    );
 
     final conversationData = {
       'id': conversationId,
@@ -182,14 +188,8 @@ class ConversationService {
       'lastMessageTime': null,
       'lastMessage': null,
       'lastMessageSenderId': null,
-      'unreadCount': {
-        currentUserId: 0,
-        otherUser.uid: 0,
-      },
-      'isTyping': {
-        currentUserId: false,
-        otherUser.uid: false,
-      },
+      'unreadCount': {currentUserId: 0, otherUser.uid: 0},
+      'isTyping': {currentUserId: false, otherUser.uid: false},
       'isGroup': false,
       'lastSeen': {
         currentUserId: FieldValue.serverTimestamp(),
@@ -200,11 +200,14 @@ class ConversationService {
     };
 
     try {
-      await _firestore.collection('conversations').doc(conversationId).set(conversationData);
+      await _firestore
+          .collection('conversations')
+          .doc(conversationId)
+          .set(conversationData);
       // print('ConversationService: Conversation document created successfully');
     } catch (e) {
       // print('ConversationService: ERROR creating conversation document: $e');
-      throw e;
+      rethrow;
     }
   }
 
@@ -220,11 +223,10 @@ class ConversationService {
         .get();
 
     final currentUserData = currentUserDoc.data() ?? {};
-    final currentUserName = currentUserData['name'] ??
-                            _auth.currentUser?.displayName ??
-                            'User';
-    final currentUserPhoto = currentUserData['photoUrl'] ??
-                            _auth.currentUser?.photoURL;
+    final currentUserName =
+        currentUserData['name'] ?? _auth.currentUser?.displayName ?? 'User';
+    final currentUserPhoto =
+        currentUserData['photoUrl'] ?? _auth.currentUser?.photoURL;
 
     // IMPORTANT: Validate participants array before updating other info
     // This is a safety check in case the array was corrupted
@@ -232,11 +234,11 @@ class ConversationService {
 
     // Update participant info to ensure it's current
     await _firestore.collection('conversations').doc(conversationId).update({
-      'participantNames.${currentUserId}': currentUserName,
+      'participantNames.$currentUserId': currentUserName,
       'participantNames.${otherUser.uid}': otherUser.name,
-      'participantPhotos.${currentUserId}': currentUserPhoto,
+      'participantPhotos.$currentUserId': currentUserPhoto,
       'participantPhotos.${otherUser.uid}': otherUser.profileImageUrl,
-      'lastSeen.${currentUserId}': FieldValue.serverTimestamp(),
+      'lastSeen.$currentUserId': FieldValue.serverTimestamp(),
     });
   }
 
@@ -257,7 +259,7 @@ class ConversationService {
           .collection('conversations')
           .doc(conversationId)
           .get();
-      
+
       if (doc.exists) {
         return ConversationModel.fromFirestore(doc);
       }
@@ -269,10 +271,13 @@ class ConversationService {
   }
 
   // Create or get conversation with user IDs (overloaded method)
-  Future<String> createOrGetConversation(String currentUserId, String otherUserId) async {
+  Future<String> createOrGetConversation(
+    String currentUserId,
+    String otherUserId,
+  ) async {
     // Generate consistent conversation ID
     final conversationId = generateConversationId(currentUserId, otherUserId);
-    
+
     try {
       // First, try to get existing conversation
       final conversationDoc = await _firestore
@@ -289,7 +294,7 @@ class ConversationService {
           .collection('users')
           .doc(otherUserId)
           .get();
-      
+
       if (!otherUserDoc.exists) {
         throw Exception('Other user not found');
       }
@@ -299,7 +304,8 @@ class ConversationService {
         uid: otherUserId,
         name: otherUserData['name'] ?? 'User',
         email: otherUserData['email'] ?? '',
-        profileImageUrl: otherUserData['profileImageUrl'] ?? otherUserData['photoUrl'],
+        profileImageUrl:
+            otherUserData['profileImageUrl'] ?? otherUserData['photoUrl'],
         createdAt: DateTime.now(),
         lastSeen: DateTime.now(),
       );
@@ -307,9 +313,8 @@ class ConversationService {
       // Create conversation
       await _createConversation(conversationId, currentUserId, otherUser);
       return conversationId;
-      
     } catch (e) {
-      throw e;
+      rethrow;
     }
   }
 
@@ -331,13 +336,13 @@ class ConversationService {
           .doc(conversationId)
           .collection('messages')
           .add({
-        'senderId': currentUserId,
-        'text': text,
-        'imageUrl': imageUrl,
-        'timestamp': FieldValue.serverTimestamp(),
-        'isRead': false,
-        'isEdited': false,
-      });
+            'senderId': currentUserId,
+            'text': text,
+            'imageUrl': imageUrl,
+            'timestamp': FieldValue.serverTimestamp(),
+            'isRead': false,
+            'isEdited': false,
+          });
 
       // Update conversation with last message
       await _firestore.collection('conversations').doc(conversationId).update({
@@ -351,18 +356,23 @@ class ConversationService {
           .collection('conversations')
           .doc(conversationId)
           .get();
-      
+
       if (conversationDoc.exists) {
-        final participantIds = List<String>.from(conversationDoc.data()!['participants']);
+        final participantIds = List<String>.from(
+          conversationDoc.data()!['participants'],
+        );
         final otherUserIds = participantIds.where((id) => id != currentUserId);
-        
+
         final updates = <String, dynamic>{};
         for (final userId in otherUserIds) {
           updates['unreadCount.$userId'] = FieldValue.increment(1);
         }
-        
+
         if (updates.isNotEmpty) {
-          await _firestore.collection('conversations').doc(conversationId).update(updates);
+          await _firestore
+              .collection('conversations')
+              .doc(conversationId)
+              .update(updates);
         }
       }
     } catch (e) {
@@ -403,12 +413,12 @@ class ConversationService {
 
       // Group conversations by participants
       final Map<String, List<QueryDocumentSnapshot>> groupedConversations = {};
-      
+
       for (var doc in conversations.docs) {
         final participants = List<String>.from(doc.data()['participants']);
         participants.sort();
         final key = participants.join('_');
-        
+
         if (!groupedConversations.containsKey(key)) {
           groupedConversations[key] = [];
         }
@@ -433,8 +443,8 @@ class ConversationService {
           // Keep the first (most recent) and delete others
           for (int i = 1; i < entry.value.length; i++) {
             await _mergeAndDeleteConversation(
-              entry.value[0].id,  // Keep this one
-              entry.value[i].id,  // Delete this one
+              entry.value[0].id, // Keep this one
+              entry.value[i].id, // Delete this one
             );
           }
         }
@@ -459,22 +469,24 @@ class ConversationService {
 
       // Move messages to the conversation we're keeping
       final batch = _firestore.batch();
-      
+
       for (var messageDoc in messagesToMove.docs) {
         final newMessageRef = _firestore
             .collection('conversations')
             .doc(keepConversationId)
             .collection('messages')
             .doc(messageDoc.id);
-        
+
         batch.set(newMessageRef, messageDoc.data());
       }
 
       // Delete the duplicate conversation
-      batch.delete(_firestore.collection('conversations').doc(deleteConversationId));
-      
+      batch.delete(
+        _firestore.collection('conversations').doc(deleteConversationId),
+      );
+
       await batch.commit();
-      
+
       // Merged and deleted duplicate conversation
     } catch (e) {
       // Error merging conversation
@@ -487,7 +499,7 @@ class ConversationService {
     if (currentUserId == null) return;
 
     await _firestore.collection('conversations').doc(conversationId).update({
-      'lastSeen.${currentUserId}': FieldValue.serverTimestamp(),
+      'lastSeen.$currentUserId': FieldValue.serverTimestamp(),
     });
   }
 
@@ -587,10 +599,7 @@ class ConversationService {
 
       // Check if all participants exist
       for (var userId in participants) {
-        final userDoc = await _firestore
-            .collection('users')
-            .doc(userId)
-            .get();
+        final userDoc = await _firestore.collection('users').doc(userId).get();
 
         if (!userDoc.exists) {
           return true; // Found an orphaned user

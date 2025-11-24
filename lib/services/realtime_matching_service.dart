@@ -7,7 +7,8 @@ import 'gemini_service.dart';
 import '../models/user_profile.dart';
 
 class RealtimeMatchingService {
-  static final RealtimeMatchingService _instance = RealtimeMatchingService._internal();
+  static final RealtimeMatchingService _instance =
+      RealtimeMatchingService._internal();
   factory RealtimeMatchingService() => _instance;
   RealtimeMatchingService._internal();
 
@@ -24,7 +25,7 @@ class RealtimeMatchingService {
   // Initialize real-time listeners
   Future<void> initialize() async {
     if (_isInitialized) return;
-    
+
     final userId = _auth.currentUser?.uid;
     if (userId == null) return;
 
@@ -44,17 +45,20 @@ class RealtimeMatchingService {
         .where('isActive', isEqualTo: true)
         .snapshots()
         .listen((snapshot) async {
-      for (var change in snapshot.docChanges) {
-        if (change.type == DocumentChangeType.added) {
-          await _checkPostMatch(change.doc, currentUserId);
-        }
-      }
-    });
+          for (var change in snapshot.docChanges) {
+            if (change.type == DocumentChangeType.added) {
+              await _checkPostMatch(change.doc, currentUserId);
+            }
+          }
+        });
 
     debugPrint('✅ Listening for new posts in real-time');
   }
 
-  Future<void> _checkIntentMatch(DocumentSnapshot newIntent, String currentUserId) async {
+  Future<void> _checkIntentMatch(
+    DocumentSnapshot newIntent,
+    String currentUserId,
+  ) async {
     try {
       // Get user's active intents
       final userIntents = await _firestore
@@ -67,19 +71,24 @@ class RealtimeMatchingService {
 
       final newIntentData = newIntent.data() as Map<String, dynamic>;
       final newEmbedding = List<double>.from(newIntentData['embedding'] ?? []);
-      
+
       if (newEmbedding.isEmpty) return;
 
       // Check each user intent against the new intent
       for (var userIntent in userIntents.docs) {
-        final userIntentData = userIntent.data() as Map<String, dynamic>;
-        final userEmbedding = List<double>.from(userIntentData['embedding'] ?? []);
-        
+        final userIntentData = userIntent.data();
+        final userEmbedding = List<double>.from(
+          userIntentData['embedding'] ?? [],
+        );
+
         if (userEmbedding.isEmpty) continue;
 
         // Calculate similarity
-        final similarity = _geminiService.calculateSimilarity(userEmbedding, newEmbedding);
-        
+        final similarity = _geminiService.calculateSimilarity(
+          userEmbedding,
+          newEmbedding,
+        );
+
         // Check if it's a complementary match
         final isComplementary = await _checkComplementaryMatch(
           userIntentData['text'] ?? '',
@@ -102,7 +111,10 @@ class RealtimeMatchingService {
     }
   }
 
-  Future<void> _checkPostMatch(DocumentSnapshot newPost, String currentUserId) async {
+  Future<void> _checkPostMatch(
+    DocumentSnapshot newPost,
+    String currentUserId,
+  ) async {
     try {
       // Get user's active posts
       final userPosts = await _firestore
@@ -118,9 +130,12 @@ class RealtimeMatchingService {
 
       // UPDATED: If embedding missing, generate it now
       if (newEmbedding.isEmpty) {
-        debugPrint('⚠️ New post ${newPost.id} missing embedding, generating...');
+        debugPrint(
+          '⚠️ New post ${newPost.id} missing embedding, generating...',
+        );
         try {
-          final text = '${newPostData['title'] ?? ''} ${newPostData['description'] ?? ''}';
+          final text =
+              '${newPostData['title'] ?? ''} ${newPostData['description'] ?? ''}';
           newEmbedding = await _geminiService.generateEmbedding(text);
 
           // Update document with embedding
@@ -137,14 +152,17 @@ class RealtimeMatchingService {
       }
 
       for (var userPost in userPosts.docs) {
-        final userPostData = userPost.data() as Map<String, dynamic>;
+        final userPostData = userPost.data();
         var userEmbedding = List<double>.from(userPostData['embedding'] ?? []);
 
         // UPDATED: Generate embedding if missing for user's post too
         if (userEmbedding.isEmpty) {
-          debugPrint('⚠️ User post ${userPost.id} missing embedding, generating...');
+          debugPrint(
+            '⚠️ User post ${userPost.id} missing embedding, generating...',
+          );
           try {
-            final text = '${userPostData['title'] ?? ''} ${userPostData['description'] ?? ''}';
+            final text =
+                '${userPostData['title'] ?? ''} ${userPostData['description'] ?? ''}';
             userEmbedding = await _geminiService.generateEmbedding(text);
 
             await userPost.reference.update({
@@ -160,7 +178,10 @@ class RealtimeMatchingService {
         }
 
         // Calculate similarity
-        final similarity = _geminiService.calculateSimilarity(userEmbedding, newEmbedding);
+        final similarity = _geminiService.calculateSimilarity(
+          userEmbedding,
+          newEmbedding,
+        );
 
         if (similarity > 0.75) {
           // Match found! Send notification
@@ -168,7 +189,8 @@ class RealtimeMatchingService {
             currentUserId: currentUserId,
             matchedUserId: newPostData['userId'],
             matchedUserName: await _getUserName(newPostData['userId']),
-            matchedIntent: newPostData['title'] ?? newPostData['description'] ?? '',
+            matchedIntent:
+                newPostData['title'] ?? newPostData['description'] ?? '',
             similarity: similarity,
           );
         }
@@ -180,7 +202,8 @@ class RealtimeMatchingService {
 
   Future<bool> _checkComplementaryMatch(String intent1, String intent2) async {
     try {
-      final prompt = '''
+      final prompt =
+          '''
 Check if these two intents are complementary matches:
 Intent 1: "$intent1"
 Intent 2: "$intent2"
@@ -216,9 +239,12 @@ Return "true" if they complement each other, "false" otherwise.
     }
 
     // Set timer to prevent duplicate notifications
-    _notificationTimers[notificationKey] = Timer(Duration(minutes: 5), () {
-      _notificationTimers.remove(notificationKey);
-    });
+    _notificationTimers[notificationKey] = Timer(
+      const Duration(minutes: 5),
+      () {
+        _notificationTimers.remove(notificationKey);
+      },
+    );
 
     // Store the match in database
     await _firestore.collection('matches').add({
@@ -262,12 +288,12 @@ Return "true" if they complement each other, "false" otherwise.
         .orderBy('timestamp', descending: true)
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs.map((doc) {
-        final data = doc.data() as Map<String, dynamic>;
-        data['id'] = doc.id;
-        return data;
-      }).toList();
-    });
+          return snapshot.docs.map((doc) {
+            final data = doc.data();
+            data['id'] = doc.id;
+            return data;
+          }).toList();
+        });
   }
 
   // Mark match as read
@@ -295,13 +321,13 @@ class BackgroundMatcher {
   static Future<void> runMatching() async {
     // This would be called periodically or triggered by Cloud Functions
     final firestore = FirebaseFirestore.instance;
-    
+
     // Get all active intents
     final intents = await firestore
         .collection('intents')
         .where('expiresAt', isGreaterThan: Timestamp.now())
         .get();
-    
+
     // Process in batches to avoid memory issues
     const batchSize = 100;
     for (int i = 0; i < intents.docs.length; i += batchSize) {

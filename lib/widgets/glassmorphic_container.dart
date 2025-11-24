@@ -16,7 +16,7 @@ class GlassmorphicContainer extends StatelessWidget {
   final Gradient? gradient;
 
   const GlassmorphicContainer({
-    Key? key,
+    super.key,
     required this.child,
     this.width,
     this.height,
@@ -29,7 +29,7 @@ class GlassmorphicContainer extends StatelessWidget {
     this.border,
     this.boxShadow,
     this.gradient,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -44,26 +44,32 @@ class GlassmorphicContainer extends StatelessWidget {
           child: Container(
             padding: padding,
             decoration: BoxDecoration(
-              gradient: gradient ?? LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  (color ?? Colors.white).withValues(alpha: opacity),
-                  (color ?? Colors.white).withValues(alpha: opacity * 0.5),
-                ],
-              ),
+              gradient:
+                  gradient ??
+                  LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      (color ?? Colors.white).withValues(alpha: opacity),
+                      (color ?? Colors.white).withValues(alpha: opacity * 0.5),
+                    ],
+                  ),
               borderRadius: BorderRadius.circular(borderRadius),
-              border: border ?? Border.all(
-                color: Colors.white.withValues(alpha: 0.2),
-                width: 1.5,
-              ),
-              boxShadow: boxShadow ?? [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.1),
-                  blurRadius: 20,
-                  offset: const Offset(0, 10),
-                ),
-              ],
+              border:
+                  border ??
+                  Border.all(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    width: 1.5,
+                  ),
+              boxShadow:
+                  boxShadow ??
+                  [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.1),
+                      blurRadius: 20,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
             ),
             child: child,
           ),
@@ -73,7 +79,8 @@ class GlassmorphicContainer extends StatelessWidget {
   }
 }
 
-class GlassmorphicAppBar extends StatelessWidget implements PreferredSizeWidget {
+class GlassmorphicAppBar extends StatelessWidget
+    implements PreferredSizeWidget {
   final Widget? title;
   final List<Widget>? actions;
   final Widget? leading;
@@ -84,7 +91,7 @@ class GlassmorphicAppBar extends StatelessWidget implements PreferredSizeWidget 
   final double opacity;
 
   const GlassmorphicAppBar({
-    Key? key,
+    super.key,
     this.title,
     this.actions,
     this.leading,
@@ -93,12 +100,12 @@ class GlassmorphicAppBar extends StatelessWidget implements PreferredSizeWidget 
     this.backgroundColor,
     this.blur = 20,
     this.opacity = 0.8,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     return ClipRect(
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
@@ -116,7 +123,7 @@ class GlassmorphicAppBar extends StatelessWidget implements PreferredSizeWidget 
             ),
             border: Border(
               bottom: BorderSide(
-                color: isDark 
+                color: isDark
                     ? Colors.white.withValues(alpha: 0.1)
                     : Colors.black.withValues(alpha: 0.1),
                 width: 0.5,
@@ -131,10 +138,9 @@ class GlassmorphicAppBar extends StatelessWidget implements PreferredSizeWidget 
               child: NavigationToolbar(
                 leading: leading,
                 middle: centerTitle ? Center(child: title) : title,
-                trailing: actions != null ? Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: actions!,
-                ) : null,
+                trailing: actions != null
+                    ? Row(mainAxisSize: MainAxisSize.min, children: actions!)
+                    : null,
                 centerMiddle: centerTitle,
               ),
             ),
@@ -160,7 +166,7 @@ class GlassmorphicCard extends StatelessWidget {
   final bool enableShadow;
 
   const GlassmorphicCard({
-    Key? key,
+    super.key,
     required this.child,
     this.padding,
     this.margin,
@@ -170,12 +176,12 @@ class GlassmorphicCard extends StatelessWidget {
     this.blur = 10,
     this.opacity = 0.1,
     this.enableShadow = true,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     return Container(
       margin: margin,
       child: ClipRRect(
@@ -202,18 +208,22 @@ class GlassmorphicCard extends StatelessWidget {
                   ),
                   borderRadius: BorderRadius.circular(borderRadius),
                   border: Border.all(
-                    color: isDark 
+                    color: isDark
                         ? Colors.white.withValues(alpha: 0.1)
                         : Colors.white.withValues(alpha: 0.3),
                     width: 1,
                   ),
-                  boxShadow: enableShadow ? [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.1),
-                      blurRadius: 20,
-                      offset: const Offset(0, 10),
-                    ),
-                  ] : null,
+                  boxShadow: enableShadow
+                      ? [
+                          BoxShadow(
+                            color: Colors.black.withValues(
+                              alpha: isDark ? 0.3 : 0.1,
+                            ),
+                            blurRadius: 20,
+                            offset: const Offset(0, 10),
+                          ),
+                        ]
+                      : null,
                 ),
                 child: child,
               ),
@@ -236,7 +246,7 @@ class AnimatedGlassmorphicContainer extends StatefulWidget {
   final Curve curve;
 
   const AnimatedGlassmorphicContainer({
-    Key? key,
+    super.key,
     required this.child,
     this.width,
     this.height,
@@ -245,15 +255,15 @@ class AnimatedGlassmorphicContainer extends StatefulWidget {
     this.borderRadius = 20,
     this.duration = const Duration(milliseconds: 300),
     this.curve = Curves.easeInOut,
-  }) : super(key: key);
+  });
 
   @override
-  State<AnimatedGlassmorphicContainer> createState() => 
+  State<AnimatedGlassmorphicContainer> createState() =>
       _AnimatedGlassmorphicContainerState();
 }
 
-class _AnimatedGlassmorphicContainerState 
-    extends State<AnimatedGlassmorphicContainer> 
+class _AnimatedGlassmorphicContainerState
+    extends State<AnimatedGlassmorphicContainer>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _animation;
@@ -261,14 +271,8 @@ class _AnimatedGlassmorphicContainerState
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      duration: widget.duration,
-      vsync: this,
-    );
-    _animation = CurvedAnimation(
-      parent: _controller,
-      curve: widget.curve,
-    );
+    _controller = AnimationController(duration: widget.duration, vsync: this);
+    _animation = CurvedAnimation(parent: _controller, curve: widget.curve);
     _controller.forward();
   }
 
@@ -283,10 +287,7 @@ class _AnimatedGlassmorphicContainerState
     return FadeTransition(
       opacity: _animation,
       child: ScaleTransition(
-        scale: Tween<double>(
-          begin: 0.95,
-          end: 1.0,
-        ).animate(_animation),
+        scale: Tween<double>(begin: 0.95, end: 1.0).animate(_animation),
         child: GlassmorphicContainer(
           width: widget.width,
           height: widget.height,

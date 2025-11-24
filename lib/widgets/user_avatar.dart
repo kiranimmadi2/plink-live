@@ -6,13 +6,13 @@ class UserAvatar extends StatelessWidget {
   final String? profileImageUrl;
   final double radius;
   final String? fallbackText;
-  
+
   const UserAvatar({
-    Key? key,
+    super.key,
     this.profileImageUrl,
     this.radius = 20,
     this.fallbackText,
-  }) : super(key: key);
+  });
 
   String? _fixPhotoUrl(String? url) {
     // Use the centralized helper with rate limiting protection
@@ -22,7 +22,7 @@ class UserAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final fixedUrl = _fixPhotoUrl(profileImageUrl);
-    
+
     return CircleAvatar(
       radius: radius,
       backgroundColor: Colors.grey.shade300,
@@ -35,10 +35,14 @@ class UserAvatar extends StatelessWidget {
                 fit: BoxFit.cover,
                 // Add longer cache duration with higher resolution
                 cacheKey: fixedUrl,
-                maxWidthDiskCache: 1024,  // Increased from 400 for better quality
-                maxHeightDiskCache: 1024, // Increased from 400 for better quality
-                memCacheWidth: (radius * 4).round(),  // Doubled for sharper images
-                memCacheHeight: (radius * 4).round(), // Doubled for sharper images
+                maxWidthDiskCache:
+                    1024, // Increased from 400 for better quality
+                maxHeightDiskCache:
+                    1024, // Increased from 400 for better quality
+                memCacheWidth: (radius * 4)
+                    .round(), // Doubled for sharper images
+                memCacheHeight: (radius * 4)
+                    .round(), // Doubled for sharper images
                 placeholder: (context, url) => Container(
                   color: Colors.grey.shade300,
                   child: Icon(
@@ -49,7 +53,8 @@ class UserAvatar extends StatelessWidget {
                 ),
                 errorWidget: (context, url, error) {
                   // Mark URL as rate-limited if it's a 429 error
-                  if (error.toString().contains('429') && url.contains('googleusercontent.com')) {
+                  if (error.toString().contains('429') &&
+                      url.contains('googleusercontent.com')) {
                     PhotoUrlHelper.markAsRateLimited(url);
                   }
                   // Use fallback silently
@@ -57,7 +62,7 @@ class UserAvatar extends StatelessWidget {
                     color: Colors.grey.shade300,
                     child: Center(
                       child: Text(
-                        fallbackText?.isNotEmpty == true 
+                        fallbackText?.isNotEmpty == true
                             ? fallbackText![0].toUpperCase()
                             : '?',
                         style: TextStyle(

@@ -20,13 +20,15 @@ import 'enhanced_chat_screen.dart';
 import '../models/user_profile.dart';
 
 class ProfileWithHistoryScreen extends ConsumerStatefulWidget {
-  const ProfileWithHistoryScreen({Key? key}) : super(key: key);
+  const ProfileWithHistoryScreen({super.key});
 
   @override
-  ConsumerState<ProfileWithHistoryScreen> createState() => _ProfileWithHistoryScreenState();
+  ConsumerState<ProfileWithHistoryScreen> createState() =>
+      _ProfileWithHistoryScreenState();
 }
 
-class _ProfileWithHistoryScreenState extends ConsumerState<ProfileWithHistoryScreen> {
+class _ProfileWithHistoryScreenState
+    extends ConsumerState<ProfileWithHistoryScreen> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final UniversalIntentService _intentService = UniversalIntentService();
@@ -80,36 +82,44 @@ class _ProfileWithHistoryScreenState extends ConsumerState<ProfileWithHistoryScr
         .doc(userId)
         .snapshots()
         .listen((snapshot) {
-      if (!mounted) return;
+          if (!mounted) return;
 
-      if (snapshot.exists) {
-        final userData = snapshot.data();
+          if (snapshot.exists) {
+            final userData = snapshot.data();
 
-        // OPTIMIZATION: Only call setState if data actually changed
-        // This prevents unnecessary rebuilds that cause frame drops
-        final newCity = userData?['city'];
-        final newLocation = userData?['location'];
-        final newInterests = List<String>.from(userData?['interests'] ?? []);
+            // OPTIMIZATION: Only call setState if data actually changed
+            // This prevents unnecessary rebuilds that cause frame drops
+            final newCity = userData?['city'];
+            final newLocation = userData?['location'];
+            final newInterests = List<String>.from(
+              userData?['interests'] ?? [],
+            );
 
-        final oldCity = _userProfile?['city'];
-        final oldLocation = _userProfile?['location'];
+            final oldCity = _userProfile?['city'];
+            final oldLocation = _userProfile?['location'];
 
-        // Check if anything meaningful changed
-        final cityChanged = newCity != oldCity;
-        final locationChanged = newLocation != oldLocation;
-        final interestsChanged = !_listEquals(newInterests, _selectedInterests);
+            // Check if anything meaningful changed
+            final cityChanged = newCity != oldCity;
+            final locationChanged = newLocation != oldLocation;
+            final interestsChanged = !_listEquals(
+              newInterests,
+              _selectedInterests,
+            );
 
-        if (cityChanged || locationChanged || interestsChanged || _userProfile == null) {
-          setState(() {
-            _userProfile = userData;
-            _selectedInterests = newInterests;
-          });
+            if (cityChanged ||
+                locationChanged ||
+                interestsChanged ||
+                _userProfile == null) {
+              setState(() {
+                _userProfile = userData;
+                _selectedInterests = newInterests;
+              });
 
-          // Only log in debug mode
-          // debugPrint('ProfileScreen: Profile updated - city=$newCity');
-        }
-      }
-    });
+              // Only log in debug mode
+              // debugPrint('ProfileScreen: Profile updated - city=$newCity');
+            }
+          }
+        });
   }
 
   // Helper to compare lists
@@ -150,44 +160,49 @@ class _ProfileWithHistoryScreenState extends ConsumerState<ProfileWithHistoryScr
             data?['displayLocation'] == 'Location detected' ||
             data?['displayLocation'] == 'Location detected (Web)' ||
             (data?['city'] == null ||
-             data?['city'] == 'Location not set' ||
-             data?['city'] == '' ||
-             data?['city'] == 'Location detected' ||
-             data?['city'] == 'Location detected (Web)')) {
-
+                data?['city'] == 'Location not set' ||
+                data?['city'] == '' ||
+                data?['city'] == 'Location detected' ||
+                data?['city'] == 'Location detected (Web)')) {
           // Update location SILENTLY in background without blocking UI
           // Run this as fire-and-forget to prevent blocking
-          _locationService.updateUserLocation(silent: true).then((success) {
-            if (!mounted) return; // Check mounted before continuing
+          _locationService
+              .updateUserLocation(silent: true)
+              .then((success) {
+                if (!mounted) return; // Check mounted before continuing
 
-            if (success) {
-              // Short delay to let Firestore propagate, then reload
-              Future.delayed(const Duration(milliseconds: 500)).then((_) {
-                if (mounted) {
-                  _loadUserData();
+                if (success) {
+                  // Short delay to let Firestore propagate, then reload
+                  Future.delayed(const Duration(milliseconds: 500)).then((_) {
+                    if (mounted) {
+                      _loadUserData();
+                    }
+                  });
                 }
+              })
+              .catchError((error) {
+                debugPrint('ProfileScreen: Location update error: $error');
               });
-            }
-          }).catchError((error) {
-            debugPrint('ProfileScreen: Location update error: $error');
-          });
         }
       } else {
         // Document doesn't exist, create it with location
         // Update location SILENTLY in background
-        _locationService.updateUserLocation(silent: true).then((success) {
-          if (!mounted) return;
+        _locationService
+            .updateUserLocation(silent: true)
+            .then((success) {
+              if (!mounted) return;
 
-          if (success) {
-            Future.delayed(const Duration(milliseconds: 500)).then((_) {
-              if (mounted) {
-                _loadUserData();
+              if (success) {
+                Future.delayed(const Duration(milliseconds: 500)).then((_) {
+                  if (mounted) {
+                    _loadUserData();
+                  }
+                });
               }
+            })
+            .catchError((error) {
+              debugPrint('ProfileScreen: Location creation error: $error');
             });
-          }
-        }).catchError((error) {
-          debugPrint('ProfileScreen: Location creation error: $error');
-        });
       }
     } catch (e) {
       debugPrint('ProfileScreen: Error updating location: $e');
@@ -222,7 +237,9 @@ class _ProfileWithHistoryScreenState extends ConsumerState<ProfileWithHistoryScr
           // Load user's saved interests
           _selectedInterests = List<String>.from(userData?['interests'] ?? []);
           // Load connection types, activities, and about me
-          _selectedConnectionTypes = List<String>.from(userData?['connectionTypes'] ?? []);
+          _selectedConnectionTypes = List<String>.from(
+            userData?['connectionTypes'] ?? [],
+          );
           _aboutMe = userData?['aboutMe'] ?? '';
           _aboutMeController.text = _aboutMe;
 
@@ -297,10 +314,27 @@ class _ProfileWithHistoryScreenState extends ConsumerState<ProfileWithHistoryScr
 
   // Common interests for users to choose from
   final List<String> _availableInterests = [
-    'Dating', 'Friendship', 'Business', 'Roommate', 'Job Seeker',
-    'Hiring', 'Selling', 'Buying', 'Lost & Found', 'Events',
-    'Sports', 'Travel', 'Food', 'Music', 'Movies', 'Gaming',
-    'Fitness', 'Art', 'Technology', 'Photography', 'Fashion',
+    'Dating',
+    'Friendship',
+    'Business',
+    'Roommate',
+    'Job Seeker',
+    'Hiring',
+    'Selling',
+    'Buying',
+    'Lost & Found',
+    'Events',
+    'Sports',
+    'Travel',
+    'Food',
+    'Music',
+    'Movies',
+    'Gaming',
+    'Fitness',
+    'Art',
+    'Technology',
+    'Photography',
+    'Fashion',
   ];
 
   Future<void> _loadNearbyPeople() async {
@@ -325,7 +359,10 @@ class _ProfileWithHistoryScreenState extends ConsumerState<ProfileWithHistoryScr
 
       // Apply interest filter if enabled
       if (_filterByInterests && _selectedInterests.isNotEmpty) {
-        usersQuery = usersQuery.where('interests', arrayContainsAny: _selectedInterests);
+        usersQuery = usersQuery.where(
+          'interests',
+          arrayContainsAny: _selectedInterests,
+        );
       }
 
       // Apply exact location filter if enabled
@@ -355,7 +392,8 @@ class _ProfileWithHistoryScreenState extends ConsumerState<ProfileWithHistoryScr
 
         // Calculate common interests
         List<String> commonInterests = [];
-        double matchScore = 1.0; // Default match score when interest filter is off
+        double matchScore =
+            1.0; // Default match score when interest filter is off
 
         if (_filterByInterests && _selectedInterests.isNotEmpty) {
           commonInterests = _selectedInterests
@@ -381,7 +419,10 @@ class _ProfileWithHistoryScreenState extends ConsumerState<ProfileWithHistoryScr
       }
 
       // Sort by match score (highest first)
-      people.sort((a, b) => (b['matchScore'] as double).compareTo(a['matchScore'] as double));
+      people.sort(
+        (a, b) =>
+            (b['matchScore'] as double).compareTo(a['matchScore'] as double),
+      );
 
       if (mounted) {
         setState(() {
@@ -509,10 +550,7 @@ class _ProfileWithHistoryScreenState extends ConsumerState<ProfileWithHistoryScr
                       title: const Text('Filter by Exact Location'),
                       subtitle: Text(
                         'Only show people in your exact city/area',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                       ),
                       value: _filterByExactLocation,
                       onChanged: (value) {
@@ -526,10 +564,7 @@ class _ProfileWithHistoryScreenState extends ConsumerState<ProfileWithHistoryScr
                       title: const Text('Filter by Interests'),
                       subtitle: Text(
                         'Only show people with common interests',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                       ),
                       value: _filterByInterests,
                       onChanged: (value) {
@@ -563,17 +598,25 @@ class _ProfileWithHistoryScreenState extends ConsumerState<ProfileWithHistoryScr
                                     _showInterestsDialog();
                                   },
                                   icon: Icon(
-                                    _selectedInterests.isEmpty ? Icons.add : Icons.edit,
+                                    _selectedInterests.isEmpty
+                                        ? Icons.add
+                                        : Icons.edit,
                                     size: 16,
                                   ),
                                   label: Text(
-                                    _selectedInterests.isEmpty ? 'Select' : 'Change',
+                                    _selectedInterests.isEmpty
+                                        ? 'Select'
+                                        : 'Change',
                                     style: const TextStyle(fontSize: 12),
                                   ),
                                   style: TextButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
                                     minimumSize: Size.zero,
-                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
                                   ),
                                 ),
                               ],
@@ -585,11 +628,17 @@ class _ProfileWithHistoryScreenState extends ConsumerState<ProfileWithHistoryScr
                                 decoration: BoxDecoration(
                                   color: Colors.orange.shade50,
                                   borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: Colors.orange.shade200),
+                                  border: Border.all(
+                                    color: Colors.orange.shade200,
+                                  ),
                                 ),
                                 child: Row(
                                   children: [
-                                    Icon(Icons.info_outline, size: 16, color: Colors.orange.shade700),
+                                    Icon(
+                                      Icons.info_outline,
+                                      size: 16,
+                                      color: Colors.orange.shade700,
+                                    ),
                                     const SizedBox(width: 8),
                                     Expanded(
                                       child: Text(
@@ -609,12 +658,19 @@ class _ProfileWithHistoryScreenState extends ConsumerState<ProfileWithHistoryScr
                                 runSpacing: 6,
                                 children: _selectedInterests.map((interest) {
                                   return Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 5,
+                                    ),
                                     decoration: BoxDecoration(
-                                      color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
+                                      color: Theme.of(
+                                        context,
+                                      ).primaryColor.withValues(alpha: 0.1),
                                       borderRadius: BorderRadius.circular(16),
                                       border: Border.all(
-                                        color: Theme.of(context).primaryColor.withValues(alpha: 0.3),
+                                        color: Theme.of(
+                                          context,
+                                        ).primaryColor.withValues(alpha: 0.3),
                                       ),
                                     ),
                                     child: Text(
@@ -674,9 +730,7 @@ class _ProfileWithHistoryScreenState extends ConsumerState<ProfileWithHistoryScr
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-            ),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             child: const Text('Logout', style: TextStyle(color: Colors.white)),
           ),
         ],
@@ -771,7 +825,6 @@ class _ProfileWithHistoryScreenState extends ConsumerState<ProfileWithHistoryScr
     'Gaming',
     'Travel',
     'gaming',
-
   ];
 
   @override
@@ -779,7 +832,7 @@ class _ProfileWithHistoryScreenState extends ConsumerState<ProfileWithHistoryScr
     final themeState = ref.watch(themeProvider);
     final isDarkMode = themeState.isDarkMode;
     final isGlass = themeState.isGlassmorphism;
-    
+
     return Scaffold(
       extendBodyBehindAppBar: true,
       backgroundColor: Colors.transparent,
@@ -790,11 +843,16 @@ class _ProfileWithHistoryScreenState extends ConsumerState<ProfileWithHistoryScr
             filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
             child: AppBar(
               elevation: 0,
-              backgroundColor: isGlass 
+              backgroundColor: isGlass
                   ? Colors.white.withValues(alpha: 0.7)
-                  : (isDarkMode ? Colors.black.withValues(alpha: 0.9) : Colors.white.withValues(alpha: 0.95)),
+                  : (isDarkMode
+                        ? Colors.black.withValues(alpha: 0.9)
+                        : Colors.white.withValues(alpha: 0.95)),
               leading: IconButton(
-                icon: Icon(Icons.arrow_back, color: isDarkMode ? Colors.white : Colors.black),
+                icon: Icon(
+                  Icons.arrow_back,
+                  color: isDarkMode ? Colors.white : Colors.black,
+                ),
                 onPressed: () {
                   // Navigate back to home screen (Discover tab)
                   // Pop until we reach the MainNavigationScreen (first route)
@@ -810,7 +868,10 @@ class _ProfileWithHistoryScreenState extends ConsumerState<ProfileWithHistoryScr
               ),
               actions: [
                 IconButton(
-                  icon: Icon(Icons.settings, color: isDarkMode ? Colors.white : Colors.black),
+                  icon: Icon(
+                    Icons.settings,
+                    color: isDarkMode ? Colors.white : Colors.black,
+                  ),
                   onPressed: () {
                     Navigator.push(
                       context,
@@ -819,84 +880,82 @@ class _ProfileWithHistoryScreenState extends ConsumerState<ProfileWithHistoryScr
                   },
                 ),
               ],
+            ),
+          ),
+        ),
       ),
-    ),
-  ),
-),
       body: Stack(
-  children: [
-    // iOS 16 Glassmorphism gradient background
-    Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: isGlass 
-              ? [
-                  const Color(0xFFE3F2FD).withValues(alpha: 0.8),
-                  const Color(0xFFF3E5F5).withValues(alpha: 0.6),
-                  const Color(0xFFE8F5E9).withValues(alpha: 0.4),
-                  const Color(0xFFFFF3E0).withValues(alpha: 0.3),
-                ]
-              : isDarkMode 
-                  ? [
-                      Colors.black,
-                      const Color(0xFF1C1C1E),
-                    ]
-                  : [
-                      const Color(0xFFF5F5F7),
-                      Colors.white,
+        children: [
+          // iOS 16 Glassmorphism gradient background
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: isGlass
+                    ? [
+                        const Color(0xFFE3F2FD).withValues(alpha: 0.8),
+                        const Color(0xFFF3E5F5).withValues(alpha: 0.6),
+                        const Color(0xFFE8F5E9).withValues(alpha: 0.4),
+                        const Color(0xFFFFF3E0).withValues(alpha: 0.3),
+                      ]
+                    : isDarkMode
+                    ? [Colors.black, const Color(0xFF1C1C1E)]
+                    : [const Color(0xFFF5F5F7), Colors.white],
+              ),
+            ),
+          ),
+
+          // Floating glass circles for depth
+          if (isGlass) ...[
+            Positioned(
+              top: 150,
+              right: -100,
+              child: Container(
+                width: 300,
+                height: 300,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      AppColors.iosPurple.withValues(alpha: 0.2),
+                      AppColors.iosPurple.withValues(alpha: 0.0),
                     ],
-        ),
-      ),
-    ),
-    
-    // Floating glass circles for depth
-    if (isGlass) ...[
-      Positioned(
-        top: 150,
-        right: -100,
-        child: Container(
-          width: 300,
-          height: 300,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: RadialGradient(
-              colors: [
-                ThemeProvider.iosPurple.withValues(alpha: 0.2),
-                ThemeProvider.iosPurple.withValues(alpha: 0.0),
-              ],
+                  ),
+                ),
+              ),
             ),
-          ),
-        ),
-      ),
-      Positioned(
-        bottom: 200,
-        left: -100,
-        child: Container(
-          width: 350,
-          height: 350,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: RadialGradient(
-              colors: [
-                ThemeProvider.iosBlue.withValues(alpha: 0.15),
-                ThemeProvider.iosBlue.withValues(alpha: 0.0),
-              ],
+            Positioned(
+              bottom: 200,
+              left: -100,
+              child: Container(
+                width: 350,
+                height: 350,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      AppColors.iosBlue.withValues(alpha: 0.15),
+                      AppColors.iosBlue.withValues(alpha: 0.0),
+                    ],
+                  ),
+                ),
+              ),
             ),
-          ),
-        ),
-      ),
-    ],
-    
-    _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null
+          ],
+
+          _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : _error != null
               ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.error_outline, size: 60, color: Colors.red),
+                      const Icon(
+                        Icons.error_outline,
+                        size: 60,
+                        color: Colors.red,
+                      ),
                       const SizedBox(height: 16),
                       Text(_error!, style: const TextStyle(color: Colors.red)),
                       const SizedBox(height: 16),
@@ -920,20 +979,26 @@ class _ProfileWithHistoryScreenState extends ConsumerState<ProfileWithHistoryScr
                             decoration: BoxDecoration(
                               color: isGlass
                                   ? Colors.white.withValues(alpha: 0.7)
-                                  : (isDarkMode ? Colors.grey[900] : Colors.white),
+                                  : (isDarkMode
+                                        ? Colors.grey[900]
+                                        : Colors.white),
                               borderRadius: BorderRadius.circular(20),
                               boxShadow: isGlass
                                   ? []
                                   : [
                                       BoxShadow(
-                                        color: Colors.black.withValues(alpha: 0.08),
+                                        color: Colors.black.withValues(
+                                          alpha: 0.08,
+                                        ),
                                         blurRadius: 16,
                                         offset: const Offset(0, 4),
                                       ),
                                     ],
                               border: isGlass
                                   ? Border.all(
-                                      color: Colors.white.withValues(alpha: 0.3),
+                                      color: Colors.white.withValues(
+                                        alpha: 0.3,
+                                      ),
                                       width: 1.5,
                                     )
                                   : null,
@@ -944,22 +1009,29 @@ class _ProfileWithHistoryScreenState extends ConsumerState<ProfileWithHistoryScr
                                   children: [
                                     // Profile Photo
                                     UserAvatar(
-                                      profileImageUrl: _userProfile?['profileImageUrl'] ?? _userProfile?['photoUrl'],
+                                      profileImageUrl:
+                                          _userProfile?['profileImageUrl'] ??
+                                          _userProfile?['photoUrl'],
                                       radius: 50,
-                                      fallbackText: _userProfile?['name'] ?? 'User',
+                                      fallbackText:
+                                          _userProfile?['name'] ?? 'User',
                                     ),
                                     const SizedBox(width: 20),
                                     // User Info
                                     Expanded(
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           Text(
-                                            _userProfile?['name'] ?? 'Unknown User',
+                                            _userProfile?['name'] ??
+                                                'Unknown User',
                                             style: TextStyle(
                                               fontSize: 22,
                                               fontWeight: FontWeight.w700,
-                                              color: isDarkMode ? Colors.white : Colors.black,
+                                              color: isDarkMode
+                                                  ? Colors.white
+                                                  : Colors.black,
                                               letterSpacing: 0.3,
                                             ),
                                           ),
@@ -969,17 +1041,26 @@ class _ProfileWithHistoryScreenState extends ConsumerState<ProfileWithHistoryScr
                                               Icon(
                                                 Icons.email_outlined,
                                                 size: 16,
-                                                color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                                                color: isDarkMode
+                                                    ? Colors.grey[400]
+                                                    : Colors.grey[600],
                                               ),
                                               const SizedBox(width: 6),
                                               Expanded(
                                                 child: Text(
-                                                  _userProfile?['email'] ?? _auth.currentUser?.email ?? 'No email',
+                                                  _userProfile?['email'] ??
+                                                      _auth
+                                                          .currentUser
+                                                          ?.email ??
+                                                      'No email',
                                                   style: TextStyle(
                                                     fontSize: 14,
-                                                    color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                                                    color: isDarkMode
+                                                        ? Colors.grey[400]
+                                                        : Colors.grey[600],
                                                   ),
-                                                  overflow: TextOverflow.ellipsis,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
                                                 ),
                                               ),
                                             ],
@@ -990,20 +1071,34 @@ class _ProfileWithHistoryScreenState extends ConsumerState<ProfileWithHistoryScr
                                               // Manual location update
                                               if (!mounted) return;
 
-                                              ScaffoldMessenger.of(context).showSnackBar(
-                                                const SnackBar(content: Text('Updating location...')),
+                                              ScaffoldMessenger.of(
+                                                context,
+                                              ).showSnackBar(
+                                                const SnackBar(
+                                                  content: Text(
+                                                    'Updating location...',
+                                                  ),
+                                                ),
                                               );
 
                                               try {
                                                 // User manually clicked to update location, so NOT silent
-                                                final success = await _locationService.updateUserLocation(silent: false);
+                                                final success =
+                                                    await _locationService
+                                                        .updateUserLocation(
+                                                          silent: false,
+                                                        );
 
                                                 // Check mounted after async operation
                                                 if (!mounted) return;
 
                                                 if (success) {
                                                   // Short delay for Firestore propagation
-                                                  await Future.delayed(const Duration(milliseconds: 500));
+                                                  await Future.delayed(
+                                                    const Duration(
+                                                      milliseconds: 500,
+                                                    ),
+                                                  );
 
                                                   // Check mounted again after delay
                                                   if (!mounted) return;
@@ -1011,115 +1106,181 @@ class _ProfileWithHistoryScreenState extends ConsumerState<ProfileWithHistoryScr
                                                   _loadUserData();
 
                                                   if (mounted) {
-                                                    ScaffoldMessenger.of(context).showSnackBar(
+                                                    ScaffoldMessenger.of(
+                                                      context,
+                                                    ).showSnackBar(
                                                       const SnackBar(
-                                                        content: Text('Location updated successfully'),
-                                                        backgroundColor: Colors.green,
+                                                        content: Text(
+                                                          'Location updated successfully',
+                                                        ),
+                                                        backgroundColor:
+                                                            Colors.green,
                                                       ),
                                                     );
                                                   }
                                                 } else {
                                                   if (mounted) {
-                                                    ScaffoldMessenger.of(context).showSnackBar(
+                                                    ScaffoldMessenger.of(
+                                                      context,
+                                                    ).showSnackBar(
                                                       const SnackBar(
-                                                        content: Text('Could not update location'),
-                                                        backgroundColor: Colors.red,
+                                                        content: Text(
+                                                          'Could not update location',
+                                                        ),
+                                                        backgroundColor:
+                                                            Colors.red,
                                                       ),
                                                     );
                                                   }
                                                 }
                                               } catch (e) {
-                                                print('Error during manual location update: $e');
+                                                print(
+                                                  'Error during manual location update: $e',
+                                                );
                                                 if (mounted) {
-                                                  ScaffoldMessenger.of(context).showSnackBar(
+                                                  ScaffoldMessenger.of(
+                                                    context,
+                                                  ).showSnackBar(
                                                     const SnackBar(
-                                                      content: Text('Location update failed'),
-                                                      backgroundColor: Colors.red,
+                                                      content: Text(
+                                                        'Location update failed',
+                                                      ),
+                                                      backgroundColor:
+                                                          Colors.red,
                                                     ),
                                                   );
                                                 }
                                               }
                                             },
                                             child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
                                               children: [
                                                 Row(
                                                   children: [
                                                     Icon(
-                                                      Icons.location_on_outlined,
+                                                      Icons
+                                                          .location_on_outlined,
                                                       size: 16,
-                                                      color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                                                      color: isDarkMode
+                                                          ? Colors.grey[400]
+                                                          : Colors.grey[600],
                                                     ),
                                                     const SizedBox(width: 6),
                                                     Flexible(
                                                       child: Text(
                                                         _userProfile?['displayLocation'] ??
-                                                        _userProfile?['city'] ??
-                                                        _userProfile?['location'] ??
-                                                        'Tap to set location',
+                                                            _userProfile?['city'] ??
+                                                            _userProfile?['location'] ??
+                                                            'Tap to set location',
                                                         style: TextStyle(
                                                           fontSize: 14,
-                                                          color: (_userProfile?['displayLocation'] == null &&
-                                                                  _userProfile?['city'] == null &&
-                                                                  _userProfile?['location'] == null)
-                                                              ? Theme.of(context).primaryColor
-                                                              : isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                                                          decoration: (_userProfile?['displayLocation'] == null &&
-                                                                      _userProfile?['city'] == null &&
-                                                                      _userProfile?['location'] == null)
-                                                              ? TextDecoration.underline
+                                                          color:
+                                                              (_userProfile?['displayLocation'] ==
+                                                                      null &&
+                                                                  _userProfile?['city'] ==
+                                                                      null &&
+                                                                  _userProfile?['location'] ==
+                                                                      null)
+                                                              ? Theme.of(
+                                                                  context,
+                                                                ).primaryColor
+                                                              : isDarkMode
+                                                              ? Colors.grey[400]
+                                                              : Colors
+                                                                    .grey[600],
+                                                          decoration:
+                                                              (_userProfile?['displayLocation'] ==
+                                                                      null &&
+                                                                  _userProfile?['city'] ==
+                                                                      null &&
+                                                                  _userProfile?['location'] ==
+                                                                      null)
+                                                              ? TextDecoration
+                                                                    .underline
                                                               : null,
                                                         ),
-                                                        overflow: TextOverflow.ellipsis,
+                                                        overflow: TextOverflow
+                                                            .ellipsis,
                                                         maxLines: 1,
                                                       ),
                                                     ),
                                                   ],
                                                 ),
                                                 // Location freshness indicator
-                                                if (_userProfile?['locationUpdatedAt'] != null)
+                                                if (_userProfile?['locationUpdatedAt'] !=
+                                                    null)
                                                   FutureBuilder<int?>(
-                                                    future: _locationService.getLocationAgeInHours(),
+                                                    future: _locationService
+                                                        .getLocationAgeInHours(),
                                                     builder: (context, snapshot) {
-                                                      if (snapshot.hasData && snapshot.data != null) {
-                                                        final hours = snapshot.data!;
+                                                      if (snapshot.hasData &&
+                                                          snapshot.data !=
+                                                              null) {
+                                                        final hours =
+                                                            snapshot.data!;
                                                         String timeText;
                                                         Color indicatorColor;
 
                                                         if (hours < 1) {
-                                                          timeText = 'Updated recently';
-                                                          indicatorColor = Colors.green;
+                                                          timeText =
+                                                              'Updated recently';
+                                                          indicatorColor =
+                                                              Colors.green;
                                                         } else if (hours < 24) {
-                                                          timeText = 'Updated ${hours}h ago';
-                                                          indicatorColor = Colors.green;
+                                                          timeText =
+                                                              'Updated ${hours}h ago';
+                                                          indicatorColor =
+                                                              Colors.green;
                                                         } else if (hours < 48) {
-                                                          timeText = 'Updated 1 day ago';
-                                                          indicatorColor = Colors.orange;
+                                                          timeText =
+                                                              'Updated 1 day ago';
+                                                          indicatorColor =
+                                                              Colors.orange;
                                                         } else {
-                                                          final days = (hours / 24).floor();
-                                                          timeText = 'Updated $days days ago';
-                                                          indicatorColor = Colors.red;
+                                                          final days =
+                                                              (hours / 24)
+                                                                  .floor();
+                                                          timeText =
+                                                              'Updated $days days ago';
+                                                          indicatorColor =
+                                                              Colors.red;
                                                         }
 
                                                         return Padding(
-                                                          padding: const EdgeInsets.only(left: 22, top: 4),
+                                                          padding:
+                                                              const EdgeInsets.only(
+                                                                left: 22,
+                                                                top: 4,
+                                                              ),
                                                           child: Row(
                                                             children: [
                                                               Container(
                                                                 width: 7,
                                                                 height: 7,
                                                                 decoration: BoxDecoration(
-                                                                  shape: BoxShape.circle,
-                                                                  color: indicatorColor,
+                                                                  shape: BoxShape
+                                                                      .circle,
+                                                                  color:
+                                                                      indicatorColor,
                                                                 ),
                                                               ),
-                                                              const SizedBox(width: 6),
+                                                              const SizedBox(
+                                                                width: 6,
+                                                              ),
                                                               Text(
                                                                 timeText,
                                                                 style: TextStyle(
                                                                   fontSize: 12,
-                                                                  color: isDarkMode ? Colors.grey[500] : Colors.grey[500],
-                                                                  fontWeight: FontWeight.w500,
+                                                                  color:
+                                                                      isDarkMode
+                                                                      ? Colors
+                                                                            .grey[500]
+                                                                      : Colors
+                                                                            .grey[500],
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w500,
                                                                 ),
                                                               ),
                                                             ],
@@ -1150,8 +1311,8 @@ class _ProfileWithHistoryScreenState extends ConsumerState<ProfileWithHistoryScr
                     ..._buildHistorySliver(isDarkMode, isGlass),
                   ],
                 ),
-          ],
-        ),
+        ],
+      ),
     );
   }
 
@@ -1174,10 +1335,7 @@ class _ProfileWithHistoryScreenState extends ConsumerState<ProfileWithHistoryScr
                 ),
               ],
         border: isGlass
-            ? Border.all(
-                color: Colors.white.withValues(alpha: 0.2),
-                width: 1,
-              )
+            ? Border.all(color: Colors.white.withValues(alpha: 0.2), width: 1)
             : null,
       ),
       child: Column(
@@ -1220,7 +1378,9 @@ class _ProfileWithHistoryScreenState extends ConsumerState<ProfileWithHistoryScr
                       }
                     });
                   },
-                  selectedColor: Theme.of(context).primaryColor.withValues(alpha: 0.3),
+                  selectedColor: Theme.of(
+                    context,
+                  ).primaryColor.withValues(alpha: 0.3),
                   checkmarkColor: Theme.of(context).primaryColor,
                 );
               }).toList(),
@@ -1231,7 +1391,10 @@ class _ProfileWithHistoryScreenState extends ConsumerState<ProfileWithHistoryScr
               runSpacing: 8,
               children: _selectedConnectionTypes.map((type) {
                 return Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: _getConnectionTypeColor(type),
                     borderRadius: BorderRadius.circular(20),
@@ -1271,10 +1434,7 @@ class _ProfileWithHistoryScreenState extends ConsumerState<ProfileWithHistoryScr
                 ),
               ],
         border: isGlass
-            ? Border.all(
-                color: Colors.white.withValues(alpha: 0.2),
-                width: 1,
-              )
+            ? Border.all(color: Colors.white.withValues(alpha: 0.2), width: 1)
             : null,
       ),
       child: Column(
@@ -1321,7 +1481,10 @@ class _ProfileWithHistoryScreenState extends ConsumerState<ProfileWithHistoryScr
             ..._selectedActivities.map((activity) {
               return Container(
                 margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFF9B59B6).withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(12),
@@ -1340,7 +1503,11 @@ class _ProfileWithHistoryScreenState extends ConsumerState<ProfileWithHistoryScr
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.delete, size: 20, color: Colors.red),
+                      icon: const Icon(
+                        Icons.delete,
+                        size: 20,
+                        color: Colors.red,
+                      ),
                       onPressed: () {
                         setState(() {
                           _selectedActivities.remove(activity);
@@ -1350,7 +1517,7 @@ class _ProfileWithHistoryScreenState extends ConsumerState<ProfileWithHistoryScr
                   ],
                 ),
               );
-            }).toList()
+            })
           else
             Wrap(
               spacing: 8,
@@ -1381,29 +1548,41 @@ class _ProfileWithHistoryScreenState extends ConsumerState<ProfileWithHistoryScr
                                     .collection('users')
                                     .doc(FirebaseAuth.instance.currentUser?.uid)
                                     .update({
-                                  'activities': _selectedActivities,
-                                });
+                                      'activities': _selectedActivities,
+                                    });
                                 if (mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text('Deleted $activity')),
+                                    SnackBar(
+                                      content: Text('Deleted $activity'),
+                                    ),
                                   );
                                 }
                               } catch (e) {
                                 if (mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text('Error deleting activity: $e')),
+                                    SnackBar(
+                                      content: Text(
+                                        'Error deleting activity: $e',
+                                      ),
+                                    ),
                                   );
                                 }
                               }
                             },
-                            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                            child: const Text(
+                              'Delete',
+                              style: TextStyle(color: Colors.red),
+                            ),
                           ),
                         ],
                       ),
                     );
                   },
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFF9B59B6),
                       borderRadius: BorderRadius.circular(20),
@@ -1444,10 +1623,7 @@ class _ProfileWithHistoryScreenState extends ConsumerState<ProfileWithHistoryScr
                 ),
               ],
         border: isGlass
-            ? Border.all(
-                color: Colors.white.withValues(alpha: 0.2),
-                width: 1,
-              )
+            ? Border.all(color: Colors.white.withValues(alpha: 0.2), width: 1)
             : null,
       ),
       child: Column(
@@ -1512,10 +1688,7 @@ class _ProfileWithHistoryScreenState extends ConsumerState<ProfileWithHistoryScr
                 ),
               ],
         border: isGlass
-            ? Border.all(
-                color: Colors.white.withValues(alpha: 0.2),
-                width: 1,
-              )
+            ? Border.all(color: Colors.white.withValues(alpha: 0.2), width: 1)
             : null,
       ),
       child: Column(
@@ -1546,7 +1719,10 @@ class _ProfileWithHistoryScreenState extends ConsumerState<ProfileWithHistoryScr
             runSpacing: 8,
             children: _selectedInterests.map((interest) {
               return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFF00D67D),
                   borderRadius: BorderRadius.circular(20),
@@ -1585,7 +1761,7 @@ class _ProfileWithHistoryScreenState extends ConsumerState<ProfileWithHistoryScr
                       labelText: 'Select Activity',
                       border: OutlineInputBorder(),
                     ),
-                    value: selectedActivity,
+                    initialValue: selectedActivity,
                     items: _availableActivities.map((activity) {
                       return DropdownMenuItem(
                         value: activity,
@@ -1762,124 +1938,116 @@ class _ProfileWithHistoryScreenState extends ConsumerState<ProfileWithHistoryScr
       SliverPadding(
         padding: const EdgeInsets.all(16),
         sliver: SliverList(
-          delegate: SliverChildBuilderDelegate(
-            (context, index) {
-        final intent = _searchHistory[index];
-        final createdAt = intent['createdAt'];
-        String timeAgo = 'Recently';
+          delegate: SliverChildBuilderDelegate((context, index) {
+            final intent = _searchHistory[index];
+            final createdAt = intent['createdAt'];
+            String timeAgo = 'Recently';
 
-        if (createdAt != null && createdAt is Timestamp) {
-          timeAgo = timeago.format(createdAt.toDate());
-        }
+            if (createdAt != null && createdAt is Timestamp) {
+              timeAgo = timeago.format(createdAt.toDate());
+            }
 
-        return Dismissible(
-          key: Key(intent['id']),
-          direction: DismissDirection.endToStart,
-          background: Container(
-            alignment: Alignment.centerRight,
-            padding: const EdgeInsets.only(right: 20),
-            color: Colors.red,
-            child: const Icon(
-              Icons.delete,
-              color: Colors.white,
-            ),
-          ),
-          confirmDismiss: (direction) async {
-            return await showDialog<bool>(
-              context: context,
-              builder: (BuildContext context) {
-                return AlertDialog(
-                  title: const Text('Delete Search History'),
-                  content: Text(
-                    'Are you sure you want to delete "${intent['title'] ?? intent['embeddingText'] ?? 'this search'}"? This action cannot be undone.',
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.of(context).pop(false),
-                      child: const Text('Cancel'),
-                    ),
-                    ElevatedButton(
-                      onPressed: () => Navigator.of(context).pop(true),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red,
+            return Dismissible(
+              key: Key(intent['id']),
+              direction: DismissDirection.endToStart,
+              background: Container(
+                alignment: Alignment.centerRight,
+                padding: const EdgeInsets.only(right: 20),
+                color: Colors.red,
+                child: const Icon(Icons.delete, color: Colors.white),
+              ),
+              confirmDismiss: (direction) async {
+                return await showDialog<bool>(
+                  context: context,
+                  builder: (BuildContext context) {
+                    return AlertDialog(
+                      title: const Text('Delete Search History'),
+                      content: Text(
+                        'Are you sure you want to delete "${intent['title'] ?? intent['embeddingText'] ?? 'this search'}"? This action cannot be undone.',
                       ),
-                      child: const Text(
-                        'Delete',
-                        style: TextStyle(color: Colors.white),
-                      ),
-                    ),
-                  ],
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(false),
+                          child: const Text('Cancel'),
+                        ),
+                        ElevatedButton(
+                          onPressed: () => Navigator.of(context).pop(true),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red,
+                          ),
+                          child: const Text(
+                            'Delete',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 );
               },
-            );
-          },
-          onDismissed: (direction) async {
-            final success = await _intentService.deleteIntent(intent['id']);
+              onDismissed: (direction) async {
+                final success = await _intentService.deleteIntent(intent['id']);
 
-            if (!mounted) return;
+                if (!mounted) return;
 
-            if (success) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Search history deleted successfully'),
-                  backgroundColor: Colors.green,
-                ),
-              );
-              _loadUserData();
-            } else {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Failed to delete search history'),
-                  backgroundColor: Colors.red,
-                ),
-              );
-              _loadUserData();
-            }
-          },
-          child: Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: isGlass
-                    ? [
-                        Colors.white.withValues(alpha: 0.7),
-                        Colors.white.withValues(alpha: 0.5),
-                      ]
-                    : isDarkMode
+                if (success) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Search history deleted successfully'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                  _loadUserData();
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Failed to delete search history'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                  _loadUserData();
+                }
+              },
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: isGlass
                         ? [
-                            const Color(0xFF2D2D2D),
-                            const Color(0xFF252525),
+                            Colors.white.withValues(alpha: 0.7),
+                            Colors.white.withValues(alpha: 0.5),
                           ]
-                        : [
-                            Colors.white,
-                            const Color(0xFFFAFAFA),
-                          ],
-              ),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: isGlass
-                    ? Colors.white.withValues(alpha: 0.3)
-                    : (isDarkMode ? Colors.grey[800]! : Colors.grey[200]!),
-                width: 1.5,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF00D67D).withValues(alpha: 0.1),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
+                        : isDarkMode
+                        ? [const Color(0xFF2D2D2D), const Color(0xFF252525)]
+                        : [Colors.white, const Color(0xFFFAFAFA)],
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: isGlass
+                        ? Colors.white.withValues(alpha: 0.3)
+                        : (isDarkMode ? Colors.grey[800]! : Colors.grey[200]!),
+                    width: 1.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF00D67D).withValues(alpha: 0.1),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                    BoxShadow(
+                      color: Colors.black.withValues(
+                        alpha: isDarkMode ? 0.3 : 0.08,
+                      ),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: isDarkMode ? 0.3 : 0.08),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: BackdropFilter(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: BackdropFilter(
                     filter: isGlass
                         ? ImageFilter.blur(sigmaX: 10, sigmaY: 10)
                         : ImageFilter.blur(sigmaX: 0, sigmaY: 0),
@@ -1890,7 +2058,9 @@ class _ProfileWithHistoryScreenState extends ConsumerState<ProfileWithHistoryScr
                         children: [
                           // Title
                           Text(
-                            intent['title'] ?? intent['embeddingText'] ?? 'Search',
+                            intent['title'] ??
+                                intent['embeddingText'] ??
+                                'Search',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
@@ -1909,14 +2079,18 @@ class _ProfileWithHistoryScreenState extends ConsumerState<ProfileWithHistoryScr
                               Icon(
                                 Icons.access_time_rounded,
                                 size: 14,
-                                color: isDarkMode ? Colors.grey[500] : Colors.grey[500],
+                                color: isDarkMode
+                                    ? Colors.grey[500]
+                                    : Colors.grey[500],
                               ),
                               const SizedBox(width: 4),
                               Text(
                                 timeAgo,
                                 style: TextStyle(
                                   fontSize: 13,
-                                  color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                                  color: isDarkMode
+                                      ? Colors.grey[400]
+                                      : Colors.grey[600],
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
@@ -1925,13 +2099,11 @@ class _ProfileWithHistoryScreenState extends ConsumerState<ProfileWithHistoryScr
                         ],
                       ),
                     ),
+                  ),
+                ),
               ),
-            ),
-          ),
-        );
-            },
-            childCount: _searchHistory.length,
-          ),
+            );
+          }, childCount: _searchHistory.length),
         ),
       ),
     ];
@@ -1984,7 +2156,10 @@ class _ProfileWithHistoryScreenState extends ConsumerState<ProfileWithHistoryScr
                   icon: const Icon(Icons.add),
                   label: const Text('Select Interests'),
                   style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -1993,7 +2168,10 @@ class _ProfileWithHistoryScreenState extends ConsumerState<ProfileWithHistoryScr
                   icon: const Icon(Icons.filter_list),
                   label: const Text('Filters'),
                   style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
                   ),
                 ),
               ],
@@ -2079,7 +2257,8 @@ class _ProfileWithHistoryScreenState extends ConsumerState<ProfileWithHistoryScr
               child: ListTile(
                 contentPadding: const EdgeInsets.all(16),
                 leading: UserAvatar(
-                  profileImageUrl: userData['profileImageUrl'] ?? userData['photoUrl'],
+                  profileImageUrl:
+                      userData['profileImageUrl'] ?? userData['photoUrl'],
                   radius: 28,
                   fallbackText: userData['name'] ?? 'User',
                 ),
@@ -2109,7 +2288,9 @@ class _ProfileWithHistoryScreenState extends ConsumerState<ProfileWithHistoryScr
                           Icon(
                             Icons.location_on,
                             size: 14,
-                            color: isDarkMode ? Colors.grey[500] : Colors.grey[600],
+                            color: isDarkMode
+                                ? Colors.grey[500]
+                                : Colors.grey[600],
                           ),
                           const SizedBox(width: 4),
                           Expanded(
@@ -2117,7 +2298,9 @@ class _ProfileWithHistoryScreenState extends ConsumerState<ProfileWithHistoryScr
                               userData['location'],
                               style: TextStyle(
                                 fontSize: 12,
-                                color: isDarkMode ? Colors.grey[500] : Colors.grey[600],
+                                color: isDarkMode
+                                    ? Colors.grey[500]
+                                    : Colors.grey[600],
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -2131,12 +2314,19 @@ class _ProfileWithHistoryScreenState extends ConsumerState<ProfileWithHistoryScr
                       runSpacing: 4,
                       children: commonInterests.take(3).map((interest) {
                         return Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
                           decoration: BoxDecoration(
-                            color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
+                            color: Theme.of(
+                              context,
+                            ).primaryColor.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
-                              color: Theme.of(context).primaryColor.withValues(alpha: 0.3),
+                              color: Theme.of(
+                                context,
+                              ).primaryColor.withValues(alpha: 0.3),
                               width: 1,
                             ),
                           ),
@@ -2155,13 +2345,15 @@ class _ProfileWithHistoryScreenState extends ConsumerState<ProfileWithHistoryScr
                 ),
                 onTap: () async {
                   // Navigate to their profile
-                  final userProfile = UserProfile.fromMap(userData, person['userId']);
+                  final userProfile = UserProfile.fromMap(
+                    userData,
+                    person['userId'],
+                  );
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => ProfileViewScreen(
-                        userProfile: userProfile,
-                      ),
+                      builder: (context) =>
+                          ProfileViewScreen(userProfile: userProfile),
                     ),
                   );
                 },
@@ -2182,9 +2374,7 @@ class _ProfileWithHistoryScreenState extends ConsumerState<ProfileWithHistoryScr
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => EnhancedChatScreen(
-          otherUser: userProfile,
-        ),
+        builder: (context) => EnhancedChatScreen(otherUser: userProfile),
       ),
     );
   }

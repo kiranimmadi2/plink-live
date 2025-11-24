@@ -13,7 +13,7 @@ import '../services/notification_service.dart';
 import '../services/location_service.dart';
 
 class MainNavigationScreen extends StatefulWidget {
-  const MainNavigationScreen({Key? key}) : super(key: key);
+  const MainNavigationScreen({super.key});
 
   @override
   State<MainNavigationScreen> createState() => _MainNavigationScreenState();
@@ -106,58 +106,56 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
 
   void _listenToUnreadMessages() {
     if (_auth.currentUser == null) return;
-    
+
     _firestore
         .collection('conversations')
         .where('participants', arrayContains: _auth.currentUser!.uid)
         .snapshots()
         .listen((snapshot) {
-      int totalUnread = 0;
-      for (var doc in snapshot.docs) {
-        final data = doc.data();
-        final unreadCount = data['unreadCount']?[_auth.currentUser!.uid] ?? 0;
-        totalUnread += unreadCount as int;
-      }
-      
-      if (mounted) {
-        setState(() {
-          _unreadMessageCount = totalUnread;
+          int totalUnread = 0;
+          for (var doc in snapshot.docs) {
+            final data = doc.data();
+            final unreadCount =
+                data['unreadCount']?[_auth.currentUser!.uid] ?? 0;
+            totalUnread += unreadCount as int;
+          }
+
+          if (mounted) {
+            setState(() {
+              _unreadMessageCount = totalUnread;
+            });
+
+            NotificationService().updateBadgeCount(totalUnread);
+          }
         });
-        
-        NotificationService().updateBadgeCount(totalUnread);
-      }
-    });
   }
 
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    
+
     return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _screens,
-      ),
+      body: IndexedStack(index: _currentIndex, children: _screens),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: isDarkMode
-              ? [
-                  Colors.black.withValues(alpha: 0.3),
-                  Colors.black.withValues(alpha: 0.9),
-                ]
-              : [
-                  Colors.white.withValues(alpha: 0.3),
-                  Colors.white.withValues(alpha: 0.95),
-                ],
+                ? [
+                    Colors.black.withValues(alpha: 0.3),
+                    Colors.black.withValues(alpha: 0.9),
+                  ]
+                : [
+                    Colors.white.withValues(alpha: 0.3),
+                    Colors.white.withValues(alpha: 0.95),
+                  ],
           ),
           border: Border(
             top: BorderSide(
               color: isDarkMode
-                ? Colors.white.withValues(alpha: 0.1)
-                : Colors.black.withValues(alpha: 0.1),
+                  ? Colors.white.withValues(alpha: 0.1)
+                  : Colors.black.withValues(alpha: 0.1),
               width: 0.5,
             ),
           ),
@@ -183,7 +181,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
               type: BottomNavigationBarType.fixed,
               backgroundColor: Colors.transparent,
               selectedItemColor: Theme.of(context).primaryColor,
-              unselectedItemColor: isDarkMode ? Colors.grey[500] : Colors.grey[600],
+              unselectedItemColor: isDarkMode
+                  ? Colors.grey[500]
+                  : Colors.grey[600],
               selectedFontSize: 11,
               unselectedFontSize: 10,
               selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600),

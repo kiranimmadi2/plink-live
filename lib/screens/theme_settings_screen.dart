@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../providers/theme_provider.dart';
+import 'package:supper/providers/theme_provider.dart';
+
 import '../widgets/glassmorphic_container.dart';
 
 class ThemeSettingsScreen extends ConsumerStatefulWidget {
-  const ThemeSettingsScreen({Key? key}) : super(key: key);
+  const ThemeSettingsScreen({super.key});
 
   @override
-  ConsumerState<ThemeSettingsScreen> createState() => _ThemeSettingsScreenState();
+  ConsumerState<ThemeSettingsScreen> createState() =>
+      _ThemeSettingsScreenState();
 }
 
 class _ThemeSettingsScreenState extends ConsumerState<ThemeSettingsScreen>
@@ -24,20 +26,20 @@ class _ThemeSettingsScreenState extends ConsumerState<ThemeSettingsScreen>
       duration: const Duration(milliseconds: 800),
       vsync: this,
     );
-    
+
     _fadeAnimation = CurvedAnimation(
       parent: _animationController,
       curve: Curves.easeIn,
     );
-    
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.1),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeOutCubic,
-    ));
-    
+
+    _slideAnimation =
+        Tween<Offset>(begin: const Offset(0, 0.1), end: Offset.zero).animate(
+          CurvedAnimation(
+            parent: _animationController,
+            curve: Curves.easeOutCubic,
+          ),
+        );
+
     _animationController.forward();
   }
 
@@ -55,7 +57,9 @@ class _ThemeSettingsScreenState extends ConsumerState<ThemeSettingsScreen>
 
     return Scaffold(
       extendBodyBehindAppBar: true,
-      backgroundColor: isDark ? const Color(0xFF000000) : const Color(0xFFF5F5F7),
+      backgroundColor: isDark
+          ? const Color(0xFF000000)
+          : const Color(0xFFF5F5F7),
       body: Stack(
         children: [
           // Animated gradient background
@@ -67,25 +71,26 @@ class _ThemeSettingsScreenState extends ConsumerState<ThemeSettingsScreen>
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    ThemeProvider.glassmorphismBackground[0],
-                    ThemeProvider.glassmorphismBackground[1],
-                    ThemeProvider.glassmorphismBackground[2],
-                    ThemeProvider.glassmorphismBackground[3],
+                    ThemeNotifier.glassmorphismBackground[0],
+                    ThemeNotifier.glassmorphismBackground[1],
+                    ThemeNotifier.glassmorphismBackground[2],
+                    ThemeNotifier.glassmorphismBackground[3],
                   ],
                   stops: const [0.0, 0.3, 0.6, 1.0],
                 ),
               ),
-              child: CustomPaint(
-                painter: _BackgroundPainter(),
-              ),
+              child: CustomPaint(painter: _BackgroundPainter()),
             ),
-          
+
           SafeArea(
             child: Column(
               children: [
                 // Custom App Bar with glassmorphic effect
                 GlassmorphicContainer(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                   margin: const EdgeInsets.all(16),
                   borderRadius: 20,
                   blur: 20,
@@ -111,15 +116,15 @@ class _ThemeSettingsScreenState extends ConsumerState<ThemeSettingsScreen>
                       ),
                       const Spacer(),
                       Icon(
-                        themeState.isGlassmorphism 
-                            ? CupertinoIcons.sparkles 
+                        themeState.isGlassmorphism
+                            ? CupertinoIcons.sparkles
                             : CupertinoIcons.moon_fill,
-                        color: ThemeProvider.iosPurple,
+                        color: AppColors.iosPurple,
                       ),
                     ],
                   ),
                 ),
-                
+
                 Expanded(
                   child: FadeTransition(
                     opacity: _fadeAnimation,
@@ -129,7 +134,7 @@ class _ThemeSettingsScreenState extends ConsumerState<ThemeSettingsScreen>
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         children: [
                           const SizedBox(height: 20),
-                          
+
                           // Theme Preview Cards
                           Center(
                             child: Text(
@@ -141,9 +146,9 @@ class _ThemeSettingsScreenState extends ConsumerState<ThemeSettingsScreen>
                               ),
                             ),
                           ),
-                          
+
                           const SizedBox(height: 24),
-                          
+
                           // Glassmorphism Theme Card
                           _buildThemeCard(
                             context,
@@ -151,19 +156,18 @@ class _ThemeSettingsScreenState extends ConsumerState<ThemeSettingsScreen>
                             subtitle: 'Premium glass effect with depth',
                             icon: CupertinoIcons.sparkles,
                             gradient: const LinearGradient(
-                              colors: [
-                                Color(0xFFE3F2FD),
-                                Color(0xFFF3E5F5),
-                              ],
+                              colors: [Color(0xFFE3F2FD), Color(0xFFF3E5F5)],
                             ),
                             isSelected: themeState.isGlassmorphism,
                             onTap: () {
-                              themeNotifier.setTheme(AppThemeMode.glassmorphism);
+                              themeNotifier.setTheme(
+                                AppThemeMode.glassmorphism,
+                              );
                             },
                           ),
-                          
+
                           const SizedBox(height: 16),
-                          
+
                           // Dark Theme Card
                           _buildThemeCard(
                             context,
@@ -171,19 +175,16 @@ class _ThemeSettingsScreenState extends ConsumerState<ThemeSettingsScreen>
                             subtitle: 'Easy on the eyes',
                             icon: CupertinoIcons.moon_fill,
                             gradient: const LinearGradient(
-                              colors: [
-                                Color(0xFF1C1C1E),
-                                Color(0xFF000000),
-                              ],
+                              colors: [Color(0xFF1C1C1E), Color(0xFF000000)],
                             ),
                             isSelected: themeState.isDarkMode,
                             onTap: () {
                               themeNotifier.setTheme(AppThemeMode.dark);
                             },
                           ),
-                          
+
                           const SizedBox(height: 32),
-                          
+
                           // Features Section
                           AnimatedGlassmorphicContainer(
                             padding: const EdgeInsets.all(20),
@@ -196,7 +197,7 @@ class _ThemeSettingsScreenState extends ConsumerState<ThemeSettingsScreen>
                                   children: [
                                     Icon(
                                       CupertinoIcons.paintbrush_fill,
-                                      color: ThemeProvider.iosPurple,
+                                      color: AppColors.iosPurple,
                                     ),
                                     const SizedBox(width: 12),
                                     Text(
@@ -204,7 +205,9 @@ class _ThemeSettingsScreenState extends ConsumerState<ThemeSettingsScreen>
                                       style: TextStyle(
                                         fontSize: 18,
                                         fontWeight: FontWeight.w600,
-                                        color: isDark ? Colors.white : Colors.black,
+                                        color: isDark
+                                            ? Colors.white
+                                            : Colors.black,
                                       ),
                                     ),
                                   ],
@@ -231,7 +234,7 @@ class _ThemeSettingsScreenState extends ConsumerState<ThemeSettingsScreen>
                               ],
                             ),
                           ),
-                          
+
                           const SizedBox(height: 100),
                         ],
                       ),
@@ -245,7 +248,7 @@ class _ThemeSettingsScreenState extends ConsumerState<ThemeSettingsScreen>
       ),
     );
   }
-  
+
   Widget _buildThemeCard(
     BuildContext context, {
     required String title,
@@ -256,7 +259,7 @@ class _ThemeSettingsScreenState extends ConsumerState<ThemeSettingsScreen>
     required VoidCallback onTap,
   }) {
     final isDark = ref.watch(themeProvider).isDarkMode;
-    
+
     return TweenAnimationBuilder<double>(
       duration: const Duration(milliseconds: 300),
       tween: Tween(begin: 0, end: isSelected ? 1 : 0),
@@ -274,8 +277,8 @@ class _ThemeSettingsScreenState extends ConsumerState<ThemeSettingsScreen>
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(24),
                 border: Border.all(
-                  color: isSelected 
-                      ? ThemeProvider.iosBlue.withValues(alpha: 0.5)
+                  color: isSelected
+                      ? AppColors.iosBlue.withValues(alpha: 0.5)
                       : Colors.transparent,
                   width: 2,
                 ),
@@ -289,11 +292,7 @@ class _ThemeSettingsScreenState extends ConsumerState<ThemeSettingsScreen>
                       gradient: gradient,
                       borderRadius: BorderRadius.circular(16),
                     ),
-                    child: Icon(
-                      icon,
-                      color: Colors.white,
-                      size: 30,
-                    ),
+                    child: Icon(icon, color: Colors.white, size: 30),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -325,22 +324,18 @@ class _ThemeSettingsScreenState extends ConsumerState<ThemeSettingsScreen>
                     height: 24,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: isSelected 
-                          ? ThemeProvider.iosBlue
+                      color: isSelected
+                          ? AppColors.iosBlue
                           : Colors.transparent,
                       border: Border.all(
-                        color: isSelected 
-                            ? ThemeProvider.iosBlue
+                        color: isSelected
+                            ? AppColors.iosBlue
                             : (isDark ? Colors.white30 : Colors.black26),
                         width: 2,
                       ),
                     ),
                     child: isSelected
-                        ? const Icon(
-                            Icons.check,
-                            color: Colors.white,
-                            size: 16,
-                          )
+                        ? const Icon(Icons.check, color: Colors.white, size: 16)
                         : null,
                   ),
                 ],
@@ -351,7 +346,7 @@ class _ThemeSettingsScreenState extends ConsumerState<ThemeSettingsScreen>
       },
     );
   }
-  
+
   Widget _buildFeatureItem(
     String title,
     String description,
@@ -366,14 +361,10 @@ class _ThemeSettingsScreenState extends ConsumerState<ThemeSettingsScreen>
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: ThemeProvider.iosBlue.withValues(alpha: 0.1),
+              color: AppColors.iosBlue.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(
-              icon,
-              color: ThemeProvider.iosBlue,
-              size: 20,
-            ),
+            child: Icon(icon, color: AppColors.iosBlue, size: 20),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -414,25 +405,13 @@ class _BackgroundPainter extends CustomPainter {
 
     // Draw circles for glassmorphic effect
     paint.color = Colors.purple.withValues(alpha: 0.1);
-    canvas.drawCircle(
-      Offset(size.width * 0.2, size.height * 0.3),
-      100,
-      paint,
-    );
+    canvas.drawCircle(Offset(size.width * 0.2, size.height * 0.3), 100, paint);
 
     paint.color = Colors.blue.withValues(alpha: 0.1);
-    canvas.drawCircle(
-      Offset(size.width * 0.8, size.height * 0.5),
-      120,
-      paint,
-    );
+    canvas.drawCircle(Offset(size.width * 0.8, size.height * 0.5), 120, paint);
 
     paint.color = Colors.teal.withValues(alpha: 0.1);
-    canvas.drawCircle(
-      Offset(size.width * 0.5, size.height * 0.8),
-      80,
-      paint,
-    );
+    canvas.drawCircle(Offset(size.width * 0.5, size.height * 0.8), 80, paint);
   }
 
   @override

@@ -6,7 +6,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import '../config/api_config.dart';
-import '../models/user_profile.dart';
 import 'cache_service.dart';
 
 /// Unified Matching Service
@@ -18,7 +17,8 @@ import 'cache_service.dart';
 /// - Multi-factor scoring algorithm
 /// - Scalable architecture
 class UnifiedMatchingService {
-  static final UnifiedMatchingService _instance = UnifiedMatchingService._internal();
+  static final UnifiedMatchingService _instance =
+      UnifiedMatchingService._internal();
   factory UnifiedMatchingService() => _instance;
   UnifiedMatchingService._internal();
 
@@ -74,7 +74,8 @@ class UnifiedMatchingService {
     await _ensureInitialized();
 
     try {
-      final prompt = '''
+      final prompt =
+          '''
 Analyze this user input and extract their intent WITHOUT using predefined categories.
 Think deeply about what the user really wants.
 
@@ -106,10 +107,12 @@ Return ONLY a valid JSON object (no markdown, no backticks):
 ''';
 
       final response = await _aiModel.generateContent([Content.text(prompt)]);
-      final text = response.text
-          ?.replaceAll('```json', '')
-          .replaceAll('```', '')
-          .trim() ?? '{}';
+      final text =
+          response.text
+              ?.replaceAll('```json', '')
+              .replaceAll('```', '')
+              .trim() ??
+          '{}';
 
       final json = jsonDecode(text);
       return IntentAnalysis.fromJson(json);
@@ -127,7 +130,8 @@ Return ONLY a valid JSON object (no markdown, no backticks):
     await _ensureInitialized();
 
     try {
-      final prompt = '''
+      final prompt =
+          '''
 The user said: "$userInput"
 
 We understood their intent as: ${intent.primaryIntent}
@@ -152,10 +156,12 @@ Return ONLY valid JSON (no markdown, no backticks):
 ''';
 
       final response = await _aiModel.generateContent([Content.text(prompt)]);
-      final text = response.text
-          ?.replaceAll('```json', '')
-          .replaceAll('```', '')
-          .trim() ?? '{}';
+      final text =
+          response.text
+              ?.replaceAll('```json', '')
+              .replaceAll('```', '')
+              .trim() ??
+          '{}';
 
       final json = jsonDecode(text);
       return (json['questions'] as List)
@@ -185,7 +191,9 @@ Return ONLY valid JSON (no markdown, no backticks):
         return _generateFallbackEmbedding(text);
       }
 
-      final response = await _embeddingModel.embedContent(Content.text(cleanedText));
+      final response = await _embeddingModel.embedContent(
+        Content.text(cleanedText),
+      );
       final embedding = response.embedding.values;
 
       // Cache the result
@@ -225,7 +233,8 @@ Return ONLY valid JSON (no markdown, no backticks):
 
     try {
       // Generate embedding for user's intent
-      final userText = '${userIntent.primaryIntent} ${userIntent.searchKeywords.join(' ')}';
+      final userText =
+          '${userIntent.primaryIntent} ${userIntent.searchKeywords.join(' ')}';
       final userEmbedding = await generateEmbedding(userText);
 
       // Get active posts from other users
@@ -247,7 +256,8 @@ Return ONLY valid JSON (no markdown, no backticks):
           if (postData['embedding'] != null) {
             postEmbedding = List<double>.from(postData['embedding']);
           } else {
-            final postText = '${postData['title'] ?? ''} ${postData['description'] ?? ''}';
+            final postText =
+                '${postData['title'] ?? ''} ${postData['description'] ?? ''}';
             postEmbedding = await generateEmbedding(postText);
           }
 
@@ -263,15 +273,17 @@ Return ONLY valid JSON (no markdown, no backticks):
           );
 
           if (score.totalScore > 0.5) {
-            matches.add(MatchResult(
-              postId: doc.id,
-              userId: postData['userId'] ?? '',
-              score: score.totalScore,
-              reasons: score.reasons,
-              concerns: score.concerns,
-              postData: postData,
-              breakdown: score.breakdown,
-            ));
+            matches.add(
+              MatchResult(
+                postId: doc.id,
+                userId: postData['userId'] ?? '',
+                score: score.totalScore,
+                reasons: score.reasons,
+                concerns: score.concerns,
+                postData: postData,
+                breakdown: score.breakdown,
+              ),
+            );
           }
         } catch (e) {
           debugPrint('Error processing post ${doc.id}: $e');
@@ -320,7 +332,10 @@ Return ONLY valid JSON (no markdown, no backticks):
     }
 
     // 2. SEMANTIC SIMILARITY (30% weight)
-    final semanticScore = _calculateCosineSimilarity(userEmbedding, postEmbedding);
+    final semanticScore = _calculateCosineSimilarity(
+      userEmbedding,
+      postEmbedding,
+    );
     breakdown['semantic'] = semanticScore;
     totalScore += semanticScore * ApiConfig.semanticMatchWeight;
 
@@ -356,7 +371,9 @@ Return ONLY valid JSON (no markdown, no backticks):
     // 5. KEYWORD MATCH (5% weight)
     final keywordScore = _calculateKeywordMatch(
       userIntent.searchKeywords,
-      postData['keywords'] != null ? List<String>.from(postData['keywords']) : [],
+      postData['keywords'] != null
+          ? List<String>.from(postData['keywords'])
+          : [],
     );
     breakdown['keywords'] = keywordScore;
     totalScore += keywordScore * ApiConfig.keywordMatchWeight;
@@ -395,14 +412,17 @@ Return ONLY valid JSON (no markdown, no backticks):
     final postIntent = IntentAnalysis.fromJson(postData['intent_analysis']);
 
     // Check if intents are complementary
-    if (userIntent.complementaryIntents.any((ci) =>
-        postIntent.primaryIntent.toLowerCase().contains(ci.toLowerCase()))) {
+    if (userIntent.complementaryIntents.any(
+      (ci) => postIntent.primaryIntent.toLowerCase().contains(ci.toLowerCase()),
+    )) {
       return 1.0;
     }
 
     // Check action type compatibility
-    if ((userIntent.actionType == 'seeking' && postIntent.actionType == 'offering') ||
-        (userIntent.actionType == 'offering' && postIntent.actionType == 'seeking')) {
+    if ((userIntent.actionType == 'seeking' &&
+            postIntent.actionType == 'offering') ||
+        (userIntent.actionType == 'offering' &&
+            postIntent.actionType == 'seeking')) {
       return 0.9;
     }
 
@@ -442,7 +462,10 @@ Return ONLY valid JSON (no markdown, no backticks):
     double? postLat,
     double? postLon,
   ) {
-    if (userLat == null || userLon == null || postLat == null || postLon == null) {
+    if (userLat == null ||
+        userLon == null ||
+        postLat == null ||
+        postLon == null) {
       return 0.5; // Neutral score if no location data
     }
 
@@ -472,7 +495,10 @@ Return ONLY valid JSON (no markdown, no backticks):
   }
 
   /// Calculate keyword match score
-  double _calculateKeywordMatch(List<String> keywords1, List<String> keywords2) {
+  double _calculateKeywordMatch(
+    List<String> keywords1,
+    List<String> keywords2,
+  ) {
     if (keywords1.isEmpty || keywords2.isEmpty) return 0.0;
 
     final set1 = keywords1.map((k) => k.toLowerCase()).toSet();
@@ -487,15 +513,23 @@ Return ONLY valid JSON (no markdown, no backticks):
   }
 
   /// Calculate distance between two coordinates (Haversine formula)
-  double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+  double _calculateDistance(
+    double lat1,
+    double lon1,
+    double lat2,
+    double lon2,
+  ) {
     const double earthRadius = 6371; // km
 
     final dLat = _toRadians(lat2 - lat1);
     final dLon = _toRadians(lon2 - lon1);
 
-    final a = sin(dLat / 2) * sin(dLat / 2) +
-        cos(_toRadians(lat1)) * cos(_toRadians(lat2)) *
-        sin(dLon / 2) * sin(dLon / 2);
+    final a =
+        sin(dLat / 2) * sin(dLat / 2) +
+        cos(_toRadians(lat1)) *
+            cos(_toRadians(lat2)) *
+            sin(dLon / 2) *
+            sin(dLon / 2);
 
     final c = 2 * asin(sqrt(a));
     return earthRadius * c;
@@ -544,7 +578,9 @@ Return ONLY valid JSON (no markdown, no backticks):
         'keywords': intent.searchKeywords,
       };
 
-      final docRef = await _firestore.collection(ApiConfig.postsCollection).add(postData);
+      final docRef = await _firestore
+          .collection(ApiConfig.postsCollection)
+          .add(postData);
 
       debugPrint('✅ Post created: ${docRef.id}');
 
@@ -593,7 +629,9 @@ Return ONLY valid JSON (no markdown, no backticks):
       final batch = _firestore.batch();
 
       for (final match in matches.take(10)) {
-        final matchDoc = _firestore.collection(ApiConfig.matchesCollection).doc();
+        final matchDoc = _firestore
+            .collection(ApiConfig.matchesCollection)
+            .doc();
         batch.set(matchDoc, {
           'post1Id': postId,
           'post2Id': match.postId,
@@ -626,7 +664,10 @@ Return ONLY valid JSON (no markdown, no backticks):
   /// Generate fallback embedding
   List<double> _generateFallbackEmbedding(String text) {
     final random = Random(text.hashCode);
-    return List.generate(ApiConfig.embeddingDimension, (_) => random.nextDouble() * 2 - 1);
+    return List.generate(
+      ApiConfig.embeddingDimension,
+      (_) => random.nextDouble() * 2 - 1,
+    );
   }
 
   /// Get cache statistics
@@ -665,8 +706,12 @@ class IntentAnalysis {
       primaryIntent: json['primary_intent'] ?? '',
       actionType: json['action_type'] ?? 'neutral',
       entities: json['entities'] ?? {},
-      complementaryIntents: List<String>.from(json['complementary_intents'] ?? []),
-      clarificationsNeeded: List<String>.from(json['clarifications_needed'] ?? []),
+      complementaryIntents: List<String>.from(
+        json['complementary_intents'] ?? [],
+      ),
+      clarificationsNeeded: List<String>.from(
+        json['clarifications_needed'] ?? [],
+      ),
       searchKeywords: List<String>.from(json['search_keywords'] ?? []),
       emotionalTone: json['emotional_tone'] ?? 'casual',
       matchCriteria: MatchCriteria.fromJson(json['match_criteria'] ?? {}),
@@ -756,7 +801,9 @@ class ClarifyingQuestion {
       id: json['id'] ?? '',
       question: json['question'] ?? '',
       type: json['type'] ?? 'text',
-      options: json['options'] != null ? List<String>.from(json['options']) : null,
+      options: json['options'] != null
+          ? List<String>.from(json['options'])
+          : null,
       importance: json['importance'] ?? 'helpful',
       reason: json['reason'] ?? '',
     );

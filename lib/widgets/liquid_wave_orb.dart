@@ -1,22 +1,17 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
 
-enum VoiceOrbState {
-  idle,
-  listening,
-  processing,
-  speaking,
-}
+enum VoiceOrbState { idle, listening, processing, speaking }
 
 class LiquidWaveOrb extends StatefulWidget {
   final VoiceOrbState state;
   final double size;
 
   const LiquidWaveOrb({
-    Key? key,
+    super.key,
     this.state = VoiceOrbState.idle,
     this.size = 200,
-  }) : super(key: key);
+  });
 
   @override
   State<LiquidWaveOrb> createState() => _LiquidWaveOrbState();
@@ -115,7 +110,8 @@ class _CleanLiquidPainter extends CustomPainter {
 
     // Clip to circle
     canvas.save();
-    final clipPath = Path()..addOval(Rect.fromCircle(center: center, radius: radius));
+    final clipPath = Path()
+      ..addOval(Rect.fromCircle(center: center, radius: radius));
     canvas.clipPath(clipPath);
 
     // 1. Fill entire circle with BLACK background
@@ -152,7 +148,7 @@ class _CleanLiquidPainter extends CustomPainter {
     path.moveTo(0, waveY);
 
     // Simple smooth wave - just one clean sine wave
-    final points = 50;
+    const points = 50;
     for (int i = 0; i <= points; i++) {
       final x = (i / points) * size.width;
       final t = i / points;
@@ -178,7 +174,9 @@ class _CleanLiquidPainter extends CustomPainter {
     );
 
     final paint = Paint()
-      ..shader = gradient.createShader(Rect.fromLTWH(0, 0, size.width, size.height))
+      ..shader = gradient.createShader(
+        Rect.fromLTWH(0, 0, size.width, size.height),
+      )
       ..style = PaintingStyle.fill;
 
     canvas.drawPath(path, paint);

@@ -6,18 +6,18 @@ class PersistentKeyboardWrapper extends StatefulWidget {
   final bool persistKeyboard;
 
   const PersistentKeyboardWrapper({
-    Key? key,
+    super.key,
     required this.child,
     this.persistKeyboard = true,
-  }) : super(key: key);
+  });
 
   @override
-  State<PersistentKeyboardWrapper> createState() => _PersistentKeyboardWrapperState();
+  State<PersistentKeyboardWrapper> createState() =>
+      _PersistentKeyboardWrapperState();
 }
 
-class _PersistentKeyboardWrapperState extends State<PersistentKeyboardWrapper> 
+class _PersistentKeyboardWrapperState extends State<PersistentKeyboardWrapper>
     with WidgetsBindingObserver {
-  
   @override
   void initState() {
     super.initState();
@@ -60,7 +60,8 @@ class _PersistentKeyboardWrapperState extends State<PersistentKeyboardWrapper>
         // Prevent keyboard from closing on tap outside
         if (widget.persistKeyboard) {
           final currentFocus = FocusScope.of(context);
-          if (!currentFocus.hasPrimaryFocus && currentFocus.focusedChild != null) {
+          if (!currentFocus.hasPrimaryFocus &&
+              currentFocus.focusedChild != null) {
             FocusManager.instance.primaryFocus?.unfocus();
           }
         }

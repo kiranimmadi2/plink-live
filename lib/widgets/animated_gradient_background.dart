@@ -7,14 +7,15 @@ class AnimatedGradientBackground extends StatefulWidget {
   final Duration duration;
 
   const AnimatedGradientBackground({
-    Key? key,
+    super.key,
     required this.child,
     this.colors,
     this.duration = const Duration(seconds: 3),
-  }) : super(key: key);
+  });
 
   @override
-  State<AnimatedGradientBackground> createState() => _AnimatedGradientBackgroundState();
+  State<AnimatedGradientBackground> createState() =>
+      _AnimatedGradientBackgroundState();
 }
 
 class _AnimatedGradientBackgroundState extends State<AnimatedGradientBackground>
@@ -25,14 +26,13 @@ class _AnimatedGradientBackgroundState extends State<AnimatedGradientBackground>
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      duration: widget.duration,
-      vsync: this,
-    )..repeat(reverse: true);
+    _controller = AnimationController(duration: widget.duration, vsync: this)
+      ..repeat(reverse: true);
 
-    _animation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
+    _animation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
   }
 
   @override
@@ -43,7 +43,8 @@ class _AnimatedGradientBackgroundState extends State<AnimatedGradientBackground>
 
   @override
   Widget build(BuildContext context) {
-    final colors = widget.colors ??
+    final colors =
+        widget.colors ??
         [
           Theme.of(context).primaryColor.withOpacity(0.1),
           Theme.of(context).colorScheme.secondary.withOpacity(0.1),

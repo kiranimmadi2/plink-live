@@ -11,10 +11,10 @@ class EditProfileBottomSheet extends StatefulWidget {
   final Function()? onProfileUpdated;
 
   const EditProfileBottomSheet({
-    Key? key,
+    super.key,
     required this.currentProfile,
     this.onProfileUpdated,
-  }) : super(key: key);
+  });
 
   @override
   State<EditProfileBottomSheet> createState() => _EditProfileBottomSheetState();
@@ -49,43 +49,134 @@ class _EditProfileBottomSheetState extends State<EditProfileBottomSheet> {
 
   // Popular items (most commonly used)
   final List<String> _popularInterests = [
-    'Fitness', 'Travel', 'Music', 'Movies', 'Food Photography',
-    'Tech', 'Business', 'Cooking', 'Reading', 'Photography',
+    'Fitness',
+    'Travel',
+    'Music',
+    'Movies',
+    'Food Photography',
+    'Tech',
+    'Business',
+    'Cooking',
+    'Reading',
+    'Photography',
   ];
 
   final List<String> _popularConnectionTypes = [
-    'Dating', 'Friendship', 'Networking', 'Activity Partner',
-    'Travel Buddy', 'Workout Partner', 'Career Advice', 'Mentorship',
+    'Dating',
+    'Friendship',
+    'Networking',
+    'Activity Partner',
+    'Travel Buddy',
+    'Workout Partner',
+    'Career Advice',
+    'Mentorship',
   ];
 
   final List<String> _popularActivities = [
-    'Gym', 'Running', 'Tennis', 'Badminton', 'Yoga',
-    'Swimming', 'Cycling', 'Hiking', 'Basketball', 'Football',
+    'Gym',
+    'Running',
+    'Tennis',
+    'Badminton',
+    'Yoga',
+    'Swimming',
+    'Cycling',
+    'Hiking',
+    'Basketball',
+    'Football',
   ];
 
   // All available options
   final List<String> _availableInterests = [
-    'Fitness', 'Hiking', 'Nutrition', 'Wellness', 'Running',
-    'Tech', 'Business', 'Travel', 'Music', 'Movies',
-    'Cooking', 'Wine', 'Food Photography', 'Culture',
-    'Design', 'Art', 'Photography', 'Gaming', 'Sports',
-    'Reading', 'Writing', 'Dancing', 'Yoga', 'Meditation',
+    'Fitness',
+    'Hiking',
+    'Nutrition',
+    'Wellness',
+    'Running',
+    'Tech',
+    'Business',
+    'Travel',
+    'Music',
+    'Movies',
+    'Cooking',
+    'Wine',
+    'Food Photography',
+    'Culture',
+    'Design',
+    'Art',
+    'Photography',
+    'Gaming',
+    'Sports',
+    'Reading',
+    'Writing',
+    'Dancing',
+    'Yoga',
+    'Meditation',
   ];
 
   final List<String> _connectionTypeOptions = [
-    'Dating', 'Friendship', 'Casual Hangout', 'Travel Buddy', 'Nightlife Partner',
-    'Networking', 'Mentorship', 'Business Partner', 'Career Advice', 'Collaboration',
-    'Workout Partner', 'Sports Partner', 'Hobby Partner', 'Event Companion', 'Study Group',
-    'Language Exchange', 'Skill Sharing', 'Book Club', 'Learning Partner', 'Creative Workshop',
-    'Music Jam', 'Art Collaboration', 'Photography', 'Content Creation', 'Performance',
-    'Roommate', 'Pet Playdate', 'Community Service', 'Gaming', 'Online Friends',
+    'Dating',
+    'Friendship',
+    'Casual Hangout',
+    'Travel Buddy',
+    'Nightlife Partner',
+    'Networking',
+    'Mentorship',
+    'Business Partner',
+    'Career Advice',
+    'Collaboration',
+    'Workout Partner',
+    'Sports Partner',
+    'Hobby Partner',
+    'Event Companion',
+    'Study Group',
+    'Language Exchange',
+    'Skill Sharing',
+    'Book Club',
+    'Learning Partner',
+    'Creative Workshop',
+    'Music Jam',
+    'Art Collaboration',
+    'Photography',
+    'Content Creation',
+    'Performance',
+    'Roommate',
+    'Pet Playdate',
+    'Community Service',
+    'Gaming',
+    'Online Friends',
   ];
 
   final List<String> _activityOptions = [
-    'Tennis', 'Badminton', 'Basketball', 'Football', 'Volleyball', 'Golf', 'Table Tennis', 'Squash',
-    'Running', 'Gym', 'Yoga', 'Pilates', 'CrossFit', 'Cycling', 'Swimming', 'Dance',
-    'Hiking', 'Rock Climbing', 'Camping', 'Kayaking', 'Surfing', 'Mountain Biking', 'Trail Running',
-    'Photography', 'Painting', 'Music', 'Writing', 'Cooking', 'Crafts', 'Gaming',
+    'Tennis',
+    'Badminton',
+    'Basketball',
+    'Football',
+    'Volleyball',
+    'Golf',
+    'Table Tennis',
+    'Squash',
+    'Running',
+    'Gym',
+    'Yoga',
+    'Pilates',
+    'CrossFit',
+    'Cycling',
+    'Swimming',
+    'Dance',
+    'Hiking',
+    'Rock Climbing',
+    'Camping',
+    'Kayaking',
+    'Surfing',
+    'Mountain Biking',
+    'Trail Running',
+    'Photography',
+    'Painting',
+    'Music',
+    'Writing',
+    'Cooking',
+    'Crafts',
+    'Gaming',
   ];
 
   String? _getPhotoUrl() {
@@ -131,7 +222,9 @@ class _EditProfileBottomSheetState extends State<EditProfileBottomSheet> {
 
       final connectionTypes = widget.currentProfile['connectionTypes'];
       if (connectionTypes is List) {
-        _selectedConnectionTypes = connectionTypes.map((e) => e.toString()).toList();
+        _selectedConnectionTypes = connectionTypes
+            .map((e) => e.toString())
+            .toList();
         _initialConnectionTypes = List.from(_selectedConnectionTypes);
       }
 
@@ -151,10 +244,10 @@ class _EditProfileBottomSheetState extends State<EditProfileBottomSheet> {
 
   void _checkForChanges() {
     final hasChanges =
-      !_listsEqual(_selectedInterests, _initialInterests) ||
-      !_listsEqual(_selectedConnectionTypes, _initialConnectionTypes) ||
-      !_listsEqual(_selectedActivities, _initialActivities) ||
-      _imageBytes != null;
+        !_listsEqual(_selectedInterests, _initialInterests) ||
+        !_listsEqual(_selectedConnectionTypes, _initialConnectionTypes) ||
+        !_listsEqual(_selectedActivities, _initialActivities) ||
+        _imageBytes != null;
 
     if (hasChanges != _hasUnsavedChanges) {
       setState(() {
@@ -186,7 +279,9 @@ class _EditProfileBottomSheetState extends State<EditProfileBottomSheet> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Unsaved Changes'),
-        content: const Text('You have unsaved changes. Do you want to discard them?'),
+        content: const Text(
+          'You have unsaved changes. Do you want to discard them?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -221,9 +316,9 @@ class _EditProfileBottomSheetState extends State<EditProfileBottomSheet> {
         });
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error picking image: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error picking image: $e')));
     }
   }
 
@@ -271,9 +366,9 @@ class _EditProfileBottomSheetState extends State<EditProfileBottomSheet> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error updating profile: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error updating profile: $e')));
       }
     } finally {
       if (mounted) {
@@ -304,7 +399,11 @@ class _EditProfileBottomSheetState extends State<EditProfileBottomSheet> {
     });
   }
 
-  void _showAddCustomDialog(String title, List<String> targetList, List<String> existingOptions) {
+  void _showAddCustomDialog(
+    String title,
+    List<String> targetList,
+    List<String> existingOptions,
+  ) {
     final controller = TextEditingController();
 
     showDialog(
@@ -420,8 +519,10 @@ class _EditProfileBottomSheetState extends State<EditProfileBottomSheet> {
                             _interestsExpanded = !_interestsExpanded;
                           });
                         },
-                        onToggle: (item) => _toggleSelection(item, _selectedInterests),
-                        onRemove: (item) => _removeSelected(item, _selectedInterests),
+                        onToggle: (item) =>
+                            _toggleSelection(item, _selectedInterests),
+                        onRemove: (item) =>
+                            _removeSelected(item, _selectedInterests),
                         onAddCustom: () => _showAddCustomDialog(
                           'Interest',
                           _selectedInterests,
@@ -439,11 +540,14 @@ class _EditProfileBottomSheetState extends State<EditProfileBottomSheet> {
                         isExpanded: _connectionTypesExpanded,
                         onExpandToggle: () {
                           setState(() {
-                            _connectionTypesExpanded = !_connectionTypesExpanded;
+                            _connectionTypesExpanded =
+                                !_connectionTypesExpanded;
                           });
                         },
-                        onToggle: (item) => _toggleSelection(item, _selectedConnectionTypes),
-                        onRemove: (item) => _removeSelected(item, _selectedConnectionTypes),
+                        onToggle: (item) =>
+                            _toggleSelection(item, _selectedConnectionTypes),
+                        onRemove: (item) =>
+                            _removeSelected(item, _selectedConnectionTypes),
                         onAddCustom: () => _showAddCustomDialog(
                           'Connection Type',
                           _selectedConnectionTypes,
@@ -464,8 +568,10 @@ class _EditProfileBottomSheetState extends State<EditProfileBottomSheet> {
                             _activitiesExpanded = !_activitiesExpanded;
                           });
                         },
-                        onToggle: (item) => _toggleSelection(item, _selectedActivities),
-                        onRemove: (item) => _removeSelected(item, _selectedActivities),
+                        onToggle: (item) =>
+                            _toggleSelection(item, _selectedActivities),
+                        onRemove: (item) =>
+                            _removeSelected(item, _selectedActivities),
                         onAddCustom: () => _showAddCustomDialog(
                           'Activity',
                           _selectedActivities,
@@ -501,13 +607,10 @@ class _EditProfileBottomSheetState extends State<EditProfileBottomSheet> {
           },
         ),
         // Title
-        Expanded(
+        const Expanded(
           child: Text(
             'Edit Profile',
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-            ),
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
           ),
         ),
         // Unsaved badge and close button on right
@@ -550,8 +653,8 @@ class _EditProfileBottomSheetState extends State<EditProfileBottomSheet> {
             backgroundImage: _imageBytes != null
                 ? MemoryImage(_imageBytes!)
                 : _getPhotoUrl() != null
-                    ? NetworkImage(_getPhotoUrl()!)
-                    : null,
+                ? NetworkImage(_getPhotoUrl()!)
+                : null,
             child: _getPhotoUrl() == null && _imageBytes == null
                 ? const Icon(Icons.person, size: 50)
                 : null,
@@ -563,7 +666,11 @@ class _EditProfileBottomSheetState extends State<EditProfileBottomSheet> {
               radius: 18,
               backgroundColor: Theme.of(context).primaryColor,
               child: IconButton(
-                icon: const Icon(Icons.camera_alt, size: 18, color: Colors.white),
+                icon: const Icon(
+                  Icons.camera_alt,
+                  size: 18,
+                  color: Colors.white,
+                ),
                 onPressed: _pickImage,
                 padding: EdgeInsets.zero,
               ),
@@ -628,17 +735,12 @@ class _EditProfileBottomSheetState extends State<EditProfileBottomSheet> {
               children: [
                 const Text(
                   'Location',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey,
-                  ),
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   displayLocation.isEmpty ? 'Not set' : displayLocation,
-                  style: const TextStyle(
-                    fontSize: 16,
-                  ),
+                  style: const TextStyle(fontSize: 16),
                 ),
               ],
             ),
@@ -674,10 +776,7 @@ class _EditProfileBottomSheetState extends State<EditProfileBottomSheet> {
         // Title
         Text(
           title,
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 16),
 
@@ -731,11 +830,11 @@ class _EditProfileBottomSheetState extends State<EditProfileBottomSheet> {
 
         // Popular Items Section
         if (filteredPopular.isNotEmpty) ...[
-          Row(
+          const Row(
             children: [
-              const Icon(Icons.local_fire_department, size: 18, color: Colors.orange),
-              const SizedBox(width: 8),
-              const Text(
+              Icon(Icons.local_fire_department, size: 18, color: Colors.orange),
+              SizedBox(width: 8),
+              Text(
                 'POPULAR',
                 style: TextStyle(
                   fontSize: 14,
@@ -751,7 +850,12 @@ class _EditProfileBottomSheetState extends State<EditProfileBottomSheet> {
             runSpacing: 8,
             children: filteredPopular.map((item) {
               final isSelected = selectedItems.contains(item);
-              return _buildOptionChip(item, isSelected, () => onToggle(item), isPopular: true);
+              return _buildOptionChip(
+                item,
+                isSelected,
+                () => onToggle(item),
+                isPopular: true,
+              );
             }).toList(),
           ),
           const SizedBox(height: 16),
@@ -833,11 +937,7 @@ class _EditProfileBottomSheetState extends State<EditProfileBottomSheet> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(
-            Icons.check,
-            size: 16,
-            color: Colors.white,
-          ),
+          const Icon(Icons.check, size: 16, color: Colors.white),
           const SizedBox(width: 6),
           Text(
             text,
@@ -850,18 +950,19 @@ class _EditProfileBottomSheetState extends State<EditProfileBottomSheet> {
           const SizedBox(width: 6),
           GestureDetector(
             onTap: onRemove,
-            child: const Icon(
-              Icons.close,
-              size: 16,
-              color: Colors.white,
-            ),
+            child: const Icon(Icons.close, size: 16, color: Colors.white),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildOptionChip(String text, bool isSelected, VoidCallback onTap, {bool isPopular = false}) {
+  Widget _buildOptionChip(
+    String text,
+    bool isSelected,
+    VoidCallback onTap, {
+    bool isPopular = false,
+  }) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -870,15 +971,17 @@ class _EditProfileBottomSheetState extends State<EditProfileBottomSheet> {
           color: isSelected
               ? const Color(0xFF00D67D)
               : isPopular
-                  ? const Color(0xFF4A5FE8).withOpacity(0.3) // Blue tint for popular
-                  : Colors.grey[800],
+              ? const Color(0xFF4A5FE8).withOpacity(
+                  0.3,
+                ) // Blue tint for popular
+              : Colors.grey[800],
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isSelected
                 ? const Color(0xFF00D67D)
                 : isPopular
-                    ? const Color(0xFF4A5FE8) // Blue border for popular
-                    : Colors.grey[700]!,
+                ? const Color(0xFF4A5FE8) // Blue border for popular
+                : Colors.grey[700]!,
             width: 2,
           ),
         ),
@@ -886,11 +989,7 @@ class _EditProfileBottomSheetState extends State<EditProfileBottomSheet> {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (isSelected)
-              const Icon(
-                Icons.check_circle,
-                size: 18,
-                color: Colors.white,
-              ),
+              const Icon(Icons.check_circle, size: 18, color: Colors.white),
             if (isSelected) const SizedBox(width: 6),
             Text(
               text,
@@ -939,10 +1038,7 @@ class _EditProfileBottomSheetState extends State<EditProfileBottomSheet> {
                 )
               : const Text(
                   'Save Changes',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
         ),
       ),

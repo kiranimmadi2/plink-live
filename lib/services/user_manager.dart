@@ -12,13 +12,14 @@ class UserManager {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final PhotoCacheService _photoCache = PhotoCacheService();
-  
+
   User? get currentUser => _auth.currentUser;
-  
+
   // User profile cache
   Map<String, dynamic>? _cachedProfile;
-  StreamController<Map<String, dynamic>?> _profileController = StreamController<Map<String, dynamic>?>.broadcast();
-  
+  final StreamController<Map<String, dynamic>?> _profileController =
+      StreamController<Map<String, dynamic>?>.broadcast();
+
   Stream<Map<String, dynamic>?> get profileStream => _profileController.stream;
   Map<String, dynamic>? get cachedProfile => _cachedProfile;
 
@@ -43,7 +44,7 @@ class UserManager {
     try {
       final docRef = _firestore.collection('users').doc(user.uid);
       final doc = await docRef.get();
-      
+
       if (!doc.exists) {
         // Create new profile
         await _createUserProfile(user);
@@ -53,7 +54,7 @@ class UserManager {
           'lastSeen': FieldValue.serverTimestamp(),
           'isOnline': true,
         });
-        
+
         // Load profile to cache
         await loadUserProfile(user.uid);
       }
@@ -67,34 +68,36 @@ class UserManager {
     try {
       // Get the best available photo URL
       String? photoUrl = user.photoURL;
-      
+
       // If it's a Google photo, ensure it's high quality
       if (photoUrl != null && photoUrl.contains('googleusercontent.com')) {
         // Remove size parameters and set to higher quality
         final baseUrl = photoUrl.split('=')[0];
         photoUrl = '$baseUrl=s400-c'; // 400x400 cropped
       }
-      
+
       final profileData = {
         'uid': user.uid,
         'email': user.email ?? '',
         'name': user.displayName ?? user.email?.split('@')[0] ?? 'User',
         'photoUrl': photoUrl,
-        'provider': user.providerData.isNotEmpty ? user.providerData.first.providerId : 'unknown',
+        'provider': user.providerData.isNotEmpty
+            ? user.providerData.first.providerId
+            : 'unknown',
         'createdAt': FieldValue.serverTimestamp(),
         'lastSeen': FieldValue.serverTimestamp(),
         'isOnline': true,
         'emailVerified': user.emailVerified,
       };
-      
+
       await _firestore.collection('users').doc(user.uid).set(profileData);
-      
+
       // Load to cache
       _cachedProfile = profileData;
       _cachedProfile!['createdAt'] = DateTime.now();
       _cachedProfile!['lastSeen'] = DateTime.now();
       _profileController.add(_cachedProfile);
-      
+
       print('Created user profile for ${user.email}');
     } catch (e) {
       print('Error creating user profile: $e');
@@ -105,12 +108,12 @@ class UserManager {
   Future<Map<String, dynamic>?> loadUserProfile(String userId) async {
     try {
       final doc = await _firestore.collection('users').doc(userId).get();
-      
+
       if (doc.exists) {
         _cachedProfile = doc.data();
-        
+
         // Fix Google photo URL if needed
-        if (_cachedProfile?['photoUrl'] != null && 
+        if (_cachedProfile?['photoUrl'] != null &&
             _cachedProfile!['photoUrl'].contains('googleusercontent.com')) {
           final photoUrl = _cachedProfile!['photoUrl'] as String;
           if (!photoUrl.contains('=s400')) {
@@ -118,11 +121,11 @@ class UserManager {
             _cachedProfile!['photoUrl'] = '$baseUrl=s400-c';
           }
         }
-        
+
         _profileController.add(_cachedProfile);
         return _cachedProfile;
       }
-      
+
       return null;
     } catch (e) {
       print('Error loading user profile: $e');
@@ -135,9 +138,9 @@ class UserManager {
     try {
       final user = currentUser;
       if (user == null) return;
-      
+
       await _firestore.collection('users').doc(user.uid).update(updates);
-      
+
       // Update cache
       if (_cachedProfile != null) {
         _cachedProfile!.addAll(updates);
@@ -153,34 +156,35 @@ class UserManager {
     try {
       // Check cache first
       final cachedPhotoUrl = _photoCache.getCachedPhotoUrl(userId);
-      
+
       final doc = await _firestore.collection('users').doc(userId).get();
-      
+
       if (doc.exists) {
         final data = doc.data()!;
-        
+
         // Use cached photo if available
         if (cachedPhotoUrl != null) {
           data['photoUrl'] = cachedPhotoUrl;
         } else {
           // Fix Google photo URL if needed
-          if (data['photoUrl'] != null && data['photoUrl'].contains('googleusercontent.com')) {
+          if (data['photoUrl'] != null &&
+              data['photoUrl'].contains('googleusercontent.com')) {
             final photoUrl = data['photoUrl'] as String;
             if (!photoUrl.contains('=s400')) {
               final baseUrl = photoUrl.split('=')[0];
               data['photoUrl'] = '$baseUrl=s400-c';
             }
           }
-          
+
           // Cache the photo URL
           if (data['photoUrl'] != null) {
             _photoCache.cachePhotoUrl(userId, data['photoUrl']);
           }
         }
-        
+
         return data;
       }
-      
+
       return null;
     } catch (e) {
       print('Error getting user profile: $e');
@@ -199,7 +203,7 @@ class UserManager {
           'lastSeen': FieldValue.serverTimestamp(),
         });
       }
-      
+
       // Clear cache
       _cachedProfile = null;
       _profileController.add(null);

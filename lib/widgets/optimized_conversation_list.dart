@@ -15,75 +15,75 @@ import '../utils/app_optimizer.dart';
 class OptimizedConversationList extends StatefulWidget {
   final bool isDarkMode;
   final String searchQuery;
-  
+
   const OptimizedConversationList({
-    Key? key,
+    super.key,
     required this.isDarkMode,
     this.searchQuery = '',
-  }) : super(key: key);
-  
+  });
+
   @override
-  State<OptimizedConversationList> createState() => _OptimizedConversationListState();
+  State<OptimizedConversationList> createState() =>
+      _OptimizedConversationListState();
 }
 
-class _OptimizedConversationListState extends State<OptimizedConversationList> 
+class _OptimizedConversationListState extends State<OptimizedConversationList>
     with AutomaticKeepAliveClientMixin, MemoryAwareMixin {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  
-  
+
   // Pagination
   static const int _pageSize = 20;
   final List<ConversationModel> _conversations = [];
   DocumentSnapshot? _lastDocument;
   bool _isLoading = false;
   bool _hasMore = true;
-  
+
   // Scroll controller
   final ScrollController _scrollController = ScrollController();
-  
+
   @override
   bool get wantKeepAlive => true;
-  
+
   @override
   void initState() {
     super.initState();
     _loadConversations();
     _scrollController.addListener(_onScroll);
   }
-  
+
   @override
   void dispose() {
     _scrollController.dispose();
     super.dispose();
   }
-  
+
   void _onScroll() {
-    if (_scrollController.position.pixels >= 
+    if (_scrollController.position.pixels >=
         _scrollController.position.maxScrollExtent - 200) {
       _loadMoreConversations();
     }
   }
-  
+
   Future<void> _loadConversations() async {
     if (_isLoading) return;
-    
+
     setState(() => _isLoading = true);
-    
+
     try {
       final userId = _auth.currentUser?.uid;
       if (userId == null) return;
-      
+
       Query query = _firestore
           .collection('conversations')
           .where('participants', arrayContains: userId)
           .orderBy('lastMessageTime', descending: true)
           .limit(_pageSize);
-      
+
       final snapshot = await query.get();
-      
+
       final conversations = await _processConversations(snapshot.docs);
-      
+
       if (mounted) {
         setState(() {
           _conversations.clear();
@@ -100,27 +100,27 @@ class _OptimizedConversationListState extends State<OptimizedConversationList>
       }
     }
   }
-  
+
   Future<void> _loadMoreConversations() async {
     if (_isLoading || !_hasMore || _lastDocument == null) return;
-    
+
     setState(() => _isLoading = true);
-    
+
     try {
       final userId = _auth.currentUser?.uid;
       if (userId == null) return;
-      
+
       Query query = _firestore
           .collection('conversations')
           .where('participants', arrayContains: userId)
           .orderBy('lastMessageTime', descending: true)
           .startAfterDocument(_lastDocument!)
           .limit(_pageSize);
-      
+
       final snapshot = await query.get();
-      
+
       final conversations = await _processConversations(snapshot.docs);
-      
+
       if (mounted) {
         setState(() {
           _conversations.addAll(conversations);
@@ -136,35 +136,34 @@ class _OptimizedConversationListState extends State<OptimizedConversationList>
       }
     }
   }
-  
+
   Future<List<ConversationModel>> _processConversations(
     List<QueryDocumentSnapshot> docs,
   ) async {
     final conversations = <ConversationModel>[];
     final userId = _auth.currentUser?.uid;
     if (userId == null) return conversations;
-    
+
     for (var doc in docs) {
       try {
         final conversation = ConversationModel.fromFirestore(doc);
-        
+
         // Get other user's details
-        final otherUserId = conversation.participantIds
-            .firstWhere((id) => id != userId, orElse: () => '');
-        
+        final otherUserId = conversation.participantIds.firstWhere(
+          (id) => id != userId,
+          orElse: () => '',
+        );
+
         if (otherUserId.isNotEmpty) {
           // Use cached user data if available
           final otherUserDoc = await _firestore
               .collection('users')
               .doc(otherUserId)
               .get();
-          
+
           if (otherUserDoc.exists) {
             final updatedConversation = conversation.copyWith(
-              otherUser: UserProfile.fromMap(
-                otherUserDoc.data()!,
-                otherUserId,
-              ),
+              otherUser: UserProfile.fromMap(otherUserDoc.data()!, otherUserId),
             );
             conversations.add(updatedConversation);
           }
@@ -173,15 +172,15 @@ class _OptimizedConversationListState extends State<OptimizedConversationList>
         debugPrint('Error processing conversation: $e');
       }
     }
-    
+
     return conversations;
   }
-  
+
   List<ConversationModel> get _filteredConversations {
     if (widget.searchQuery.isEmpty) {
       return _conversations;
     }
-    
+
     final query = widget.searchQuery.toLowerCase();
     return _conversations.where((conv) {
       final userName = conv.otherUser?.name.toLowerCase() ?? '';
@@ -189,17 +188,17 @@ class _OptimizedConversationListState extends State<OptimizedConversationList>
       return userName.contains(query) || lastMessage.contains(query);
     }).toList();
   }
-  
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    
+
     final conversations = _filteredConversations;
-    
+
     if (conversations.isEmpty && !_isLoading) {
       return _buildEmptyState();
     }
-    
+
     return RefreshIndicator(
       onRefresh: _loadConversations,
       child: ListView.builder(
@@ -209,7 +208,7 @@ class _OptimizedConversationListState extends State<OptimizedConversationList>
           if (index == conversations.length) {
             return _buildLoadingIndicator();
           }
-          
+
           final conversation = conversations[index];
           return _ConversationTile(
             conversation: conversation,
@@ -225,17 +224,13 @@ class _OptimizedConversationListState extends State<OptimizedConversationList>
       ),
     );
   }
-  
+
   Widget _buildEmptyState() {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.chat_bubble_outline,
-            size: 64,
-            color: Colors.grey[400],
-          ),
+          Icon(Icons.chat_bubble_outline, size: 64, color: Colors.grey[400]),
           const SizedBox(height: 16),
           Text(
             'No conversations yet',
@@ -248,16 +243,13 @@ class _OptimizedConversationListState extends State<OptimizedConversationList>
           const SizedBox(height: 8),
           Text(
             'Start a new chat to begin messaging',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[500],
-            ),
+            style: TextStyle(fontSize: 14, color: Colors.grey[500]),
           ),
         ],
       ),
     );
   }
-  
+
   Widget _buildLoadingIndicator() {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -265,26 +257,27 @@ class _OptimizedConversationListState extends State<OptimizedConversationList>
       child: const CircularProgressIndicator(strokeWidth: 2),
     );
   }
-  
+
   void _openChat(ConversationModel conversation) {
     if (conversation.otherUser == null) return;
-    
+
     HapticFeedback.lightImpact();
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => EnhancedChatScreen(
-          otherUser: conversation.otherUser!,
-        ),
+        builder: (context) =>
+            EnhancedChatScreen(otherUser: conversation.otherUser!),
       ),
     );
   }
-  
+
   void _showConversationOptions(ConversationModel conversation) {
     HapticFeedback.mediumImpact();
     showModalBottomSheet(
       context: context,
-      backgroundColor: widget.isDarkMode ? const Color(0xFF1C1C1E) : Colors.white,
+      backgroundColor: widget.isDarkMode
+          ? const Color(0xFF1C1C1E)
+          : Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -297,15 +290,15 @@ class _OptimizedConversationListState extends State<OptimizedConversationList>
       ),
     );
   }
-  
+
   Future<void> _deleteConversation(ConversationModel conversation) async {
     // Implementation
   }
-  
+
   Future<void> _muteConversation(ConversationModel conversation) async {
     // Implementation
   }
-  
+
   Future<void> _blockUser(ConversationModel conversation) async {
     // Implementation
   }
@@ -317,22 +310,23 @@ class _ConversationTile extends StatelessWidget {
   final bool isDarkMode;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
-  
+
   const _ConversationTile({
     required this.conversation,
     required this.isDarkMode,
     required this.onTap,
     required this.onLongPress,
   });
-  
+
   @override
   Widget build(BuildContext context) {
     final otherUser = conversation.otherUser;
     if (otherUser == null) return const SizedBox.shrink();
-    
-    final unreadCount = conversation.unreadCount[FirebaseAuth.instance.currentUser?.uid] ?? 0;
+
+    final unreadCount =
+        conversation.unreadCount[FirebaseAuth.instance.currentUser?.uid] ?? 0;
     final isOnline = otherUser.isOnline ?? false;
-    
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -362,10 +356,10 @@ class _ConversationTile extends StatelessWidget {
                               fit: BoxFit.cover,
                               memCacheWidth: 112,
                               memCacheHeight: 112,
-                              placeholder: (context, url) => Container(
-                                color: Colors.grey[300],
-                              ),
-                              errorWidget: (context, url, error) => _buildDefaultAvatar(otherUser),
+                              placeholder: (context, url) =>
+                                  Container(color: Colors.grey[300]),
+                              errorWidget: (context, url, error) =>
+                                  _buildDefaultAvatar(otherUser),
                             )
                           : _buildDefaultAvatar(otherUser),
                     ),
@@ -403,7 +397,9 @@ class _ConversationTile extends StatelessWidget {
                             otherUser.name,
                             style: TextStyle(
                               fontSize: 16,
-                              fontWeight: unreadCount > 0 ? FontWeight.bold : FontWeight.w500,
+                              fontWeight: unreadCount > 0
+                                  ? FontWeight.bold
+                                  : FontWeight.w500,
                               color: isDarkMode ? Colors.white : Colors.black,
                             ),
                             maxLines: 1,
@@ -417,7 +413,9 @@ class _ConversationTile extends StatelessWidget {
                               fontSize: 12,
                               color: unreadCount > 0
                                   ? Theme.of(context).primaryColor
-                                  : (isDarkMode ? Colors.grey[400] : Colors.grey[600]),
+                                  : (isDarkMode
+                                        ? Colors.grey[400]
+                                        : Colors.grey[600]),
                             ),
                           ),
                       ],
@@ -430,8 +428,12 @@ class _ConversationTile extends StatelessWidget {
                             conversation.lastMessage ?? 'Start a conversation',
                             style: TextStyle(
                               fontSize: 14,
-                              color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                              fontWeight: unreadCount > 0 ? FontWeight.w500 : FontWeight.normal,
+                              color: isDarkMode
+                                  ? Colors.grey[400]
+                                  : Colors.grey[600],
+                              fontWeight: unreadCount > 0
+                                  ? FontWeight.w500
+                                  : FontWeight.normal,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -440,7 +442,10 @@ class _ConversationTile extends StatelessWidget {
                         if (unreadCount > 0)
                           Container(
                             margin: const EdgeInsets.only(left: 8),
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
                               color: Theme.of(context).primaryColor,
                               borderRadius: BorderRadius.circular(10),
@@ -465,7 +470,7 @@ class _ConversationTile extends StatelessWidget {
       ),
     );
   }
-  
+
   Widget _buildDefaultAvatar(UserProfile user) {
     return Container(
       color: Colors.grey[300],
@@ -481,11 +486,11 @@ class _ConversationTile extends StatelessWidget {
       ),
     );
   }
-  
+
   String _formatTime(DateTime dateTime) {
     final now = DateTime.now();
     final difference = now.difference(dateTime);
-    
+
     if (difference.inDays == 0) {
       return timeago.format(dateTime, locale: 'en_short');
     } else if (difference.inDays == 1) {
@@ -505,7 +510,7 @@ class _ConversationOptionsSheet extends StatelessWidget {
   final VoidCallback onDelete;
   final VoidCallback onMute;
   final VoidCallback onBlock;
-  
+
   const _ConversationOptionsSheet({
     required this.conversation,
     required this.isDarkMode,
@@ -513,7 +518,7 @@ class _ConversationOptionsSheet extends StatelessWidget {
     required this.onMute,
     required this.onBlock,
   });
-  
+
   @override
   Widget build(BuildContext context) {
     return Container(

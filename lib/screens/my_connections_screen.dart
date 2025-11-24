@@ -7,7 +7,7 @@ import '../models/user_profile.dart';
 import 'enhanced_chat_screen.dart';
 
 class MyConnectionsScreen extends StatefulWidget {
-  const MyConnectionsScreen({Key? key}) : super(key: key);
+  const MyConnectionsScreen({super.key});
 
   @override
   State<MyConnectionsScreen> createState() => _MyConnectionsScreenState();
@@ -57,9 +57,9 @@ class _MyConnectionsScreenState extends State<MyConnectionsScreen> {
         children: [
           Row(
             children: [
-              Icon(
+              const Icon(
                 Icons.pending_outlined,
-                color: const Color(0xFF9C27B0),
+                color: Color(0xFF9C27B0),
                 size: 24,
               ),
               const SizedBox(width: 12),
@@ -77,7 +77,10 @@ class _MyConnectionsScreenState extends State<MyConnectionsScreen> {
                 builder: (context, snapshot) {
                   final count = snapshot.data?.length ?? 0;
                   return Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFF9C27B0),
                       borderRadius: BorderRadius.circular(12),
@@ -113,13 +116,19 @@ class _MyConnectionsScreenState extends State<MyConnectionsScreen> {
                   padding: const EdgeInsets.all(24),
                   child: Column(
                     children: [
-                      Icon(Icons.error_outline, size: 48, color: Colors.red[300]),
+                      Icon(
+                        Icons.error_outline,
+                        size: 48,
+                        color: Colors.red[300],
+                      ),
                       const SizedBox(height: 12),
                       Text(
                         'Failed to load requests',
                         style: TextStyle(
                           fontSize: 16,
-                          color: isDarkMode ? Colors.grey[400] : Colors.grey[700],
+                          color: isDarkMode
+                              ? Colors.grey[400]
+                              : Colors.grey[700],
                         ),
                       ),
                     ],
@@ -144,7 +153,9 @@ class _MyConnectionsScreenState extends State<MyConnectionsScreen> {
                         'No pending requests',
                         style: TextStyle(
                           fontSize: 16,
-                          color: isDarkMode ? Colors.grey[500] : Colors.grey[600],
+                          color: isDarkMode
+                              ? Colors.grey[500]
+                              : Colors.grey[600],
                         ),
                       ),
                     ],
@@ -176,11 +187,7 @@ class _MyConnectionsScreenState extends State<MyConnectionsScreen> {
         children: [
           Row(
             children: [
-              Icon(
-                Icons.people,
-                color: const Color(0xFF00D67D),
-                size: 24,
-              ),
+              const Icon(Icons.people, color: Color(0xFF00D67D), size: 24),
               const SizedBox(width: 12),
               const Text(
                 'My Connections',
@@ -196,7 +203,10 @@ class _MyConnectionsScreenState extends State<MyConnectionsScreen> {
                 builder: (context, snapshot) {
                   final count = snapshot.data ?? 0;
                   return Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFF00D67D),
                       borderRadius: BorderRadius.circular(12),
@@ -232,13 +242,19 @@ class _MyConnectionsScreenState extends State<MyConnectionsScreen> {
                   padding: const EdgeInsets.all(24),
                   child: Column(
                     children: [
-                      Icon(Icons.error_outline, size: 48, color: Colors.red[300]),
+                      Icon(
+                        Icons.error_outline,
+                        size: 48,
+                        color: Colors.red[300],
+                      ),
                       const SizedBox(height: 12),
                       Text(
                         'Failed to load connections',
                         style: TextStyle(
                           fontSize: 16,
-                          color: isDarkMode ? Colors.grey[400] : Colors.grey[700],
+                          color: isDarkMode
+                              ? Colors.grey[400]
+                              : Colors.grey[700],
                         ),
                       ),
                     ],
@@ -264,7 +280,9 @@ class _MyConnectionsScreenState extends State<MyConnectionsScreen> {
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                          color: isDarkMode
+                              ? Colors.grey[400]
+                              : Colors.grey[600],
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -273,7 +291,9 @@ class _MyConnectionsScreenState extends State<MyConnectionsScreen> {
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 14,
-                          color: isDarkMode ? Colors.grey[600] : Colors.grey[500],
+                          color: isDarkMode
+                              ? Colors.grey[600]
+                              : Colors.grey[500],
                         ),
                       ),
                     ],
@@ -294,7 +314,8 @@ class _MyConnectionsScreenState extends State<MyConnectionsScreen> {
                         return const SizedBox.shrink();
                       }
 
-                      final userData = userSnapshot.data!.data() as Map<String, dynamic>?;
+                      final userData =
+                          userSnapshot.data!.data() as Map<String, dynamic>?;
                       if (userData == null) return const SizedBox.shrink();
 
                       return _buildConnectionCard(userId, userData, isDarkMode);
@@ -384,7 +405,11 @@ class _MyConnectionsScreenState extends State<MyConnectionsScreen> {
     );
   }
 
-  Widget _buildConnectionCard(String userId, Map<String, dynamic> userData, bool isDarkMode) {
+  Widget _buildConnectionCard(
+    String userId,
+    Map<String, dynamic> userData,
+    bool isDarkMode,
+  ) {
     final name = userData['name'] ?? 'Unknown User';
     final photoUrl = userData['photoUrl'] as String?;
     final bio = userData['bio'] ?? 'No bio available';
@@ -426,11 +451,11 @@ class _MyConnectionsScreenState extends State<MyConnectionsScreen> {
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 8),
-                  Text(
+                  const Text(
                     'Connected',
                     style: TextStyle(
                       fontSize: 12,
-                      color: const Color(0xFF00D67D),
+                      color: Color(0xFF00D67D),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -442,7 +467,10 @@ class _MyConnectionsScreenState extends State<MyConnectionsScreen> {
               children: [
                 IconButton(
                   onPressed: () => _openChat(userId, userData),
-                  icon: const Icon(Icons.message_outlined, color: Color(0xFF00D67D)),
+                  icon: const Icon(
+                    Icons.message_outlined,
+                    color: Color(0xFF00D67D),
+                  ),
                   tooltip: 'Message',
                   style: IconButton.styleFrom(
                     backgroundColor: const Color(0xFF00D67D).withOpacity(0.1),
@@ -451,7 +479,10 @@ class _MyConnectionsScreenState extends State<MyConnectionsScreen> {
                 const SizedBox(width: 8),
                 IconButton(
                   onPressed: () => _removeConnection(userId, name),
-                  icon: const Icon(Icons.person_remove_outlined, color: Colors.red),
+                  icon: const Icon(
+                    Icons.person_remove_outlined,
+                    color: Colors.red,
+                  ),
                   tooltip: 'Remove Connection',
                   style: IconButton.styleFrom(
                     backgroundColor: Colors.red.withOpacity(0.1),
@@ -472,16 +503,16 @@ class _MyConnectionsScreenState extends State<MyConnectionsScreen> {
       if (mounted) {
         if (result['success'] == true) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
+            const SnackBar(
               content: Row(
-                children: const [
+                children: [
                   Icon(Icons.check_circle, color: Colors.white),
                   SizedBox(width: 12),
                   Text('Connection request accepted!'),
                 ],
               ),
-              backgroundColor: const Color(0xFF00D67D),
-              duration: const Duration(seconds: 2),
+              backgroundColor: Color(0xFF00D67D),
+              duration: Duration(seconds: 2),
             ),
           );
         } else {
@@ -544,7 +575,9 @@ class _MyConnectionsScreenState extends State<MyConnectionsScreen> {
             ? const Color(0xFF2A2A2A)
             : Colors.white,
         title: const Text('Remove Connection'),
-        content: Text('Are you sure you want to remove $userName from your connections?'),
+        content: Text(
+          'Are you sure you want to remove $userName from your connections?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -580,16 +613,16 @@ class _MyConnectionsScreenState extends State<MyConnectionsScreen> {
         setState(() {}); // Refresh the list
 
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          const SnackBar(
             content: Row(
-              children: const [
+              children: [
                 Icon(Icons.person_remove, color: Colors.white),
                 SizedBox(width: 12),
                 Text('Connection removed'),
               ],
             ),
             backgroundColor: Colors.orange,
-            duration: const Duration(seconds: 2),
+            duration: Duration(seconds: 2),
           ),
         );
       }
@@ -645,14 +678,13 @@ class _MyConnectionsScreenState extends State<MyConnectionsScreen> {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => EnhancedChatScreen(
-            otherUser: userProfile,
-          ),
+          builder: (context) => EnhancedChatScreen(otherUser: userProfile),
         ),
       );
 
-      debugPrint('MyConnections: Successfully opened chat with ${userData['name']}');
-
+      debugPrint(
+        'MyConnections: Successfully opened chat with ${userData['name']}',
+      );
     } catch (e) {
       debugPrint('MyConnections ERROR opening chat: $e');
 

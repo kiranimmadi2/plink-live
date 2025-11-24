@@ -1,5 +1,3 @@
-import 'dart:async';
-
 class PhotoCacheService {
   static final PhotoCacheService _instance = PhotoCacheService._internal();
   factory PhotoCacheService() => _instance;
@@ -7,10 +5,10 @@ class PhotoCacheService {
 
   // Cache for photo URLs with timestamp
   final Map<String, CachedPhoto> _photoCache = {};
-  
+
   // Cache duration (1 hour)
   static const Duration _cacheDuration = Duration(hours: 1);
-  
+
   // Maximum cache size
   static const int _maxCacheSize = 100;
 
@@ -21,29 +19,26 @@ class PhotoCacheService {
       print('Photo cache hit for user: $userId');
       return cached.url;
     }
-    
+
     // Remove expired entry
     if (cached != null && cached.isExpired) {
       _photoCache.remove(userId);
     }
-    
+
     return null;
   }
 
   // Cache photo URL
   void cachePhotoUrl(String userId, String? photoUrl) {
     if (photoUrl == null || photoUrl.isEmpty) return;
-    
+
     // Maintain cache size limit
     if (_photoCache.length >= _maxCacheSize) {
       _removeOldestEntry();
     }
-    
-    _photoCache[userId] = CachedPhoto(
-      url: photoUrl,
-      timestamp: DateTime.now(),
-    );
-    
+
+    _photoCache[userId] = CachedPhoto(url: photoUrl, timestamp: DateTime.now());
+
     print('Cached photo for user: $userId');
   }
 
@@ -70,17 +65,17 @@ class PhotoCacheService {
   // Remove oldest cache entry
   void _removeOldestEntry() {
     if (_photoCache.isEmpty) return;
-    
+
     String? oldestKey;
     DateTime? oldestTime;
-    
+
     _photoCache.forEach((key, value) {
       if (oldestTime == null || value.timestamp.isBefore(oldestTime!)) {
         oldestTime = value.timestamp;
         oldestKey = key;
       }
     });
-    
+
     if (oldestKey != null) {
       _photoCache.remove(oldestKey);
     }
@@ -90,7 +85,7 @@ class PhotoCacheService {
   Map<String, dynamic> getCacheStats() {
     int expired = 0;
     int valid = 0;
-    
+
     _photoCache.forEach((_, cached) {
       if (cached.isExpired) {
         expired++;
@@ -98,7 +93,7 @@ class PhotoCacheService {
         valid++;
       }
     });
-    
+
     return {
       'total': _photoCache.length,
       'valid': valid,
@@ -112,12 +107,10 @@ class CachedPhoto {
   final String url;
   final DateTime timestamp;
 
-  CachedPhoto({
-    required this.url,
-    required this.timestamp,
-  });
+  CachedPhoto({required this.url, required this.timestamp});
 
   bool get isExpired {
-    return DateTime.now().difference(timestamp) > PhotoCacheService._cacheDuration;
+    return DateTime.now().difference(timestamp) >
+        PhotoCacheService._cacheDuration;
   }
 }

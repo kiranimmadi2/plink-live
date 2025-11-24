@@ -22,10 +22,7 @@ class FloatingParticle {
 class FloatingParticles extends StatefulWidget {
   final int particleCount;
 
-  const FloatingParticles({
-    Key? key,
-    this.particleCount = 8,
-  }) : super(key: key);
+  const FloatingParticles({super.key, this.particleCount = 8});
 
   @override
   State<FloatingParticles> createState() => _FloatingParticlesState();
@@ -62,7 +59,9 @@ class _FloatingParticlesState extends State<FloatingParticles>
         size: 3 + _random.nextDouble() * 8,
         speedX: (_random.nextDouble() - 0.5) * 0.0005,
         speedY: (_random.nextDouble() - 0.5) * 0.0005,
-        color: Colors.white.withValues(alpha: 0.03 + _random.nextDouble() * 0.07),
+        color: Colors.white.withValues(
+          alpha: 0.03 + _random.nextDouble() * 0.07,
+        ),
       );
     });
   }
@@ -102,10 +101,7 @@ class _ParticlesPainter extends CustomPainter {
   final List<FloatingParticle> particles;
   final double animationValue;
 
-  _ParticlesPainter({
-    required this.particles,
-    required this.animationValue,
-  });
+  _ParticlesPainter({required this.particles, required this.animationValue});
 
   @override
   void paint(Canvas canvas, Size size) {

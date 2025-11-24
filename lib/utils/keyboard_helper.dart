@@ -5,15 +5,15 @@ class KeyboardHelper {
   static void keepKeyboardOpen(BuildContext context) {
     SystemChannels.textInput.invokeMethod('TextInput.show');
   }
-  
+
   static void hideKeyboard(BuildContext context) {
     FocusScope.of(context).unfocus();
   }
-  
+
   static void requestFocus(BuildContext context, FocusNode focusNode) {
     FocusScope.of(context).requestFocus(focusNode);
   }
-  
+
   static Widget buildPersistentTextField({
     required TextEditingController controller,
     required FocusNode focusNode,
@@ -46,16 +46,17 @@ class KeyboardHelper {
           // Ensure keyboard stays open
           SystemChannels.textInput.invokeMethod('TextInput.show');
         },
-        decoration: decoration ?? InputDecoration(
-          hintText: hintText,
-          contentPadding: contentPadding ?? const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 12,
-          ),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
-        ),
+        decoration:
+            decoration ??
+            InputDecoration(
+              hintText: hintText,
+              contentPadding:
+                  contentPadding ??
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
       ),
     );
   }
@@ -72,7 +73,7 @@ class PersistentKeyboardTextField extends StatefulWidget {
   final InputDecoration? decoration;
 
   const PersistentKeyboardTextField({
-    Key? key,
+    super.key,
     required this.controller,
     this.hintText,
     this.onChanged,
@@ -81,13 +82,15 @@ class PersistentKeyboardTextField extends StatefulWidget {
     this.maxLines,
     this.autofocus = false,
     this.decoration,
-  }) : super(key: key);
+  });
 
   @override
-  State<PersistentKeyboardTextField> createState() => _PersistentKeyboardTextFieldState();
+  State<PersistentKeyboardTextField> createState() =>
+      _PersistentKeyboardTextFieldState();
 }
 
-class _PersistentKeyboardTextFieldState extends State<PersistentKeyboardTextField> {
+class _PersistentKeyboardTextFieldState
+    extends State<PersistentKeyboardTextField> {
   late FocusNode _focusNode;
   bool _keyboardVisible = false;
 
@@ -96,7 +99,7 @@ class _PersistentKeyboardTextFieldState extends State<PersistentKeyboardTextFiel
     super.initState();
     _focusNode = FocusNode();
     _focusNode.addListener(_onFocusChange);
-    
+
     // Auto-focus if requested
     if (widget.autofocus) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -147,20 +150,22 @@ class _PersistentKeyboardTextFieldState extends State<PersistentKeyboardTextFiel
               _requestFocus();
             }
           },
-          decoration: widget.decoration ?? InputDecoration(
-            hintText: widget.hintText,
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 12,
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-            filled: true,
-            fillColor: _keyboardVisible 
-              ? Colors.blue.withValues(alpha: 0.05)
-              : Colors.grey.withValues(alpha: 0.05),
-          ),
+          decoration:
+              widget.decoration ??
+              InputDecoration(
+                hintText: widget.hintText,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                filled: true,
+                fillColor: _keyboardVisible
+                    ? Colors.blue.withValues(alpha: 0.05)
+                    : Colors.grey.withValues(alpha: 0.05),
+              ),
         ),
       ),
     );

@@ -2,22 +2,17 @@ import 'package:flutter/material.dart';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
-enum VoiceOrbState {
-  idle,
-  listening,
-  processing,
-  speaking,
-}
+enum VoiceOrbState { idle, listening, processing, speaking }
 
 class SimpleVoiceOrb extends StatefulWidget {
   final VoiceOrbState state;
   final double size;
 
   const SimpleVoiceOrb({
-    Key? key,
+    super.key,
     this.state = VoiceOrbState.idle,
     this.size = 200,
-  }) : super(key: key);
+  });
 
   @override
   State<SimpleVoiceOrb> createState() => _SimpleVoiceOrbState();

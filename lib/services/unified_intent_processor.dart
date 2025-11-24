@@ -8,34 +8,66 @@ import 'intent_clarification_service.dart';
 import '../models/user_profile.dart';
 
 class UnifiedIntentProcessor {
-  static final UnifiedIntentProcessor _instance = UnifiedIntentProcessor._internal();
+  static final UnifiedIntentProcessor _instance =
+      UnifiedIntentProcessor._internal();
   factory UnifiedIntentProcessor() => _instance;
   UnifiedIntentProcessor._internal();
 
   final GeminiService _geminiService = GeminiService();
   final UniversalIntentService _universalService = UniversalIntentService();
-  final IntentClarificationService _clarificationService = IntentClarificationService();
+  final IntentClarificationService _clarificationService =
+      IntentClarificationService();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   // Clarification patterns for common ambiguous inputs
   final Map<String, List<String>> _clarificationPatterns = {
     'iphone': ['Do you want to buy or sell an iPhone?', 'Buy', 'Sell'],
-    'room': ['Are you looking to rent or offering a room?', 'Looking to rent', 'Offering a room'],
-    'designer': ['Are you offering a job for a designer or looking for a job as a designer?', 'Hiring a designer', 'Looking for designer job'],
-    'friend': ['Do you prefer male, female, or anyone as a friend?', 'Male', 'Female', 'Anyone'],
-    'date': ['Do you prefer to date male, female, or anyone?', 'Male', 'Female', 'Anyone'],
+    'room': [
+      'Are you looking to rent or offering a room?',
+      'Looking to rent',
+      'Offering a room',
+    ],
+    'designer': [
+      'Are you offering a job for a designer or looking for a job as a designer?',
+      'Hiring a designer',
+      'Looking for designer job',
+    ],
+    'friend': [
+      'Do you prefer male, female, or anyone as a friend?',
+      'Male',
+      'Female',
+      'Anyone',
+    ],
+    'date': [
+      'Do you prefer to date male, female, or anyone?',
+      'Male',
+      'Female',
+      'Anyone',
+    ],
     'bicycle': ['Do you want to buy or sell a bicycle?', 'Buy', 'Sell'],
     'car': ['Do you want to buy, sell, or rent a car?', 'Buy', 'Sell', 'Rent'],
-    'apartment': ['Are you looking to rent or offering an apartment?', 'Looking to rent', 'Offering'],
-    'job': ['Are you looking for a job or hiring?', 'Looking for job', 'Hiring'],
-    'tutor': ['Do you need a tutor or are you offering tutoring services?', 'Need a tutor', 'Offering tutoring'],
+    'apartment': [
+      'Are you looking to rent or offering an apartment?',
+      'Looking to rent',
+      'Offering',
+    ],
+    'job': [
+      'Are you looking for a job or hiring?',
+      'Looking for job',
+      'Hiring',
+    ],
+    'tutor': [
+      'Do you need a tutor or are you offering tutoring services?',
+      'Need a tutor',
+      'Offering tutoring',
+    ],
   };
 
   // Check if intent needs clarification
   Future<Map<String, dynamic>?> checkClarificationNeeded(String input) async {
     final lowerInput = input.toLowerCase().trim();
-    
+
     // Check for exact single-word ambiguous inputs
     if (_clarificationPatterns.containsKey(lowerInput)) {
       return {
@@ -48,7 +80,8 @@ class UnifiedIntentProcessor {
 
     // Use AI to detect ambiguity with better context understanding
     try {
-      final prompt = '''
+      final prompt =
+          '''
 Analyze this user input carefully and determine if it needs clarification:
 "$input"
 
@@ -92,12 +125,15 @@ If the intent is clear enough to find matches (even if not perfect), set needsCl
         if (jsonMatch != null) {
           final jsonStr = jsonMatch.group(0)!;
           final result = _parseJson(jsonStr);
-          
+
           // Only show clarification if truly needed and confidence is high
-          if (result['needsClarification'] == true && result['confidence'] > 0.8) {
+          if (result['needsClarification'] == true &&
+              result['confidence'] > 0.8) {
             return {
               'needsClarification': true,
-              'question': result['question'] ?? 'Could you please provide more details?',
+              'question':
+                  result['question'] ??
+                  'Could you please provide more details?',
               'options': result['options'] ?? ['Option 1', 'Option 2', 'Other'],
               'originalInput': input,
               'reason': result['reason'],
@@ -120,7 +156,7 @@ If the intent is clear enough to find matches (even if not perfect), set needsCl
   ) async {
     // First check if clarification is needed
     final clarification = await checkClarificationNeeded(input);
-    
+
     if (clarification != null && clarification['needsClarification'] == true) {
       // Show clarification dialog
       final answer = await showDialog<String>(
@@ -128,21 +164,23 @@ If the intent is clear enough to find matches (even if not perfect), set needsCl
         barrierDismissible: false,
         builder: (BuildContext context) {
           return AlertDialog(
-            title: Text('Quick Clarification'),
+            title: const Text('Quick Clarification'),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(clarification['question']),
-                SizedBox(height: 16),
+                const SizedBox(height: 16),
                 ...List.generate(
                   clarification['options'].length,
                   (index) => Padding(
-                    padding: EdgeInsets.symmetric(vertical: 4),
+                    padding: const EdgeInsets.symmetric(vertical: 4),
                     child: SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
                         onPressed: () {
-                          Navigator.of(context).pop(clarification['options'][index]);
+                          Navigator.of(
+                            context,
+                          ).pop(clarification['options'][index]);
                         },
                         child: Text(clarification['options'][index]),
                       ),
@@ -157,7 +195,11 @@ If the intent is clear enough to find matches (even if not perfect), set needsCl
 
       if (answer != null) {
         // Combine original input with clarification answer
-        final clarifiedIntent = _buildClarifiedIntent(input, answer, clarification['question']);
+        final clarifiedIntent = _buildClarifiedIntent(
+          input,
+          answer,
+          clarification['question'],
+        );
         return await _processIntent(clarifiedIntent);
       }
     }
@@ -166,7 +208,11 @@ If the intent is clear enough to find matches (even if not perfect), set needsCl
     return await _processIntent(input);
   }
 
-  String _buildClarifiedIntent(String original, String answer, String question) {
+  String _buildClarifiedIntent(
+    String original,
+    String answer,
+    String question,
+  ) {
     // Build a more complete intent from the clarification
     if (question.contains('buy or sell')) {
       if (answer.toLowerCase().contains('buy')) {
@@ -189,7 +235,7 @@ If the intent is clear enough to find matches (even if not perfect), set needsCl
     } else if (question.contains('gender') || question.contains('prefer')) {
       return '$original, preference: $answer';
     }
-    
+
     // Default combination
     return '$original - $answer';
   }
@@ -225,37 +271,51 @@ If the intent is clear enough to find matches (even if not perfect), set needsCl
       // Clean up the JSON string
       jsonStr = jsonStr.replaceAll(RegExp(r'[\n\r\t]'), ' ');
       jsonStr = jsonStr.replaceAll(RegExp(r'\s+'), ' ');
-      
+
       // Manual parsing for common fields
-      final needsClarification = jsonStr.contains('"needsClarification": true') || 
-                                jsonStr.contains('"needsClarification":true');
-      
-      final confidenceMatch = RegExp(r'"confidence":\s*([0-9.]+)').firstMatch(jsonStr);
-      final confidence = confidenceMatch != null ? double.tryParse(confidenceMatch.group(1)!) ?? 0.0 : 0.0;
-      
-      final questionMatch = RegExp(r'"question":\s*"([^"]+)"').firstMatch(jsonStr);
+      final needsClarification =
+          jsonStr.contains('"needsClarification": true') ||
+          jsonStr.contains('"needsClarification":true');
+
+      final confidenceMatch = RegExp(
+        r'"confidence":\s*([0-9.]+)',
+      ).firstMatch(jsonStr);
+      final confidence = confidenceMatch != null
+          ? double.tryParse(confidenceMatch.group(1)!) ?? 0.0
+          : 0.0;
+
+      final questionMatch = RegExp(
+        r'"question":\s*"([^"]+)"',
+      ).firstMatch(jsonStr);
       final question = questionMatch?.group(1);
-      
-      final intentUnderstoodMatch = RegExp(r'"intentUnderstood":\s*"([^"]+)"').firstMatch(jsonStr);
+
+      final intentUnderstoodMatch = RegExp(
+        r'"intentUnderstood":\s*"([^"]+)"',
+      ).firstMatch(jsonStr);
       final intentUnderstood = intentUnderstoodMatch?.group(1);
-      
-      final missingInfoMatch = RegExp(r'"missingInfo":\s*"([^"]+)"').firstMatch(jsonStr);
+
+      final missingInfoMatch = RegExp(
+        r'"missingInfo":\s*"([^"]+)"',
+      ).firstMatch(jsonStr);
       final missingInfo = missingInfoMatch?.group(1);
-      
+
       // Parse options array
-      final optionsMatch = RegExp(r'"options":\s*\[([^\]]+)\]').firstMatch(jsonStr);
+      final optionsMatch = RegExp(
+        r'"options":\s*\[([^\]]+)\]',
+      ).firstMatch(jsonStr);
       List<String> options = [];
       if (optionsMatch != null) {
         final optionsStr = optionsMatch.group(1)!;
-        options = optionsStr.split(',')
+        options = optionsStr
+            .split(',')
             .map((s) => s.trim().replaceAll('"', ''))
             .where((s) => s.isNotEmpty)
             .toList();
       }
-      
+
       final reasonMatch = RegExp(r'"reason":\s*"([^"]+)"').firstMatch(jsonStr);
       final reason = reasonMatch?.group(1);
-      
+
       return {
         'needsClarification': needsClarification,
         'confidence': confidence,

@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../models/user_profile.dart';
 
 /// ChatService - Handles all chat-related operations
 ///
@@ -142,21 +141,12 @@ class ChatService {
             'createdAt': now,
 
             // Unread counts for each user
-            'unreadCount': {
-              myUid: 0,
-              otherUid: 0,
-            },
+            'unreadCount': {myUid: 0, otherUid: 0},
 
             // Additional fields for compatibility
-            'isTyping': {
-              myUid: false,
-              otherUid: false,
-            },
+            'isTyping': {myUid: false, otherUid: false},
 
-            'lastSeen': {
-              myUid: now,
-              otherUid: null,
-            },
+            'lastSeen': {myUid: now, otherUid: null},
 
             // Status flags
             'isGroup': false,
@@ -166,12 +156,13 @@ class ChatService {
 
           print('ChatService: Chat created successfully: $chatId');
         } else {
-          print('ChatService: Chat was created by another transaction: $chatId');
+          print(
+            'ChatService: Chat was created by another transaction: $chatId',
+          );
         }
       });
 
       return chatId;
-
     } catch (e) {
       print('ChatService ERROR in getOrCreateChat: $e');
       rethrow;
@@ -226,7 +217,6 @@ class ChatService {
       });
 
       print('ChatService: Message sent successfully in chat $chatId');
-
     } catch (e) {
       print('ChatService ERROR in sendMessage: $e');
       rethrow;
@@ -256,10 +246,7 @@ class ChatService {
       final chatRef = _firestore.collection('conversations').doc(chatId);
 
       // Update unread count for this user
-      await chatRef.update({
-        'unreadCount.$userId': 0,
-      });
-
+      await chatRef.update({'unreadCount.$userId': 0});
     } catch (e) {
       print('ChatService ERROR in markMessagesAsRead: $e');
     }
@@ -282,7 +269,6 @@ class ChatService {
       await chatRef.delete();
 
       print('ChatService: Chat deleted: $chatId');
-
     } catch (e) {
       print('ChatService ERROR in deleteChat: $e');
       rethrow;

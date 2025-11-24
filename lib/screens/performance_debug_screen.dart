@@ -4,7 +4,7 @@ import '../utils/performance_monitor.dart';
 import '../widgets/performance_overlay_widget.dart';
 
 class PerformanceDebugScreen extends StatefulWidget {
-  const PerformanceDebugScreen({Key? key}) : super(key: key);
+  const PerformanceDebugScreen({super.key});
 
   @override
   State<PerformanceDebugScreen> createState() => _PerformanceDebugScreenState();
@@ -16,25 +16,25 @@ class _PerformanceDebugScreenState extends State<PerformanceDebugScreen> {
   bool _showSemantics = false;
   bool _checkerboardImages = false;
   bool _checkerboardLayers = false;
-  
+
   Map<String, dynamic> _performanceMetrics = {};
-  
+
   @override
   void initState() {
     super.initState();
     _loadPerformanceMetrics();
   }
-  
+
   void _loadPerformanceMetrics() {
     setState(() {
       _performanceMetrics = PerformanceTracker.getReport();
     });
   }
-  
+
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Performance Debug'),
@@ -75,7 +75,7 @@ class _PerformanceDebugScreenState extends State<PerformanceDebugScreen> {
       ),
     );
   }
-  
+
   Widget _buildDebugOptionsCard(bool isDarkMode) {
     return Card(
       color: isDarkMode ? const Color(0xFF2A2A2A) : Colors.white,
@@ -148,7 +148,7 @@ class _PerformanceDebugScreenState extends State<PerformanceDebugScreen> {
       ),
     );
   }
-  
+
   Widget _buildPerformanceMetricsCard(bool isDarkMode) {
     return Card(
       color: isDarkMode ? const Color(0xFF2A2A2A) : Colors.white,
@@ -192,22 +192,38 @@ class _PerformanceDebugScreenState extends State<PerformanceDebugScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          _buildMetric('Avg', '${metrics['average']}ms', isDarkMode),
-                          _buildMetric('Min', '${metrics['min']}ms', isDarkMode),
-                          _buildMetric('Max', '${metrics['max']}ms', isDarkMode),
-                          _buildMetric('Count', '${metrics['count']}', isDarkMode),
+                          _buildMetric(
+                            'Avg',
+                            '${metrics['average']}ms',
+                            isDarkMode,
+                          ),
+                          _buildMetric(
+                            'Min',
+                            '${metrics['min']}ms',
+                            isDarkMode,
+                          ),
+                          _buildMetric(
+                            'Max',
+                            '${metrics['max']}ms',
+                            isDarkMode,
+                          ),
+                          _buildMetric(
+                            'Count',
+                            '${metrics['count']}',
+                            isDarkMode,
+                          ),
                         ],
                       ),
                     ],
                   ),
                 );
-              }).toList(),
+              }),
           ],
         ),
       ),
     );
   }
-  
+
   Widget _buildMetric(String label, String value, bool isDarkMode) {
     return Column(
       children: [
@@ -229,7 +245,7 @@ class _PerformanceDebugScreenState extends State<PerformanceDebugScreen> {
       ],
     );
   }
-  
+
   Widget _buildFrameRateCard(bool isDarkMode) {
     return Card(
       color: isDarkMode ? const Color(0xFF2A2A2A) : Colors.white,
@@ -250,20 +266,21 @@ class _PerformanceDebugScreenState extends State<PerformanceDebugScreen> {
             StreamBuilder(
               stream: Stream.periodic(const Duration(seconds: 1)),
               builder: (context, snapshot) {
-                final frameTime = SchedulerBinding.instance.currentFrameTimeStamp;
-                final fps = frameTime != null 
-                    ? (1000000 / frameTime.inMicroseconds).clamp(0, 120)
-                    : 60.0;
-                
+                final frameTime =
+                    SchedulerBinding.instance.currentFrameTimeStamp;
+                final fps = (1000000 / frameTime.inMicroseconds).clamp(0, 120);
+
                 return Column(
                   children: [
                     LinearProgressIndicator(
                       value: fps / 60,
                       backgroundColor: Colors.red.withValues(alpha: 0.2),
                       valueColor: AlwaysStoppedAnimation<Color>(
-                        fps >= 55 ? Colors.green 
-                                  : fps >= 30 ? Colors.orange 
-                                              : Colors.red,
+                        fps >= 55
+                            ? Colors.green
+                            : fps >= 30
+                            ? Colors.orange
+                            : Colors.red,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -272,9 +289,11 @@ class _PerformanceDebugScreenState extends State<PerformanceDebugScreen> {
                       style: TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
-                        color: fps >= 55 ? Colors.green 
-                                         : fps >= 30 ? Colors.orange 
-                                                     : Colors.red,
+                        color: fps >= 55
+                            ? Colors.green
+                            : fps >= 30
+                            ? Colors.orange
+                            : Colors.red,
                       ),
                     ),
                   ],
@@ -286,7 +305,7 @@ class _PerformanceDebugScreenState extends State<PerformanceDebugScreen> {
       ),
     );
   }
-  
+
   Widget _buildMemoryCard(bool isDarkMode) {
     return Card(
       color: isDarkMode ? const Color(0xFF2A2A2A) : Colors.white,
@@ -330,7 +349,7 @@ class _PerformanceDebugScreenState extends State<PerformanceDebugScreen> {
       ),
     );
   }
-  
+
   Widget _buildTestActionsCard(bool isDarkMode) {
     return Card(
       color: isDarkMode ? const Color(0xFF2A2A2A) : Colors.white,
@@ -375,7 +394,7 @@ class _PerformanceDebugScreenState extends State<PerformanceDebugScreen> {
       ),
     );
   }
-  
+
   void _runScrollTest() {
     Navigator.push(
       context,
@@ -399,19 +418,17 @@ class _PerformanceDebugScreenState extends State<PerformanceDebugScreen> {
       ),
     );
   }
-  
+
   void _runAnimationTest() {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => const AnimationTestScreen(),
-      ),
+      MaterialPageRoute(builder: (context) => const AnimationTestScreen()),
     );
   }
-  
+
   void _runHeavyComputation() async {
     PerformanceTracker.startTracking('HeavyComputation');
-    
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -425,46 +442,46 @@ class _PerformanceDebugScreenState extends State<PerformanceDebugScreen> {
         ),
       ),
     );
-    
+
     // Simulate heavy computation
     await Future.delayed(const Duration(seconds: 2));
     int result = 0;
     for (int i = 0; i < 10000000; i++) {
       result += i;
     }
-    
+
     PerformanceTracker.stopTracking('HeavyComputation');
-    
+
     Navigator.pop(context);
     _loadPerformanceMetrics();
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Computation result: $result')),
-    );
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('Computation result: $result')));
   }
-  
+
   void _runNetworkTest() async {
     PerformanceTracker.startTracking('NetworkTest');
-    
+
     // Simulate multiple network requests
     final futures = List.generate(10, (index) async {
       await Future.delayed(Duration(milliseconds: 100 + (index * 50)));
       return 'Response $index';
     });
-    
+
     await Future.wait(futures);
-    
+
     PerformanceTracker.stopTracking('NetworkTest');
     _loadPerformanceMetrics();
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Network test completed')),
-    );
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Network test completed')));
   }
 }
 
 class AnimationTestScreen extends StatefulWidget {
-  const AnimationTestScreen({Key? key}) : super(key: key);
+  const AnimationTestScreen({super.key});
 
   @override
   State<AnimationTestScreen> createState() => _AnimationTestScreenState();
@@ -474,7 +491,7 @@ class _AnimationTestScreenState extends State<AnimationTestScreen>
     with TickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _animation;
-  
+
   @override
   void initState() {
     super.initState();
@@ -482,13 +499,10 @@ class _AnimationTestScreenState extends State<AnimationTestScreen>
       duration: const Duration(seconds: 2),
       vsync: this,
     );
-    _animation = CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeInOut,
-    );
+    _animation = CurvedAnimation(parent: _controller, curve: Curves.easeInOut);
     _controller.repeat(reverse: true);
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -506,11 +520,7 @@ class _AnimationTestScreenState extends State<AnimationTestScreen>
                   height: 200,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      colors: [
-                        Colors.blue,
-                        Colors.purple,
-                        Colors.red,
-                      ],
+                      colors: const [Colors.blue, Colors.purple, Colors.red],
                       transform: GradientRotation(_animation.value * 3.14),
                     ),
                     borderRadius: BorderRadius.circular(20),
@@ -534,7 +544,7 @@ class _AnimationTestScreenState extends State<AnimationTestScreen>
       ),
     );
   }
-  
+
   @override
   void dispose() {
     _controller.dispose();

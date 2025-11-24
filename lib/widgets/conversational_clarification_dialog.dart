@@ -8,12 +8,12 @@ class ConversationalClarificationDialog extends StatefulWidget {
   final String? reason;
 
   const ConversationalClarificationDialog({
-    Key? key,
+    super.key,
     required this.originalInput,
     required this.question,
     required this.options,
     this.reason,
-  }) : super(key: key);
+  });
 
   static Future<String?> show(
     BuildContext context, {
@@ -53,23 +53,15 @@ class _ConversationalClarificationDialogState
   void initState() {
     super.initState();
     _animationController = AnimationController(
-      duration: Duration(milliseconds: 400),
+      duration: const Duration(milliseconds: 400),
       vsync: this,
     );
-    _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeInOut,
-    ));
-    _scaleAnimation = Tween<double>(
-      begin: 0.8,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeOutBack,
-    ));
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
+    _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeOutBack),
+    );
     _animationController.forward();
   }
 
@@ -99,7 +91,7 @@ class _ConversationalClarificationDialogState
               elevation: 24,
               backgroundColor: Colors.transparent,
               child: Container(
-                constraints: BoxConstraints(maxWidth: 400),
+                constraints: const BoxConstraints(maxWidth: 400),
                 decoration: BoxDecoration(
                   color: theme.dialogBackgroundColor,
                   borderRadius: BorderRadius.circular(24),
@@ -116,7 +108,7 @@ class _ConversationalClarificationDialogState
                   children: [
                     // Header with gradient
                     Container(
-                      padding: EdgeInsets.all(20),
+                      padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: [
@@ -126,11 +118,11 @@ class _ConversationalClarificationDialogState
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
-                        borderRadius: BorderRadius.vertical(
+                        borderRadius: const BorderRadius.vertical(
                           top: Radius.circular(24),
                         ),
                       ),
-                      child: Column(
+                      child: const Column(
                         children: [
                           Icon(
                             Icons.help_outline,
@@ -152,13 +144,13 @@ class _ConversationalClarificationDialogState
 
                     // Content
                     Container(
-                      padding: EdgeInsets.all(20),
+                      padding: const EdgeInsets.all(20),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           // Original input chip
                           Container(
-                            padding: EdgeInsets.symmetric(
+                            padding: const EdgeInsets.symmetric(
                               horizontal: 12,
                               vertical: 6,
                             ),
@@ -177,7 +169,7 @@ class _ConversationalClarificationDialogState
                                   size: 16,
                                   color: theme.primaryColor,
                                 ),
-                                SizedBox(width: 6),
+                                const SizedBox(width: 6),
                                 Flexible(
                                   child: Text(
                                     widget.originalInput,
@@ -192,7 +184,7 @@ class _ConversationalClarificationDialogState
                               ],
                             ),
                           ),
-                          SizedBox(height: 16),
+                          const SizedBox(height: 16),
 
                           // Question
                           Text(
@@ -203,7 +195,7 @@ class _ConversationalClarificationDialogState
                           ),
 
                           if (widget.reason != null) ...[
-                            SizedBox(height: 8),
+                            const SizedBox(height: 8),
                             Text(
                               widget.reason!,
                               style: theme.textTheme.bodySmall?.copyWith(
@@ -213,14 +205,14 @@ class _ConversationalClarificationDialogState
                             ),
                           ],
 
-                          SizedBox(height: 20),
+                          const SizedBox(height: 20),
 
                           // Options
                           if (!_showCustomInput) ...[
                             ...widget.options.map((option) {
                               final isSelected = _selectedOption == option;
                               return Padding(
-                                padding: EdgeInsets.only(bottom: 8),
+                                padding: const EdgeInsets.only(bottom: 8),
                                 child: Material(
                                   color: Colors.transparent,
                                   child: InkWell(
@@ -230,7 +222,7 @@ class _ConversationalClarificationDialogState
                                         _selectedOption = option;
                                       });
                                       Future.delayed(
-                                        Duration(milliseconds: 200),
+                                        const Duration(milliseconds: 200),
                                         () {
                                           Navigator.of(context).pop(option);
                                         },
@@ -238,15 +230,18 @@ class _ConversationalClarificationDialogState
                                     },
                                     borderRadius: BorderRadius.circular(12),
                                     child: AnimatedContainer(
-                                      duration: Duration(milliseconds: 200),
-                                      padding: EdgeInsets.symmetric(
+                                      duration: const Duration(
+                                        milliseconds: 200,
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
                                         horizontal: 16,
                                         vertical: 14,
                                       ),
                                       decoration: BoxDecoration(
                                         color: isSelected
-                                            ? theme.primaryColor
-                                                .withOpacity(0.1)
+                                            ? theme.primaryColor.withOpacity(
+                                                0.1,
+                                              )
                                             : Colors.transparent,
                                         borderRadius: BorderRadius.circular(12),
                                         border: Border.all(
@@ -259,8 +254,9 @@ class _ConversationalClarificationDialogState
                                       child: Row(
                                         children: [
                                           AnimatedContainer(
-                                            duration:
-                                                Duration(milliseconds: 200),
+                                            duration: const Duration(
+                                              milliseconds: 200,
+                                            ),
                                             width: 20,
                                             height: 20,
                                             decoration: BoxDecoration(
@@ -276,14 +272,14 @@ class _ConversationalClarificationDialogState
                                                   : Colors.transparent,
                                             ),
                                             child: isSelected
-                                                ? Icon(
+                                                ? const Icon(
                                                     Icons.check,
                                                     size: 12,
                                                     color: Colors.white,
                                                   )
                                                 : null,
                                           ),
-                                          SizedBox(width: 12),
+                                          const SizedBox(width: 12),
                                           Expanded(
                                             child: Text(
                                               option,
@@ -303,18 +299,18 @@ class _ConversationalClarificationDialogState
                                   ),
                                 ),
                               );
-                            }).toList(),
+                            }),
 
                             // Custom input option
-                            SizedBox(height: 8),
+                            const SizedBox(height: 8),
                             TextButton.icon(
                               onPressed: () {
                                 setState(() {
                                   _showCustomInput = true;
                                 });
                               },
-                              icon: Icon(Icons.edit),
-                              label: Text('Type my own answer'),
+                              icon: const Icon(Icons.edit),
+                              label: const Text('Type my own answer'),
                               style: TextButton.styleFrom(
                                 foregroundColor: theme.primaryColor,
                               ),
@@ -336,7 +332,7 @@ class _ConversationalClarificationDialogState
                                     width: 2,
                                   ),
                                 ),
-                                prefixIcon: Icon(Icons.edit),
+                                prefixIcon: const Icon(Icons.edit),
                               ),
                               onSubmitted: (value) {
                                 if (value.isNotEmpty) {
@@ -344,7 +340,7 @@ class _ConversationalClarificationDialogState
                                 }
                               },
                             ),
-                            SizedBox(height: 12),
+                            const SizedBox(height: 12),
                             Row(
                               children: [
                                 TextButton(
@@ -354,17 +350,18 @@ class _ConversationalClarificationDialogState
                                       _customController.clear();
                                     });
                                   },
-                                  child: Text('Back to options'),
+                                  child: const Text('Back to options'),
                                 ),
-                                Spacer(),
+                                const Spacer(),
                                 ElevatedButton(
                                   onPressed: () {
                                     if (_customController.text.isNotEmpty) {
-                                      Navigator.of(context)
-                                          .pop(_customController.text);
+                                      Navigator.of(
+                                        context,
+                                      ).pop(_customController.text);
                                     }
                                   },
-                                  child: Text('Submit'),
+                                  child: const Text('Submit'),
                                 ),
                               ],
                             ),

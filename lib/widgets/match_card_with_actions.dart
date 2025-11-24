@@ -13,29 +13,23 @@ class MatchCardWithActions extends StatelessWidget {
   final Map<String, dynamic> match;
   final VoidCallback? onTap;
 
-  const MatchCardWithActions({
-    Key? key,
-    required this.match,
-    this.onTap,
-  }) : super(key: key);
+  const MatchCardWithActions({super.key, required this.match, this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    
+
     return Card(
-      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       elevation: isDark ? 8 : 4,
       shadowColor: theme.primaryColor.withOpacity(0.2),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: InkWell(
         onTap: onTap ?? () => _viewProfile(context),
         borderRadius: BorderRadius.circular(16),
         child: Container(
-          padding: EdgeInsets.all(16),
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
             gradient: isDark
@@ -61,15 +55,17 @@ class MatchCardWithActions extends StatelessWidget {
                     child: CircleAvatar(
                       radius: 28,
                       backgroundImage: match['userProfile']?['photoUrl'] != null
-                          ? CachedNetworkImageProvider(match['userProfile']['photoUrl'])
+                          ? CachedNetworkImageProvider(
+                              match['userProfile']['photoUrl'],
+                            )
                           : null,
                       child: match['userProfile']?['photoUrl'] == null
-                          ? Icon(Icons.person, size: 28)
+                          ? const Icon(Icons.person, size: 28)
                           : null,
                     ),
                   ),
-                  SizedBox(width: 12),
-                  
+                  const SizedBox(width: 12),
+
                   // Name and Location
                   Expanded(
                     child: Column(
@@ -89,7 +85,7 @@ class MatchCardWithActions extends StatelessWidget {
                                 size: 14,
                                 color: theme.textTheme.bodySmall?.color,
                               ),
-                              SizedBox(width: 4),
+                              const SizedBox(width: 4),
                               Text(
                                 match['location'],
                                 style: theme.textTheme.bodySmall,
@@ -101,12 +97,12 @@ class MatchCardWithActions extends StatelessWidget {
                   ),
                 ],
               ),
-              
+
               // Intent/Description
               if (match['text'] != null || match['intent'] != null)
                 Container(
-                  margin: EdgeInsets.only(top: 12),
-                  padding: EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(top: 12),
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: theme.primaryColor.withOpacity(0.05),
                     borderRadius: BorderRadius.circular(12),
@@ -122,10 +118,10 @@ class MatchCardWithActions extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-              
+
               // Action Buttons Row
               Container(
-                margin: EdgeInsets.only(top: 16),
+                margin: const EdgeInsets.only(top: 16),
                 child: Row(
                   children: [
                     // Chat Button
@@ -137,8 +133,8 @@ class MatchCardWithActions extends StatelessWidget {
                         onTap: () => _startChat(context),
                       ),
                     ),
-                    SizedBox(width: 8),
-                    
+                    const SizedBox(width: 8),
+
                     // Call Button
                     Expanded(
                       child: _ActionButton(
@@ -148,8 +144,8 @@ class MatchCardWithActions extends StatelessWidget {
                         onTap: () => _startCall(context),
                       ),
                     ),
-                    SizedBox(width: 8),
-                    
+                    const SizedBox(width: 8),
+
                     // View Profile Button
                     Expanded(
                       child: _ActionButton(
@@ -194,9 +190,7 @@ class MatchCardWithActions extends StatelessWidget {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => EnhancedChatScreen(
-          otherUser: receiver,
-        ),
+        builder: (context) => EnhancedChatScreen(otherUser: receiver),
       ),
     );
   }
@@ -225,9 +219,7 @@ class MatchCardWithActions extends StatelessWidget {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => ProfileViewScreen(
-          userProfile: profile,
-        ),
+        builder: (context) => ProfileViewScreen(userProfile: profile),
       ),
     );
   }
@@ -257,24 +249,17 @@ class _ActionButton extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
         child: Container(
-          padding: EdgeInsets.symmetric(vertical: 10),
+          padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
             color: color.withOpacity(isDark ? 0.2 : 0.1),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: color.withOpacity(0.3),
-              width: 1,
-            ),
+            border: Border.all(color: color.withOpacity(0.3), width: 1),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                icon,
-                color: color,
-                size: 20,
-              ),
-              SizedBox(height: 4),
+              Icon(icon, color: color, size: 20),
+              const SizedBox(height: 4),
               Text(
                 label,
                 style: TextStyle(

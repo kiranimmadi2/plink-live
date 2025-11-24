@@ -2,22 +2,13 @@ import 'package:flutter/material.dart';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
-enum VoiceOrbState {
-  idle,
-  listening,
-  processing,
-  speaking,
-}
+enum VoiceOrbState { idle, listening, processing, speaking }
 
 class VoiceOrb extends StatefulWidget {
   final VoiceOrbState state;
   final double size;
 
-  const VoiceOrb({
-    Key? key,
-    this.state = VoiceOrbState.idle,
-    this.size = 200,
-  }) : super(key: key);
+  const VoiceOrb({super.key, this.state = VoiceOrbState.idle, this.size = 200});
 
   @override
   State<VoiceOrb> createState() => _VoiceOrbState();
@@ -120,7 +111,8 @@ class _VoiceOrbState extends State<VoiceOrb> with TickerProviderStateMixin {
 
               // Main orb
               Transform.scale(
-                scale: widget.state == VoiceOrbState.idle ||
+                scale:
+                    widget.state == VoiceOrbState.idle ||
                         widget.state == VoiceOrbState.listening
                     ? _pulseAnimation.value
                     : 1.0,
@@ -179,17 +171,10 @@ class _VoiceOrbState extends State<VoiceOrb> with TickerProviderStateMixin {
   List<Widget> _buildRippleRings() {
     return List.generate(3, (index) {
       final delay = index * 0.2;
-      final animation = Tween<double>(
-        begin: 0.5,
-        end: 1.2,
-      ).animate(
+      final animation = Tween<double>(begin: 0.5, end: 1.2).animate(
         CurvedAnimation(
           parent: _pulseController,
-          curve: Interval(
-            delay,
-            1.0,
-            curve: Curves.easeOut,
-          ),
+          curve: Interval(delay, 1.0, curve: Curves.easeOut),
         ),
       );
 
@@ -201,9 +186,9 @@ class _VoiceOrbState extends State<VoiceOrb> with TickerProviderStateMixin {
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             border: Border.all(
-              color: const Color(0xFF8B5CF6).withValues(
-                alpha: (1 - animation.value) * 0.5,
-              ),
+              color: const Color(
+                0xFF8B5CF6,
+              ).withValues(alpha: (1 - animation.value) * 0.5),
               width: 2,
             ),
           ),
@@ -218,10 +203,7 @@ class _VoiceOrbState extends State<VoiceOrb> with TickerProviderStateMixin {
       final distance = 60 + math.sin(_waveController.value * math.pi) * 20;
 
       return Transform.translate(
-        offset: Offset(
-          math.cos(angle) * distance,
-          math.sin(angle) * distance,
-        ),
+        offset: Offset(math.cos(angle) * distance, math.sin(angle) * distance),
         child: Container(
           width: 8,
           height: 8,
@@ -247,29 +229,22 @@ class _VoiceOrbState extends State<VoiceOrb> with TickerProviderStateMixin {
         return const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF8B5CF6),
-            Color(0xFF06B6D4),
-          ],
+          colors: [Color(0xFF8B5CF6), Color(0xFF06B6D4)],
         );
       case VoiceOrbState.listening:
         return const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF0EA5E9),
-            Color(0xFF8B5CF6),
-            Color(0xFF06B6D4),
-          ],
+          colors: [Color(0xFF0EA5E9), Color(0xFF8B5CF6), Color(0xFF06B6D4)],
         );
       case VoiceOrbState.processing:
         return LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            const Color(0xFFFFAA00),
-            const Color(0xFFFF6B6B),
-            const Color(0xFF8B5CF6),
+          colors: const [
+            Color(0xFFFFAA00),
+            Color(0xFFFF6B6B),
+            Color(0xFF8B5CF6),
           ],
           transform: GradientRotation(_rotateController.value * math.pi),
         );
@@ -277,10 +252,7 @@ class _VoiceOrbState extends State<VoiceOrb> with TickerProviderStateMixin {
         return const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF10B981),
-            Color(0xFF06B6D4),
-          ],
+          colors: [Color(0xFF10B981), Color(0xFF06B6D4)],
         );
     }
   }

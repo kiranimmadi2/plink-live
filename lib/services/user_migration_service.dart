@@ -5,7 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// User Migration Service
 /// Adds missing fields to existing users for new features
 class UserMigrationService {
-  static final UserMigrationService _instance = UserMigrationService._internal();
+  static final UserMigrationService _instance =
+      UserMigrationService._internal();
   factory UserMigrationService() => _instance;
   UserMigrationService._internal();
 
@@ -44,7 +45,7 @@ class UserMigrationService {
       debugPrint('📊 Found ${usersSnapshot.docs.length} users to migrate');
 
       // Process in batches of 500 (Firestore batch limit)
-      final batchSize = 500;
+      const batchSize = 500;
       for (int i = 0; i < usersSnapshot.docs.length; i += batchSize) {
         final batch = _firestore.batch();
         final batchDocs = usersSnapshot.docs.skip(i).take(batchSize).toList();
@@ -147,10 +148,7 @@ class UserMigrationService {
       };
     } catch (e) {
       debugPrint('❌ Error getting migration status: $e');
-      return {
-        'migrationDone': false,
-        'error': e.toString(),
-      };
+      return {'migrationDone': false, 'error': e.toString()};
     }
   }
 

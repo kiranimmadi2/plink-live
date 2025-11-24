@@ -15,13 +15,13 @@ class NotificationService {
   NotificationService._internal();
 
   final FirebaseMessaging _fcm = FirebaseMessaging.instance;
-  final FlutterLocalNotificationsPlugin _localNotifications = 
+  final FlutterLocalNotificationsPlugin _localNotifications =
       FlutterLocalNotificationsPlugin();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
   String? _fcmToken;
-  
+
   Future<void> initialize() async {
     try {
       await _requestPermissions();
@@ -41,24 +41,26 @@ class NotificationService {
       sound: true,
       provisional: false,
     );
-    
+
     print('Notification permissions: ${settings.authorizationStatus}');
   }
 
   Future<void> _configureLocalNotifications() async {
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
-    
+    const androidSettings = AndroidInitializationSettings(
+      '@mipmap/ic_launcher',
+    );
+
     const iosSettings = DarwinInitializationSettings(
       requestAlertPermission: true,
       requestBadgePermission: true,
       requestSoundPermission: true,
     );
-    
+
     const initSettings = InitializationSettings(
       android: androidSettings,
       iOS: iosSettings,
     );
-    
+
     await _localNotifications.initialize(
       initSettings,
       onDidReceiveNotificationResponse: _onNotificationTapped,
@@ -67,11 +69,11 @@ class NotificationService {
 
   Future<void> _configureFCM() async {
     FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
-    
+
     FirebaseMessaging.onMessageOpenedApp.listen(_handleBackgroundMessage);
-    
+
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-    
+
     final initialMessage = await _fcm.getInitialMessage();
     if (initialMessage != null) {
       _handleBackgroundMessage(initialMessage);
@@ -86,10 +88,12 @@ class NotificationService {
         // Add a small delay to ensure Firestore auth is ready
         await Future.delayed(const Duration(milliseconds: 500));
 
-        await _firestore.collection('users').doc(_auth.currentUser!.uid).update({
-          'fcmToken': _fcmToken,
-          'lastTokenUpdate': FieldValue.serverTimestamp(),
-        });
+        await _firestore.collection('users').doc(_auth.currentUser!.uid).update(
+          {
+            'fcmToken': _fcmToken,
+            'lastTokenUpdate': FieldValue.serverTimestamp(),
+          },
+        );
       }
     } catch (e) {
       print('Error updating FCM token: $e');
@@ -100,10 +104,13 @@ class NotificationService {
       try {
         _fcmToken = newToken;
         if (_auth.currentUser != null) {
-          await _firestore.collection('users').doc(_auth.currentUser!.uid).update({
-            'fcmToken': newToken,
-            'lastTokenUpdate': FieldValue.serverTimestamp(),
-          });
+          await _firestore
+              .collection('users')
+              .doc(_auth.currentUser!.uid)
+              .update({
+                'fcmToken': newToken,
+                'lastTokenUpdate': FieldValue.serverTimestamp(),
+              });
         }
       } catch (e) {
         print('Error refreshing FCM token: $e');
@@ -114,7 +121,7 @@ class NotificationService {
 
   void _handleForegroundMessage(RemoteMessage message) {
     print('Foreground message received: ${message.messageId}');
-    
+
     if (message.notification != null) {
       _showLocalNotification(
         title: message.notification!.title ?? 'New Message',
@@ -126,7 +133,7 @@ class NotificationService {
 
   void _handleBackgroundMessage(RemoteMessage message) {
     print('Background message opened: ${message.messageId}');
-    
+
     if (message.data['conversationId'] != null) {
       // Navigate to chat screen
     }
@@ -136,7 +143,6 @@ class NotificationService {
     required String title,
     required String body,
     String? payload,
-    String? channelId,
   }) async {
     const androidDetails = AndroidNotificationDetails(
       'chat_messages',
@@ -149,18 +155,18 @@ class NotificationService {
       playSound: true,
       styleInformation: BigTextStyleInformation(''),
     );
-    
+
     const iosDetails = DarwinNotificationDetails(
       presentAlert: true,
       presentBadge: true,
       presentSound: true,
     );
-    
+
     const details = NotificationDetails(
       android: androidDetails,
       iOS: iosDetails,
     );
-    
+
     await _localNotifications.show(
       DateTime.now().millisecondsSinceEpoch ~/ 1000,
       title,
@@ -184,11 +190,7 @@ class NotificationService {
     required String body,
     String? payload,
   }) async {
-    await _showLocalNotification(
-      title: title,
-      body: body,
-      payload: payload,
-    );
+    await _showLocalNotification(title: title, body: body, payload: payload);
   }
 
   // REMOVED: Call feature methods (feature deleted)
@@ -280,7 +282,7 @@ class NotificationService {
     required List<String> quickReplies,
   }) async {
     if (recipientToken.isEmpty) return;
-    
+
     try {
       // Send notification with quick reply actions
       // This would be implemented with platform-specific notification actions
@@ -295,13 +297,14 @@ class NotificationService {
       // Badge count not supported on web
       return;
     }
-    
+
     try {
       if (Platform.isIOS) {
         // Update app badge on iOS
         await _localNotifications
             .resolvePlatformSpecificImplementation<
-                IOSFlutterLocalNotificationsPlugin>()
+              IOSFlutterLocalNotificationsPlugin
+            >()
             ?.requestPermissions(badge: true);
       }
     } catch (e) {
@@ -317,7 +320,7 @@ class NotificationService {
     Map<String, dynamic>? data,
   }) async {
     if (recipientToken.isEmpty) return;
-    
+
     try {
       // In production, this would send through FCM
       print('📱 Push notification sent:');
@@ -325,7 +328,7 @@ class NotificationService {
       print('   Title: $title');
       print('   Body: $body');
       print('   Data: $data');
-      
+
       // For now, show local notification
       await _showLocalNotification(
         title: title,
@@ -363,20 +366,20 @@ class NotificationService {
 
   Future<int> getUnreadMessageCount() async {
     if (_auth.currentUser == null) return 0;
-    
+
     try {
       final conversations = await _firestore
           .collection('conversations')
           .where('participants', arrayContains: _auth.currentUser!.uid)
           .get();
-      
+
       int totalUnread = 0;
       for (var doc in conversations.docs) {
         final data = doc.data();
         final unreadCount = data['unreadCount']?[_auth.currentUser!.uid] ?? 0;
         totalUnread += unreadCount as int;
       }
-      
+
       return totalUnread;
     } catch (e) {
       print('Error getting unread count: $e');

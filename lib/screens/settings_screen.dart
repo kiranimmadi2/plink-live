@@ -21,7 +21,7 @@ import 'privacy_policy_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
-  const SettingsScreen({Key? key}) : super(key: key);
+  const SettingsScreen({super.key});
 
   @override
   ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
@@ -57,7 +57,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           _discoveryModeEnabled = data['discoveryModeEnabled'] ?? true;
           _messageNotifications = data['messageNotifications'] ?? true;
           _matchNotifications = data['matchNotifications'] ?? true;
-          _connectionRequestNotifications = data['connectionRequestNotifications'] ?? true;
+          _connectionRequestNotifications =
+              data['connectionRequestNotifications'] ?? true;
           _promotionalNotifications = data['promotionalNotifications'] ?? false;
         });
       }
@@ -86,7 +87,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     setState(() {
       _isLoading = true;
     });
-    
+
     final user = _auth.currentUser;
     if (user != null) {
       try {
@@ -99,12 +100,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             _showOnlineStatus = value;
             _isLoading = false;
           });
-          
+
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(value 
-                ? 'Your active status is now visible to others' 
-                : 'Your active status is now hidden'),
+              content: Text(
+                value
+                    ? 'Your active status is now visible to others'
+                    : 'Your active status is now hidden',
+              ),
               backgroundColor: value ? Colors.green : Colors.orange,
               behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(
@@ -135,7 +138,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final isDark = themeState.isDarkMode;
     final isGlass = themeState.isGlassmorphism;
     final authService = AuthService();
-    
+
     return Scaffold(
       extendBodyBehindAppBar: true,
       backgroundColor: Colors.transparent,
@@ -147,14 +150,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             child: AppBar(
               title: const Text(
                 'Settings',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
               ),
-              backgroundColor: isGlass 
+              backgroundColor: isGlass
                   ? Colors.white.withValues(alpha: 0.7)
-                  : (isDark ? Colors.black.withValues(alpha: 0.8) : Colors.white.withValues(alpha: 0.9)),
+                  : (isDark
+                        ? Colors.black.withValues(alpha: 0.8)
+                        : Colors.white.withValues(alpha: 0.9)),
               elevation: 0,
               centerTitle: false,
             ),
@@ -169,26 +171,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: isGlass 
+                colors: isGlass
                     ? [
                         const Color(0xFFE3F2FD).withValues(alpha: 0.8),
                         const Color(0xFFF3E5F5).withValues(alpha: 0.6),
                         const Color(0xFFE8F5E9).withValues(alpha: 0.4),
                         const Color(0xFFFFF3E0).withValues(alpha: 0.3),
                       ]
-                    : isDark 
-                        ? [
-                            Colors.black,
-                            const Color(0xFF1C1C1E),
-                          ]
-                        : [
-                            const Color(0xFFF5F5F7),
-                            Colors.white,
-                          ],
+                    : isDark
+                    ? [Colors.black, const Color(0xFF1C1C1E)]
+                    : [const Color(0xFFF5F5F7), Colors.white],
               ),
             ),
           ),
-          
+
           // Floating glass circles for depth
           if (isGlass) ...[
             Positioned(
@@ -201,8 +197,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   shape: BoxShape.circle,
                   gradient: RadialGradient(
                     colors: [
-                      ThemeProvider.iosPurple.withValues(alpha: 0.3),
-                      ThemeProvider.iosPurple.withValues(alpha: 0.0),
+                      AppColors.iosPurple.withValues(alpha: 0.3),
+                      AppColors.iosPurple.withValues(alpha: 0.0),
                     ],
                   ),
                 ),
@@ -218,15 +214,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   shape: BoxShape.circle,
                   gradient: RadialGradient(
                     colors: [
-                      ThemeProvider.iosBlue.withValues(alpha: 0.2),
-                      ThemeProvider.iosBlue.withValues(alpha: 0.0),
+                      AppColors.iosBlue.withValues(alpha: 0.2),
+                      AppColors.iosBlue.withValues(alpha: 0.0),
                     ],
                   ),
                 ),
               ),
             ),
           ],
-          
+
           ListView(
             padding: const EdgeInsets.only(
               top: kToolbarHeight + 60,
@@ -241,23 +237,28 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 isGlass: isGlass,
                 children: [
                   ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
                     leading: Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: [
-                            ThemeProvider.iosGreen.withValues(alpha: 0.3),
-                            ThemeProvider.iosBlue.withValues(alpha: 0.3),
+                            AppColors.iosGreen.withValues(alpha: 0.3),
+                            AppColors.iosBlue.withValues(alpha: 0.3),
                           ],
                         ),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Icon(
                         _showOnlineStatus
-                          ? CupertinoIcons.circle_fill
-                          : CupertinoIcons.circle,
-                        color: _showOnlineStatus ? ThemeProvider.iosGreen : Colors.grey,
+                            ? CupertinoIcons.circle_fill
+                            : CupertinoIcons.circle,
+                        color: _showOnlineStatus
+                            ? AppColors.iosGreen
+                            : Colors.grey,
                         size: 22,
                       ),
                     ),
@@ -270,27 +271,29 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ),
                     subtitle: Text(
                       _showOnlineStatus
-                        ? 'Others can see when you\'re active'
-                        : 'Your activity status is hidden',
+                          ? 'Others can see when you\'re active'
+                          : 'Your activity status is hidden',
                       style: const TextStyle(fontSize: 13),
                     ),
                     trailing: Transform.scale(
                       scale: 0.9,
                       child: CupertinoSwitch(
                         value: _showOnlineStatus,
-                        onChanged: _isLoading ? null : _updateOnlineStatusPreference,
-                        activeColor: ThemeProvider.iosGreen,
+                        onChanged: _isLoading
+                            ? null
+                            : _updateOnlineStatusPreference,
+                        activeTrackColor: AppColors.iosGreen,
                       ),
                     ),
                   ),
                 ],
               ),
-              
+
               // Theme Section
               _buildSectionHeader(
                 icon: CupertinoIcons.paintbrush_fill,
                 title: 'Appearance',
-                color: ThemeProvider.iosPurple,
+                color: AppColors.iosPurple,
                 isDark: isDark,
               ),
               const SizedBox(height: 12),
@@ -305,7 +308,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     icon: CupertinoIcons.sun_max_fill,
                     isSelected: isGlass,
                     onTap: () {
-                      themeProvider.setTheme(AppThemeMode.glassmorphism);
+                      ref
+                          .read(themeProvider.notifier)
+                          .setTheme(AppThemeMode.glassmorphism);
+                      // themeProvider.setTheme(AppThemeMode.glassmorphism);
                     },
                   ),
                   const Divider(height: 1),
@@ -316,19 +322,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     icon: CupertinoIcons.moon_fill,
                     isSelected: isDark,
                     onTap: () {
-                      themeProvider.setTheme(AppThemeMode.dark);
+                      ref
+                          .read(themeProvider.notifier)
+                          .setTheme(AppThemeMode.dark);
+                      // themeProvider.setTheme(AppThemeMode.dark);
                     },
                   ),
                 ],
               ),
-              
+
               const SizedBox(height: 24),
-              
+
               // Account Section
               _buildSectionHeader(
                 icon: CupertinoIcons.person_circle_fill,
                 title: 'Account',
-                color: ThemeProvider.iosBlue,
+                color: AppColors.iosBlue,
                 isDark: isDark,
               ),
               const SizedBox(height: 12),
@@ -354,7 +363,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   SwitchListTile(
                     secondary: const Icon(Icons.visibility_outlined),
                     title: const Text('Discoverable on Live Connect'),
-                    subtitle: const Text('Allow others to find you in nearby people'),
+                    subtitle: const Text(
+                      'Allow others to find you in nearby people',
+                    ),
                     value: _discoveryModeEnabled,
                     onChanged: (value) {
                       setState(() => _discoveryModeEnabled = value);
@@ -365,8 +376,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         SnackBar(
                           content: Text(
                             value
-                              ? 'You are now discoverable on Live Connect'
-                              : 'You are now hidden from Live Connect searches',
+                                ? 'You are now discoverable on Live Connect'
+                                : 'You are now hidden from Live Connect searches',
                           ),
                           backgroundColor: value ? Colors.green : Colors.orange,
                           duration: const Duration(seconds: 2),
@@ -413,7 +424,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               _buildSectionHeader(
                 icon: CupertinoIcons.bell_fill,
                 title: 'Notifications',
-                color: ThemeProvider.iosOrange,
+                color: AppColors.iosOrange,
                 isDark: isDark,
               ),
               const SizedBox(height: 12),
@@ -450,7 +461,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     value: _connectionRequestNotifications,
                     onChanged: (value) {
                       setState(() => _connectionRequestNotifications = value);
-                      _updatePreference('connectionRequestNotifications', value);
+                      _updatePreference(
+                        'connectionRequestNotifications',
+                        value,
+                      );
                     },
                   ),
                   const Divider(height: 1),
@@ -466,14 +480,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                 ],
               ),
-              
+
               const SizedBox(height: 24),
-              
+
               // App Settings Section
               _buildSectionHeader(
                 icon: CupertinoIcons.gear_solid,
                 title: 'App Settings',
-                color: ThemeProvider.iosGreen,
+                color: AppColors.iosGreen,
                 isDark: isDark,
               ),
               const SizedBox(height: 12),
@@ -542,14 +556,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                 ],
               ),
-              
+
               const SizedBox(height: 24),
-              
+
               // Support Section
               _buildSectionHeader(
                 icon: CupertinoIcons.question_circle_fill,
                 title: 'Support',
-                color: ThemeProvider.iosTeal,
+                color: AppColors.iosTeal,
                 isDark: isDark,
               ),
               const SizedBox(height: 12),
@@ -620,7 +634,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ListTile(
                     leading: const Icon(Icons.bug_report_outlined),
                     title: const Text('Report a Problem'),
-                    subtitle: const Text('Let us know if something isn\'t working'),
+                    subtitle: const Text(
+                      'Let us know if something isn\'t working',
+                    ),
                     trailing: const Icon(CupertinoIcons.chevron_forward),
                     onTap: () {
                       _showReportProblemDialog(context);
@@ -628,7 +644,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                 ],
               ),
-              
+
               const SizedBox(height: 40),
             ],
           ),
@@ -636,7 +652,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ),
     );
   }
-  
+
   Widget _buildSectionHeader({
     required IconData icon,
     required String title,
@@ -652,11 +668,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             color: color.withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Icon(
-            icon,
-            color: color,
-            size: 18,
-          ),
+          child: Icon(icon, color: color, size: 18),
         ),
         const SizedBox(width: 12),
         Text(
@@ -670,7 +682,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ],
     );
   }
-  
+
   Widget _buildSettingsCard({
     required bool isDark,
     required bool isGlass,
@@ -694,22 +706,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       Colors.white.withValues(alpha: 0.3),
                     ]
                   : isDark
-                      ? [
-                          const Color(0xFF2C2C2E),
-                          const Color(0xFF1C1C1E),
-                        ]
-                      : [
-                          Colors.white,
-                          Colors.grey[50]!,
-                        ],
+                  ? [const Color(0xFF2C2C2E), const Color(0xFF1C1C1E)]
+                  : [Colors.white, Colors.grey[50]!],
             ),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
               color: isGlass
                   ? Colors.white.withValues(alpha: 0.3)
                   : isDark
-                      ? Colors.white.withValues(alpha: 0.1)
-                      : Colors.grey.withValues(alpha: 0.2),
+                  ? Colors.white.withValues(alpha: 0.1)
+                  : Colors.grey.withValues(alpha: 0.2),
               width: 1,
             ),
           ),
@@ -718,7 +724,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ),
     );
   }
-  
+
   Widget _buildThemeOption(
     BuildContext context, {
     required String title,
@@ -732,35 +738,32 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          color: isSelected 
-              ? ThemeProvider.iosPurple.withValues(alpha: 0.2)
+          color: isSelected
+              ? AppColors.iosPurple.withValues(alpha: 0.2)
               : Colors.grey.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Icon(
           icon,
-          color: isSelected ? ThemeProvider.iosPurple : Colors.grey,
+          color: isSelected ? AppColors.iosPurple : Colors.grey,
           size: 20,
         ),
       ),
       title: Text(
         title,
-        style: const TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w600,
-        ),
+        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
       ),
       subtitle: Text(subtitle),
       trailing: Radio<bool>(
         value: true,
         groupValue: isSelected,
         onChanged: (_) => onTap(),
-        activeColor: ThemeProvider.iosPurple,
+        activeColor: AppColors.iosPurple,
       ),
       onTap: onTap,
     );
   }
-  
+
   Widget _buildLogoutButton(BuildContext context, AuthService authService) {
     return ListTile(
       leading: Container(
@@ -770,11 +773,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           color: Colors.red.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(10),
         ),
-        child: const Icon(
-          Icons.logout,
-          color: Colors.red,
-          size: 20,
-        ),
+        child: const Icon(Icons.logout, color: Colors.red, size: 20),
       ),
       title: const Text(
         'Logout',
@@ -788,10 +787,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         FirebaseAuth.instance.currentUser?.email ?? '',
         style: const TextStyle(fontSize: 14),
       ),
-      trailing: const Icon(
-        CupertinoIcons.chevron_forward,
-        color: Colors.red,
-      ),
+      trailing: const Icon(CupertinoIcons.chevron_forward, color: Colors.red),
       onTap: () async {
         showDialog(
           context: context,
@@ -828,9 +824,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       context,
       MaterialPageRoute(
         builder: (context) => Scaffold(
-          appBar: AppBar(
-            title: const Text('Blocked Users'),
-          ),
+          appBar: AppBar(title: const Text('Blocked Users')),
           body: StreamBuilder<QuerySnapshot>(
             stream: _firestore
                 .collection('users')
@@ -879,9 +873,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             .delete();
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('User unblocked'),
-                            ),
+                            const SnackBar(content: Text('User unblocked')),
                           );
                         }
                       },
@@ -918,16 +910,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
               title: Text(
                 'Change Password',
-                style: TextStyle(
-                  color: hasPassword ? null : Colors.grey,
-                ),
+                style: TextStyle(color: hasPassword ? null : Colors.grey),
               ),
               subtitle: Text(
                 hasPassword
                     ? 'Update your password'
                     : signInMethod == 'google.com'
-                        ? 'You signed in with Google'
-                        : 'Not available for your account type',
+                    ? 'You signed in with Google'
+                    : 'Not available for your account type',
               ),
               trailing: Icon(
                 Icons.chevron_right,
@@ -1167,13 +1157,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ListTile(
                   leading: const Icon(Icons.folder_outlined),
                   title: const Text('App Data'),
-                  subtitle: Text('${(appSize / (1024 * 1024)).toStringAsFixed(2)} MB'),
+                  subtitle: Text(
+                    '${(appSize / (1024 * 1024)).toStringAsFixed(2)} MB',
+                  ),
                 ),
                 const Divider(),
                 ListTile(
                   leading: const Icon(Icons.cached_outlined),
                   title: const Text('Cache'),
-                  subtitle: Text('${(cacheSize / (1024 * 1024)).toStringAsFixed(2)} MB'),
+                  subtitle: Text(
+                    '${(cacheSize / (1024 * 1024)).toStringAsFixed(2)} MB',
+                  ),
                 ),
                 const Divider(),
                 ListTile(
@@ -1232,9 +1226,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               showDialog(
                 context: context,
                 barrierDismissible: false,
-                builder: (context) => const Center(
-                  child: CircularProgressIndicator(),
-                ),
+                builder: (context) =>
+                    const Center(child: CircularProgressIndicator()),
               );
 
               try {
@@ -1291,7 +1284,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     int size = 0;
     try {
       if (directory.existsSync()) {
-        directory.listSync(recursive: true, followLinks: false).forEach((entity) {
+        directory.listSync(recursive: true, followLinks: false).forEach((
+          entity,
+        ) {
           if (entity is File) {
             size += entity.lengthSync();
           }
@@ -1397,16 +1392,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 DropdownButtonFormField<String>(
-                  value: selectedCategory,
+                  initialValue: selectedCategory,
                   decoration: const InputDecoration(
                     border: OutlineInputBorder(),
                     labelText: 'Problem Type',
                   ),
                   items: ['Bug', 'Crash', 'Feature Request', 'Other']
-                      .map((category) => DropdownMenuItem(
-                            value: category,
-                            child: Text(category),
-                          ))
+                      .map(
+                        (category) => DropdownMenuItem(
+                          value: category,
+                          child: Text(category),
+                        ),
+                      )
                       .toList(),
                   onChanged: (value) {
                     setDialogState(() => selectedCategory = value!);
@@ -1445,7 +1442,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         Navigator.pop(context);
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('Report submitted. We\'ll look into it!'),
+                            content: Text(
+                              'Report submitted. We\'ll look into it!',
+                            ),
                             backgroundColor: Colors.green,
                           ),
                         );

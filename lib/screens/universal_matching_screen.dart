@@ -18,10 +18,11 @@ import '../widgets/floating_particles.dart';
 import '../widgets/liquid_wave_orb.dart';
 
 class UniversalMatchingScreen extends StatefulWidget {
-  const UniversalMatchingScreen({Key? key}) : super(key: key);
+  const UniversalMatchingScreen({super.key});
 
   @override
-  State<UniversalMatchingScreen> createState() => _UniversalMatchingScreenState();
+  State<UniversalMatchingScreen> createState() =>
+      _UniversalMatchingScreenState();
 }
 
 class _UniversalMatchingScreenState extends State<UniversalMatchingScreen> {
@@ -88,7 +89,7 @@ class _UniversalMatchingScreenState extends State<UniversalMatchingScreen> {
           .collection('users')
           .doc(userId)
           .get();
-      
+
       if (userDoc.exists && mounted) {
         setState(() {
           _currentUserName = userDoc.data()?['name'] ?? 'User';
@@ -121,8 +122,10 @@ class _UniversalMatchingScreenState extends State<UniversalMatchingScreen> {
     });
 
     // Check if clarification is needed
-    final clarification = await _unifiedProcessor.checkClarificationNeeded(intent);
-    
+    final clarification = await _unifiedProcessor.checkClarificationNeeded(
+      intent,
+    );
+
     if (clarification != null && clarification['needsClarification'] == true) {
       // Show clarification dialog
       final answer = await ConversationalClarificationDialog.show(
@@ -132,10 +135,14 @@ class _UniversalMatchingScreenState extends State<UniversalMatchingScreen> {
         options: List<String>.from(clarification['options']),
         reason: clarification['reason'],
       );
-      
+
       if (answer != null) {
         // Process with clarified intent
-        final clarifiedIntent = _buildClarifiedIntent(intent, answer, clarification['question']);
+        final clarifiedIntent = _buildClarifiedIntent(
+          intent,
+          answer,
+          clarification['question'],
+        );
         await _processWithIntent(clarifiedIntent);
       }
     } else {
@@ -144,7 +151,11 @@ class _UniversalMatchingScreenState extends State<UniversalMatchingScreen> {
     }
   }
 
-  String _buildClarifiedIntent(String original, String answer, String question) {
+  String _buildClarifiedIntent(
+    String original,
+    String answer,
+    String question,
+  ) {
     if (question.contains('buy or sell')) {
       if (answer.toLowerCase().contains('buy')) {
         return 'I want to buy $original';
@@ -178,40 +189,44 @@ class _UniversalMatchingScreenState extends State<UniversalMatchingScreen> {
 
     try {
       final result = await _intentService.processIntentAndMatch(intent);
-      
+
       if (!mounted) return;
-      
+
       if (result['success'] == true) {
-        final matches = List<Map<String, dynamic>>.from(result['matches'] ?? []);
-        
+        final matches = List<Map<String, dynamic>>.from(
+          result['matches'] ?? [],
+        );
+
         // Cache user photos
         for (final match in matches) {
           final userProfile = match['userProfile'] ?? {};
           final userId = match['userId'];
           final photoUrl = userProfile['photoUrl'];
-          
+
           if (userId != null && photoUrl != null) {
             _photoCache.cachePhotoUrl(userId, photoUrl);
           }
         }
-        
+
         setState(() {
           _currentIntent = result['intent'];
           _matches = matches;
           _isProcessing = false;
         });
-        
+
         print('UniversalMatchingScreen: Found ${matches.length} matches');
         for (var match in matches) {
-          print('Match: ${match['userProfile']?['name']} - Score: ${match['matchScore']}');
+          print(
+            'Match: ${match['userProfile']?['name']} - Score: ${match['matchScore']}',
+          );
         }
-        
+
         // Reload user intents
         _loadUserIntents();
-        
+
         // Clear the input after successful search
         _intentController.clear();
-        
+
         // Show success message if matches found
         if (_matches.isNotEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -235,7 +250,7 @@ class _UniversalMatchingScreenState extends State<UniversalMatchingScreen> {
       });
     }
   }
-  
+
   // Load smart suggestions as user types
   Future<void> _loadSuggestions(String input) async {
     // Suggestions disabled - progressive_intent_service removed
@@ -302,9 +317,15 @@ class _UniversalMatchingScreenState extends State<UniversalMatchingScreen> {
   void _showVoiceResponse() {
     // Mock conversation
     final List<Map<String, String>> mockConversation = [
-      {'user': 'Hello, I need help', 'ai': 'Hi! What can I help you find today?'},
+      {
+        'user': 'Hello, I need help',
+        'ai': 'Hi! What can I help you find today?',
+      },
       {'user': 'Looking for a bike', 'ai': 'Great! What\'s your budget?'},
-      {'user': 'Under 200 dollars', 'ai': 'Perfect! Searching for bikes under \$200...'},
+      {
+        'user': 'Under 200 dollars',
+        'ai': 'Perfect! Searching for bikes under \$200...',
+      },
     ];
 
     if (_voiceConversationIndex < mockConversation.length) {
@@ -369,8 +390,8 @@ class _UniversalMatchingScreenState extends State<UniversalMatchingScreen> {
           title: ShaderMask(
             shaderCallback: (bounds) => LinearGradient(
               colors: isDarkMode
-                ? [Colors.white, Colors.grey[400]!]
-                : [Colors.black, Colors.grey[800]!],
+                  ? [Colors.white, Colors.grey[400]!]
+                  : [Colors.black, Colors.grey[800]!],
             ).createShader(bounds),
             child: const Text(
               'Supper',
@@ -406,7 +427,9 @@ class _UniversalMatchingScreenState extends State<UniversalMatchingScreen> {
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: Theme.of(context).primaryColor.withValues(alpha: 0.3),
+                        color: Theme.of(
+                          context,
+                        ).primaryColor.withValues(alpha: 0.3),
                         blurRadius: 8,
                         spreadRadius: 2,
                       ),
@@ -427,212 +450,220 @@ class _UniversalMatchingScreenState extends State<UniversalMatchingScreen> {
       body: Stack(
         children: [
           // Pure black background
-          Container(
-            color: Colors.black,
-          ),
+          Container(color: Colors.black),
           // Subtle floating particles
-          const Positioned.fill(
-            child: FloatingParticles(
-              particleCount: 12,
-            ),
-          ),
+          const Positioned.fill(child: FloatingParticles(particleCount: 12)),
           // Main content
           Column(
             children: [
-            // Main content area
-            Expanded(
-              child: _isProcessing
-                  ? Center(
-                      child: Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: isDarkMode
-                            ? Colors.white.withValues(alpha: 0.1)
-                            : Colors.black.withValues(alpha: 0.05),
-                          borderRadius: BorderRadius.circular(20),
+              // Main content area
+              Expanded(
+                child: _isProcessing
+                    ? Center(
+                        child: Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: isDarkMode
+                                ? Colors.white.withValues(alpha: 0.1)
+                                : Colors.black.withValues(alpha: 0.05),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: CircularProgressIndicator(
+                            color: Theme.of(context).primaryColor,
+                            strokeWidth: 3,
+                          ),
                         ),
-                        child: CircularProgressIndicator(
-                          color: Theme.of(context).primaryColor,
-                          strokeWidth: 3,
-                        ),
-                      ),
-                    )
-                  : _matches.isNotEmpty
-                      ? _buildMatchesList(isDarkMode)
-                      : _buildHomeState(isDarkMode),
-            ),
+                      )
+                    : _matches.isNotEmpty
+                    ? _buildMatchesList(isDarkMode)
+                    : _buildHomeState(isDarkMode),
+              ),
 
-            // Search input at bottom
-            Container(
-              padding: EdgeInsets.only(
-                left: 20,
-                right: 20,
-                bottom: MediaQuery.of(context).padding.bottom + 12,
-                top: 16,
-              ),
-              decoration: const BoxDecoration(
-                color: Colors.transparent,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                      // Suggestions
-                      if (_suggestions.isNotEmpty)
-                        Container(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          height: 36,
-                          child: ListView.builder(
-                            scrollDirection: Axis.horizontal,
-                            itemCount: _suggestions.length,
-                            itemBuilder: (context, index) {
-                              return Padding(
-                                padding: const EdgeInsets.only(right: 8),
-                                child: InkWell(
-                                  onTap: () {
-                                    HapticFeedback.lightImpact();
-                                    _intentController.text = _suggestions[index];
-                                    _processIntent();
-                                  },
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                    decoration: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        colors: [
-                                          Theme.of(context).primaryColor.withValues(alpha: 0.2),
-                                          Theme.of(context).primaryColor.withValues(alpha: 0.1),
-                                        ],
-                                      ),
-                                      borderRadius: BorderRadius.circular(20),
-                                      border: Border.all(
-                                        color: Theme.of(context).primaryColor.withValues(alpha: 0.3),
-                                      ),
+              // Search input at bottom
+              Container(
+                padding: EdgeInsets.only(
+                  left: 20,
+                  right: 20,
+                  bottom: MediaQuery.of(context).padding.bottom + 12,
+                  top: 16,
+                ),
+                decoration: const BoxDecoration(color: Colors.transparent),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Suggestions
+                    if (_suggestions.isNotEmpty)
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        height: 36,
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: _suggestions.length,
+                          itemBuilder: (context, index) {
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: InkWell(
+                                onTap: () {
+                                  HapticFeedback.lightImpact();
+                                  _intentController.text = _suggestions[index];
+                                  _processIntent();
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 8,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        Theme.of(
+                                          context,
+                                        ).primaryColor.withValues(alpha: 0.2),
+                                        Theme.of(
+                                          context,
+                                        ).primaryColor.withValues(alpha: 0.1),
+                                      ],
                                     ),
-                                    child: Text(
-                                      _suggestions[index],
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w500,
-                                        color: Theme.of(context).primaryColor,
-                                      ),
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(
+                                      color: Theme.of(
+                                        context,
+                                      ).primaryColor.withValues(alpha: 0.3),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    _suggestions[index],
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w500,
+                                      color: Theme.of(context).primaryColor,
                                     ),
                                   ),
                                 ),
-                              );
-                            },
-                          ),
+                              ),
+                            );
+                          },
                         ),
+                      ),
 
-                      // Search input with auto-expanding design
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: 250),
-                        curve: Curves.easeOutCubic,
-                        constraints: const BoxConstraints(
-                          minHeight: 52,
-                          maxHeight: 120,
+                    // Search input with auto-expanding design
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 250),
+                      curve: Curves.easeOutCubic,
+                      constraints: const BoxConstraints(
+                        minHeight: 52,
+                        maxHeight: 120,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.6),
+                        borderRadius: BorderRadius.circular(26),
+                        border: Border.all(
+                          color: _isSearchFocused
+                              ? Theme.of(context).primaryColor
+                              : Colors.blue.withValues(alpha: 0.5),
+                          width: 1.5,
                         ),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.6),
-                          borderRadius: BorderRadius.circular(26),
-                          border: Border.all(
-                            color: _isSearchFocused
-                                ? Theme.of(context).primaryColor
-                                : Colors.blue.withValues(alpha: 0.5),
-                            width: 1.5,
-                          ),
-                        ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            const SizedBox(width: 20),
-                            Expanded(
-                              child: TextField(
-                                controller: _intentController,
-                                focusNode: _searchFocusNode,
-                                textInputAction: TextInputAction.newline,
-                                keyboardType: TextInputType.multiline,
-                                minLines: 1,
-                                maxLines: null,
-                                style: const TextStyle(
-                                  color: Colors.white,
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          const SizedBox(width: 20),
+                          Expanded(
+                            child: TextField(
+                              controller: _intentController,
+                              focusNode: _searchFocusNode,
+                              textInputAction: TextInputAction.newline,
+                              keyboardType: TextInputType.multiline,
+                              minLines: 1,
+                              maxLines: null,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w400,
+                                height: 1.4,
+                              ),
+                              cursorColor: Theme.of(context).primaryColor,
+                              decoration: InputDecoration(
+                                hintText: 'Find Anything Supper',
+                                hintStyle: TextStyle(
+                                  color: Colors.grey[400],
                                   fontSize: 15,
                                   fontWeight: FontWeight.w400,
-                                  height: 1.4,
                                 ),
-                                cursorColor: Theme.of(context).primaryColor,
-                                decoration: InputDecoration(
-                                  hintText: 'Find Anything Supper',
-                                  hintStyle: TextStyle(
-                                    color: Colors.grey[400],
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w400,
-                                  ),
-                                  border: InputBorder.none,
-                                  enabledBorder: InputBorder.none,
-                                  focusedBorder: InputBorder.none,
-                                  fillColor: Colors.transparent,
-                                  filled: true,
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    vertical: 16,
-                                  ),
-                                  isDense: true,
+                                border: InputBorder.none,
+                                enabledBorder: InputBorder.none,
+                                focusedBorder: InputBorder.none,
+                                fillColor: Colors.transparent,
+                                filled: true,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  vertical: 16,
                                 ),
-                                onChanged: (value) {
-                                  if (value.length >= 2) {
-                                    _loadSuggestions(value);
-                                  } else {
-                                    setState(() {
-                                      _suggestions = [];
-                                    });
-                                  }
-                                },
-                                onSubmitted: (_) => _processIntent(),
+                                isDense: true,
                               ),
-                            ),
-                            const SizedBox(width: 8),
-                            // Send button
-                            GestureDetector(
-                              onTap: _isProcessing ? null : () {
-                                HapticFeedback.mediumImpact();
-                                _processIntent();
+                              onChanged: (value) {
+                                if (value.length >= 2) {
+                                  _loadSuggestions(value);
+                                } else {
+                                  setState(() {
+                                    _suggestions = [];
+                                  });
+                                }
                               },
-                              child: Container(
-                                width: 40,
-                                height: 40,
-                                margin: const EdgeInsets.only(right: 6, bottom: 6),
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: Theme.of(context).primaryColor,
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Theme.of(context).primaryColor.withValues(alpha: 0.4),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ],
-                                ),
-                                child: _isProcessing
-                                    ? const Padding(
-                                        padding: EdgeInsets.all(11),
-                                        child: CircularProgressIndicator(
-                                          color: Colors.white,
-                                          strokeWidth: 2.5,
-                                        ),
-                                      )
-                                    : const Icon(
-                                        Icons.arrow_upward_rounded,
-                                        color: Colors.white,
-                                        size: 22,
-                                      ),
-                              ),
+                              onSubmitted: (_) => _processIntent(),
                             ),
-                          ],
-                        ),
+                          ),
+                          const SizedBox(width: 8),
+                          // Send button
+                          GestureDetector(
+                            onTap: _isProcessing
+                                ? null
+                                : () {
+                                    HapticFeedback.mediumImpact();
+                                    _processIntent();
+                                  },
+                            child: Container(
+                              width: 40,
+                              height: 40,
+                              margin: const EdgeInsets.only(
+                                right: 6,
+                                bottom: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Theme.of(context).primaryColor,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Theme.of(
+                                      context,
+                                    ).primaryColor.withValues(alpha: 0.4),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: _isProcessing
+                                  ? const Padding(
+                                      padding: EdgeInsets.all(11),
+                                      child: CircularProgressIndicator(
+                                        color: Colors.white,
+                                        strokeWidth: 2.5,
+                                      ),
+                                    )
+                                  : const Icon(
+                                      Icons.arrow_upward_rounded,
+                                      color: Colors.white,
+                                      size: 22,
+                                    ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
+                  ],
                 ),
-            ),
-          ],
-        ),
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -685,10 +716,7 @@ class _UniversalMatchingScreenState extends State<UniversalMatchingScreen> {
               },
               child: GestureDetector(
                 onTap: _handleVoiceOrbTap,
-                child: LiquidWaveOrb(
-                  state: _voiceOrbState,
-                  size: 250,
-                ),
+                child: LiquidWaveOrb(state: _voiceOrbState, size: 250),
               ),
             ),
             if (_errorMessage != null) ...[
@@ -697,13 +725,13 @@ class _UniversalMatchingScreenState extends State<UniversalMatchingScreen> {
                 tween: Tween<double>(begin: 0, end: 1),
                 duration: const Duration(milliseconds: 400),
                 builder: (context, double value, child) {
-                  return Opacity(
-                    opacity: value,
-                    child: child,
-                  );
+                  return Opacity(opacity: value, child: child);
                 },
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 12,
+                  ),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
@@ -763,11 +791,13 @@ class _UniversalMatchingScreenState extends State<UniversalMatchingScreen> {
     final matchScore = (match['matchScore'] ?? 0.0) * 100;
     final userName = userProfile['name'] ?? 'Unknown User';
     final userId = match['userId'];
-    
+
     // Try to get cached photo first
-    final cachedPhoto = userId != null ? _photoCache.getCachedPhotoUrl(userId) : null;
+    final cachedPhoto = userId != null
+        ? _photoCache.getCachedPhotoUrl(userId)
+        : null;
     final photoUrl = cachedPhoto ?? userProfile['photoUrl'];
-    
+
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8),
       elevation: 0,
@@ -781,18 +811,13 @@ class _UniversalMatchingScreenState extends State<UniversalMatchingScreen> {
       child: InkWell(
         onTap: () async {
           HapticFeedback.lightImpact();
-          
-          final otherUser = UserProfile.fromMap(
-            userProfile,
-            match['userId'],
-          );
-          
+
+          final otherUser = UserProfile.fromMap(userProfile, match['userId']);
+
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => EnhancedChatScreen(
-                otherUser: otherUser,
-              ),
+              builder: (context) => EnhancedChatScreen(otherUser: otherUser),
             ),
           );
         },
@@ -867,7 +892,8 @@ class _UniversalMatchingScreenState extends State<UniversalMatchingScreen> {
                           ),
                         ),
                         // Location badge if available
-                        if (userProfile['city'] != null && userProfile['city'].toString().isNotEmpty)
+                        if (userProfile['city'] != null &&
+                            userProfile['city'].toString().isNotEmpty)
                           Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 12,
@@ -954,7 +980,9 @@ class _UniversalMatchingScreenState extends State<UniversalMatchingScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      match['title'] ?? match['description'] ?? 'Looking for match',
+                      match['title'] ??
+                          match['description'] ??
+                          'Looking for match',
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
@@ -963,14 +991,17 @@ class _UniversalMatchingScreenState extends State<UniversalMatchingScreen> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    if (match['description'] != null && match['description'] != match['title'])
+                    if (match['description'] != null &&
+                        match['description'] != match['title'])
                       Padding(
                         padding: const EdgeInsets.only(top: 4),
                         child: Text(
                           match['description'],
                           style: TextStyle(
                             fontSize: 13,
-                            color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                            color: isDarkMode
+                                ? Colors.grey[400]
+                                : Colors.grey[600],
                           ),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
@@ -980,7 +1011,8 @@ class _UniversalMatchingScreenState extends State<UniversalMatchingScreen> {
                 ),
               ),
               // Why it matches
-              if (match['lookingFor'] != null && match['lookingFor'].toString().isNotEmpty)
+              if (match['lookingFor'] != null &&
+                  match['lookingFor'].toString().isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
                   child: Row(

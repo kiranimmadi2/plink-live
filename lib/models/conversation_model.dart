@@ -44,19 +44,23 @@ class ConversationModel {
 
   factory ConversationModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
-    
+
     // Handle both old and new conversation formats
-    final participantIds = data.containsKey('participantIds') 
+    final participantIds = data.containsKey('participantIds')
         ? List<String>.from(data['participantIds'] ?? [])
         : List<String>.from(data['participants'] ?? []);
-    
+
     return ConversationModel(
       id: doc.id,
       participantIds: participantIds,
-      participantNames: Map<String, String>.from(data['participantNames'] ?? {}),
-      participantPhotos: Map<String, String?>.from(data['participantPhotos'] ?? {}),
+      participantNames: Map<String, String>.from(
+        data['participantNames'] ?? {},
+      ),
+      participantPhotos: Map<String, String?>.from(
+        data['participantPhotos'] ?? {},
+      ),
       lastMessage: data['lastMessage'],
-      lastMessageTime: data['lastMessageTime'] != null 
+      lastMessageTime: data['lastMessageTime'] != null
           ? (data['lastMessageTime'] as Timestamp).toDate()
           : null,
       lastMessageSenderId: data['lastMessageSenderId'],
@@ -65,15 +69,17 @@ class ConversationModel {
       isGroup: data['isGroup'] ?? false,
       groupName: data['groupName'],
       groupPhoto: data['groupPhoto'],
-      createdAt: data['createdAt'] != null 
+      createdAt: data['createdAt'] != null
           ? (data['createdAt'] as Timestamp).toDate()
           : DateTime.now(),
-      lastSeen: (data['lastSeen'] as Map<String, dynamic>?)?.map(
-        (key, value) => MapEntry(
-          key, 
-          value != null ? (value as Timestamp).toDate() : null
-        ),
-      ) ?? {},
+      lastSeen:
+          (data['lastSeen'] as Map<String, dynamic>?)?.map(
+            (key, value) => MapEntry(
+              key,
+              value != null ? (value as Timestamp).toDate() : null,
+            ),
+          ) ??
+          {},
       isArchived: data['isArchived'] ?? false,
       isMuted: data['isMuted'] ?? false,
       metadata: data['metadata'],
@@ -97,10 +103,8 @@ class ConversationModel {
       'groupPhoto': groupPhoto,
       'createdAt': Timestamp.fromDate(createdAt),
       'lastSeen': lastSeen.map(
-        (key, value) => MapEntry(
-          key,
-          value != null ? Timestamp.fromDate(value!) : null
-        ),
+        (key, value) =>
+            MapEntry(key, value != null ? Timestamp.fromDate(value) : null),
       ),
       'isArchived': isArchived,
       'isMuted': isMuted,

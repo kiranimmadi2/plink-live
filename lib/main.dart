@@ -1,6 +1,4 @@
 import 'dart:async';
-// ignore: avoid_web_libraries_in_flutter
-
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart';
@@ -10,6 +8,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 import 'firebase_options.dart';
 import 'screens/login_screen.dart';
 import 'screens/main_navigation_screen.dart';
@@ -20,34 +19,39 @@ import 'services/notification_service.dart';
 import 'services/conversation_service.dart';
 import 'services/location_service.dart';
 import 'services/connectivity_service.dart';
-import 'services/database_cleanup_service.dart';
 import 'services/user_migration_service.dart';
 import 'services/conversation_migration_service.dart';
 import 'providers/theme_provider.dart';
 import 'utils/app_optimizer.dart';
 import 'utils/memory_manager.dart';
 
-// Background message handler - MUST be top-level function
+// Top-level background handler for FCM
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // Load environment variables first
-  await dotenv.load(fileName: ".env");
-
-  // Initialize Firebase if not already initialized
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-
-  debugPrint('Background message received: ${message.data}');
+  // Only print data; do NOT initialize Firebase here
+  debugPrint('Background message received: ${message.messageId}');
 }
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Load environment variables FIRST (before any other initialization)
+  // Load environment variables
   await dotenv.load(fileName: ".env");
 
-  // Set system UI overlay style
+  // Initialize Firebase only once
+  if (Firebase.apps.isEmpty) {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  }
+
+  // Lock orientation
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
+
+  // System UI overlay
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -55,18 +59,7 @@ void main() async {
     ),
   );
 
-  // Set preferred orientations
-  SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-  ]);
-
-  // Initialize Firebase with optimizations
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-
-  // Enable Firestore offline persistence for better UX and caching
+  // Firestore offline persistence (mobile only)
   if (!kIsWeb) {
     FirebaseFirestore.instance.settings = const Settings(
       persistenceEnabled: true,
@@ -74,59 +67,36 @@ void main() async {
     );
   }
 
-  // Set up FCM background handler
+  // FCM background handler
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-  
-  // Initialize app optimizer
+
+  // Initialize utilities and services
   await AppOptimizer.initialize();
-  
-  // Initialize memory manager
   MemoryManager().initialize();
-  
-  // Initialize services sequentially
   UserManager().initialize();
   await NotificationService().initialize();
   await ConnectivityService().initialize();
 
-  // REMOVED: Database cleanup was deleting the posts collection
-  // The posts collection is actively used and should NOT be deleted
-
-  // Run user migration (adds missing fields to existing users)
+  // Run user migration
   try {
-    final UserMigrationService migrationService = UserMigrationService();
-    await migrationService.checkAndRunMigration();
+    final userMigration = UserMigrationService();
+    await userMigration.checkAndRunMigration();
   } catch (e) {
-    debugPrint('⚠️ User migration error (non-fatal): $e');
+    debugPrint('User migration failed (non-fatal): $e');
   }
 
-  // Run conversation migration (fixes corrupted participants arrays)
-  // This ensures all conversations appear in the Messages screen
+  // Run conversation migration
   try {
-    final ConversationMigrationService conversationMigrationService = ConversationMigrationService();
-
-    // Only run if migration hasn't been completed before
-    final isCompleted = await conversationMigrationService.isMigrationCompleted();
+    final conversationMigration = ConversationMigrationService();
+    final isCompleted = await conversationMigration.isMigrationCompleted();
     if (!isCompleted) {
-      debugPrint('🔧 Running conversation migration...');
-      final result = await conversationMigrationService.runMigration();
-
-      if (result['success']) {
-        debugPrint('✅ Conversation migration completed successfully');
-        debugPrint('   - Scanned: ${result['scanned']} conversations');
-        debugPrint('   - Fixed: ${result['fixed']} conversations');
-        if (result['errors'].isNotEmpty) {
-          debugPrint('   - Errors: ${result['errors'].length}');
-        }
-      } else {
-        debugPrint('⚠️ Conversation migration completed with errors');
-        debugPrint('   - Fixed: ${result['fixed']} conversations');
-        debugPrint('   - Errors: ${result['errors']}');
-      }
+      final result = await conversationMigration.runMigration();
+      debugPrint('Conversation migration result: $result');
     } else {
-      debugPrint('✓ Conversation migration already completed');
+      debugPrint('Conversation migration already completed');
     }
   } catch (e) {
-    debugPrint('⚠️ Conversation migration error (non-fatal): $e');
+    debugPrint('Conversation migration failed (non-fatal): $e');
   }
 
   runApp(const ProviderScope(child: MyApp()));
@@ -137,7 +107,6 @@ class MyApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final themeState = ref.watch(themeProvider);
     final themeNotifier = ref.read(themeProvider.notifier);
 
     return MaterialApp(
@@ -162,7 +131,6 @@ class _AuthWrapperState extends State<AuthWrapper> {
   final LocationService _locationService = LocationService();
   final ConversationService _conversationService = ConversationService();
 
-  // Flags to ensure initialization happens only ONCE per session
   bool _hasInitializedServices = false;
   String? _lastInitializedUserId;
 
@@ -173,23 +141,19 @@ class _AuthWrapperState extends State<AuthWrapper> {
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
-            body: Center(
-              child: CircularProgressIndicator(),
-            ),
+            body: Center(child: CircularProgressIndicator()),
           );
         }
 
         if (snapshot.hasData && snapshot.data != null) {
           final currentUserId = snapshot.data!.uid;
 
-          // CRITICAL: Only initialize services ONCE per user session
-          // This prevents duplicate calls on StreamBuilder rebuilds
-          if (!_hasInitializedServices || _lastInitializedUserId != currentUserId) {
+          // Initialize user-dependent services only once per session
+          if (!_hasInitializedServices ||
+              _lastInitializedUserId != currentUserId) {
             _hasInitializedServices = true;
             _lastInitializedUserId = currentUserId;
 
-            // Defer heavy initialization to after first frame renders
-            // This prevents frame skipping during app startup
             WidgetsBinding.instance.addPostFrameCallback((_) {
               _initializeUserServices();
             });
@@ -198,7 +162,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
           return const MainNavigationScreen();
         }
 
-        // Reset flags when user logs out
+        // Reset when user logs out
         _hasInitializedServices = false;
         _lastInitializedUserId = null;
 
@@ -207,26 +171,15 @@ class _AuthWrapperState extends State<AuthWrapper> {
     );
   }
 
-  /// Initialize all user-dependent services
-  /// Called ONCE per user session, deferred to after first frame
   Future<void> _initializeUserServices() async {
     try {
-      // Ensure profile exists
       await _profileService.ensureProfileExists();
-
-      // Small delay to prevent overwhelming the main thread
       await Future.delayed(const Duration(milliseconds: 100));
-
-      // Initialize location SILENTLY in background
       _locationService.initializeLocation();
-
-      // Start periodic location updates (has internal guard against duplicates)
       _locationService.startPeriodicLocationUpdates();
-
-      // Clean up duplicate conversations (runs in background)
       _conversationService.cleanupDuplicateConversations();
     } catch (e) {
-      debugPrint('AuthWrapper: Error initializing services: $e');
+      debugPrint('Error initializing user services: $e');
     }
   }
 }

@@ -11,7 +11,7 @@ class ErrorHandler {
   // Error tracking
   final List<AppError> _recentErrors = [];
   static const int maxErrorHistory = 50;
-  
+
   /// Initialize error handling
   static void initialize() {
     // Set up Flutter error handling
@@ -22,7 +22,7 @@ class ErrorHandler {
         // In release mode, report to Crashlytics
         // FirebaseCrashlytics.instance.recordFlutterFatalError(details);
       }
-      
+
       _instance._logError(
         AppError(
           message: details.exceptionAsString(),
@@ -32,7 +32,7 @@ class ErrorHandler {
         ),
       );
     };
-    
+
     // Set up async error handling
     PlatformDispatcher.instance.onError = (error, stack) {
       if (kDebugMode) {
@@ -42,19 +42,15 @@ class ErrorHandler {
         // In release mode, report to Crashlytics
         // FirebaseCrashlytics.instance.recordError(error, stack);
       }
-      
+
       _instance._logError(
-        AppError(
-          message: error.toString(),
-          stackTrace: stack,
-          isFatal: false,
-        ),
+        AppError(message: error.toString(), stackTrace: stack, isFatal: false),
       );
-      
+
       return true;
     };
   }
-  
+
   /// Log an error
   void _logError(AppError error) {
     _recentErrors.add(error);
@@ -62,7 +58,7 @@ class ErrorHandler {
       _recentErrors.removeAt(0);
     }
   }
-  
+
   /// Handle and log errors with context
   static Future<T?> handleError<T>(
     Future<T> Function() operation, {
@@ -77,7 +73,7 @@ class ErrorHandler {
         print('Error in $context: $error');
         print('Stack trace: $stackTrace');
       }
-      
+
       _instance._logError(
         AppError(
           message: error.toString(),
@@ -86,20 +82,20 @@ class ErrorHandler {
           isFatal: false,
         ),
       );
-      
+
       onError?.call();
-      
+
       if (showSnackbar && _instance._context != null) {
         _instance.showErrorSnackbar(
           _instance._context!,
           _getUserFriendlyMessage(error),
         );
       }
-      
+
       return null;
     }
   }
-  
+
   /// Handle sync errors
   static T? handleSyncError<T>(
     T Function() operation, {
@@ -113,7 +109,7 @@ class ErrorHandler {
         print('Sync error in $context: $error');
         print('Stack trace: $stackTrace');
       }
-      
+
       _instance._logError(
         AppError(
           message: error.toString(),
@@ -122,57 +118,53 @@ class ErrorHandler {
           isFatal: false,
         ),
       );
-      
+
       return defaultValue;
     }
   }
-  
+
   /// Get user-friendly error message
   static String _getUserFriendlyMessage(dynamic error) {
     final errorString = error.toString().toLowerCase();
-    
-    if (errorString.contains('network') || 
+
+    if (errorString.contains('network') ||
         errorString.contains('connection') ||
         errorString.contains('socket')) {
       return 'Network connection error. Please check your internet connection.';
     }
-    
-    if (errorString.contains('permission') || 
-        errorString.contains('denied')) {
+
+    if (errorString.contains('permission') || errorString.contains('denied')) {
       return 'Permission denied. Please check your app permissions.';
     }
-    
-    if (errorString.contains('not found') || 
-        errorString.contains('404')) {
+
+    if (errorString.contains('not found') || errorString.contains('404')) {
       return 'The requested resource was not found.';
     }
-    
+
     if (errorString.contains('timeout')) {
       return 'Operation timed out. Please try again.';
     }
-    
-    if (errorString.contains('invalid') || 
-        errorString.contains('format')) {
+
+    if (errorString.contains('invalid') || errorString.contains('format')) {
       return 'Invalid data format. Please try again.';
     }
-    
-    if (errorString.contains('authentication') || 
+
+    if (errorString.contains('authentication') ||
         errorString.contains('unauthorized')) {
       return 'Authentication error. Please sign in again.';
     }
-    
-    if (errorString.contains('quota') || 
-        errorString.contains('limit')) {
+
+    if (errorString.contains('quota') || errorString.contains('limit')) {
       return 'Service limit reached. Please try again later.';
     }
-    
+
     return 'An unexpected error occurred. Please try again.';
   }
-  
+
   /// Show error snackbar
   void showErrorSnackbar(BuildContext context, String message) {
     if (!context.mounted) return;
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
@@ -180,10 +172,7 @@ class ErrorHandler {
             const Icon(Icons.error_outline, color: Colors.white),
             const SizedBox(width: 12),
             Expanded(
-              child: Text(
-                message,
-                style: const TextStyle(color: Colors.white),
-              ),
+              child: Text(message, style: const TextStyle(color: Colors.white)),
             ),
           ],
         ),
@@ -200,21 +189,18 @@ class ErrorHandler {
       ),
     );
   }
-  
+
   /// Show success snackbar
   void showSuccessSnackbar(BuildContext context, String message) {
     if (!context.mounted) return;
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
           children: [
             const Icon(Icons.check_circle_outline, color: Colors.white),
             const SizedBox(width: 12),
-            Text(
-              message,
-              style: const TextStyle(color: Colors.white),
-            ),
+            Text(message, style: const TextStyle(color: Colors.white)),
           ],
         ),
         backgroundColor: Colors.green[600],
@@ -223,19 +209,19 @@ class ErrorHandler {
       ),
     );
   }
-  
+
   /// Get recent errors for debugging
   List<AppError> get recentErrors => List.unmodifiable(_recentErrors);
-  
+
   /// Clear error history
   void clearErrorHistory() {
     _recentErrors.clear();
   }
-  
+
   // Store context for showing snackbars
   BuildContext? _context;
   void setContext(BuildContext context) => _context = context;
-  
+
   /// Retry operation with exponential backoff
   static Future<T?> retryOperation<T>(
     Future<T> Function() operation, {
@@ -254,11 +240,13 @@ class ErrorHandler {
           }
           rethrow;
         }
-        
+
         // Wait before retrying with exponential backoff
         final delay = initialDelay * (attempt + 1);
         if (kDebugMode) {
-          print('Retry attempt ${attempt + 1} for $context after ${delay.inSeconds}s');
+          print(
+            'Retry attempt ${attempt + 1} for $context after ${delay.inSeconds}s',
+          );
         }
         await Future.delayed(delay);
       }
@@ -274,14 +262,14 @@ class AppError {
   final String? context;
   final bool isFatal;
   final DateTime timestamp;
-  
+
   AppError({
     required this.message,
     this.stackTrace,
     this.context,
     this.isFatal = false,
   }) : timestamp = DateTime.now();
-  
+
   @override
   String toString() {
     return 'AppError: $message${context != null ? ' (Context: $context)' : ''} at $timestamp';
@@ -292,13 +280,9 @@ class AppError {
 class ErrorBoundary extends StatefulWidget {
   final Widget child;
   final Widget Function(Object error, StackTrace? stack)? errorBuilder;
-  
-  const ErrorBoundary({
-    Key? key,
-    required this.child,
-    this.errorBuilder,
-  }) : super(key: key);
-  
+
+  const ErrorBoundary({super.key, required this.child, this.errorBuilder});
+
   @override
   State<ErrorBoundary> createState() => _ErrorBoundaryState();
 }
@@ -306,7 +290,7 @@ class ErrorBoundary extends StatefulWidget {
 class _ErrorBoundaryState extends State<ErrorBoundary> {
   Object? _error;
   StackTrace? _stackTrace;
-  
+
   @override
   void initState() {
     super.initState();
@@ -317,12 +301,12 @@ class _ErrorBoundaryState extends State<ErrorBoundary> {
           _stackTrace = details.stack;
         });
       }
-      
+
       return widget.errorBuilder?.call(details.exception, details.stack) ??
           _buildDefaultErrorWidget(details.exception);
     };
   }
-  
+
   Widget _buildDefaultErrorWidget(Object error) {
     return Material(
       child: Container(
@@ -333,18 +317,11 @@ class _ErrorBoundaryState extends State<ErrorBoundary> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(
-                  Icons.error_outline,
-                  color: Colors.red,
-                  size: 60,
-                ),
+                const Icon(Icons.error_outline, color: Colors.red, size: 60),
                 const SizedBox(height: 16),
                 const Text(
                   'Something went wrong',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -369,7 +346,7 @@ class _ErrorBoundaryState extends State<ErrorBoundary> {
       ),
     );
   }
-  
+
   @override
   Widget build(BuildContext context) {
     if (_error != null) {

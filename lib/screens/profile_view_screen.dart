@@ -8,18 +8,14 @@ class ProfileViewScreen extends StatefulWidget {
   final UserProfile userProfile;
   final PostModel? post;
 
-  const ProfileViewScreen({
-    Key? key,
-    required this.userProfile,
-    this.post,
-  }) : super(key: key);
+  const ProfileViewScreen({super.key, required this.userProfile, this.post});
 
   @override
   State<ProfileViewScreen> createState() => _ProfileViewScreenState();
 }
 
 class _ProfileViewScreenState extends State<ProfileViewScreen> {
-  PageController _pageController = PageController();
+  final PageController _pageController = PageController();
   int _currentImageIndex = 0;
 
   @override
@@ -58,10 +54,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
-              Colors.black.withValues(alpha: 0.5),
-              Colors.transparent,
-            ],
+            colors: [Colors.black.withValues(alpha: 0.5), Colors.transparent],
           ),
         ),
         child: Row(
@@ -75,7 +68,10 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
               children: [
                 if (widget.userProfile.isOnline)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.green,
                       borderRadius: BorderRadius.circular(20),
@@ -107,18 +103,18 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
   Widget _buildImageSection() {
     final images = widget.post?.images ?? [];
     final profileImage = widget.userProfile.profileImageUrl;
-    
+
     // Debug logging
     print('Profile Image URL: $profileImage');
     print('Post Images: $images');
-    
+
     final allImages = <String>[];
-    
+
     // Add profile image if it exists and is valid
     if (profileImage != null && profileImage.isNotEmpty) {
       allImages.add(profileImage);
     }
-    
+
     // Add post images
     allImages.addAll(images);
 
@@ -130,11 +126,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                Icons.person,
-                size: 100,
-                color: Colors.grey.shade600,
-              ),
+              Icon(Icons.person, size: 100, color: Colors.grey.shade600),
               const SizedBox(height: 16),
               Text(
                 widget.userProfile.name,
@@ -150,7 +142,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
       );
     }
 
-    return Container(
+    return SizedBox(
       height: 400,
       child: Stack(
         children: [
@@ -163,7 +155,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
             itemBuilder: (context, index) {
               final imageUrl = allImages[index];
               print('Loading image at index $index: $imageUrl');
-              
+
               // Validate URL before loading
               if (imageUrl.isEmpty) {
                 return Container(
@@ -180,16 +172,14 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
                         const SizedBox(height: 8),
                         Text(
                           index == 0 ? 'No Profile Image' : 'No Image',
-                          style: TextStyle(
-                            color: Colors.grey.shade600,
-                          ),
+                          style: TextStyle(color: Colors.grey.shade600),
                         ),
                       ],
                     ),
                   ),
                 );
               }
-              
+
               return CachedNetworkImage(
                 imageUrl: imageUrl,
                 fit: BoxFit.cover,
@@ -293,10 +283,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
           if (widget.post != null)
             Text(
               widget.post!.title,
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-              ),
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
             ),
         ],
       ),
@@ -313,10 +300,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
         children: [
           const Text(
             'About',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
           if (widget.post != null)
@@ -335,10 +319,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    'Price',
-                    style: TextStyle(fontSize: 16),
-                  ),
+                  const Text('Price', style: TextStyle(fontSize: 16)),
                   Text(
                     '${widget.post!.currency ?? '\$'}${widget.post!.price!.toStringAsFixed(2)}',
                     style: const TextStyle(
@@ -355,13 +336,10 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
             const SizedBox(height: 20),
             const Text(
               'Additional Details',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
-            ...widget.post!.metadata!.entries.map(
+            ...widget.post!.metadata.entries.map(
               (entry) => Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Row(
@@ -426,9 +404,10 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
     // Create initial message with post context
     String? initialMessage;
     if (widget.post != null) {
-      initialMessage = 'Hi! I\'m interested in your post: "${widget.post!.title}"';
+      initialMessage =
+          'Hi! I\'m interested in your post: "${widget.post!.title}"';
     }
-    
+
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -474,5 +453,4 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
       ),
     );
   }
-
 }

@@ -12,7 +12,7 @@ import '../services/location_service.dart';
 import '../widgets/user_avatar.dart';
 
 class ProfileEditScreen extends StatefulWidget {
-  const ProfileEditScreen({Key? key}) : super(key: key);
+  const ProfileEditScreen({super.key});
 
   @override
   State<ProfileEditScreen> createState() => _ProfileEditScreenState();
@@ -25,7 +25,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   final LocationService _locationService = LocationService();
   final FirebaseStorageService _storageService = FirebaseStorageService();
   final ImagePicker _imagePicker = ImagePicker();
-  
+
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
@@ -44,7 +44,12 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   String? _selectedOccupation;
   DateTime? _selectedDateOfBirth;
 
-  final List<String> _genderOptions = ['Male', 'Female', 'Non-binary', 'Prefer not to say'];
+  final List<String> _genderOptions = [
+    'Male',
+    'Female',
+    'Non-binary',
+    'Prefer not to say',
+  ];
   final List<String> _occupationOptions = [
     'Accountant',
     'Actor/Actress',
@@ -126,18 +131,20 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
 
   Future<void> _loadUserProfile() async {
     if (user == null) return;
-    
+
     setState(() => _isLoading = true);
-    
+
     try {
       // Get profile from UserManager
-      final profileData = _userManager.cachedProfile ?? 
-                          await _userManager.loadUserProfile(user!.uid);
-      
+      final profileData =
+          _userManager.cachedProfile ??
+          await _userManager.loadUserProfile(user!.uid);
+
       if (profileData != null) {
         _nameController.text = profileData['name'] ?? '';
         _phoneController.text = profileData['phone'] ?? '';
-        _locationController.text = profileData['city'] ?? profileData['location'] ?? '';
+        _locationController.text =
+            profileData['city'] ?? profileData['location'] ?? '';
         _bioController.text = profileData['bio'] ?? '';
         _currentPhotoUrl = profileData['photoUrl'];
 
@@ -162,9 +169,12 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         // Parse date of birth if exists
         if (profileData['dateOfBirth'] != null) {
           if (profileData['dateOfBirth'] is Timestamp) {
-            _selectedDateOfBirth = (profileData['dateOfBirth'] as Timestamp).toDate();
+            _selectedDateOfBirth = (profileData['dateOfBirth'] as Timestamp)
+                .toDate();
           } else if (profileData['dateOfBirth'] is String) {
-            _selectedDateOfBirth = DateTime.tryParse(profileData['dateOfBirth']);
+            _selectedDateOfBirth = DateTime.tryParse(
+              profileData['dateOfBirth'],
+            );
           }
         }
       } else {
@@ -172,8 +182,10 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         _nameController.text = user!.displayName ?? '';
         _currentPhotoUrl = user!.photoURL;
       }
-      
-      print('Loaded profile - Name: ${_nameController.text}, Photo URL: $_currentPhotoUrl');
+
+      print(
+        'Loaded profile - Name: ${_nameController.text}, Photo URL: $_currentPhotoUrl',
+      );
     } catch (e) {
       print('Error loading profile: $e');
       if (mounted) {
@@ -193,7 +205,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
 
   Future<void> _createInitialProfile() async {
     if (user == null) return;
-    
+
     try {
       await _firestore.collection('users').doc(user!.uid).set({
         'uid': user!.uid,
@@ -209,20 +221,21 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     }
   }
 
-
-
   Future<void> _updateProfile() async {
     if (!_formKey.currentState!.validate() || user == null) return;
-    
+
     setState(() => _isUpdating = true);
-    
+
     try {
       // Handle photo upload if new image selected
       String? photoUrl = _currentPhotoUrl ?? user!.photoURL;
-      
+
       if (_selectedImage != null) {
         print('Uploading new profile image...');
-        final uploadedUrl = await _storageService.uploadProfileImage(_selectedImage!, user!.uid);
+        final uploadedUrl = await _storageService.uploadProfileImage(
+          _selectedImage!,
+          user!.uid,
+        );
         if (uploadedUrl != null) {
           photoUrl = uploadedUrl;
           print('New profile image uploaded: $uploadedUrl');
@@ -230,17 +243,17 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
           print('Failed to upload profile image');
         }
       }
-      
+
       // Update Firebase Auth profile (name and photo)
       await user!.updateProfile(
         displayName: _nameController.text.trim(),
         photoURL: photoUrl,
       );
-      
+
       // Reload user to get updated data
       await user!.reload();
       user = _authService.currentUser;
-      
+
       // Calculate age from date of birth
       int? age;
       if (_selectedDateOfBirth != null) {
@@ -283,9 +296,9 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         'dateOfBirth': _selectedDateOfBirth?.toIso8601String(),
         'age': age,
       });
-      
+
       print('Profile updated successfully');
-      
+
       // Update local state with new photo URL and clear selected image
       if (photoUrl != null) {
         setState(() {
@@ -293,7 +306,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
           _selectedImage = null; // Clear selected image after successful upload
         });
       }
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -301,11 +314,14 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
             backgroundColor: Colors.green,
           ),
         );
-        
+
         // Reload profile to ensure everything is synced
         await _loadUserProfile();
-        
-        Navigator.pop(context, true); // Return true to indicate profile was updated
+
+        Navigator.pop(
+          context,
+          true,
+        ); // Return true to indicate profile was updated
       }
     } catch (e) {
       print('Error updating profile: $e');
@@ -320,16 +336,15 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     }
   }
 
-
   Future<void> _pickImage() async {
     try {
       final XFile? image = await _imagePicker.pickImage(
         source: ImageSource.gallery,
-        imageQuality: 95,  // High quality to prevent blur
-        maxWidth: 1920,    // Max resolution for optimization
+        imageQuality: 95, // High quality to prevent blur
+        maxWidth: 1920, // Max resolution for optimization
         maxHeight: 1920,
       );
-      
+
       if (image != null && mounted) {
         setState(() {
           _selectedImage = File(image.path);
@@ -352,11 +367,11 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     try {
       final XFile? photo = await _imagePicker.pickImage(
         source: ImageSource.camera,
-        imageQuality: 95,  // High quality to prevent blur
-        maxWidth: 1920,    // Max resolution for optimization
+        imageQuality: 95, // High quality to prevent blur
+        maxWidth: 1920, // Max resolution for optimization
         maxHeight: 1920,
       );
-      
+
       if (photo != null && mounted) {
         setState(() {
           _selectedImage = File(photo.path);
@@ -429,7 +444,9 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       final position = await _locationService.getCurrentLocation(silent: false);
 
       if (position != null) {
-        print('ProfileEditScreen: Got GPS position: ${position.latitude}, ${position.longitude}');
+        print(
+          'ProfileEditScreen: Got GPS position: ${position.latitude}, ${position.longitude}',
+        );
         final addressData = await _locationService.getCityFromCoordinates(
           position.latitude,
           position.longitude,
@@ -457,7 +474,9 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('Could not get address from GPS coordinates. Please check internet connection.'),
+                content: Text(
+                  'Could not get address from GPS coordinates. Please check internet connection.',
+                ),
                 backgroundColor: Colors.orange,
               ),
             );
@@ -468,7 +487,9 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Location permission denied or GPS is disabled. Please enable in settings.'),
+              content: Text(
+                'Location permission denied or GPS is disabled. Please enable in settings.',
+              ),
               backgroundColor: Colors.red,
               duration: Duration(seconds: 4),
             ),
@@ -575,7 +596,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                       ),
                     ),
                     const SizedBox(height: 24),
-                    
+
                     // Name Field
                     TextFormField(
                       controller: _nameController,
@@ -592,7 +613,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                       },
                     ),
                     const SizedBox(height: 16),
-                    
+
                     // Email Field (Read-only)
                     TextFormField(
                       initialValue: user?.email ?? '',
@@ -661,7 +682,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
 
                     // Gender Selection
                     DropdownButtonFormField<String>(
-                      value: _selectedGender,
+                      initialValue: _selectedGender,
                       decoration: const InputDecoration(
                         labelText: 'Gender',
                         prefixIcon: Icon(Icons.person_outline),
@@ -705,7 +726,9 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                               ? '${_selectedDateOfBirth!.day}/${_selectedDateOfBirth!.month}/${_selectedDateOfBirth!.year}'
                               : 'Select your date of birth',
                           style: TextStyle(
-                            color: _selectedDateOfBirth != null ? null : Colors.grey,
+                            color: _selectedDateOfBirth != null
+                                ? null
+                                : Colors.grey,
                           ),
                         ),
                       ),
@@ -714,7 +737,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
 
                     // Occupation Dropdown
                     DropdownButtonFormField<String>(
-                      value: _selectedOccupation,
+                      initialValue: _selectedOccupation,
                       decoration: const InputDecoration(
                         labelText: 'Occupation',
                         prefixIcon: Icon(Icons.work_outline),
@@ -746,7 +769,9 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                                 height: 20,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
                                 ),
                               )
                             : const Text('Update Profile'),
@@ -771,21 +796,13 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
           placeholder: (context, url) => const CircularProgressIndicator(),
           errorWidget: (context, url, error) {
             print('Error loading profile image in edit screen: $error');
-            return Icon(
-              Icons.person,
-              size: 60,
-              color: Colors.grey.shade600,
-            );
+            return Icon(Icons.person, size: 60, color: Colors.grey.shade600);
           },
         ),
       );
     } else {
       // Show default person icon
-      return Icon(
-        Icons.person,
-        size: 60,
-        color: Colors.grey.shade600,
-      );
+      return Icon(Icons.person, size: 60, color: Colors.grey.shade600);
     }
   }
 }

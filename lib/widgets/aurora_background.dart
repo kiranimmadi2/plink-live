@@ -5,7 +5,7 @@ import 'dart:ui' as ui;
 class AuroraBackground extends StatefulWidget {
   final Widget child;
 
-  const AuroraBackground({Key? key, required this.child}) : super(key: key);
+  const AuroraBackground({super.key, required this.child});
 
   @override
   State<AuroraBackground> createState() => _AuroraBackgroundState();
@@ -227,7 +227,8 @@ class _AuroraPainter extends CustomPainter {
     for (int i = 0; i < 5; i++) {
       final streakProgress = (flowProgress + i * 0.2) % 1.0;
       final startX = size.width * ((i * 0.2 + streakProgress) % 1.0);
-      final startY = size.height * 0.2 + math.sin(streakProgress * math.pi) * 100;
+      final startY =
+          size.height * 0.2 + math.sin(streakProgress * math.pi) * 100;
 
       final endX = startX + 150 + math.cos(streakProgress * math.pi) * 50;
       final endY = startY + 200;
@@ -237,9 +238,15 @@ class _AuroraPainter extends CustomPainter {
         Offset(endX, endY),
         [
           Colors.transparent,
-          colors[i % colors.length].withValues(alpha: colors[i % colors.length].a * 0.4),
-          colors[i % colors.length].withValues(alpha: colors[i % colors.length].a * 0.6),
-          colors[i % colors.length].withValues(alpha: colors[i % colors.length].a * 0.3),
+          colors[i % colors.length].withValues(
+            alpha: colors[i % colors.length].a * 0.4,
+          ),
+          colors[i % colors.length].withValues(
+            alpha: colors[i % colors.length].a * 0.6,
+          ),
+          colors[i % colors.length].withValues(
+            alpha: colors[i % colors.length].a * 0.3,
+          ),
           Colors.transparent,
         ],
         [0.0, 0.2, 0.5, 0.8, 1.0],

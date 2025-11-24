@@ -9,8 +9,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:supper/providers/theme_provider.dart';
 import '../widgets/user_avatar.dart';
-import '../providers/theme_provider.dart';
 import 'enhanced_chat_screen.dart';
 import '../models/user_profile.dart';
 import '../models/extended_user_profile.dart';
@@ -21,10 +21,11 @@ import '../services/location_service.dart';
 import 'my_connections_screen.dart';
 
 class LiveConnectTabScreen extends ConsumerStatefulWidget {
-  const LiveConnectTabScreen({Key? key}) : super(key: key);
+  const LiveConnectTabScreen({super.key});
 
   @override
-  ConsumerState<LiveConnectTabScreen> createState() => _LiveConnectTabScreenState();
+  ConsumerState<LiveConnectTabScreen> createState() =>
+      _LiveConnectTabScreenState();
 }
 
 class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
@@ -35,8 +36,8 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
 
   Map<String, dynamic>? _userProfile;
   List<String> _selectedInterests = [];
-  List<String> _selectedConnectionTypes = [];
-  List<String> _selectedActivities = [];
+  final List<String> _selectedConnectionTypes = [];
+  final List<String> _selectedActivities = [];
   List<Map<String, dynamic>> _nearbyPeople = [];
   List<Map<String, dynamic>> _filteredPeople = []; // For search results
   bool _isLoadingPeople = false;
@@ -47,14 +48,15 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
   double? _currentUserLon;
 
   // Filter options
-  bool _filterByExactLocation = false;
+  final bool _filterByExactLocation = false;
   bool _filterByInterests = false;
   bool _filterByGender = false;
   bool _filterByConnectionTypes = false;
   bool _filterByActivities = false;
   double _distanceFilter = 50.0; // Distance in km
-  String _locationFilter = 'Worldwide'; // 'Near me', 'City', 'Country', 'Worldwide'
-  List<String> _selectedGenders = [];
+  String _locationFilter =
+      'Worldwide'; // 'Near me', 'City', 'Country', 'Worldwide'
+  final List<String> _selectedGenders = [];
 
   // Pagination variables
   bool _isLoadingMore = false;
@@ -63,9 +65,10 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
   final int _pageSize = 20; // Number of users to load per page
 
   // Connection status caching (to avoid repeated Firestore queries)
-  final Map<String, bool> _connectionStatusCache = {};  // userId -> isConnected
-  final Map<String, String?> _requestStatusCache = {};  // userId -> 'sent'|'received'|null
-  List<String> _myConnections = [];  // List of connected user IDs
+  final Map<String, bool> _connectionStatusCache = {}; // userId -> isConnected
+  final Map<String, String?> _requestStatusCache =
+      {}; // userId -> 'sent'|'received'|null
+  List<String> _myConnections = []; // List of connected user IDs
   bool _connectionsLoaded = false;
 
   // Available genders
@@ -73,20 +76,90 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
 
   // Available connection types (grouped)
   final Map<String, List<String>> _connectionTypeGroups = {
-    'Social': ['Dating', 'Friendship', 'Casual Hangout', 'Travel Buddy', 'Nightlife Partner'],
-    'Professional': ['Networking', 'Mentorship', 'Business Partner', 'Career Advice', 'Collaboration'],
-    'Activities': ['Workout Partner', 'Sports Partner', 'Hobby Partner', 'Event Companion', 'Study Group'],
-    'Learning': ['Language Exchange', 'Skill Sharing', 'Book Club', 'Learning Partner', 'Creative Workshop'],
-    'Creative': ['Music Jam', 'Art Collaboration', 'Photography', 'Content Creation', 'Performance'],
-    'Other': ['Roommate', 'Pet Playdate', 'Community Service', 'Gaming', 'Online Friends'],
+    'Social': [
+      'Dating',
+      'Friendship',
+      'Casual Hangout',
+      'Travel Buddy',
+      'Nightlife Partner',
+    ],
+    'Professional': [
+      'Networking',
+      'Mentorship',
+      'Business Partner',
+      'Career Advice',
+      'Collaboration',
+    ],
+    'Activities': [
+      'Workout Partner',
+      'Sports Partner',
+      'Hobby Partner',
+      'Event Companion',
+      'Study Group',
+    ],
+    'Learning': [
+      'Language Exchange',
+      'Skill Sharing',
+      'Book Club',
+      'Learning Partner',
+      'Creative Workshop',
+    ],
+    'Creative': [
+      'Music Jam',
+      'Art Collaboration',
+      'Photography',
+      'Content Creation',
+      'Performance',
+    ],
+    'Other': [
+      'Roommate',
+      'Pet Playdate',
+      'Community Service',
+      'Gaming',
+      'Online Friends',
+    ],
   };
 
   // Available activities (grouped)
   final Map<String, List<String>> _activityGroups = {
-    'Sports': ['Tennis', 'Badminton', 'Basketball', 'Football', 'Volleyball', 'Golf', 'Table Tennis', 'Squash'],
-    'Fitness': ['Running', 'Gym', 'Yoga', 'Pilates', 'CrossFit', 'Cycling', 'Swimming', 'Dance'],
-    'Outdoor': ['Hiking', 'Rock Climbing', 'Camping', 'Kayaking', 'Surfing', 'Mountain Biking', 'Trail Running'],
-    'Creative': ['Photography', 'Painting', 'Music', 'Writing', 'Cooking', 'Crafts', 'Gaming'],
+    'Sports': [
+      'Tennis',
+      'Badminton',
+      'Basketball',
+      'Football',
+      'Volleyball',
+      'Golf',
+      'Table Tennis',
+      'Squash',
+    ],
+    'Fitness': [
+      'Running',
+      'Gym',
+      'Yoga',
+      'Pilates',
+      'CrossFit',
+      'Cycling',
+      'Swimming',
+      'Dance',
+    ],
+    'Outdoor': [
+      'Hiking',
+      'Rock Climbing',
+      'Camping',
+      'Kayaking',
+      'Surfing',
+      'Mountain Biking',
+      'Trail Running',
+    ],
+    'Creative': [
+      'Photography',
+      'Painting',
+      'Music',
+      'Writing',
+      'Cooking',
+      'Crafts',
+      'Gaming',
+    ],
   };
 
   // Expanded state for each group
@@ -95,10 +168,27 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
 
   // Common interests for users to choose from
   final List<String> _availableInterests = [
-    'Dating', 'Friendship', 'Business', 'Roommate', 'Job Seeker',
-    'Hiring', 'Selling', 'Buying', 'Lost & Found', 'Events',
-    'Sports', 'Travel', 'Food', 'Music', 'Movies', 'Gaming',
-    'Fitness', 'Art', 'Technology', 'Photography', 'Fashion',
+    'Dating',
+    'Friendship',
+    'Business',
+    'Roommate',
+    'Job Seeker',
+    'Hiring',
+    'Selling',
+    'Buying',
+    'Lost & Found',
+    'Events',
+    'Sports',
+    'Travel',
+    'Food',
+    'Music',
+    'Movies',
+    'Gaming',
+    'Fitness',
+    'Art',
+    'Technology',
+    'Photography',
+    'Fashion',
   ];
 
   @override
@@ -111,13 +201,13 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
     for (var groupName in _activityGroups.keys) {
       _expandedActivityGroups[groupName] = false;
     }
-    _loadMyConnections();  // Load connections for caching
+    _loadMyConnections(); // Load connections for caching
     _loadUserProfile();
   }
 
   /// Load user's connections list once for caching
   Future<void> _loadMyConnections() async {
-    if (_connectionsLoaded) return;  // Already loaded
+    if (_connectionsLoaded) return; // Already loaded
 
     try {
       _myConnections = await _connectionService.getUserConnections();
@@ -128,7 +218,9 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
         _connectionStatusCache[userId] = true;
       }
 
-      debugPrint('LiveConnect: Loaded ${_myConnections.length} connections for caching');
+      debugPrint(
+        'LiveConnect: Loaded ${_myConnections.length} connections for caching',
+      );
     } catch (e) {
       debugPrint('LiveConnect: Error loading connections: $e');
     }
@@ -153,7 +245,11 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
   }
 
   /// Update connection status cache when connection status changes
-  void _updateConnectionCache(String userId, bool isConnected, {String? requestStatus}) {
+  void _updateConnectionCache(
+    String userId,
+    bool isConnected, {
+    String? requestStatus,
+  }) {
     setState(() {
       _connectionStatusCache[userId] = isConnected;
       if (isConnected) {
@@ -201,9 +297,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
     }
 
     // No connection
-    return {
-      'show': false,
-    };
+    return {'show': false};
   }
 
   Future<void> _loadUserProfile() async {
@@ -231,12 +325,14 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Row(
-              children: const [
+            content: const Row(
+              children: [
                 Icon(Icons.error_outline, color: Colors.white),
                 SizedBox(width: 12),
                 Expanded(
-                  child: Text('Failed to load profile. Please check your connection and try again.'),
+                  child: Text(
+                    'Failed to load profile. Please check your connection and try again.',
+                  ),
                 ),
               ],
             ),
@@ -284,18 +380,24 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
       // Get real-time location for accurate distance calculation
       // Only when using 'Near me' filter or when location is needed
       if (_locationFilter == 'Near me' || _currentUserLat == null) {
-        final position = await _locationService.getCurrentLocation(silent: true);
+        final position = await _locationService.getCurrentLocation(
+          silent: true,
+        );
         if (position != null && mounted) {
           setState(() {
             _currentUserLat = position.latitude;
             _currentUserLon = position.longitude;
           });
-          debugPrint('LiveConnect: Using real-time location: ${position.latitude}, ${position.longitude}');
+          debugPrint(
+            'LiveConnect: Using real-time location: ${position.latitude}, ${position.longitude}',
+          );
         } else {
           // Fall back to profile location if real-time location unavailable
           _currentUserLat = _userProfile?['latitude']?.toDouble();
           _currentUserLon = _userProfile?['longitude']?.toDouble();
-          debugPrint('LiveConnect: Using profile location (real-time unavailable)');
+          debugPrint(
+            'LiveConnect: Using profile location (real-time unavailable)',
+          );
         }
       }
 
@@ -310,7 +412,9 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
 
       // Apply city filter if 'City' location filter is selected
       // This uses the composite index: discoveryModeEnabled + city
-      if (_locationFilter == 'City' && userCity != null && userCity.isNotEmpty) {
+      if (_locationFilter == 'City' &&
+          userCity != null &&
+          userCity.isNotEmpty) {
         usersQuery = usersQuery.where('city', isEqualTo: userCity);
       }
 
@@ -318,7 +422,10 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
       // This uses the composite index: discoveryModeEnabled + city + gender OR discoveryModeEnabled + gender
       if (_filterByGender && _selectedGenders.length == 1) {
         // Only apply single-gender filter at DB level (arrayContainsAny doesn't work for equality)
-        usersQuery = usersQuery.where('gender', isEqualTo: _selectedGenders.first);
+        usersQuery = usersQuery.where(
+          'gender',
+          isEqualTo: _selectedGenders.first,
+        );
       }
 
       // Apply pagination
@@ -332,15 +439,20 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
       bool hasInMemoryFilters = false;
 
       // Check if we have in-memory filters that might reduce results
-      if (_locationFilter == 'Near me') hasInMemoryFilters = true;  // Distance filtering
-      if (_filterByInterests && _selectedInterests.isNotEmpty) hasInMemoryFilters = true;
-      if (_filterByGender && _selectedGenders.length > 1) hasInMemoryFilters = true;  // Multi-gender
-      if (_filterByConnectionTypes && _selectedConnectionTypes.isNotEmpty) hasInMemoryFilters = true;
-      if (_filterByActivities && _selectedActivities.isNotEmpty) hasInMemoryFilters = true;
+      if (_locationFilter == 'Near me')
+        hasInMemoryFilters = true; // Distance filtering
+      if (_filterByInterests && _selectedInterests.isNotEmpty)
+        hasInMemoryFilters = true;
+      if (_filterByGender && _selectedGenders.length > 1)
+        hasInMemoryFilters = true; // Multi-gender
+      if (_filterByConnectionTypes && _selectedConnectionTypes.isNotEmpty)
+        hasInMemoryFilters = true;
+      if (_filterByActivities && _selectedActivities.isNotEmpty)
+        hasInMemoryFilters = true;
 
       // Over-fetch by 3x when in-memory filters are active to ensure we get enough results
       if (hasInMemoryFilters) {
-        fetchSize = _pageSize * 3;  // Fetch 60 instead of 20
+        fetchSize = _pageSize * 3; // Fetch 60 instead of 20
       }
 
       usersQuery = usersQuery.limit(fetchSize);
@@ -360,48 +472,57 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
           final otherUserLat = userData['latitude']?.toDouble();
           final otherUserLon = userData['longitude']?.toDouble();
 
-        // Calculate distance when both users have location data
-        // (for filtering with "Near me" and for displaying on cards)
-        double? distance;
-        if (userLat != null && userLon != null && otherUserLat != null && otherUserLon != null) {
-          distance = _calculateDistance(userLat, userLon, otherUserLat, otherUserLon);
-        }
-        // Optimization: If location data is missing, distance stays null and won't be displayed
+          // Calculate distance when both users have location data
+          // (for filtering with "Near me" and for displaying on cards)
+          double? distance;
+          if (userLat != null &&
+              userLon != null &&
+              otherUserLat != null &&
+              otherUserLon != null) {
+            distance = _calculateDistance(
+              userLat,
+              userLon,
+              otherUserLat,
+              otherUserLon,
+            );
+          }
+          // Optimization: If location data is missing, distance stays null and won't be displayed
 
-        // Apply location filtering based on _locationFilter
-        if (_locationFilter == 'Near me') {
-          // Skip if no distance data
-          if (distance == null) continue;
+          // Apply location filtering based on _locationFilter
+          if (_locationFilter == 'Near me') {
+            // Skip if no distance data
+            if (distance == null) continue;
 
-          // Skip if user is beyond the distance filter
-          if (distance > _distanceFilter) continue;
-        } else if (_locationFilter == 'City') {
-          // Additional city check for cases where query didn't filter
-          if (userCity != null && userCity.isNotEmpty) {
-            if (otherUserCity == null || otherUserCity != userCity) {
-              continue; // Skip if not in same city
+            // Skip if user is beyond the distance filter
+            if (distance > _distanceFilter) continue;
+          } else if (_locationFilter == 'City') {
+            // Additional city check for cases where query didn't filter
+            if (userCity != null && userCity.isNotEmpty) {
+              if (otherUserCity == null || otherUserCity != userCity) {
+                continue; // Skip if not in same city
+              }
             }
           }
-        }
-        // 'Worldwide' has no location filtering
+          // 'Worldwide' has no location filtering
 
-        // Calculate common interests
-        List<String> commonInterests = [];
-        double matchScore = 1.0; // Default match score when interest filter is off
+          // Calculate common interests
+          List<String> commonInterests = [];
+          double matchScore =
+              1.0; // Default match score when interest filter is off
 
-        if (_filterByInterests && _selectedInterests.isNotEmpty) {
-          commonInterests = _selectedInterests
-              .where((interest) => userInterests.contains(interest))
-              .toList();
+          if (_filterByInterests && _selectedInterests.isNotEmpty) {
+            commonInterests = _selectedInterests
+                .where((interest) => userInterests.contains(interest))
+                .toList();
 
-          // Skip if no common interests when filter is on
-          if (commonInterests.isEmpty) continue;
+            // Skip if no common interests when filter is on
+            if (commonInterests.isEmpty) continue;
 
-          matchScore = commonInterests.length / _selectedInterests.length;
-        } else {
-          // When interest filter is off, show all their interests as "common"
-          commonInterests = userInterests;
-        }
+            matchScore = commonInterests.length / _selectedInterests.length;
+          } else {
+            // When interest filter is off, show all their interests as "common"
+            commonInterests = userInterests;
+          }
 
           // Gender filtering (only needed for multiple genders - single gender filtered at DB level)
           if (_filterByGender && _selectedGenders.length > 1) {
@@ -416,11 +537,13 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
 
           // Connection Types filtering
           if (_filterByConnectionTypes && _selectedConnectionTypes.isNotEmpty) {
-            final userConnectionTypes = List<String>.from(userData['connectionTypes'] ?? []);
+            final userConnectionTypes = List<String>.from(
+              userData['connectionTypes'] ?? [],
+            );
 
             // Check if user has any of the selected connection types
             final hasMatchingType = _selectedConnectionTypes.any(
-              (type) => userConnectionTypes.contains(type)
+              (type) => userConnectionTypes.contains(type),
             );
 
             if (!hasMatchingType) continue;
@@ -428,11 +551,13 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
 
           // Activities filtering
           if (_filterByActivities && _selectedActivities.isNotEmpty) {
-            final userActivities = List<String>.from(userData['activities'] ?? []);
+            final userActivities = List<String>.from(
+              userData['activities'] ?? [],
+            );
 
             // Check if user has any of the selected activities
             final hasMatchingActivity = _selectedActivities.any(
-              (activity) => userActivities.contains(activity)
+              (activity) => userActivities.contains(activity),
             );
 
             if (!hasMatchingActivity) continue;
@@ -465,7 +590,10 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
         });
       } else {
         // Sort by match score (highest first)
-        people.sort((a, b) => (b['matchScore'] as double).compareTo(a['matchScore'] as double));
+        people.sort(
+          (a, b) =>
+              (b['matchScore'] as double).compareTo(a['matchScore'] as double),
+        );
       }
 
       if (mounted) {
@@ -505,12 +633,14 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Row(
-              children: const [
+            content: const Row(
+              children: [
                 Icon(Icons.error_outline, color: Colors.white),
                 SizedBox(width: 12),
                 Expanded(
-                  child: Text('Failed to load nearby users. Please check your connection.'),
+                  child: Text(
+                    'Failed to load nearby users. Please check your connection.',
+                  ),
                 ),
               ],
             ),
@@ -572,7 +702,8 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
       backgroundColor: Colors.transparent,
       builder: (context) => ProfileDetailBottomSheet(
         user: myProfile,
-        isOwnProfile: true, // This is own profile - hide Connect/Message buttons
+        isOwnProfile:
+            true, // This is own profile - hide Connect/Message buttons
         onEdit: () {
           Navigator.pop(context); // Close the profile detail sheet
           _showEditProfile(); // Show the edit sheet
@@ -604,15 +735,23 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
   }
 
   // Helper method to calculate distance between two coordinates using Haversine formula
-  double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+  double _calculateDistance(
+    double lat1,
+    double lon1,
+    double lat2,
+    double lon2,
+  ) {
     const double earthRadius = 6371; // Earth's radius in kilometers
 
     final double dLat = _toRadians(lat2 - lat1);
     final double dLon = _toRadians(lon2 - lon1);
 
-    final double a = sin(dLat / 2) * sin(dLat / 2) +
-        cos(_toRadians(lat1)) * cos(_toRadians(lat2)) *
-        sin(dLon / 2) * sin(dLon / 2);
+    final double a =
+        sin(dLat / 2) * sin(dLat / 2) +
+        cos(_toRadians(lat1)) *
+            cos(_toRadians(lat2)) *
+            sin(dLon / 2) *
+            sin(dLon / 2);
 
     final double c = 2 * atan2(sqrt(a), sqrt(1 - a));
     final double distance = earthRadius * c;
@@ -649,8 +788,8 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Row(
-              children: const [
+            content: const Row(
+              children: [
                 Icon(Icons.error_outline, color: Colors.white),
                 SizedBox(width: 12),
                 Expanded(
@@ -740,7 +879,9 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
               height: MediaQuery.of(context).size.height * 0.75,
               decoration: BoxDecoration(
                 color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(24),
+                ),
               ),
               child: Column(
                 children: [
@@ -777,7 +918,10 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                         const Spacer(),
                         IconButton(
                           onPressed: () => Navigator.pop(context),
-                          icon: Icon(Icons.close, color: isDarkMode ? Colors.white : Colors.black),
+                          icon: Icon(
+                            Icons.close,
+                            color: isDarkMode ? Colors.white : Colors.black,
+                          ),
                         ),
                       ],
                     ),
@@ -806,7 +950,9 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                 style: TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
-                                  color: isDarkMode ? Colors.white : Colors.black,
+                                  color: isDarkMode
+                                      ? Colors.white
+                                      : Colors.black,
                                 ),
                               ),
                             ],
@@ -819,13 +965,16 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                             child: Column(
                               children: [
                                 Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
                                   children: [
                                     Text(
                                       'Distance',
                                       style: TextStyle(
                                         fontSize: 14,
-                                        color: isDarkMode ? Colors.white70 : Colors.black54,
+                                        color: isDarkMode
+                                            ? Colors.white70
+                                            : Colors.black54,
                                       ),
                                     ),
                                     Text(
@@ -844,7 +993,9 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                     activeTrackColor: const Color(0xFF00D67D),
                                     inactiveTrackColor: Colors.grey[700],
                                     thumbColor: const Color(0xFF00D67D),
-                                    overlayColor: const Color(0xFF00D67D).withOpacity(0.2),
+                                    overlayColor: const Color(
+                                      0xFF00D67D,
+                                    ).withOpacity(0.2),
                                     trackHeight: 4,
                                   ),
                                   child: Slider(
@@ -853,7 +1004,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                     max: 500,
                                     divisions: 499,
                                     onChanged: _locationFilter == 'Worldwide'
-                                        ? null  // Disable slider when Worldwide selected
+                                        ? null // Disable slider when Worldwide selected
                                         : (value) {
                                             setDialogState(() {
                                               _distanceFilter = value;
@@ -866,7 +1017,11 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                     padding: const EdgeInsets.only(top: 8),
                                     child: Row(
                                       children: [
-                                        Icon(Icons.info_outline, size: 14, color: Colors.grey[500]),
+                                        Icon(
+                                          Icons.info_outline,
+                                          size: 14,
+                                          color: Colors.grey[500],
+                                        ),
                                         const SizedBox(width: 6),
                                         Expanded(
                                           child: Text(
@@ -890,13 +1045,16 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                           Wrap(
                             spacing: 8,
                             runSpacing: 8,
-                            children: ['Near me', 'City', 'Worldwide'].map((filter) {
+                            children: ['Near me', 'City', 'Worldwide'].map((
+                              filter,
+                            ) {
                               final isSelected = _locationFilter == filter;
                               return GestureDetector(
                                 onTap: () async {
                                   // Check location permission for "Near me"
                                   if (filter == 'Near me') {
-                                    final hasPermission = await _checkLocationPermission();
+                                    final hasPermission =
+                                        await _checkLocationPermission();
                                     if (!hasPermission) {
                                       return; // Don't change filter if permission denied
                                     }
@@ -906,18 +1064,29 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                   });
                                 },
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 20,
+                                    vertical: 10,
+                                  ),
                                   decoration: BoxDecoration(
-                                    color: isSelected ? const Color(0xFF00D67D) : Colors.grey[800],
+                                    color: isSelected
+                                        ? const Color(0xFF00D67D)
+                                        : Colors.grey[800],
                                     borderRadius: BorderRadius.circular(20),
-                                    border: isSelected ? null : Border.all(color: Colors.grey[600]!),
+                                    border: isSelected
+                                        ? null
+                                        : Border.all(color: Colors.grey[600]!),
                                   ),
                                   child: Text(
                                     filter,
                                     style: TextStyle(
                                       fontSize: 14,
-                                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                                      color: isSelected ? Colors.white : Colors.grey[400],
+                                      fontWeight: isSelected
+                                          ? FontWeight.w600
+                                          : FontWeight.normal,
+                                      color: isSelected
+                                          ? Colors.white
+                                          : Colors.grey[400],
                                     ),
                                   ),
                                 ),
@@ -941,7 +1110,9 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                 style: TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
-                                  color: isDarkMode ? Colors.white : Colors.black,
+                                  color: isDarkMode
+                                      ? Colors.white
+                                      : Colors.black,
                                 ),
                               ),
                               const Spacer(),
@@ -952,7 +1123,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                     _filterByInterests = value;
                                   });
                                 },
-                                activeColor: const Color(0xFF00D67D),
+                                activeThumbColor: const Color(0xFF00D67D),
                               ),
                             ],
                           ),
@@ -966,7 +1137,9 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                   'Select interests to match with:',
                                   style: TextStyle(
                                     fontSize: 13,
-                                    color: isDarkMode ? Colors.white70 : Colors.black54,
+                                    color: isDarkMode
+                                        ? Colors.white70
+                                        : Colors.black54,
                                   ),
                                 ),
                                 Text(
@@ -986,7 +1159,11 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                 padding: const EdgeInsets.only(top: 8),
                                 child: Row(
                                   children: [
-                                    Icon(Icons.warning_amber, size: 14, color: Colors.orange),
+                                    const Icon(
+                                      Icons.warning_amber,
+                                      size: 14,
+                                      color: Colors.orange,
+                                    ),
                                     const SizedBox(width: 6),
                                     Expanded(
                                       child: Text(
@@ -1005,14 +1182,20 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                               spacing: 8,
                               runSpacing: 8,
                               children: _availableInterests.map((interest) {
-                                final isSelected = _selectedInterests.contains(interest);
-                                final canSelect = isSelected || _selectedInterests.length < 10;
+                                final isSelected = _selectedInterests.contains(
+                                  interest,
+                                );
+                                final canSelect =
+                                    isSelected ||
+                                    _selectedInterests.length < 10;
                                 return GestureDetector(
                                   onTap: canSelect
                                       ? () {
                                           setDialogState(() {
                                             if (isSelected) {
-                                              _selectedInterests.remove(interest);
+                                              _selectedInterests.remove(
+                                                interest,
+                                              );
                                             } else {
                                               _selectedInterests.add(interest);
                                             }
@@ -1022,10 +1205,15 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                   child: Opacity(
                                     opacity: canSelect ? 1.0 : 0.4,
                                     child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 14,
+                                        vertical: 8,
+                                      ),
                                       decoration: BoxDecoration(
                                         color: isSelected
-                                            ? Theme.of(context).primaryColor.withOpacity(0.2)
+                                            ? Theme.of(
+                                                context,
+                                              ).primaryColor.withOpacity(0.2)
                                             : Colors.grey[800],
                                         borderRadius: BorderRadius.circular(16),
                                         border: Border.all(
@@ -1035,28 +1223,35 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                           width: isSelected ? 2 : 1,
                                         ),
                                       ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        if (isSelected)
-                                          Icon(
-                                            Icons.check_circle,
-                                            size: 16,
-                                            color: Theme.of(context).primaryColor,
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          if (isSelected)
+                                            Icon(
+                                              Icons.check_circle,
+                                              size: 16,
+                                              color: Theme.of(
+                                                context,
+                                              ).primaryColor,
+                                            ),
+                                          if (isSelected)
+                                            const SizedBox(width: 6),
+                                          Text(
+                                            interest,
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: isSelected
+                                                  ? FontWeight.w600
+                                                  : FontWeight.normal,
+                                              color: isSelected
+                                                  ? Theme.of(
+                                                      context,
+                                                    ).primaryColor
+                                                  : Colors.grey[400],
+                                            ),
                                           ),
-                                        if (isSelected) const SizedBox(width: 6),
-                                        Text(
-                                          interest,
-                                          style: TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                                            color: isSelected
-                                                ? Theme.of(context).primaryColor
-                                                : Colors.grey[400],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
+                                        ],
+                                      ),
                                     ),
                                   ),
                                 );
@@ -1071,14 +1266,20 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                               ),
                               child: Row(
                                 children: [
-                                  Icon(Icons.info_outline, size: 20, color: Colors.grey[400]),
+                                  Icon(
+                                    Icons.info_outline,
+                                    size: 20,
+                                    color: Colors.grey[400],
+                                  ),
                                   const SizedBox(width: 12),
                                   Expanded(
                                     child: Text(
                                       'Enable to filter by common interests',
                                       style: TextStyle(
                                         fontSize: 13,
-                                        color: isDarkMode ? Colors.white70 : Colors.black54,
+                                        color: isDarkMode
+                                            ? Colors.white70
+                                            : Colors.black54,
                                       ),
                                     ),
                                   ),
@@ -1103,7 +1304,9 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                 style: TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
-                                  color: isDarkMode ? Colors.white : Colors.black,
+                                  color: isDarkMode
+                                      ? Colors.white
+                                      : Colors.black,
                                 ),
                               ),
                               const Spacer(),
@@ -1114,7 +1317,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                     _filterByGender = value;
                                   });
                                 },
-                                activeColor: const Color(0xFF00D67D),
+                                activeThumbColor: const Color(0xFF00D67D),
                               ),
                             ],
                           ),
@@ -1125,7 +1328,9 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                               'Select genders to match with:',
                               style: TextStyle(
                                 fontSize: 13,
-                                color: isDarkMode ? Colors.white70 : Colors.black54,
+                                color: isDarkMode
+                                    ? Colors.white70
+                                    : Colors.black54,
                               ),
                             ),
                             const SizedBox(height: 12),
@@ -1133,7 +1338,9 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                               spacing: 8,
                               runSpacing: 8,
                               children: _availableGenders.map((gender) {
-                                final isSelected = _selectedGenders.contains(gender);
+                                final isSelected = _selectedGenders.contains(
+                                  gender,
+                                );
                                 return GestureDetector(
                                   onTap: () {
                                     setDialogState(() {
@@ -1151,12 +1358,19 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                     ),
                                     decoration: BoxDecoration(
                                       color: isSelected
-                                          ? const Color(0xFF4A90E2).withOpacity(0.2)
+                                          ? const Color(
+                                              0xFF4A90E2,
+                                            ).withOpacity(0.2)
                                           : Colors.grey[800],
                                       borderRadius: BorderRadius.circular(20),
                                       border: isSelected
-                                          ? Border.all(color: const Color(0xFF4A90E2), width: 2)
-                                          : Border.all(color: Colors.grey[600]!),
+                                          ? Border.all(
+                                              color: const Color(0xFF4A90E2),
+                                              width: 2,
+                                            )
+                                          : Border.all(
+                                              color: Colors.grey[600]!,
+                                            ),
                                     ),
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
@@ -1167,12 +1381,15 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                             size: 16,
                                             color: Color(0xFF4A90E2),
                                           ),
-                                        if (isSelected) const SizedBox(width: 6),
+                                        if (isSelected)
+                                          const SizedBox(width: 6),
                                         Text(
                                           gender,
                                           style: TextStyle(
                                             fontSize: 13,
-                                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                                            fontWeight: isSelected
+                                                ? FontWeight.w600
+                                                : FontWeight.normal,
                                             color: isSelected
                                                 ? const Color(0xFF4A90E2)
                                                 : Colors.grey[400],
@@ -1193,14 +1410,20 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                               ),
                               child: Row(
                                 children: [
-                                  Icon(Icons.info_outline, size: 20, color: Colors.grey[400]),
+                                  Icon(
+                                    Icons.info_outline,
+                                    size: 20,
+                                    color: Colors.grey[400],
+                                  ),
                                   const SizedBox(width: 12),
                                   Expanded(
                                     child: Text(
                                       'Enable to filter by gender',
                                       style: TextStyle(
                                         fontSize: 13,
-                                        color: isDarkMode ? Colors.white70 : Colors.black54,
+                                        color: isDarkMode
+                                            ? Colors.white70
+                                            : Colors.black54,
                                       ),
                                     ),
                                   ),
@@ -1214,9 +1437,9 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                           // Connection Types Filter Section
                           Row(
                             children: [
-                              Icon(
+                              const Icon(
                                 Icons.connect_without_contact,
-                                color: const Color(0xFF9C27B0), // Purple
+                                color: Color(0xFF9C27B0), // Purple
                                 size: 20,
                               ),
                               const SizedBox(width: 8),
@@ -1225,7 +1448,9 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                 style: TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
-                                  color: isDarkMode ? Colors.white : Colors.black,
+                                  color: isDarkMode
+                                      ? Colors.white
+                                      : Colors.black,
                                 ),
                               ),
                               const Spacer(),
@@ -1236,7 +1461,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                     _filterByConnectionTypes = value;
                                   });
                                 },
-                                activeColor: const Color(0xFF00D67D),
+                                activeThumbColor: const Color(0xFF00D67D),
                               ),
                             ],
                           ),
@@ -1247,7 +1472,9 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                               'Select connection types you\'re interested in:',
                               style: TextStyle(
                                 fontSize: 13,
-                                color: isDarkMode ? Colors.white70 : Colors.black54,
+                                color: isDarkMode
+                                    ? Colors.white70
+                                    : Colors.black54,
                               ),
                             ),
                             const SizedBox(height: 16),
@@ -1256,7 +1483,8 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                             ..._connectionTypeGroups.entries.map((groupEntry) {
                               final groupName = groupEntry.key;
                               final types = groupEntry.value;
-                              final isExpanded = _expandedConnectionGroups[groupName] ?? false;
+                              final isExpanded =
+                                  _expandedConnectionGroups[groupName] ?? false;
 
                               return Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1265,22 +1493,32 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                   GestureDetector(
                                     onTap: () {
                                       setDialogState(() {
-                                        _expandedConnectionGroups[groupName] = !isExpanded;
+                                        _expandedConnectionGroups[groupName] =
+                                            !isExpanded;
                                       });
                                     },
                                     child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 12,
+                                      ),
                                       decoration: BoxDecoration(
-                                        color: const Color(0xFF9C27B0).withOpacity(0.15),
+                                        color: const Color(
+                                          0xFF9C27B0,
+                                        ).withOpacity(0.15),
                                         borderRadius: BorderRadius.circular(12),
                                         border: Border.all(
-                                          color: const Color(0xFF9C27B0).withOpacity(0.3),
+                                          color: const Color(
+                                            0xFF9C27B0,
+                                          ).withOpacity(0.3),
                                         ),
                                       ),
                                       child: Row(
                                         children: [
                                           Icon(
-                                            isExpanded ? Icons.expand_less : Icons.expand_more,
+                                            isExpanded
+                                                ? Icons.expand_less
+                                                : Icons.expand_more,
                                             color: const Color(0xFF9C27B0),
                                             size: 20,
                                           ),
@@ -1315,35 +1553,57 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                         spacing: 8,
                                         runSpacing: 8,
                                         children: types.map((type) {
-                                          final isSelected = _selectedConnectionTypes.contains(type);
-                                          final userConnectionTypes = List<String>.from(_userProfile?['connectionTypes'] ?? []);
-                                          final isUserOwn = userConnectionTypes.contains(type);
+                                          final isSelected =
+                                              _selectedConnectionTypes.contains(
+                                                type,
+                                              );
+                                          final userConnectionTypes =
+                                              List<String>.from(
+                                                _userProfile?['connectionTypes'] ??
+                                                    [],
+                                              );
+                                          final isUserOwn = userConnectionTypes
+                                              .contains(type);
 
                                           return GestureDetector(
                                             onTap: () {
                                               setDialogState(() {
                                                 if (isSelected) {
-                                                  _selectedConnectionTypes.remove(type);
+                                                  _selectedConnectionTypes
+                                                      .remove(type);
                                                 } else {
-                                                  _selectedConnectionTypes.add(type);
+                                                  _selectedConnectionTypes.add(
+                                                    type,
+                                                  );
                                                 }
                                               });
                                             },
                                             child: Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 14,
+                                                    vertical: 8,
+                                                  ),
                                               decoration: BoxDecoration(
                                                 color: isSelected
-                                                    ? const Color(0xFF00D67D).withOpacity(0.2)
+                                                    ? const Color(
+                                                        0xFF00D67D,
+                                                      ).withOpacity(0.2)
                                                     : isUserOwn
-                                                        ? const Color(0xFF9C27B0).withOpacity(0.1)
-                                                        : Colors.grey[800],
-                                                borderRadius: BorderRadius.circular(16),
+                                                    ? const Color(
+                                                        0xFF9C27B0,
+                                                      ).withOpacity(0.1)
+                                                    : Colors.grey[800],
+                                                borderRadius:
+                                                    BorderRadius.circular(16),
                                                 border: Border.all(
                                                   color: isSelected
                                                       ? const Color(0xFF00D67D)
                                                       : isUserOwn
-                                                          ? const Color(0xFF9C27B0).withOpacity(0.5)
-                                                          : Colors.grey[600]!,
+                                                      ? const Color(
+                                                          0xFF9C27B0,
+                                                        ).withOpacity(0.5)
+                                                      : Colors.grey[600]!,
                                                   width: isSelected ? 2 : 1,
                                                 ),
                                               ),
@@ -1356,24 +1616,32 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                                       size: 16,
                                                       color: Color(0xFF00D67D),
                                                     ),
-                                                  if (isSelected) const SizedBox(width: 6),
+                                                  if (isSelected)
+                                                    const SizedBox(width: 6),
                                                   if (isUserOwn && !isSelected)
                                                     const Icon(
                                                       Icons.person,
                                                       size: 14,
                                                       color: Color(0xFF9C27B0),
                                                     ),
-                                                  if (isUserOwn && !isSelected) const SizedBox(width: 4),
+                                                  if (isUserOwn && !isSelected)
+                                                    const SizedBox(width: 4),
                                                   Text(
                                                     type,
                                                     style: TextStyle(
                                                       fontSize: 13,
-                                                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                                                      fontWeight: isSelected
+                                                          ? FontWeight.w600
+                                                          : FontWeight.normal,
                                                       color: isSelected
-                                                          ? const Color(0xFF00D67D)
+                                                          ? const Color(
+                                                              0xFF00D67D,
+                                                            )
                                                           : isUserOwn
-                                                              ? const Color(0xFF9C27B0)
-                                                              : Colors.grey[400],
+                                                          ? const Color(
+                                                              0xFF9C27B0,
+                                                            )
+                                                          : Colors.grey[400],
                                                     ),
                                                   ),
                                                 ],
@@ -1387,7 +1655,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                   const SizedBox(height: 12),
                                 ],
                               );
-                            }).toList(),
+                            }),
                           ] else ...[
                             Container(
                               padding: const EdgeInsets.all(16),
@@ -1397,14 +1665,20 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                               ),
                               child: Row(
                                 children: [
-                                  Icon(Icons.info_outline, size: 20, color: Colors.grey[400]),
+                                  Icon(
+                                    Icons.info_outline,
+                                    size: 20,
+                                    color: Colors.grey[400],
+                                  ),
                                   const SizedBox(width: 12),
                                   Expanded(
                                     child: Text(
                                       'Enable to filter by connection types',
                                       style: TextStyle(
                                         fontSize: 13,
-                                        color: isDarkMode ? Colors.white70 : Colors.black54,
+                                        color: isDarkMode
+                                            ? Colors.white70
+                                            : Colors.black54,
                                       ),
                                     ),
                                   ),
@@ -1418,9 +1692,9 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                           // Activities Filter Section
                           Row(
                             children: [
-                              Icon(
+                              const Icon(
                                 Icons.directions_run,
-                                color: const Color(0xFF9C27B0), // Purple
+                                color: Color(0xFF9C27B0), // Purple
                                 size: 20,
                               ),
                               const SizedBox(width: 8),
@@ -1429,7 +1703,9 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                 style: TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
-                                  color: isDarkMode ? Colors.white : Colors.black,
+                                  color: isDarkMode
+                                      ? Colors.white
+                                      : Colors.black,
                                 ),
                               ),
                               const Spacer(),
@@ -1440,7 +1716,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                     _filterByActivities = value;
                                   });
                                 },
-                                activeColor: const Color(0xFF00D67D),
+                                activeThumbColor: const Color(0xFF00D67D),
                               ),
                             ],
                           ),
@@ -1451,7 +1727,9 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                               'Select activities you\'re interested in:',
                               style: TextStyle(
                                 fontSize: 13,
-                                color: isDarkMode ? Colors.white70 : Colors.black54,
+                                color: isDarkMode
+                                    ? Colors.white70
+                                    : Colors.black54,
                               ),
                             ),
                             const SizedBox(height: 16),
@@ -1460,7 +1738,8 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                             ..._activityGroups.entries.map((groupEntry) {
                               final groupName = groupEntry.key;
                               final activities = groupEntry.value;
-                              final isExpanded = _expandedActivityGroups[groupName] ?? false;
+                              final isExpanded =
+                                  _expandedActivityGroups[groupName] ?? false;
 
                               return Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1469,22 +1748,32 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                   GestureDetector(
                                     onTap: () {
                                       setDialogState(() {
-                                        _expandedActivityGroups[groupName] = !isExpanded;
+                                        _expandedActivityGroups[groupName] =
+                                            !isExpanded;
                                       });
                                     },
                                     child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 12,
+                                      ),
                                       decoration: BoxDecoration(
-                                        color: const Color(0xFF9C27B0).withOpacity(0.15),
+                                        color: const Color(
+                                          0xFF9C27B0,
+                                        ).withOpacity(0.15),
                                         borderRadius: BorderRadius.circular(12),
                                         border: Border.all(
-                                          color: const Color(0xFF9C27B0).withOpacity(0.3),
+                                          color: const Color(
+                                            0xFF9C27B0,
+                                          ).withOpacity(0.3),
                                         ),
                                       ),
                                       child: Row(
                                         children: [
                                           Icon(
-                                            isExpanded ? Icons.expand_less : Icons.expand_more,
+                                            isExpanded
+                                                ? Icons.expand_less
+                                                : Icons.expand_more,
                                             color: const Color(0xFF9C27B0),
                                             size: 20,
                                           ),
@@ -1519,35 +1808,56 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                         spacing: 8,
                                         runSpacing: 8,
                                         children: activities.map((activity) {
-                                          final isSelected = _selectedActivities.contains(activity);
-                                          final userActivities = List<String>.from(_userProfile?['activities'] ?? []);
-                                          final isUserOwn = userActivities.contains(activity);
+                                          final isSelected = _selectedActivities
+                                              .contains(activity);
+                                          final userActivities =
+                                              List<String>.from(
+                                                _userProfile?['activities'] ??
+                                                    [],
+                                              );
+                                          final isUserOwn = userActivities
+                                              .contains(activity);
 
                                           return GestureDetector(
                                             onTap: () {
                                               setDialogState(() {
                                                 if (isSelected) {
-                                                  _selectedActivities.remove(activity);
+                                                  _selectedActivities.remove(
+                                                    activity,
+                                                  );
                                                 } else {
-                                                  _selectedActivities.add(activity);
+                                                  _selectedActivities.add(
+                                                    activity,
+                                                  );
                                                 }
                                               });
                                             },
                                             child: Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 14,
+                                                    vertical: 8,
+                                                  ),
                                               decoration: BoxDecoration(
                                                 color: isSelected
-                                                    ? const Color(0xFF00D67D).withOpacity(0.2)
+                                                    ? const Color(
+                                                        0xFF00D67D,
+                                                      ).withOpacity(0.2)
                                                     : isUserOwn
-                                                        ? const Color(0xFF9C27B0).withOpacity(0.1)
-                                                        : Colors.grey[800],
-                                                borderRadius: BorderRadius.circular(16),
+                                                    ? const Color(
+                                                        0xFF9C27B0,
+                                                      ).withOpacity(0.1)
+                                                    : Colors.grey[800],
+                                                borderRadius:
+                                                    BorderRadius.circular(16),
                                                 border: Border.all(
                                                   color: isSelected
                                                       ? const Color(0xFF00D67D)
                                                       : isUserOwn
-                                                          ? const Color(0xFF9C27B0).withOpacity(0.5)
-                                                          : Colors.grey[600]!,
+                                                      ? const Color(
+                                                          0xFF9C27B0,
+                                                        ).withOpacity(0.5)
+                                                      : Colors.grey[600]!,
                                                   width: isSelected ? 2 : 1,
                                                 ),
                                               ),
@@ -1560,24 +1870,32 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                                       size: 16,
                                                       color: Color(0xFF00D67D),
                                                     ),
-                                                  if (isSelected) const SizedBox(width: 6),
+                                                  if (isSelected)
+                                                    const SizedBox(width: 6),
                                                   if (isUserOwn && !isSelected)
                                                     const Icon(
                                                       Icons.person,
                                                       size: 14,
                                                       color: Color(0xFF9C27B0),
                                                     ),
-                                                  if (isUserOwn && !isSelected) const SizedBox(width: 4),
+                                                  if (isUserOwn && !isSelected)
+                                                    const SizedBox(width: 4),
                                                   Text(
                                                     activity,
                                                     style: TextStyle(
                                                       fontSize: 13,
-                                                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                                                      fontWeight: isSelected
+                                                          ? FontWeight.w600
+                                                          : FontWeight.normal,
                                                       color: isSelected
-                                                          ? const Color(0xFF00D67D)
+                                                          ? const Color(
+                                                              0xFF00D67D,
+                                                            )
                                                           : isUserOwn
-                                                              ? const Color(0xFF9C27B0)
-                                                              : Colors.grey[400],
+                                                          ? const Color(
+                                                              0xFF9C27B0,
+                                                            )
+                                                          : Colors.grey[400],
                                                     ),
                                                   ),
                                                 ],
@@ -1591,7 +1909,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                   const SizedBox(height: 12),
                                 ],
                               );
-                            }).toList(),
+                            }),
                           ] else ...[
                             Container(
                               padding: const EdgeInsets.all(16),
@@ -1601,14 +1919,20 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                               ),
                               child: Row(
                                 children: [
-                                  Icon(Icons.info_outline, size: 20, color: Colors.grey[400]),
+                                  Icon(
+                                    Icons.info_outline,
+                                    size: 20,
+                                    color: Colors.grey[400],
+                                  ),
                                   const SizedBox(width: 12),
                                   Expanded(
                                     child: Text(
                                       'Enable to filter by activities',
                                       style: TextStyle(
                                         fontSize: 13,
-                                        color: isDarkMode ? Colors.white70 : Colors.black54,
+                                        color: isDarkMode
+                                            ? Colors.white70
+                                            : Colors.black54,
                                       ),
                                     ),
                                   ),
@@ -1625,7 +1949,9 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                   Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+                      color: isDarkMode
+                          ? const Color(0xFF1E1E1E)
+                          : Colors.white,
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black.withOpacity(0.1),
@@ -1640,7 +1966,9 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                           child: OutlinedButton(
                             onPressed: () => Navigator.pop(context),
                             style: OutlinedButton.styleFrom(
-                              side: BorderSide(color: Theme.of(context).primaryColor),
+                              side: BorderSide(
+                                color: Theme.of(context).primaryColor,
+                              ),
                               padding: const EdgeInsets.symmetric(vertical: 16),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(16),
@@ -1706,9 +2034,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => EnhancedChatScreen(
-          otherUser: userProfile,
-        ),
+        builder: (context) => EnhancedChatScreen(otherUser: userProfile),
       ),
     );
   }
@@ -1750,7 +2076,9 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
     try {
       final userRef = _firestore.collection('users').doc(currentUserId);
       final userDoc = await userRef.get();
-      final favoriteUsers = List<String>.from(userDoc.data()?['favoriteUsers'] ?? []);
+      final favoriteUsers = List<String>.from(
+        userDoc.data()?['favoriteUsers'] ?? [],
+      );
 
       if (favoriteUsers.contains(userId)) {
         // Remove from favorites
@@ -1784,7 +2112,9 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to update favorites. Please try again.'),
+            content: const Text(
+              'Failed to update favorites. Please try again.',
+            ),
             backgroundColor: Colors.red.shade600,
           ),
         );
@@ -1794,7 +2124,8 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
 
   void _showProfileDetail(ExtendedUserProfile user) async {
     // Check connection status before showing sheet
-    final connectionStatus = await _connectionService.getConnectionRequestStatus(user.uid);
+    final connectionStatus = await _connectionService
+        .getConnectionRequestStatus(user.uid);
     final isConnected = await _connectionService.areUsersConnected(
       _auth.currentUser!.uid,
       user.uid,
@@ -1815,9 +2146,9 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
         user: user,
         connectionStatus: displayStatus,
         onConnect: isConnected
-          ? null  // Already connected, hide button
-          : connectionStatus == 'sent'
-            ? null  // Already sent, show different state
+            ? null // Already connected, hide button
+            : connectionStatus == 'sent'
+            ? null // Already sent, show different state
             : () async {
                 Navigator.pop(context);
 
@@ -1838,9 +2169,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                           ),
                         ),
                         SizedBox(width: 12),
-                        Expanded(
-                          child: Text('Sending connection request...'),
-                        ),
+                        Expanded(child: Text('Sending connection request...')),
                       ],
                     ),
                     duration: Duration(seconds: 2),
@@ -1857,18 +2186,16 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                 if (result['success']) {
                   // Request succeeded - cache is already updated optimistically
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
+                    const SnackBar(
                       content: Row(
-                        children: const [
+                        children: [
                           Icon(Icons.check_circle, color: Colors.white),
                           SizedBox(width: 12),
-                          Expanded(
-                            child: Text('Connection request sent!'),
-                          ),
+                          Expanded(child: Text('Connection request sent!')),
                         ],
                       ),
                       backgroundColor: Colors.green,
-                      duration: const Duration(seconds: 2),
+                      duration: Duration(seconds: 2),
                     ),
                   );
                 } else {
@@ -1882,7 +2209,9 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                           const Icon(Icons.error_outline, color: Colors.white),
                           const SizedBox(width: 12),
                           Expanded(
-                            child: Text(result['message'] ?? 'Failed to send request'),
+                            child: Text(
+                              result['message'] ?? 'Failed to send request',
+                            ),
                           ),
                         ],
                       ),
@@ -1911,9 +2240,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => EnhancedChatScreen(
-                otherUser: userProfile,
-              ),
+              builder: (context) => EnhancedChatScreen(otherUser: userProfile),
             ),
           );
         },
@@ -1939,7 +2266,9 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
               elevation: 0,
               backgroundColor: isGlass
                   ? Colors.white.withValues(alpha: 0.7)
-                  : (isDarkMode ? Colors.black.withValues(alpha: 0.9) : Colors.white.withValues(alpha: 0.95)),
+                  : (isDarkMode
+                        ? Colors.black.withValues(alpha: 0.9)
+                        : Colors.white.withValues(alpha: 0.95)),
               automaticallyImplyLeading: false,
               title: Text(
                 'Live Connect',
@@ -1956,8 +2285,10 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                     color: (_filterByExactLocation || _filterByInterests)
                         ? Theme.of(context).primaryColor
                         : (isGlass
-                            ? Colors.white.withValues(alpha: 0.7)
-                            : (isDarkMode ? Colors.grey[900] : Colors.grey[100])),
+                              ? Colors.white.withValues(alpha: 0.7)
+                              : (isDarkMode
+                                    ? Colors.grey[900]
+                                    : Colors.grey[100])),
                     borderRadius: BorderRadius.circular(12),
                     border: isGlass
                         ? Border.all(
@@ -2005,13 +2336,16 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) => const MyConnectionsScreen(),
+                                  builder: (context) =>
+                                      const MyConnectionsScreen(),
                                 ),
                               );
                             },
                             icon: Icon(
                               Icons.people_outline,
-                              color: isDarkMode ? Colors.grey[400] : Colors.grey[700],
+                              color: isDarkMode
+                                  ? Colors.grey[400]
+                                  : Colors.grey[700],
                             ),
                             tooltip: 'Connection Requests',
                           ),
@@ -2027,7 +2361,9 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                   border: Border.all(
                                     color: isGlass
                                         ? Colors.white
-                                        : (isDarkMode ? Colors.black : Colors.white),
+                                        : (isDarkMode
+                                              ? Colors.black
+                                              : Colors.white),
                                     width: 2,
                                   ),
                                 ),
@@ -2065,7 +2401,9 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                       ),
                     ),
                     child: UserAvatar(
-                      profileImageUrl: _userProfile?['profileImageUrl'] ?? _userProfile?['photoUrl'],
+                      profileImageUrl:
+                          _userProfile?['profileImageUrl'] ??
+                          _userProfile?['photoUrl'],
                       radius: 18,
                       fallbackText: _userProfile?['name'] ?? 'User',
                     ),
@@ -2092,14 +2430,8 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                         const Color(0xFFFFF3E0).withValues(alpha: 0.3),
                       ]
                     : isDarkMode
-                        ? [
-                            Colors.black,
-                            const Color(0xFF1C1C1E),
-                          ]
-                        : [
-                            const Color(0xFFF5F5F7),
-                            Colors.white,
-                          ],
+                    ? [Colors.black, const Color(0xFF1C1C1E)]
+                    : [const Color(0xFFF5F5F7), Colors.white],
               ),
             ),
           ),
@@ -2116,8 +2448,8 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                   shape: BoxShape.circle,
                   gradient: RadialGradient(
                     colors: [
-                      ThemeProvider.iosPurple.withValues(alpha: 0.2),
-                      ThemeProvider.iosPurple.withValues(alpha: 0.0),
+                      AppColors.iosPurple.withValues(alpha: 0.2),
+                      AppColors.iosPurple.withValues(alpha: 0.0),
                     ],
                   ),
                 ),
@@ -2133,8 +2465,8 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                   shape: BoxShape.circle,
                   gradient: RadialGradient(
                     colors: [
-                      ThemeProvider.iosBlue.withValues(alpha: 0.15),
-                      ThemeProvider.iosBlue.withValues(alpha: 0.0),
+                      AppColors.iosBlue.withValues(alpha: 0.15),
+                      AppColors.iosBlue.withValues(alpha: 0.0),
                     ],
                   ),
                 ),
@@ -2148,13 +2480,18 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
               children: [
                 // Search bar - compact size
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
                   child: Container(
                     height: 40,
                     decoration: BoxDecoration(
                       color: isGlass
                           ? Colors.white.withValues(alpha: 0.7)
-                          : (isDarkMode ? const Color(0xFF1C1C1E) : const Color(0xFFF2F2F7)),
+                          : (isDarkMode
+                                ? const Color(0xFF1C1C1E)
+                                : const Color(0xFFF2F2F7)),
                       borderRadius: BorderRadius.circular(10),
                       border: isGlass
                           ? Border.all(
@@ -2177,12 +2514,16 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                       decoration: InputDecoration(
                         hintText: 'Search by name, interests, or city...',
                         hintStyle: TextStyle(
-                          color: isDarkMode ? Colors.grey[600] : Colors.grey[500],
+                          color: isDarkMode
+                              ? Colors.grey[600]
+                              : Colors.grey[500],
                           fontSize: 15,
                         ),
                         prefixIcon: Icon(
                           Icons.search,
-                          color: isDarkMode ? Colors.grey[500] : Colors.grey[500],
+                          color: isDarkMode
+                              ? Colors.grey[500]
+                              : Colors.grey[500],
                           size: 20,
                         ),
                         prefixIconConstraints: const BoxConstraints(
@@ -2193,7 +2534,9 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                             ? IconButton(
                                 icon: Icon(
                                   Icons.clear,
-                                  color: isDarkMode ? Colors.grey[500] : Colors.grey[500],
+                                  color: isDarkMode
+                                      ? Colors.grey[500]
+                                      : Colors.grey[500],
                                   size: 18,
                                 ),
                                 onPressed: () {
@@ -2224,9 +2567,9 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                       Padding(
                         padding: const EdgeInsets.only(right: 6),
                         child: FilterChip(
-                          label: Row(
+                          label: const Row(
                             mainAxisSize: MainAxisSize.min,
-                            children: const [
+                            children: [
                               Icon(Icons.location_on, size: 14),
                               SizedBox(width: 3),
                               Text('Near Me', style: TextStyle(fontSize: 12)),
@@ -2235,35 +2578,53 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                           selected: _locationFilter == 'Near me',
                           onSelected: (selected) async {
                             if (selected) {
-                              final hasPermission = await _checkLocationPermission();
+                              final hasPermission =
+                                  await _checkLocationPermission();
                               if (!hasPermission) return;
                             }
                             setState(() {
-                              _locationFilter = selected ? 'Near me' : 'Worldwide';
+                              _locationFilter = selected
+                                  ? 'Near me'
+                                  : 'Worldwide';
                             });
                             _loadNearbyPeople();
                           },
                           selectedColor: const Color(0xFF00D67D),
                           checkmarkColor: Colors.white,
                           visualDensity: VisualDensity.compact,
-                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
                           labelStyle: TextStyle(
                             fontSize: 12,
                             color: _locationFilter == 'Near me'
                                 ? Colors.white
-                                : (isDarkMode ? Colors.grey[400] : Colors.grey[700]),
-                            fontWeight: _locationFilter == 'Near me' ? FontWeight.w600 : FontWeight.normal,
+                                : (isDarkMode
+                                      ? Colors.grey[400]
+                                      : Colors.grey[700]),
+                            fontWeight: _locationFilter == 'Near me'
+                                ? FontWeight.w600
+                                : FontWeight.normal,
                           ),
-                          backgroundColor: isDarkMode ? const Color(0xFF2A2A2A) : Colors.grey[200],
+                          backgroundColor: isDarkMode
+                              ? const Color(0xFF2A2A2A)
+                              : Colors.grey[200],
                         ),
                       ),
                       // Dating filter
                       Padding(
                         padding: const EdgeInsets.only(right: 6),
                         child: FilterChip(
-                          label: const Text('Dating', style: TextStyle(fontSize: 12)),
-                          selected: _filterByInterests && _selectedInterests.contains('Dating'),
+                          label: const Text(
+                            'Dating',
+                            style: TextStyle(fontSize: 12),
+                          ),
+                          selected:
+                              _filterByInterests &&
+                              _selectedInterests.contains('Dating'),
                           onSelected: (selected) {
                             setState(() {
                               if (selected) {
@@ -2283,31 +2644,50 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                           selectedColor: const Color(0xFFFF6B9D),
                           checkmarkColor: Colors.white,
                           visualDensity: VisualDensity.compact,
-                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
                           labelStyle: TextStyle(
                             fontSize: 12,
-                            color: _filterByInterests && _selectedInterests.contains('Dating')
+                            color:
+                                _filterByInterests &&
+                                    _selectedInterests.contains('Dating')
                                 ? Colors.white
-                                : (isDarkMode ? Colors.grey[400] : Colors.grey[700]),
-                            fontWeight: _filterByInterests && _selectedInterests.contains('Dating')
+                                : (isDarkMode
+                                      ? Colors.grey[400]
+                                      : Colors.grey[700]),
+                            fontWeight:
+                                _filterByInterests &&
+                                    _selectedInterests.contains('Dating')
                                 ? FontWeight.w600
                                 : FontWeight.normal,
                           ),
-                          backgroundColor: isDarkMode ? const Color(0xFF2A2A2A) : Colors.grey[200],
+                          backgroundColor: isDarkMode
+                              ? const Color(0xFF2A2A2A)
+                              : Colors.grey[200],
                         ),
                       ),
                       // Friendship filter
                       Padding(
                         padding: const EdgeInsets.only(right: 6),
                         child: FilterChip(
-                          label: const Text('Friendship', style: TextStyle(fontSize: 12)),
-                          selected: _filterByInterests && _selectedInterests.contains('Friendship'),
+                          label: const Text(
+                            'Friendship',
+                            style: TextStyle(fontSize: 12),
+                          ),
+                          selected:
+                              _filterByInterests &&
+                              _selectedInterests.contains('Friendship'),
                           onSelected: (selected) {
                             setState(() {
                               if (selected) {
                                 _filterByInterests = true;
-                                if (!_selectedInterests.contains('Friendship')) {
+                                if (!_selectedInterests.contains(
+                                  'Friendship',
+                                )) {
                                   _selectedInterests.add('Friendship');
                                 }
                               } else {
@@ -2322,26 +2702,43 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                           selectedColor: const Color(0xFF4A90E2),
                           checkmarkColor: Colors.white,
                           visualDensity: VisualDensity.compact,
-                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
                           labelStyle: TextStyle(
                             fontSize: 12,
-                            color: _filterByInterests && _selectedInterests.contains('Friendship')
+                            color:
+                                _filterByInterests &&
+                                    _selectedInterests.contains('Friendship')
                                 ? Colors.white
-                                : (isDarkMode ? Colors.grey[400] : Colors.grey[700]),
-                            fontWeight: _filterByInterests && _selectedInterests.contains('Friendship')
+                                : (isDarkMode
+                                      ? Colors.grey[400]
+                                      : Colors.grey[700]),
+                            fontWeight:
+                                _filterByInterests &&
+                                    _selectedInterests.contains('Friendship')
                                 ? FontWeight.w600
                                 : FontWeight.normal,
                           ),
-                          backgroundColor: isDarkMode ? const Color(0xFF2A2A2A) : Colors.grey[200],
+                          backgroundColor: isDarkMode
+                              ? const Color(0xFF2A2A2A)
+                              : Colors.grey[200],
                         ),
                       ),
                       // Business filter
                       Padding(
                         padding: const EdgeInsets.only(right: 6),
                         child: FilterChip(
-                          label: const Text('Business', style: TextStyle(fontSize: 12)),
-                          selected: _filterByInterests && _selectedInterests.contains('Business'),
+                          label: const Text(
+                            'Business',
+                            style: TextStyle(fontSize: 12),
+                          ),
+                          selected:
+                              _filterByInterests &&
+                              _selectedInterests.contains('Business'),
                           onSelected: (selected) {
                             setState(() {
                               if (selected) {
@@ -2361,26 +2758,43 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                           selectedColor: const Color(0xFF9B59B6),
                           checkmarkColor: Colors.white,
                           visualDensity: VisualDensity.compact,
-                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
                           labelStyle: TextStyle(
                             fontSize: 12,
-                            color: _filterByInterests && _selectedInterests.contains('Business')
+                            color:
+                                _filterByInterests &&
+                                    _selectedInterests.contains('Business')
                                 ? Colors.white
-                                : (isDarkMode ? Colors.grey[400] : Colors.grey[700]),
-                            fontWeight: _filterByInterests && _selectedInterests.contains('Business')
+                                : (isDarkMode
+                                      ? Colors.grey[400]
+                                      : Colors.grey[700]),
+                            fontWeight:
+                                _filterByInterests &&
+                                    _selectedInterests.contains('Business')
                                 ? FontWeight.w600
                                 : FontWeight.normal,
                           ),
-                          backgroundColor: isDarkMode ? const Color(0xFF2A2A2A) : Colors.grey[200],
+                          backgroundColor: isDarkMode
+                              ? const Color(0xFF2A2A2A)
+                              : Colors.grey[200],
                         ),
                       ),
                       // Sports filter
                       Padding(
                         padding: const EdgeInsets.only(right: 6),
                         child: FilterChip(
-                          label: const Text('Sports', style: TextStyle(fontSize: 12)),
-                          selected: _filterByInterests && _selectedInterests.contains('Sports'),
+                          label: const Text(
+                            'Sports',
+                            style: TextStyle(fontSize: 12),
+                          ),
+                          selected:
+                              _filterByInterests &&
+                              _selectedInterests.contains('Sports'),
                           onSelected: (selected) {
                             setState(() {
                               if (selected) {
@@ -2400,27 +2814,39 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                           selectedColor: const Color(0xFFFFB800),
                           checkmarkColor: Colors.white,
                           visualDensity: VisualDensity.compact,
-                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
                           labelStyle: TextStyle(
                             fontSize: 12,
-                            color: _filterByInterests && _selectedInterests.contains('Sports')
+                            color:
+                                _filterByInterests &&
+                                    _selectedInterests.contains('Sports')
                                 ? Colors.white
-                                : (isDarkMode ? Colors.grey[400] : Colors.grey[700]),
-                            fontWeight: _filterByInterests && _selectedInterests.contains('Sports')
+                                : (isDarkMode
+                                      ? Colors.grey[400]
+                                      : Colors.grey[700]),
+                            fontWeight:
+                                _filterByInterests &&
+                                    _selectedInterests.contains('Sports')
                                 ? FontWeight.w600
                                 : FontWeight.normal,
                           ),
-                          backgroundColor: isDarkMode ? const Color(0xFF2A2A2A) : Colors.grey[200],
+                          backgroundColor: isDarkMode
+                              ? const Color(0xFF2A2A2A)
+                              : Colors.grey[200],
                         ),
                       ),
                       // All Filters button
                       Padding(
                         padding: const EdgeInsets.only(right: 6),
                         child: ActionChip(
-                          label: Row(
+                          label: const Row(
                             mainAxisSize: MainAxisSize.min,
-                            children: const [
+                            children: [
                               Icon(Icons.tune, size: 14),
                               SizedBox(width: 3),
                               Text('Filters', style: TextStyle(fontSize: 12)),
@@ -2428,12 +2854,20 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                           ),
                           onPressed: _showFilterDialog,
                           visualDensity: VisualDensity.compact,
-                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          backgroundColor: isDarkMode ? const Color(0xFF2A2A2A) : Colors.grey[200],
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          backgroundColor: isDarkMode
+                              ? const Color(0xFF2A2A2A)
+                              : Colors.grey[200],
                           labelStyle: TextStyle(
                             fontSize: 12,
-                            color: isDarkMode ? Colors.grey[400] : Colors.grey[700],
+                            color: isDarkMode
+                                ? Colors.grey[400]
+                                : Colors.grey[700],
                           ),
                         ),
                       ),
@@ -2442,9 +2876,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                 ),
                 const SizedBox(height: 8),
                 // Main content
-                Expanded(
-                  child: _buildContent(isDarkMode, isGlass),
-                ),
+                Expanded(child: _buildContent(isDarkMode, isGlass)),
               ],
             ),
           ),
@@ -2495,7 +2927,10 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                   icon: const Icon(Icons.add),
                   label: const Text('Select Interests'),
                   style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -2504,7 +2939,10 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                   icon: const Icon(Icons.filter_list),
                   label: const Text('Filters'),
                   style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
                   ),
                 ),
               ],
@@ -2518,7 +2956,9 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (_filteredPeople.isEmpty && _nearbyPeople.isNotEmpty && _searchQuery.isNotEmpty) {
+    if (_filteredPeople.isEmpty &&
+        _nearbyPeople.isNotEmpty &&
+        _searchQuery.isNotEmpty) {
       // Show search-specific empty state
       return RefreshIndicator(
         onRefresh: () async {
@@ -2573,8 +3013,13 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                           icon: const Icon(Icons.clear),
                           label: const Text('Clear Search'),
                           style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                            side: BorderSide(color: Theme.of(context).primaryColor),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 16,
+                            ),
+                            side: BorderSide(
+                              color: Theme.of(context).primaryColor,
+                            ),
                             foregroundColor: Theme.of(context).primaryColor,
                           ),
                         ),
@@ -2586,8 +3031,13 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                           icon: const Icon(Icons.refresh),
                           label: const Text('Refresh'),
                           style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                            side: BorderSide(color: Theme.of(context).primaryColor),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 16,
+                            ),
+                            side: BorderSide(
+                              color: Theme.of(context).primaryColor,
+                            ),
                             foregroundColor: Theme.of(context).primaryColor,
                           ),
                         ),
@@ -2608,7 +3058,9 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
       String subtitle = '';
       IconData icon = Icons.search_off;
 
-      if (_locationFilter == 'Near me' && (_userProfile?['latitude'] == null || _userProfile?['longitude'] == null)) {
+      if (_locationFilter == 'Near me' &&
+          (_userProfile?['latitude'] == null ||
+              _userProfile?['longitude'] == null)) {
         title = 'Location not available';
         subtitle = 'Enable location permissions to find nearby users';
         icon = Icons.location_off;
@@ -2618,9 +3070,12 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
         icon = Icons.favorite_border;
       } else if (_locationFilter == 'Near me' && _distanceFilter < 10) {
         title = 'Search radius too small';
-        subtitle = 'Try expanding your distance to ${(_distanceFilter * 2).round()} km or more';
+        subtitle =
+            'Try expanding your distance to ${(_distanceFilter * 2).round()} km or more';
         icon = Icons.radar;
-      } else if (_locationFilter == 'City' && (_userProfile?['city'] == null || (_userProfile?['city'] as String).isEmpty)) {
+      } else if (_locationFilter == 'City' &&
+          (_userProfile?['city'] == null ||
+              (_userProfile?['city'] as String).isEmpty)) {
         title = 'City not set';
         subtitle = 'Update your profile with your city to use this filter';
         icon = Icons.location_city;
@@ -2682,8 +3137,13 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                           icon: const Icon(Icons.refresh),
                           label: const Text('Refresh'),
                           style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                            side: BorderSide(color: Theme.of(context).primaryColor),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 16,
+                            ),
+                            side: BorderSide(
+                              color: Theme.of(context).primaryColor,
+                            ),
                             foregroundColor: Theme.of(context).primaryColor,
                           ),
                         ),
@@ -2693,8 +3153,13 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                           icon: const Icon(Icons.tune),
                           label: const Text('Adjust Filters'),
                           style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                            side: BorderSide(color: Theme.of(context).primaryColor),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 16,
+                            ),
+                            side: BorderSide(
+                              color: Theme.of(context).primaryColor,
+                            ),
                             foregroundColor: Theme.of(context).primaryColor,
                           ),
                         ),
@@ -2718,314 +3183,352 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
         padding: const EdgeInsets.all(16),
         itemCount: _filteredPeople.length + (_hasMoreUsers ? 1 : 0),
         itemBuilder: (context, index) {
-        // Show "Load More" button at the end if there are more users
-        if (index == _filteredPeople.length) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            child: Center(
-              child: _isLoadingMore
-                  ? const CircularProgressIndicator()
-                  : OutlinedButton.icon(
-                      onPressed: () => _loadNearbyPeople(loadMore: true),
-                      icon: const Icon(Icons.refresh),
-                      label: const Text('Load More Users'),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                        side: BorderSide(color: Theme.of(context).primaryColor),
-                        foregroundColor: Theme.of(context).primaryColor,
-                      ),
-                    ),
-            ),
-          );
-        }
-
-        final person = _filteredPeople[index];
-        final userData = person['userData'] as Map<String, dynamic>;
-        final commonInterests = person['commonInterests'] as List<String>;
-        final matchScore = person['matchScore'] as double;
-        final userId = person['userId'] as String;
-        final distance = person['distance'] as double?;
-
-        // Create ExtendedUserProfile from userData with distance
-        final extendedProfile = ExtendedUserProfile.fromMap(userData, userId);
-
-        // Create a new profile with distance set
-        final profileWithDistance = ExtendedUserProfile(
-          uid: extendedProfile.uid,
-          name: extendedProfile.name,
-          photoUrl: extendedProfile.photoUrl,
-          city: extendedProfile.city,
-          location: extendedProfile.location,
-          latitude: extendedProfile.latitude,
-          longitude: extendedProfile.longitude,
-          interests: extendedProfile.interests,
-          verified: extendedProfile.verified,
-          connectionTypes: extendedProfile.connectionTypes,
-          activities: extendedProfile.activities,
-          aboutMe: extendedProfile.aboutMe,
-          isOnline: extendedProfile.isOnline,
-          lastSeen: extendedProfile.lastSeen,
-          age: extendedProfile.age,
-          gender: extendedProfile.gender,
-          distance: distance, // Set the calculated distance
-        );
-
-        final gradientColors = _getAvatarGradient(extendedProfile.name);
-        final userName = userData['name'] ?? 'Unknown User';
-
-        // Format distance for display
-        String? distanceText;
-        if (distance != null) {
-          if (distance < 1) {
-            distanceText = '${(distance * 1000).round()}m';
-          } else {
-            distanceText = '${distance.toStringAsFixed(1)}km';
-          }
-        }
-
-        return GestureDetector(
-          onTap: () => _showProfileDetail(profileWithDistance),
-          child: Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: isGlass
-                  ? Colors.white.withValues(alpha: 0.7)
-                  : (isDarkMode ? const Color(0xFF2A2A2A) : Colors.white),
-              borderRadius: BorderRadius.circular(16),
-              border: isGlass
-                  ? Border.all(
-                      color: Colors.white.withValues(alpha: 0.2),
-                      width: 1,
-                    )
-                  : null,
-              boxShadow: isGlass
-                  ? []
-                  : [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.08),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-            ),
-            child: Row(
-              children: [
-                // Profile Image with gradient background
-                Stack(
-                  children: [
-                    extendedProfile.photoUrl == null
-                        ? Container(
-                            width: 64,
-                            height: 64,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: LinearGradient(
-                                colors: gradientColors,
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: gradientColors[0].withOpacity(0.3),
-                                  blurRadius: 12,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            child: Center(
-                              child: Text(
-                                userName.isNotEmpty ? userName[0].toUpperCase() : '?',
-                                style: const TextStyle(
-                                  fontSize: 28,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ),
-                          )
-                        : Container(
-                            width: 64,
-                            height: 64,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: gradientColors[0].withOpacity(0.3),
-                                  blurRadius: 12,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            child: CircleAvatar(
-                              radius: 32,
-                              backgroundImage: CachedNetworkImageProvider(extendedProfile.photoUrl!),
-                            ),
+          // Show "Load More" button at the end if there are more users
+          if (index == _filteredPeople.length) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Center(
+                child: _isLoadingMore
+                    ? const CircularProgressIndicator()
+                    : OutlinedButton.icon(
+                        onPressed: () => _loadNearbyPeople(loadMore: true),
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('Load More Users'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 16,
                           ),
-                    if (extendedProfile.isOnline)
-                      Positioned(
-                        right: 0,
-                        bottom: 0,
-                        child: Container(
-                          width: 14,
-                          height: 14,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF00D67D),
-                            shape: BoxShape.circle,
-                            border: Border.all(color: isGlass ? Colors.white : (isDarkMode ? Colors.black : Colors.white), width: 2),
+                          side: BorderSide(
+                            color: Theme.of(context).primaryColor,
                           ),
+                          foregroundColor: Theme.of(context).primaryColor,
                         ),
                       ),
-                  ],
-                ),
-                const SizedBox(width: 16),
-                // User Info
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+              ),
+            );
+          }
+
+          final person = _filteredPeople[index];
+          final userData = person['userData'] as Map<String, dynamic>;
+          final commonInterests = person['commonInterests'] as List<String>;
+          final matchScore = person['matchScore'] as double;
+          final userId = person['userId'] as String;
+          final distance = person['distance'] as double?;
+
+          // Create ExtendedUserProfile from userData with distance
+          final extendedProfile = ExtendedUserProfile.fromMap(userData, userId);
+
+          // Create a new profile with distance set
+          final profileWithDistance = ExtendedUserProfile(
+            uid: extendedProfile.uid,
+            name: extendedProfile.name,
+            photoUrl: extendedProfile.photoUrl,
+            city: extendedProfile.city,
+            location: extendedProfile.location,
+            latitude: extendedProfile.latitude,
+            longitude: extendedProfile.longitude,
+            interests: extendedProfile.interests,
+            verified: extendedProfile.verified,
+            connectionTypes: extendedProfile.connectionTypes,
+            activities: extendedProfile.activities,
+            aboutMe: extendedProfile.aboutMe,
+            isOnline: extendedProfile.isOnline,
+            lastSeen: extendedProfile.lastSeen,
+            age: extendedProfile.age,
+            gender: extendedProfile.gender,
+            distance: distance, // Set the calculated distance
+          );
+
+          final gradientColors = _getAvatarGradient(extendedProfile.name);
+          final userName = userData['name'] ?? 'Unknown User';
+
+          // Format distance for display
+          String? distanceText;
+          if (distance != null) {
+            if (distance < 1) {
+              distanceText = '${(distance * 1000).round()}m';
+            } else {
+              distanceText = '${distance.toStringAsFixed(1)}km';
+            }
+          }
+
+          return GestureDetector(
+            onTap: () => _showProfileDetail(profileWithDistance),
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: isGlass
+                    ? Colors.white.withValues(alpha: 0.7)
+                    : (isDarkMode ? const Color(0xFF2A2A2A) : Colors.white),
+                borderRadius: BorderRadius.circular(16),
+                border: isGlass
+                    ? Border.all(
+                        color: Colors.white.withValues(alpha: 0.2),
+                        width: 1,
+                      )
+                    : null,
+                boxShadow: isGlass
+                    ? []
+                    : [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.08),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+              ),
+              child: Row(
+                children: [
+                  // Profile Image with gradient background
+                  Stack(
                     children: [
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              userName,
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w600,
-                                color: isDarkMode ? Colors.white : Colors.black,
+                      extendedProfile.photoUrl == null
+                          ? Container(
+                              width: 64,
+                              height: 64,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: LinearGradient(
+                                  colors: gradientColors,
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: gradientColors[0].withOpacity(0.3),
+                                    blurRadius: 12,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
                               ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                              child: Center(
+                                child: Text(
+                                  userName.isNotEmpty
+                                      ? userName[0].toUpperCase()
+                                      : '?',
+                                  style: const TextStyle(
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            )
+                          : Container(
+                              width: 64,
+                              height: 64,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: gradientColors[0].withOpacity(0.3),
+                                    blurRadius: 12,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: CircleAvatar(
+                                radius: 32,
+                                backgroundImage: CachedNetworkImageProvider(
+                                  extendedProfile.photoUrl!,
+                                ),
+                              ),
+                            ),
+                      if (extendedProfile.isOnline)
+                        Positioned(
+                          right: 0,
+                          bottom: 0,
+                          child: Container(
+                            width: 14,
+                            height: 14,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF00D67D),
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: isGlass
+                                    ? Colors.white
+                                    : (isDarkMode
+                                          ? Colors.black
+                                          : Colors.white),
+                                width: 2,
+                              ),
                             ),
                           ),
-                          if (extendedProfile.verified) ...[
-                            const SizedBox(width: 6),
-                            Icon(
-                              Icons.verified,
-                              size: 18,
-                              color: gradientColors[0],
-                            ),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      // City, Distance, and Gender - always show this row
-                      Row(
-                        children: [
-                          if (extendedProfile.city != null && extendedProfile.city!.isNotEmpty) ...[
-                            Icon(
-                              Icons.location_on,
-                              size: 14,
-                              color: isDarkMode ? Colors.grey[500] : Colors.grey[600],
-                            ),
-                            const SizedBox(width: 4),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(width: 16),
+                  // User Info
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
                             Flexible(
                               child: Text(
-                                extendedProfile.city!,
+                                userName,
                                 style: TextStyle(
-                                  fontSize: 13,
-                                  color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w600,
+                                  color: isDarkMode
+                                      ? Colors.white
+                                      : Colors.black,
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
+                            if (extendedProfile.verified) ...[
+                              const SizedBox(width: 6),
+                              Icon(
+                                Icons.verified,
+                                size: 18,
+                                color: gradientColors[0],
+                              ),
+                            ],
                           ],
-                          if (distanceText != null) ...[
-                            if (extendedProfile.city != null && extendedProfile.city!.isNotEmpty)
+                        ),
+                        const SizedBox(height: 6),
+                        // City, Distance, and Gender - always show this row
+                        Row(
+                          children: [
+                            if (extendedProfile.city != null &&
+                                extendedProfile.city!.isNotEmpty) ...[
+                              Icon(
+                                Icons.location_on,
+                                size: 14,
+                                color: isDarkMode
+                                    ? Colors.grey[500]
+                                    : Colors.grey[600],
+                              ),
+                              const SizedBox(width: 4),
+                              Flexible(
+                                child: Text(
+                                  extendedProfile.city!,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: isDarkMode
+                                        ? Colors.grey[400]
+                                        : Colors.grey[600],
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                            if (distanceText != null) ...[
+                              if (extendedProfile.city != null &&
+                                  extendedProfile.city!.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                  ),
+                                  child: Text(
+                                    '•',
+                                    style: TextStyle(
+                                      color: isDarkMode
+                                          ? Colors.grey[600]
+                                          : Colors.grey[400],
+                                    ),
+                                  ),
+                                ),
+                              Icon(
+                                Icons.navigation,
+                                size: 13,
+                                color: Theme.of(context).primaryColor,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                distanceText,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: Theme.of(context).primaryColor,
+                                ),
+                              ),
+                            ],
+                            // Gender on same line
+                            if (extendedProfile.gender != null &&
+                                extendedProfile.gender!.isNotEmpty) ...[
                               Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 8),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                ),
                                 child: Text(
                                   '•',
                                   style: TextStyle(
-                                    color: isDarkMode ? Colors.grey[600] : Colors.grey[400],
+                                    color: isDarkMode
+                                        ? Colors.grey[600]
+                                        : Colors.grey[400],
                                   ),
                                 ),
                               ),
-                            Icon(
-                              Icons.navigation,
-                              size: 13,
-                              color: Theme.of(context).primaryColor,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              distanceText,
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: Theme.of(context).primaryColor,
+                              Icon(
+                                extendedProfile.gender == 'Male'
+                                    ? Icons.male
+                                    : extendedProfile.gender == 'Female'
+                                    ? Icons.female
+                                    : Icons.person_outline,
+                                size: 13,
+                                color: isDarkMode
+                                    ? Colors.grey[500]
+                                    : Colors.grey[600],
                               ),
-                            ),
-                          ],
-                          // Gender on same line
-                          if (extendedProfile.gender != null && extendedProfile.gender!.isNotEmpty) ...[
-                            Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 8),
-                              child: Text(
-                                '•',
+                              const SizedBox(width: 4),
+                              Text(
+                                extendedProfile.gender!,
                                 style: TextStyle(
-                                  color: isDarkMode ? Colors.grey[600] : Colors.grey[400],
+                                  fontSize: 13,
+                                  color: isDarkMode
+                                      ? Colors.grey[400]
+                                      : Colors.grey[600],
                                 ),
                               ),
-                            ),
-                            Icon(
-                              extendedProfile.gender == 'Male'
-                                  ? Icons.male
-                                  : extendedProfile.gender == 'Female'
-                                      ? Icons.female
-                                      : Icons.person_outline,
-                              size: 13,
-                              color: isDarkMode ? Colors.grey[500] : Colors.grey[600],
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              extendedProfile.gender!,
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                      // Common Interests Count
-                      if (commonInterests.isNotEmpty && _filterByInterests) ...[
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.favorite,
-                              size: 13,
-                              color: Theme.of(context).primaryColor,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              '${commonInterests.length} common interest${commonInterests.length > 1 ? 's' : ''}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                                color: Theme.of(context).primaryColor,
-                              ),
-                            ),
+                            ],
                           ],
                         ),
+                        // Common Interests Count
+                        if (commonInterests.isNotEmpty &&
+                            _filterByInterests) ...[
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.favorite,
+                                size: 13,
+                                color: Theme.of(context).primaryColor,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                '${commonInterests.length} common interest${commonInterests.length > 1 ? 's' : ''}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                  color: Theme.of(context).primaryColor,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
-                ),
-                // Arrow icon
-                Icon(
-                  Icons.arrow_forward_ios,
-                  size: 18,
-                  color: isDarkMode ? Colors.grey[600] : Colors.grey[400],
-                ),
-              ],
+                  // Arrow icon
+                  Icon(
+                    Icons.arrow_forward_ios,
+                    size: 18,
+                    color: isDarkMode ? Colors.grey[600] : Colors.grey[400],
+                  ),
+                ],
+              ),
             ),
-          ),
-        );
-      },
-    ),
-    );  // Close RefreshIndicator
+          );
+        },
+      ),
+    ); // Close RefreshIndicator
   }
 
   // Check and request location permission

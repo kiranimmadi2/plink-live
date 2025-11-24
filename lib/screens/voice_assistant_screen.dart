@@ -4,7 +4,7 @@ import '../widgets/voice_orb.dart';
 import '../widgets/audio_visualizer.dart';
 
 class VoiceAssistantScreen extends StatefulWidget {
-  const VoiceAssistantScreen({Key? key}) : super(key: key);
+  const VoiceAssistantScreen({super.key});
 
   @override
   State<VoiceAssistantScreen> createState() => _VoiceAssistantScreenState();
@@ -19,8 +19,14 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
   final List<Map<String, String>> _mockConversation = [
     {'user': 'listening', 'ai': 'I\'m listening...'},
     {'user': 'Hello, I need help', 'ai': 'Hi! What can I help you find today?'},
-    {'user': 'Looking for a bike', 'ai': 'Great! What\'s your budget for the bike?'},
-    {'user': 'Under 200 dollars', 'ai': 'Perfect! Looking for bikes under \$200. Should I search now?'},
+    {
+      'user': 'Looking for a bike',
+      'ai': 'Great! What\'s your budget for the bike?',
+    },
+    {
+      'user': 'Under 200 dollars',
+      'ai': 'Perfect! Looking for bikes under \$200. Should I search now?',
+    },
   ];
 
   int _conversationIndex = 0;
@@ -136,21 +142,14 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
               const Spacer(flex: 2),
 
               // Voice Orb
-              VoiceOrb(
-                state: _currentState,
-                size: 220,
-              ),
+              VoiceOrb(state: _currentState, size: 220),
 
               const SizedBox(height: 40),
 
               // Audio visualizer (shows when listening or speaking)
               if (_currentState == VoiceOrbState.listening ||
                   _currentState == VoiceOrbState.speaking)
-                AudioVisualizer(
-                  isActive: true,
-                  height: 60,
-                  barCount: 35,
-                ),
+                const AudioVisualizer(isActive: true, height: 60, barCount: 35),
 
               const SizedBox(height: 30),
 
@@ -231,9 +230,7 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
           decoration: BoxDecoration(
             color: Colors.white.withValues(alpha: 0.05),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.1),
-            ),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
           ),
           child: Text(
             _transcriptionText,
@@ -296,21 +293,14 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: isActive
-                ? [
-                    const Color(0xFF0EA5E9),
-                    const Color(0xFF8B5CF6),
-                  ]
-                : [
-                    const Color(0xFF8B5CF6),
-                    const Color(0xFF06B6D4),
-                  ],
+                ? [const Color(0xFF0EA5E9), const Color(0xFF8B5CF6)]
+                : [const Color(0xFF8B5CF6), const Color(0xFF06B6D4)],
           ),
           boxShadow: [
             BoxShadow(
-              color: (isActive
-                      ? const Color(0xFF0EA5E9)
-                      : const Color(0xFF8B5CF6))
-                  .withValues(alpha: 0.4),
+              color:
+                  (isActive ? const Color(0xFF0EA5E9) : const Color(0xFF8B5CF6))
+                      .withValues(alpha: 0.4),
               blurRadius: 20,
               spreadRadius: 5,
             ),
@@ -338,15 +328,9 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: color,
-          border: Border.all(
-            color: Colors.white.withValues(alpha: 0.2),
-          ),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
         ),
-        child: Icon(
-          icon,
-          color: Colors.white.withValues(alpha: 0.8),
-          size: 24,
-        ),
+        child: Icon(icon, color: Colors.white.withValues(alpha: 0.8), size: 24),
       ),
     );
   }
