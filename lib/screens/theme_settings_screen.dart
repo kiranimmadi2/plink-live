@@ -67,10 +67,10 @@ class _ThemeSettingsScreenState extends ConsumerState<ThemeSettingsScreen>
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    ThemeProvider.glassmorphismBackground[0],
-                    ThemeProvider.glassmorphismBackground[1],
-                    ThemeProvider.glassmorphismBackground[2],
-                    ThemeProvider.glassmorphismBackground[3],
+                    ThemeNotifier.glassmorphismBackground[0],
+                    ThemeNotifier.glassmorphismBackground[1],
+                    ThemeNotifier.glassmorphismBackground[2],
+                    ThemeNotifier.glassmorphismBackground[3],
                   ],
                   stops: const [0.0, 0.3, 0.6, 1.0],
                 ),
@@ -114,7 +114,7 @@ class _ThemeSettingsScreenState extends ConsumerState<ThemeSettingsScreen>
                         themeState.isGlassmorphism 
                             ? CupertinoIcons.sparkles 
                             : CupertinoIcons.moon_fill,
-                        color: ThemeProvider.iosPurple,
+                        color: ThemeNotifier.iosPurple,
                       ),
                     ],
                   ),
@@ -196,7 +196,7 @@ class _ThemeSettingsScreenState extends ConsumerState<ThemeSettingsScreen>
                                   children: [
                                     Icon(
                                       CupertinoIcons.paintbrush_fill,
-                                      color: ThemeProvider.iosPurple,
+                                      color: ThemeNotifier.iosPurple,
                                     ),
                                     const SizedBox(width: 12),
                                     Text(
@@ -275,7 +275,7 @@ class _ThemeSettingsScreenState extends ConsumerState<ThemeSettingsScreen>
                 borderRadius: BorderRadius.circular(24),
                 border: Border.all(
                   color: isSelected 
-                      ? ThemeProvider.iosBlue.withValues(alpha: 0.5)
+                      ? ThemeNotifier.iosBlue.withValues(alpha: 0.5)
                       : Colors.transparent,
                   width: 2,
                 ),
@@ -326,11 +326,11 @@ class _ThemeSettingsScreenState extends ConsumerState<ThemeSettingsScreen>
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: isSelected 
-                          ? ThemeProvider.iosBlue
+                          ? ThemeNotifier.iosBlue
                           : Colors.transparent,
                       border: Border.all(
                         color: isSelected 
-                            ? ThemeProvider.iosBlue
+                            ? ThemeNotifier.iosBlue
                             : (isDark ? Colors.white30 : Colors.black26),
                         width: 2,
                       ),
@@ -366,12 +366,12 @@ class _ThemeSettingsScreenState extends ConsumerState<ThemeSettingsScreen>
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: ThemeProvider.iosBlue.withValues(alpha: 0.1),
+              color: ThemeNotifier.iosBlue.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(
               icon,
-              color: ThemeProvider.iosBlue,
+              color: ThemeNotifier.iosBlue,
               size: 20,
             ),
           ),

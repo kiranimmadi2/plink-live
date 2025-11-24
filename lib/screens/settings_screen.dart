@@ -132,6 +132,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final themeState = ref.watch(themeProvider);
+    final themeNotifier = ref.read(themeProvider.notifier);
     final isDark = themeState.isDarkMode;
     final isGlass = themeState.isGlassmorphism;
     final authService = AuthService();
@@ -201,8 +202,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   shape: BoxShape.circle,
                   gradient: RadialGradient(
                     colors: [
-                      ThemeProvider.iosPurple.withValues(alpha: 0.3),
-                      ThemeProvider.iosPurple.withValues(alpha: 0.0),
+                      ThemeNotifier.iosPurple.withValues(alpha: 0.3),
+                      ThemeNotifier.iosPurple.withValues(alpha: 0.0),
                     ],
                   ),
                 ),
@@ -218,8 +219,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   shape: BoxShape.circle,
                   gradient: RadialGradient(
                     colors: [
-                      ThemeProvider.iosBlue.withValues(alpha: 0.2),
-                      ThemeProvider.iosBlue.withValues(alpha: 0.0),
+                      ThemeNotifier.iosBlue.withValues(alpha: 0.2),
+                      ThemeNotifier.iosBlue.withValues(alpha: 0.0),
                     ],
                   ),
                 ),
@@ -247,8 +248,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: [
-                            ThemeProvider.iosGreen.withValues(alpha: 0.3),
-                            ThemeProvider.iosBlue.withValues(alpha: 0.3),
+                            ThemeNotifier.iosGreen.withValues(alpha: 0.3),
+                            ThemeNotifier.iosBlue.withValues(alpha: 0.3),
                           ],
                         ),
                         borderRadius: BorderRadius.circular(12),
@@ -257,7 +258,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         _showOnlineStatus
                           ? CupertinoIcons.circle_fill
                           : CupertinoIcons.circle,
-                        color: _showOnlineStatus ? ThemeProvider.iosGreen : Colors.grey,
+                        color: _showOnlineStatus ? ThemeNotifier.iosGreen : Colors.grey,
                         size: 22,
                       ),
                     ),
@@ -279,7 +280,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       child: CupertinoSwitch(
                         value: _showOnlineStatus,
                         onChanged: _isLoading ? null : _updateOnlineStatusPreference,
-                        activeColor: ThemeProvider.iosGreen,
+                        activeColor: ThemeNotifier.iosGreen,
                       ),
                     ),
                   ),
@@ -290,7 +291,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               _buildSectionHeader(
                 icon: CupertinoIcons.paintbrush_fill,
                 title: 'Appearance',
-                color: ThemeProvider.iosPurple,
+                color: ThemeNotifier.iosPurple,
                 isDark: isDark,
               ),
               const SizedBox(height: 12),
@@ -305,7 +306,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     icon: CupertinoIcons.sun_max_fill,
                     isSelected: isGlass,
                     onTap: () {
-                      themeProvider.setTheme(AppThemeMode.glassmorphism);
+                      themeNotifier.setTheme(AppThemeMode.glassmorphism);
                     },
                   ),
                   const Divider(height: 1),
@@ -316,7 +317,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     icon: CupertinoIcons.moon_fill,
                     isSelected: isDark,
                     onTap: () {
-                      themeProvider.setTheme(AppThemeMode.dark);
+                      themeNotifier.setTheme(AppThemeMode.dark);
                     },
                   ),
                 ],
@@ -328,7 +329,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               _buildSectionHeader(
                 icon: CupertinoIcons.person_circle_fill,
                 title: 'Account',
-                color: ThemeProvider.iosBlue,
+                color: ThemeNotifier.iosBlue,
                 isDark: isDark,
               ),
               const SizedBox(height: 12),
@@ -413,7 +414,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               _buildSectionHeader(
                 icon: CupertinoIcons.bell_fill,
                 title: 'Notifications',
-                color: ThemeProvider.iosOrange,
+                color: ThemeNotifier.iosOrange,
                 isDark: isDark,
               ),
               const SizedBox(height: 12),
@@ -473,7 +474,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               _buildSectionHeader(
                 icon: CupertinoIcons.gear_solid,
                 title: 'App Settings',
-                color: ThemeProvider.iosGreen,
+                color: ThemeNotifier.iosGreen,
                 isDark: isDark,
               ),
               const SizedBox(height: 12),
@@ -549,7 +550,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               _buildSectionHeader(
                 icon: CupertinoIcons.question_circle_fill,
                 title: 'Support',
-                color: ThemeProvider.iosTeal,
+                color: ThemeNotifier.iosTeal,
                 isDark: isDark,
               ),
               const SizedBox(height: 12),
@@ -733,13 +734,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         height: 40,
         decoration: BoxDecoration(
           color: isSelected 
-              ? ThemeProvider.iosPurple.withValues(alpha: 0.2)
+              ? ThemeNotifier.iosPurple.withValues(alpha: 0.2)
               : Colors.grey.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Icon(
           icon,
-          color: isSelected ? ThemeProvider.iosPurple : Colors.grey,
+          color: isSelected ? ThemeNotifier.iosPurple : Colors.grey,
           size: 20,
         ),
       ),
@@ -755,7 +756,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         value: true,
         groupValue: isSelected,
         onChanged: (_) => onTap(),
-        activeColor: ThemeProvider.iosPurple,
+        activeColor: ThemeNotifier.iosPurple,
       ),
       onTap: onTap,
     );

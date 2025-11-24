@@ -2116,8 +2116,8 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                   shape: BoxShape.circle,
                   gradient: RadialGradient(
                     colors: [
-                      ThemeProvider.iosPurple.withValues(alpha: 0.2),
-                      ThemeProvider.iosPurple.withValues(alpha: 0.0),
+                      ThemeNotifier.iosPurple.withValues(alpha: 0.2),
+                      ThemeNotifier.iosPurple.withValues(alpha: 0.0),
                     ],
                   ),
                 ),
@@ -2133,8 +2133,8 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                   shape: BoxShape.circle,
                   gradient: RadialGradient(
                     colors: [
-                      ThemeProvider.iosBlue.withValues(alpha: 0.15),
-                      ThemeProvider.iosBlue.withValues(alpha: 0.0),
+                      ThemeNotifier.iosBlue.withValues(alpha: 0.15),
+                      ThemeNotifier.iosBlue.withValues(alpha: 0.0),
                     ],
                   ),
                 ),
