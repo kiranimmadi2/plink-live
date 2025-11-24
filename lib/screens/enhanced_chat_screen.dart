@@ -503,32 +503,9 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
           .limit(100)
           .snapshots(),
       builder: (context, snapshot) {
+        // Skip loading indicator - show content immediately for faster UX
         if (snapshot.connectionState == ConnectionState.waiting && _allMessages.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                SizedBox(
-                  width: 40,
-                  height: 40,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      Theme.of(context).primaryColor.withOpacity(0.5),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Loading messages...',
-                  style: TextStyle(
-                    color: isDarkMode ? Colors.grey[600] : Colors.grey[400],
-                    fontSize: 14,
-                  ),
-                ),
-              ],
-            ),
-          );
+          return _buildEmptyChatState(isDarkMode);
         }
 
         if (snapshot.hasError) {
@@ -621,59 +598,6 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
               fontWeight: FontWeight.w600,
               color: isDarkMode ? Colors.white : const Color(0xFF1C1C1E),
               letterSpacing: -0.5,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Start a new conversation',
-            style: TextStyle(
-              fontSize: 15,
-              color: const Color(0xFF8E8E93),
-              letterSpacing: -0.2,
-            ),
-          ),
-          const SizedBox(height: 28),
-          GestureDetector(
-            onTap: () {
-              _messageController.text = 'Hey! 👋';
-              FocusScope.of(context).requestFocus(_messageFocusNode);
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF007AFF), Color(0xFF5856D6)],
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
-                ),
-                borderRadius: BorderRadius.circular(22),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF007AFF).withOpacity(0.3),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    '👋',
-                    style: TextStyle(fontSize: 18),
-                  ),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'Say Hello',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: -0.3,
-                    ),
-                  ),
-                ],
-              ),
             ),
           ),
         ],
