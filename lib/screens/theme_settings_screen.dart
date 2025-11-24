@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/theme_provider.dart';
 import '../widgets/glassmorphic_container.dart';
 
-class ThemeSettingsScreen extends StatefulWidget {
+class ThemeSettingsScreen extends ConsumerStatefulWidget {
   const ThemeSettingsScreen({Key? key}) : super(key: key);
 
   @override
-  State<ThemeSettingsScreen> createState() => _ThemeSettingsScreenState();
+  ConsumerState<ThemeSettingsScreen> createState() => _ThemeSettingsScreenState();
 }
 
-class _ThemeSettingsScreenState extends State<ThemeSettingsScreen> 
+class _ThemeSettingsScreenState extends ConsumerState<ThemeSettingsScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
@@ -49,16 +49,17 @@ class _ThemeSettingsScreenState extends State<ThemeSettingsScreen>
 
   @override
   Widget build(BuildContext context) {
-    final themeProvider = Provider.of<ThemeProvider>(context);
-    final isDark = themeProvider.isDarkMode;
-    
+    final themeState = ref.watch(themeProvider);
+    final themeNotifier = ref.read(themeProvider.notifier);
+    final isDark = themeState.isDarkMode;
+
     return Scaffold(
       extendBodyBehindAppBar: true,
       backgroundColor: isDark ? const Color(0xFF000000) : const Color(0xFFF5F5F7),
       body: Stack(
         children: [
           // Animated gradient background
-          if (themeProvider.isGlassmorphism)
+          if (themeState.isGlassmorphism)
             AnimatedContainer(
               duration: const Duration(seconds: 3),
               decoration: BoxDecoration(
@@ -110,7 +111,7 @@ class _ThemeSettingsScreenState extends State<ThemeSettingsScreen>
                       ),
                       const Spacer(),
                       Icon(
-                        themeProvider.isGlassmorphism 
+                        themeState.isGlassmorphism 
                             ? CupertinoIcons.sparkles 
                             : CupertinoIcons.moon_fill,
                         color: ThemeProvider.iosPurple,
@@ -155,9 +156,9 @@ class _ThemeSettingsScreenState extends State<ThemeSettingsScreen>
                                 Color(0xFFF3E5F5),
                               ],
                             ),
-                            isSelected: themeProvider.isGlassmorphism,
+                            isSelected: themeState.isGlassmorphism,
                             onTap: () {
-                              themeProvider.setTheme(AppThemeMode.glassmorphism);
+                              themeNotifier.setTheme(AppThemeMode.glassmorphism);
                             },
                           ),
                           
@@ -175,9 +176,9 @@ class _ThemeSettingsScreenState extends State<ThemeSettingsScreen>
                                 Color(0xFF000000),
                               ],
                             ),
-                            isSelected: themeProvider.isDarkMode,
+                            isSelected: themeState.isDarkMode,
                             onTap: () {
-                              themeProvider.setTheme(AppThemeMode.dark);
+                              themeNotifier.setTheme(AppThemeMode.dark);
                             },
                           ),
                           
@@ -254,7 +255,7 @@ class _ThemeSettingsScreenState extends State<ThemeSettingsScreen>
     required bool isSelected,
     required VoidCallback onTap,
   }) {
-    final isDark = Provider.of<ThemeProvider>(context).isDarkMode;
+    final isDark = ref.watch(themeProvider).isDarkMode;
     
     return TweenAnimationBuilder<double>(
       duration: const Duration(milliseconds: 300),

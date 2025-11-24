@@ -6,7 +6,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:timeago/timeago.dart' as timeago;
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/universal_intent_service.dart';
 import '../services/location_service.dart';
 import '../services/activity_migration_service.dart';
@@ -19,14 +19,14 @@ import 'settings_screen.dart';
 import 'enhanced_chat_screen.dart';
 import '../models/user_profile.dart';
 
-class ProfileWithHistoryScreen extends StatefulWidget {
+class ProfileWithHistoryScreen extends ConsumerStatefulWidget {
   const ProfileWithHistoryScreen({Key? key}) : super(key: key);
 
   @override
-  State<ProfileWithHistoryScreen> createState() => _ProfileWithHistoryScreenState();
+  ConsumerState<ProfileWithHistoryScreen> createState() => _ProfileWithHistoryScreenState();
 }
 
-class _ProfileWithHistoryScreenState extends State<ProfileWithHistoryScreen> {
+class _ProfileWithHistoryScreenState extends ConsumerState<ProfileWithHistoryScreen> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final UniversalIntentService _intentService = UniversalIntentService();
@@ -776,9 +776,9 @@ class _ProfileWithHistoryScreenState extends State<ProfileWithHistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final themeProvider = Provider.of<ThemeProvider>(context);
-    final isDarkMode = themeProvider.isDarkMode;
-    final isGlass = themeProvider.isGlassmorphism;
+    final themeState = ref.watch(themeProvider);
+    final isDarkMode = themeState.isDarkMode;
+    final isGlass = themeState.isGlassmorphism;
     
     return Scaffold(
       extendBodyBehindAppBar: true,

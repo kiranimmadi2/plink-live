@@ -5,7 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:geolocator/geolocator.dart';
@@ -20,14 +20,14 @@ import '../services/connection_service.dart';
 import '../services/location_service.dart';
 import 'my_connections_screen.dart';
 
-class LiveConnectTabScreen extends StatefulWidget {
+class LiveConnectTabScreen extends ConsumerStatefulWidget {
   const LiveConnectTabScreen({Key? key}) : super(key: key);
 
   @override
-  State<LiveConnectTabScreen> createState() => _LiveConnectTabScreenState();
+  ConsumerState<LiveConnectTabScreen> createState() => _LiveConnectTabScreenState();
 }
 
-class _LiveConnectTabScreenState extends State<LiveConnectTabScreen> {
+class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final ConnectionService _connectionService = ConnectionService();
@@ -1923,9 +1923,9 @@ class _LiveConnectTabScreenState extends State<LiveConnectTabScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final themeProvider = Provider.of<ThemeProvider>(context);
-    final isDarkMode = themeProvider.isDarkMode;
-    final isGlass = themeProvider.isGlassmorphism;
+    final themeState = ref.watch(themeProvider);
+    final isDarkMode = themeState.isDarkMode;
+    final isGlass = themeState.isGlassmorphism;
 
     return Scaffold(
       extendBodyBehindAppBar: true,

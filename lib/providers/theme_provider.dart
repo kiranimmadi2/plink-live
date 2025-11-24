@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 enum AppThemeMode {
@@ -7,15 +8,25 @@ enum AppThemeMode {
   dark,
 }
 
-class ThemeProvider extends ChangeNotifier {
+// Theme state class
+class ThemeState {
+  final AppThemeMode currentTheme;
+
+  const ThemeState({this.currentTheme = AppThemeMode.dark});
+
+  bool get isDarkMode => currentTheme == AppThemeMode.dark;
+  bool get isGlassmorphism => currentTheme == AppThemeMode.glassmorphism;
+
+  ThemeState copyWith({AppThemeMode? currentTheme}) {
+    return ThemeState(currentTheme: currentTheme ?? this.currentTheme);
+  }
+}
+
+// Theme notifier
+class ThemeNotifier extends StateNotifier<ThemeState> {
   static const String _themeKey = 'app_theme_mode';
-  AppThemeMode _currentTheme = AppThemeMode.dark;
 
-  AppThemeMode get currentTheme => _currentTheme;
-
-  ThemeProvider() {
-    // Set dark mode as default immediately
-    _currentTheme = AppThemeMode.dark;
+  ThemeNotifier() : super(const ThemeState()) {
     _updateSystemUI();
     _loadTheme();
   }
@@ -23,36 +34,31 @@ class ThemeProvider extends ChangeNotifier {
   Future<void> _loadTheme() async {
     final prefs = await SharedPreferences.getInstance();
     // Force dark mode as default and save it
-    _currentTheme = AppThemeMode.dark;
+    state = const ThemeState(currentTheme: AppThemeMode.dark);
     await prefs.setInt(_themeKey, AppThemeMode.dark.index);
     _updateSystemUI();
-    notifyListeners();
   }
-  
+
   Future<void> setTheme(AppThemeMode theme) async {
-    if (_currentTheme == theme) return;
-    
-    _currentTheme = theme;
+    if (state.currentTheme == theme) return;
+
+    state = state.copyWith(currentTheme: theme);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_themeKey, theme.index);
     _updateSystemUI();
-    notifyListeners();
   }
-  
+
   void _updateSystemUI() {
     SystemChrome.setSystemUIOverlayStyle(
       SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
-        statusBarIconBrightness: isDarkMode ? Brightness.light : Brightness.dark,
-        systemNavigationBarColor: isDarkMode ? const Color(0xFF000000) : const Color(0xFFF5F5F7),
-        systemNavigationBarIconBrightness: isDarkMode ? Brightness.light : Brightness.dark,
+        statusBarIconBrightness: state.isDarkMode ? Brightness.light : Brightness.dark,
+        systemNavigationBarColor: state.isDarkMode ? const Color(0xFF000000) : const Color(0xFFF5F5F7),
+        systemNavigationBarIconBrightness: state.isDarkMode ? Brightness.light : Brightness.dark,
       ),
     );
   }
-  
-  bool get isDarkMode => _currentTheme == AppThemeMode.dark;
-  bool get isGlassmorphism => _currentTheme == AppThemeMode.glassmorphism;
-  
+
   // iOS 16 Color Palette
   static const Color iosBlue = Color(0xFF007AFF);
   static const Color iosPurple = Color(0xFF5856D6);
@@ -62,7 +68,7 @@ class ThemeProvider extends ChangeNotifier {
   static const Color iosGreen = Color(0xFF34C759);
   static const Color iosTeal = Color(0xFF5AC8FA);
   static const Color iosIndigo = Color(0xFF5856D6);
-  
+
   // Background gradients for glassmorphism
   static const List<Color> glassmorphismBackground = [
     Color(0xFFE3F2FD),
@@ -70,22 +76,22 @@ class ThemeProvider extends ChangeNotifier {
     Color(0xFFE8F5E9),
     Color(0xFFFFF3E0),
   ];
-  
+
   static const List<Color> darkBackground = [
     Color(0xFF000000),
     Color(0xFF0A0A0A),
     Color(0xFF141414),
   ];
-  
+
   ThemeData get themeData {
-    switch (_currentTheme) {
+    switch (state.currentTheme) {
       case AppThemeMode.glassmorphism:
         return _glassmorphismTheme;
       case AppThemeMode.dark:
         return _darkTheme;
     }
   }
-  
+
   static final ThemeData _glassmorphismTheme = ThemeData(
     useMaterial3: true,
     brightness: Brightness.light,
@@ -95,7 +101,6 @@ class ThemeProvider extends ChangeNotifier {
       secondary: iosPurple,
       tertiary: iosTeal,
       surface: Color(0xFFF5F5F7),
-      background: Color(0xFFF5F5F7),
       error: iosPink,
     ),
     scaffoldBackgroundColor: const Color(0xFFF5F5F7),
@@ -274,7 +279,7 @@ class ThemeProvider extends ChangeNotifier {
       elevation: 0,
     ),
   );
-  
+
   static final ThemeData _darkTheme = ThemeData(
     useMaterial3: true,
     brightness: Brightness.dark,
@@ -284,7 +289,6 @@ class ThemeProvider extends ChangeNotifier {
       secondary: Color(0xFF5E5CE6),
       tertiary: Color(0xFF64D2FF),
       surface: Color(0xFF1C1C1E),
-      background: Color(0xFF000000),
       error: Color(0xFFFF453A),
     ),
     scaffoldBackgroundColor: const Color(0xFF000000),
@@ -464,3 +468,13 @@ class ThemeProvider extends ChangeNotifier {
     ),
   );
 }
+
+// Riverpod provider
+final themeProvider = StateNotifierProvider<ThemeNotifier, ThemeState>((ref) {
+  return ThemeNotifier();
+});
+
+// Legacy compatibility - for gradual migration
+// ignore: deprecated_member_use_from_same_package
+@Deprecated('Use themeProvider instead')
+class ThemeProvider extends ThemeNotifier {}
