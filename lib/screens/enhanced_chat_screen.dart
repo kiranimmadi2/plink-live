@@ -106,9 +106,6 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
         
         // Listen for incoming messages for sound/vibration feedback
         _listenForIncomingMessages();
-        
-        // Pre-initialize call service in background for faster call start
-        _initializeCallService();
       }
     });
     
@@ -480,13 +477,6 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
                 color: isDarkMode ? Colors.white70 : const Color(0xFF007AFF),
                 size: 24),
             onPressed: _toggleSearch,
-          ),
-        if (!_isSearching)
-          IconButton(
-            icon: Icon(Icons.phone_rounded,
-                color: isDarkMode ? Colors.white70 : const Color(0xFF007AFF),
-                size: 24),
-            onPressed: _makeVoiceCall,
           ),
         IconButton(
           icon: Icon(_isSearching ? Icons.close_rounded : Icons.more_horiz_rounded,
@@ -2325,23 +2315,6 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
       const SnackBar(content: Text('Voice messages coming soon!')),
     );
   }
-  
-  // REMOVED: Call feature disabled
-  Future<void> _initializeCallService() async {
-    // Call service removed - do nothing
-  }
-
-  void _makeVoiceCall() async {
-    // REMOVED: Call feature disabled
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Call feature is currently unavailable'),
-        backgroundColor: Colors.orange,
-      ),
-    );
-  }
-
 
   void _showUserProfile() {
     Navigator.push(

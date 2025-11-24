@@ -46,10 +46,8 @@ dependencies:
   # Gemini AI
   google_generative_ai: ^0.4.7
   
-  # Chat and calling
+  # Chat and messaging
   firebase_messaging: ^15.1.4
-  flutter_webrtc: ^1.1.0  # For all platforms including web
-  # zego_uikit_prebuilt_call: ^4.15.9  # Temporarily disabled due to web compatibility issues
   
   permission_handler: ^11.3.1
   flutter_local_notifications: ^18.0.1

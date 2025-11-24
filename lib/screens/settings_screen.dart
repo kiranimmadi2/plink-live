@@ -409,42 +409,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
               const SizedBox(height: 24),
 
-              // Call Settings Section (Voice calling is important feature)
-              _buildSectionHeader(
-                icon: CupertinoIcons.phone_fill,
-                title: 'Calls',
-                color: ThemeProvider.iosGreen,
-                isDark: isDark,
-              ),
-              const SizedBox(height: 12),
-              _buildSettingsCard(
-                isDark: isDark,
-                isGlass: isGlass,
-                children: [
-                  SwitchListTile(
-                    secondary: const Icon(Icons.phone_callback_outlined),
-                    title: const Text('Allow Incoming Calls'),
-                    subtitle: const Text('Receive voice calls from matches'),
-                    value: true,
-                    onChanged: (value) {
-                      _updatePreference('allowIncomingCalls', value);
-                    },
-                  ),
-                  const Divider(height: 1),
-                  SwitchListTile(
-                    secondary: const Icon(Icons.vibration_outlined),
-                    title: const Text('Call Vibration'),
-                    subtitle: const Text('Vibrate for incoming calls'),
-                    value: true,
-                    onChanged: (value) {
-                      _updatePreference('callVibration', value);
-                    },
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 24),
-
               // Notifications Section
               _buildSectionHeader(
                 icon: CupertinoIcons.bell_fill,

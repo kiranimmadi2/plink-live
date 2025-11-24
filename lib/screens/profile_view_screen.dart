@@ -1,11 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../models/post_model.dart';
 import '../models/user_profile.dart';
-// REMOVED: Call feature imports (feature deleted)
-// import '../models/call_model.dart';
-// import '../services/simple_call_service.dart';
 import 'enhanced_chat_screen.dart';
 
 class ProfileViewScreen extends StatefulWidget {
@@ -408,37 +404,19 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
             ),
           ],
         ),
-        child: Row(
-          children: [
-            Expanded(
-              child: ElevatedButton.icon(
-                onPressed: _startChat,
-                icon: const Icon(Icons.chat_bubble),
-                label: const Text('Chat'),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                ),
+        child: SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: _startChat,
+            icon: const Icon(Icons.chat_bubble),
+            label: const Text('Start Chat'),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(30),
               ),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: ElevatedButton.icon(
-                onPressed: _makeCall,
-                icon: const Icon(Icons.phone),
-                label: const Text('Call'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                ),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -458,16 +436,6 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
           otherUser: widget.userProfile,
           initialMessage: initialMessage,
         ),
-      ),
-    );
-  }
-
-  void _makeCall() async {
-    // REMOVED: Call feature disabled
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Call feature is currently unavailable'),
-        backgroundColor: Colors.orange,
       ),
     );
   }
