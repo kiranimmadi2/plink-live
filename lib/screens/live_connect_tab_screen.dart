@@ -1,14 +1,12 @@
 import 'dart:ui';
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:geolocator/geolocator.dart';
 import '../widgets/user_avatar.dart';
 import '../providers/theme_provider.dart';
 import 'enhanced_chat_screen.dart';
@@ -21,7 +19,7 @@ import '../services/location_service.dart';
 import 'my_connections_screen.dart';
 
 class LiveConnectTabScreen extends ConsumerStatefulWidget {
-  const LiveConnectTabScreen({Key? key}) : super(key: key);
+  const LiveConnectTabScreen({super.key});
 
   @override
   ConsumerState<LiveConnectTabScreen> createState() => _LiveConnectTabScreenState();
@@ -35,8 +33,8 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
 
   Map<String, dynamic>? _userProfile;
   List<String> _selectedInterests = [];
-  List<String> _selectedConnectionTypes = [];
-  List<String> _selectedActivities = [];
+  final List<String> _selectedConnectionTypes = [];
+  final List<String> _selectedActivities = [];
   List<Map<String, dynamic>> _nearbyPeople = [];
   List<Map<String, dynamic>> _filteredPeople = []; // For search results
   bool _isLoadingPeople = false;
@@ -47,14 +45,14 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
   double? _currentUserLon;
 
   // Filter options
-  bool _filterByExactLocation = false;
+  final bool _filterByExactLocation = false;
   bool _filterByInterests = false;
   bool _filterByGender = false;
   bool _filterByConnectionTypes = false;
   bool _filterByActivities = false;
   double _distanceFilter = 50.0; // Distance in km
   String _locationFilter = 'Worldwide'; // 'Near me', 'City', 'Country', 'Worldwide'
-  List<String> _selectedGenders = [];
+  final List<String> _selectedGenders = [];
 
   // Pagination variables
   bool _isLoadingMore = false;
@@ -169,7 +167,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
     });
   }
 
-  /// Get connection status info for displaying badge
+  // ignore: unused_element
   Future<Map<String, dynamic>> _getConnectionStatusInfo(String userId) async {
     // Check if already connected (using cache)
     final isConnected = _isConnectedCached(userId);
@@ -227,12 +225,12 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
         _loadNearbyPeople();
       }
     } catch (e) {
-      print('Error loading user profile: $e');
+      debugPrint('Error loading user profile: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Row(
-              children: const [
+            content: const Row(
+              children: [
                 Icon(Icons.error_outline, color: Colors.white),
                 SizedBox(width: 12),
                 Expanded(
@@ -497,7 +495,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
         });
       }
     } catch (e) {
-      print('Error loading nearby people: $e');
+      debugPrint('Error loading nearby people: $e');
       if (mounted) {
         setState(() {
           _isLoadingPeople = false;
@@ -505,8 +503,8 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Row(
-              children: const [
+            content: const Row(
+              children: [
                 Icon(Icons.error_outline, color: Colors.white),
                 SizedBox(width: 12),
                 Expanded(
@@ -587,6 +585,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
     final userId = _auth.currentUser?.uid;
     if (userId == null) return;
 
+    // ignore: unused_local_variable
     final myProfile = ExtendedUserProfile.fromMap(_userProfile!, userId);
 
     showModalBottomSheet(
@@ -645,12 +644,12 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
       // Reload nearby people
       _loadNearbyPeople();
     } catch (e) {
-      print('Error updating interests: $e');
+      debugPrint('Error updating interests: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Row(
-              children: const [
+            content: const Row(
+              children: [
                 Icon(Icons.error_outline, color: Colors.white),
                 SizedBox(width: 12),
                 Expanded(
@@ -844,7 +843,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                     activeTrackColor: const Color(0xFF00D67D),
                                     inactiveTrackColor: Colors.grey[700],
                                     thumbColor: const Color(0xFF00D67D),
-                                    overlayColor: const Color(0xFF00D67D).withOpacity(0.2),
+                                    overlayColor: const Color(0xFF00D67D).withValues(alpha: 0.2),
                                     trackHeight: 4,
                                   ),
                                   child: Slider(
@@ -952,7 +951,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                     _filterByInterests = value;
                                   });
                                 },
-                                activeColor: const Color(0xFF00D67D),
+                                activeTrackColor: const Color(0xFF00D67D),
                               ),
                             ],
                           ),
@@ -986,7 +985,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                 padding: const EdgeInsets.only(top: 8),
                                 child: Row(
                                   children: [
-                                    Icon(Icons.warning_amber, size: 14, color: Colors.orange),
+                                    const Icon(Icons.warning_amber, size: 14, color: Colors.orange),
                                     const SizedBox(width: 6),
                                     Expanded(
                                       child: Text(
@@ -1025,7 +1024,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                                       decoration: BoxDecoration(
                                         color: isSelected
-                                            ? Theme.of(context).primaryColor.withOpacity(0.2)
+                                            ? Theme.of(context).primaryColor.withValues(alpha: 0.2)
                                             : Colors.grey[800],
                                         borderRadius: BorderRadius.circular(16),
                                         border: Border.all(
@@ -1071,7 +1070,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                               ),
                               child: Row(
                                 children: [
-                                  Icon(Icons.info_outline, size: 20, color: Colors.grey[400]),
+                                  const Icon(Icons.info_outline, size: 20, color: Colors.grey),
                                   const SizedBox(width: 12),
                                   Expanded(
                                     child: Text(
@@ -1114,7 +1113,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                     _filterByGender = value;
                                   });
                                 },
-                                activeColor: const Color(0xFF00D67D),
+                                activeTrackColor: const Color(0xFF00D67D),
                               ),
                             ],
                           ),
@@ -1151,7 +1150,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                     ),
                                     decoration: BoxDecoration(
                                       color: isSelected
-                                          ? const Color(0xFF4A90E2).withOpacity(0.2)
+                                          ? const Color(0xFF4A90E2).withValues(alpha: 0.2)
                                           : Colors.grey[800],
                                       borderRadius: BorderRadius.circular(20),
                                       border: isSelected
@@ -1193,7 +1192,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                               ),
                               child: Row(
                                 children: [
-                                  Icon(Icons.info_outline, size: 20, color: Colors.grey[400]),
+                                  const Icon(Icons.info_outline, size: 20, color: Colors.grey),
                                   const SizedBox(width: 12),
                                   Expanded(
                                     child: Text(
@@ -1214,9 +1213,9 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                           // Connection Types Filter Section
                           Row(
                             children: [
-                              Icon(
+                              const Icon(
                                 Icons.connect_without_contact,
-                                color: const Color(0xFF9C27B0), // Purple
+                                color: Color(0xFF9C27B0), // Purple
                                 size: 20,
                               ),
                               const SizedBox(width: 8),
@@ -1236,7 +1235,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                     _filterByConnectionTypes = value;
                                   });
                                 },
-                                activeColor: const Color(0xFF00D67D),
+                                activeTrackColor: const Color(0xFF00D67D),
                               ),
                             ],
                           ),
@@ -1271,10 +1270,10 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                     child: Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                                       decoration: BoxDecoration(
-                                        color: const Color(0xFF9C27B0).withOpacity(0.15),
+                                        color: const Color(0xFF9C27B0).withValues(alpha: 0.15),
                                         borderRadius: BorderRadius.circular(12),
                                         border: Border.all(
-                                          color: const Color(0xFF9C27B0).withOpacity(0.3),
+                                          color: const Color(0xFF9C27B0).withValues(alpha: 0.3),
                                         ),
                                       ),
                                       child: Row(
@@ -1333,16 +1332,16 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                                               decoration: BoxDecoration(
                                                 color: isSelected
-                                                    ? const Color(0xFF00D67D).withOpacity(0.2)
+                                                    ? const Color(0xFF00D67D).withValues(alpha: 0.2)
                                                     : isUserOwn
-                                                        ? const Color(0xFF9C27B0).withOpacity(0.1)
+                                                        ? const Color(0xFF9C27B0).withValues(alpha: 0.1)
                                                         : Colors.grey[800],
                                                 borderRadius: BorderRadius.circular(16),
                                                 border: Border.all(
                                                   color: isSelected
                                                       ? const Color(0xFF00D67D)
                                                       : isUserOwn
-                                                          ? const Color(0xFF9C27B0).withOpacity(0.5)
+                                                          ? const Color(0xFF9C27B0).withValues(alpha: 0.5)
                                                           : Colors.grey[600]!,
                                                   width: isSelected ? 2 : 1,
                                                 ),
@@ -1387,7 +1386,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                   const SizedBox(height: 12),
                                 ],
                               );
-                            }).toList(),
+                            }),
                           ] else ...[
                             Container(
                               padding: const EdgeInsets.all(16),
@@ -1418,9 +1417,9 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                           // Activities Filter Section
                           Row(
                             children: [
-                              Icon(
+                              const Icon(
                                 Icons.directions_run,
-                                color: const Color(0xFF9C27B0), // Purple
+                                color: Color(0xFF9C27B0), // Purple
                                 size: 20,
                               ),
                               const SizedBox(width: 8),
@@ -1440,7 +1439,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                     _filterByActivities = value;
                                   });
                                 },
-                                activeColor: const Color(0xFF00D67D),
+                                activeTrackColor: const Color(0xFF00D67D),
                               ),
                             ],
                           ),
@@ -1475,10 +1474,10 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                     child: Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                                       decoration: BoxDecoration(
-                                        color: const Color(0xFF9C27B0).withOpacity(0.15),
+                                        color: const Color(0xFF9C27B0).withValues(alpha: 0.15),
                                         borderRadius: BorderRadius.circular(12),
                                         border: Border.all(
-                                          color: const Color(0xFF9C27B0).withOpacity(0.3),
+                                          color: const Color(0xFF9C27B0).withValues(alpha: 0.3),
                                         ),
                                       ),
                                       child: Row(
@@ -1537,16 +1536,16 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                                               decoration: BoxDecoration(
                                                 color: isSelected
-                                                    ? const Color(0xFF00D67D).withOpacity(0.2)
+                                                    ? const Color(0xFF00D67D).withValues(alpha: 0.2)
                                                     : isUserOwn
-                                                        ? const Color(0xFF9C27B0).withOpacity(0.1)
+                                                        ? const Color(0xFF9C27B0).withValues(alpha: 0.1)
                                                         : Colors.grey[800],
                                                 borderRadius: BorderRadius.circular(16),
                                                 border: Border.all(
                                                   color: isSelected
                                                       ? const Color(0xFF00D67D)
                                                       : isUserOwn
-                                                          ? const Color(0xFF9C27B0).withOpacity(0.5)
+                                                          ? const Color(0xFF9C27B0).withValues(alpha: 0.5)
                                                           : Colors.grey[600]!,
                                                   width: isSelected ? 2 : 1,
                                                 ),
@@ -1591,7 +1590,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                   const SizedBox(height: 12),
                                 ],
                               );
-                            }).toList(),
+                            }),
                           ] else ...[
                             Container(
                               padding: const EdgeInsets.all(16),
@@ -1628,7 +1627,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                       color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
+                          color: Colors.black.withValues(alpha: 0.1),
                           blurRadius: 12,
                           offset: const Offset(0, -4),
                         ),
@@ -1697,6 +1696,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
     );
   }
 
+  // ignore: unused_element
   void _openChat(Map<String, dynamic> userData, String userId) {
     // Create UserProfile from userData
     final userProfile = UserProfile.fromMap(userData, userId);
@@ -1730,7 +1730,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
     }
   }
 
-  // Helper method to get varied colors for interest tags
+  // ignore: unused_element
   Color _getInterestTagColor(String interest, int index) {
     final colors = [
       const Color(0xFF00D67D), // Vibrant green
@@ -1743,6 +1743,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
     return colors[index % colors.length];
   }
 
+  // ignore: unused_element
   Future<void> _toggleFavorite(String userId, String userName) async {
     final currentUserId = _auth.currentUser?.uid;
     if (currentUserId == null) return;
@@ -1780,11 +1781,11 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
         }
       }
     } catch (e) {
-      print('Error toggling favorite: $e');
+      debugPrint('Error toggling favorite: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to update favorites. Please try again.'),
+            content: const Text('Failed to update favorites. Please try again.'),
             backgroundColor: Colors.red.shade600,
           ),
         );
@@ -1856,10 +1857,11 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
 
                 if (result['success']) {
                   // Request succeeded - cache is already updated optimistically
+                  if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
+                    const SnackBar(
                       content: Row(
-                        children: const [
+                        children: [
                           Icon(Icons.check_circle, color: Colors.white),
                           SizedBox(width: 12),
                           Expanded(
@@ -1868,13 +1870,14 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                         ],
                       ),
                       backgroundColor: Colors.green,
-                      duration: const Duration(seconds: 2),
+                      duration: Duration(seconds: 2),
                     ),
                   );
                 } else {
                   // Request failed - revert optimistic update
                   _updateConnectionCache(user.uid, false, requestStatus: null);
 
+                  if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Row(
@@ -2224,9 +2227,9 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                       Padding(
                         padding: const EdgeInsets.only(right: 6),
                         child: FilterChip(
-                          label: Row(
+                          label: const Row(
                             mainAxisSize: MainAxisSize.min,
-                            children: const [
+                            children: [
                               Icon(Icons.location_on, size: 14),
                               SizedBox(width: 3),
                               Text('Near Me', style: TextStyle(fontSize: 12)),
@@ -2418,9 +2421,9 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                       Padding(
                         padding: const EdgeInsets.only(right: 6),
                         child: ActionChip(
-                          label: Row(
+                          label: const Row(
                             mainAxisSize: MainAxisSize.min,
-                            children: const [
+                            children: [
                               Icon(Icons.tune, size: 14),
                               SizedBox(width: 3),
                               Text('Filters', style: TextStyle(fontSize: 12)),
@@ -2742,6 +2745,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
         final person = _filteredPeople[index];
         final userData = person['userData'] as Map<String, dynamic>;
         final commonInterests = person['commonInterests'] as List<String>;
+        // ignore: unused_local_variable
         final matchScore = person['matchScore'] as double;
         final userId = person['userId'] as String;
         final distance = person['distance'] as double?;
@@ -2827,7 +2831,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: gradientColors[0].withOpacity(0.3),
+                                  color: gradientColors[0].withValues(alpha: 0.3),
                                   blurRadius: 12,
                                   offset: const Offset(0, 4),
                                 ),
@@ -2851,7 +2855,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                               shape: BoxShape.circle,
                               boxShadow: [
                                 BoxShadow(
-                                  color: gradientColors[0].withOpacity(0.3),
+                                  color: gradientColors[0].withValues(alpha: 0.3),
                                   blurRadius: 12,
                                   offset: const Offset(0, 4),
                                 ),

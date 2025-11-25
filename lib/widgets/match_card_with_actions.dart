@@ -14,10 +14,10 @@ class MatchCardWithActions extends StatelessWidget {
   final VoidCallback? onTap;
 
   const MatchCardWithActions({
-    Key? key,
+    super.key,
     required this.match,
     this.onTap,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -25,9 +25,9 @@ class MatchCardWithActions extends StatelessWidget {
     final isDark = theme.brightness == Brightness.dark;
     
     return Card(
-      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       elevation: isDark ? 8 : 4,
-      shadowColor: theme.primaryColor.withOpacity(0.2),
+      shadowColor: theme.primaryColor.withValues(alpha: 0.2),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
       ),
@@ -35,14 +35,14 @@ class MatchCardWithActions extends StatelessWidget {
         onTap: onTap ?? () => _viewProfile(context),
         borderRadius: BorderRadius.circular(16),
         child: Container(
-          padding: EdgeInsets.all(16),
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
             gradient: isDark
                 ? LinearGradient(
                     colors: [
                       theme.cardColor,
-                      theme.cardColor.withOpacity(0.95),
+                      theme.cardColor.withValues(alpha: 0.95),
                     ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
@@ -64,11 +64,11 @@ class MatchCardWithActions extends StatelessWidget {
                           ? CachedNetworkImageProvider(match['userProfile']['photoUrl'])
                           : null,
                       child: match['userProfile']?['photoUrl'] == null
-                          ? Icon(Icons.person, size: 28)
+                          ? const Icon(Icons.person, size: 28)
                           : null,
                     ),
                   ),
-                  SizedBox(width: 12),
+                  const SizedBox(width: 12),
                   
                   // Name and Location
                   Expanded(
@@ -89,7 +89,7 @@ class MatchCardWithActions extends StatelessWidget {
                                 size: 14,
                                 color: theme.textTheme.bodySmall?.color,
                               ),
-                              SizedBox(width: 4),
+                              const SizedBox(width: 4),
                               Text(
                                 match['location'],
                                 style: theme.textTheme.bodySmall,
@@ -105,13 +105,13 @@ class MatchCardWithActions extends StatelessWidget {
               // Intent/Description
               if (match['text'] != null || match['intent'] != null)
                 Container(
-                  margin: EdgeInsets.only(top: 12),
-                  padding: EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(top: 12),
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: theme.primaryColor.withOpacity(0.05),
+                    color: theme.primaryColor.withValues(alpha: 0.05),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: theme.primaryColor.withOpacity(0.1),
+                      color: theme.primaryColor.withValues(alpha: 0.1),
                       width: 1,
                     ),
                   ),
@@ -125,7 +125,7 @@ class MatchCardWithActions extends StatelessWidget {
               
               // Action Buttons Row
               Container(
-                margin: EdgeInsets.only(top: 16),
+                margin: const EdgeInsets.only(top: 16),
                 child: Row(
                   children: [
                     // Chat Button
@@ -137,8 +137,8 @@ class MatchCardWithActions extends StatelessWidget {
                         onTap: () => _startChat(context),
                       ),
                     ),
-                    SizedBox(width: 8),
-                    
+                    const SizedBox(width: 8),
+
                     // Call Button
                     Expanded(
                       child: _ActionButton(
@@ -148,8 +148,8 @@ class MatchCardWithActions extends StatelessWidget {
                         onTap: () => _startCall(context),
                       ),
                     ),
-                    SizedBox(width: 8),
-                    
+                    const SizedBox(width: 8),
+
                     // View Profile Button
                     Expanded(
                       child: _ActionButton(
@@ -169,6 +169,7 @@ class MatchCardWithActions extends StatelessWidget {
     );
   }
 
+  // ignore: unused_element
   Color _getScoreColor(double score) {
     if (score >= 0.9) return Colors.green;
     if (score >= 0.8) return Colors.teal;
@@ -191,6 +192,7 @@ class MatchCardWithActions extends StatelessWidget {
     final receiver = UserProfile.fromFirestore(receiverDoc);
 
     // Navigate to chat
+    if (!context.mounted) return;
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -222,6 +224,7 @@ class MatchCardWithActions extends StatelessWidget {
 
     final profile = UserProfile.fromFirestore(userDoc);
 
+    if (!context.mounted) return;
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -257,12 +260,12 @@ class _ActionButton extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
         child: Container(
-          padding: EdgeInsets.symmetric(vertical: 10),
+          padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
-            color: color.withOpacity(isDark ? 0.2 : 0.1),
+            color: color.withValues(alpha: isDark ? 0.2 : 0.1),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: color.withOpacity(0.3),
+              color: color.withValues(alpha: 0.3),
               width: 1,
             ),
           ),
@@ -274,7 +277,7 @@ class _ActionButton extends StatelessWidget {
                 color: color,
                 size: 20,
               ),
-              SizedBox(height: 4),
+              const SizedBox(height: 4),
               Text(
                 label,
                 style: TextStyle(

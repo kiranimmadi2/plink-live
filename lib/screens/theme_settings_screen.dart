@@ -5,7 +5,7 @@ import '../providers/theme_provider.dart';
 import '../widgets/glassmorphic_container.dart';
 
 class ThemeSettingsScreen extends ConsumerStatefulWidget {
-  const ThemeSettingsScreen({Key? key}) : super(key: key);
+  const ThemeSettingsScreen({super.key});
 
   @override
   ConsumerState<ThemeSettingsScreen> createState() => _ThemeSettingsScreenState();
@@ -194,7 +194,7 @@ class _ThemeSettingsScreenState extends ConsumerState<ThemeSettingsScreen>
                               children: [
                                 Row(
                                   children: [
-                                    Icon(
+                                    const Icon(
                                       CupertinoIcons.paintbrush_fill,
                                       color: ThemeNotifier.iosPurple,
                                     ),

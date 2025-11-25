@@ -23,9 +23,9 @@ class FloatingParticles extends StatefulWidget {
   final int particleCount;
 
   const FloatingParticles({
-    Key? key,
+    super.key,
     this.particleCount = 8,
-  }) : super(key: key);
+  });
 
   @override
   State<FloatingParticles> createState() => _FloatingParticlesState();

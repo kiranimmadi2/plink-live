@@ -1,6 +1,6 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
 class FirebaseStorageService {
@@ -18,18 +18,18 @@ class FirebaseStorageService {
       try {
         // Check if file exists
         if (!await image.exists()) {
-          print('Image file does not exist: ${image.path}');
+          debugPrint('Image file does not exist: ${image.path}');
           continue;
         }
-        
+
         // Get file size
         final fileSize = await image.length();
-        print('Uploading image: ${image.path}, size: $fileSize bytes');
+        debugPrint('Uploading image: ${image.path}, size: $fileSize bytes');
         
         String fileName = '${_uuid.v4()}.jpg';
         String path = 'posts/$userId/$fileName';
-        
-        print('Upload path: $path');
+
+        debugPrint('Upload path: $path');
         
         // Create reference
         final ref = _storage.ref().child(path);
@@ -47,14 +47,14 @@ class FirebaseStorageService {
         
         if (uploadTask.state == TaskState.success) {
           final downloadUrl = await uploadTask.ref.getDownloadURL();
-          print('Image uploaded successfully: $downloadUrl');
+          debugPrint('Image uploaded successfully: $downloadUrl');
           downloadUrls.add(downloadUrl);
         } else {
-          print('Upload failed with state: ${uploadTask.state}');
+          debugPrint('Upload failed with state: ${uploadTask.state}');
         }
       } catch (e, stackTrace) {
-        print('Error uploading image: $e');
-        print('Stack trace: $stackTrace');
+        debugPrint('Error uploading image: $e');
+        debugPrint('Stack trace: $stackTrace');
         // Continue with other images even if one fails
       }
     }
@@ -64,19 +64,19 @@ class FirebaseStorageService {
 
   Future<String?> uploadProfileImage(File image, String userId) async {
     try {
-      print('Starting profile image upload for user: $userId');
-      print('File path: ${image.path}');
-      
+      debugPrint('Starting profile image upload for user: $userId');
+      debugPrint('File path: ${image.path}');
+
       // Check if file exists
       if (!await image.exists()) {
-        print('Profile image file does not exist: ${image.path}');
+        debugPrint('Profile image file does not exist: ${image.path}');
         return null;
       }
-      
+
       String fileName = 'profile_${DateTime.now().millisecondsSinceEpoch}_${_uuid.v4()}.jpg';
       String path = 'profiles/$userId/$fileName';
-      
-      print('Upload path: $path');
+
+      debugPrint('Upload path: $path');
       
       final ref = _storage.ref().child(path);
       
@@ -94,28 +94,28 @@ class FirebaseStorageService {
       // Check if upload was successful
       if (uploadTask.state == TaskState.success) {
         final downloadUrl = await uploadTask.ref.getDownloadURL();
-        print('Upload successful! URL: $downloadUrl');
+        debugPrint('Upload successful! URL: $downloadUrl');
         return downloadUrl;
       } else {
-        print('Upload failed with state: ${uploadTask.state}');
+        debugPrint('Upload failed with state: ${uploadTask.state}');
         return null;
       }
     } catch (e, stackTrace) {
-      print('Error uploading profile image: $e');
-      print('Stack trace: $stackTrace');
+      debugPrint('Error uploading profile image: $e');
+      debugPrint('Stack trace: $stackTrace');
       return null;
     }
   }
 
   Future<String?> uploadProfileImageBytes(Uint8List imageBytes, String userId) async {
     try {
-      print('Starting profile image upload for user: $userId');
-      print('Image size: ${imageBytes.length} bytes');
-      
+      debugPrint('Starting profile image upload for user: $userId');
+      debugPrint('Image size: ${imageBytes.length} bytes');
+
       String fileName = 'profile_${DateTime.now().millisecondsSinceEpoch}_${_uuid.v4()}.jpg';
       String path = 'profiles/$userId/$fileName';
-      
-      print('Upload path: $path');
+
+      debugPrint('Upload path: $path');
       
       final ref = _storage.ref().child(path);
       
@@ -133,15 +133,15 @@ class FirebaseStorageService {
       // Check if upload was successful
       if (uploadTask.state == TaskState.success) {
         final downloadUrl = await uploadTask.ref.getDownloadURL();
-        print('Upload successful! URL: $downloadUrl');
+        debugPrint('Upload successful! URL: $downloadUrl');
         return downloadUrl;
       } else {
-        print('Upload failed with state: ${uploadTask.state}');
+        debugPrint('Upload failed with state: ${uploadTask.state}');
         return null;
       }
     } catch (e, stackTrace) {
-      print('Error uploading profile image bytes: $e');
-      print('Stack trace: $stackTrace');
+      debugPrint('Error uploading profile image bytes: $e');
+      debugPrint('Stack trace: $stackTrace');
       return null;
     }
   }

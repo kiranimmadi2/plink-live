@@ -6,13 +6,11 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../services/firebase_storage_service.dart';
 import '../services/auth_service.dart';
-import '../services/profile_service.dart';
 import '../services/user_manager.dart';
 import '../services/location_service.dart';
-import '../widgets/user_avatar.dart';
 
 class ProfileEditScreen extends StatefulWidget {
-  const ProfileEditScreen({Key? key}) : super(key: key);
+  const ProfileEditScreen({super.key});
 
   @override
   State<ProfileEditScreen> createState() => _ProfileEditScreenState();
@@ -173,9 +171,9 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         _currentPhotoUrl = user!.photoURL;
       }
       
-      print('Loaded profile - Name: ${_nameController.text}, Photo URL: $_currentPhotoUrl');
+      debugPrint('Loaded profile - Name: ${_nameController.text}, Photo URL: $_currentPhotoUrl');
     } catch (e) {
-      print('Error loading profile: $e');
+      debugPrint('Error loading profile: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -191,6 +189,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     }
   }
 
+  // ignore: unused_element
   Future<void> _createInitialProfile() async {
     if (user == null) return;
     
@@ -205,7 +204,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         'isOnline': true,
       });
     } catch (e) {
-      print('Error creating initial profile: $e');
+      debugPrint('Error creating initial profile: $e');
     }
   }
 
@@ -221,13 +220,13 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       String? photoUrl = _currentPhotoUrl ?? user!.photoURL;
       
       if (_selectedImage != null) {
-        print('Uploading new profile image...');
+        debugPrint('Uploading new profile image...');
         final uploadedUrl = await _storageService.uploadProfileImage(_selectedImage!, user!.uid);
         if (uploadedUrl != null) {
           photoUrl = uploadedUrl;
-          print('New profile image uploaded: $uploadedUrl');
+          debugPrint('New profile image uploaded: $uploadedUrl');
         } else {
-          print('Failed to upload profile image');
+          debugPrint('Failed to upload profile image');
         }
       }
       
@@ -284,7 +283,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         'age': age,
       });
       
-      print('Profile updated successfully');
+      debugPrint('Profile updated successfully');
       
       // Update local state with new photo URL and clear selected image
       if (photoUrl != null) {
@@ -304,11 +303,13 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         
         // Reload profile to ensure everything is synced
         await _loadUserProfile();
-        
+
+        if (!mounted) return;
         Navigator.pop(context, true); // Return true to indicate profile was updated
       }
     } catch (e) {
-      print('Error updating profile: $e');
+      debugPrint('Error updating profile: $e');
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error updating profile: $e'),
@@ -336,7 +337,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         });
       }
     } catch (e) {
-      print('Error picking image: $e');
+      debugPrint('Error picking image: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -363,7 +364,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         });
       }
     } catch (e) {
-      print('Error taking photo: $e');
+      debugPrint('Error taking photo: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -424,12 +425,12 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     });
 
     try {
-      print('ProfileEditScreen: Getting GPS location (user-initiated)...');
+      debugPrint('ProfileEditScreen: Getting GPS location (user-initiated)...');
       // User manually clicked location button, so NOT silent mode
       final position = await _locationService.getCurrentLocation(silent: false);
 
       if (position != null) {
-        print('ProfileEditScreen: Got GPS position: ${position.latitude}, ${position.longitude}');
+        debugPrint('ProfileEditScreen: Got GPS position: ${position.latitude}, ${position.longitude}');
         final addressData = await _locationService.getCityFromCoordinates(
           position.latitude,
           position.longitude,
@@ -441,7 +442,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
             mounted) {
           // Only show real location with valid city name
           final locationString = addressData['display'] ?? addressData['city'];
-          print('ProfileEditScreen: Got real location: $locationString');
+          debugPrint('ProfileEditScreen: Got real location: $locationString');
           setState(() {
             _locationController.text = locationString;
           });
@@ -453,7 +454,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
             ),
           );
         } else {
-          print('ProfileEditScreen: Geocoding failed or returned invalid data');
+          debugPrint('ProfileEditScreen: Geocoding failed or returned invalid data');
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
@@ -464,7 +465,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
           }
         }
       } else {
-        print('ProfileEditScreen: Could not get GPS position');
+        debugPrint('ProfileEditScreen: Could not get GPS position');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -476,7 +477,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         }
       }
     } catch (e) {
-      print('ProfileEditScreen: Error updating location: $e');
+      debugPrint('ProfileEditScreen: Error updating location: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -661,7 +662,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
 
                     // Gender Selection
                     DropdownButtonFormField<String>(
-                      value: _selectedGender,
+                      initialValue: _selectedGender,
                       decoration: const InputDecoration(
                         labelText: 'Gender',
                         prefixIcon: Icon(Icons.person_outline),
@@ -714,7 +715,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
 
                     // Occupation Dropdown
                     DropdownButtonFormField<String>(
-                      value: _selectedOccupation,
+                      initialValue: _selectedOccupation,
                       decoration: const InputDecoration(
                         labelText: 'Occupation',
                         prefixIcon: Icon(Icons.work_outline),
@@ -770,7 +771,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
           fit: BoxFit.cover,
           placeholder: (context, url) => const CircularProgressIndicator(),
           errorWidget: (context, url, error) {
-            print('Error loading profile image in edit screen: $error');
+            debugPrint('Error loading profile image in edit screen: $error');
             return Icon(
               Icons.person,
               size: 60,

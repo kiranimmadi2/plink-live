@@ -7,11 +7,11 @@ class AudioVisualizer extends StatefulWidget {
   final int barCount;
 
   const AudioVisualizer({
-    Key? key,
+    super.key,
     this.isActive = false,
     this.height = 60,
     this.barCount = 40,
-  }) : super(key: key);
+  });
 
   @override
   State<AudioVisualizer> createState() => _AudioVisualizerState();

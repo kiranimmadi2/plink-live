@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import '../utils/memory_manager.dart';
 
@@ -35,8 +34,9 @@ class SafeNetworkService {
               ? i + MemoryManager.optimalBufferSize 
               : chunkSize;
             
+            // ignore: unused_local_variable
             final subChunk = chunk.sublist(i, end);
-            
+
             // Process sub-chunk
             await Future.delayed(const Duration(microseconds: 100)); // Small delay to prevent overwhelming
           }

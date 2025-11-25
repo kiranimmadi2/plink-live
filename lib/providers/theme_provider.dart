@@ -104,18 +104,18 @@ class ThemeNotifier extends StateNotifier<ThemeState> {
       error: iosPink,
     ),
     scaffoldBackgroundColor: const Color(0xFFF5F5F7),
-    appBarTheme: AppBarTheme(
+    appBarTheme: const AppBarTheme(
       backgroundColor: Colors.transparent,
       foregroundColor: Colors.black,
       elevation: 0,
       systemOverlayStyle: SystemUiOverlayStyle.dark,
-      titleTextStyle: const TextStyle(
+      titleTextStyle: TextStyle(
         color: Colors.black,
         fontSize: 20,
         fontWeight: FontWeight.w600,
         letterSpacing: -0.5,
       ),
-      iconTheme: const IconThemeData(
+      iconTheme: IconThemeData(
         color: Colors.black,
         size: 24,
       ),
@@ -292,18 +292,18 @@ class ThemeNotifier extends StateNotifier<ThemeState> {
       error: Color(0xFFFF453A),
     ),
     scaffoldBackgroundColor: const Color(0xFF000000),
-    appBarTheme: AppBarTheme(
+    appBarTheme: const AppBarTheme(
       backgroundColor: Colors.transparent,
       foregroundColor: Colors.white,
       elevation: 0,
       systemOverlayStyle: SystemUiOverlayStyle.light,
-      titleTextStyle: const TextStyle(
+      titleTextStyle: TextStyle(
         color: Colors.white,
         fontSize: 20,
         fontWeight: FontWeight.w600,
         letterSpacing: -0.5,
       ),
-      iconTheme: const IconThemeData(
+      iconTheme: IconThemeData(
         color: Colors.white,
         size: 24,
       ),

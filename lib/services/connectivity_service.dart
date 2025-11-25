@@ -28,7 +28,7 @@ class ConnectivityService {
       _connectionChangeController.add(_hasConnection);
       return _hasConnection;
     } catch (e) {
-      print('Error checking connectivity: $e');
+      debugPrint('Error checking connectivity: $e');
       return true; // Assume connected if check fails
     }
   }

@@ -7,12 +7,12 @@ class ShimmerEffect extends StatefulWidget {
   final Color? highlightColor;
 
   const ShimmerEffect({
-    Key? key,
+    super.key,
     required this.child,
     this.duration = const Duration(milliseconds: 2500),
     this.baseColor,
     this.highlightColor,
-  }) : super(key: key);
+  });
 
   @override
   State<ShimmerEffect> createState() => _ShimmerEffectState();

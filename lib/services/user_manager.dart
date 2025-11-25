@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:google_sign_in/google_sign_in.dart';
+import 'package:flutter/foundation.dart';
 import 'photo_cache_service.dart';
 
 class UserManager {
@@ -17,7 +17,7 @@ class UserManager {
   
   // User profile cache
   Map<String, dynamic>? _cachedProfile;
-  StreamController<Map<String, dynamic>?> _profileController = StreamController<Map<String, dynamic>?>.broadcast();
+  final StreamController<Map<String, dynamic>?> _profileController = StreamController<Map<String, dynamic>?>.broadcast();
   
   Stream<Map<String, dynamic>?> get profileStream => _profileController.stream;
   Map<String, dynamic>? get cachedProfile => _cachedProfile;
@@ -58,7 +58,7 @@ class UserManager {
         await loadUserProfile(user.uid);
       }
     } catch (e) {
-      print('Error ensuring user profile: $e');
+      debugPrint('Error ensuring user profile: $e');
     }
   }
 
@@ -95,9 +95,9 @@ class UserManager {
       _cachedProfile!['lastSeen'] = DateTime.now();
       _profileController.add(_cachedProfile);
       
-      print('Created user profile for ${user.email}');
+      debugPrint('Created user profile for ${user.email}');
     } catch (e) {
-      print('Error creating user profile: $e');
+      debugPrint('Error creating user profile: $e');
     }
   }
 
@@ -125,7 +125,7 @@ class UserManager {
       
       return null;
     } catch (e) {
-      print('Error loading user profile: $e');
+      debugPrint('Error loading user profile: $e');
       return null;
     }
   }
@@ -144,7 +144,7 @@ class UserManager {
         _profileController.add(_cachedProfile);
       }
     } catch (e) {
-      print('Error updating profile: $e');
+      debugPrint('Error updating profile: $e');
     }
   }
 
@@ -183,7 +183,7 @@ class UserManager {
       
       return null;
     } catch (e) {
-      print('Error getting user profile: $e');
+      debugPrint('Error getting user profile: $e');
       return null;
     }
   }
@@ -204,7 +204,7 @@ class UserManager {
       _cachedProfile = null;
       _profileController.add(null);
     } catch (e) {
-      print('Error during sign out: $e');
+      debugPrint('Error during sign out: $e');
     }
   }
 

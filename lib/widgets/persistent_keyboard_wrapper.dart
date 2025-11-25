@@ -6,10 +6,10 @@ class PersistentKeyboardWrapper extends StatefulWidget {
   final bool persistKeyboard;
 
   const PersistentKeyboardWrapper({
-    Key? key,
+    super.key,
     required this.child,
     this.persistKeyboard = true,
-  }) : super(key: key);
+  });
 
   @override
   State<PersistentKeyboardWrapper> createState() => _PersistentKeyboardWrapperState();
@@ -37,7 +37,8 @@ class _PersistentKeyboardWrapperState extends State<PersistentKeyboardWrapper>
   @override
   void didChangeMetrics() {
     if (widget.persistKeyboard) {
-      final bottomInset = WidgetsBinding.instance.window.viewInsets.bottom;
+      final view = WidgetsBinding.instance.platformDispatcher.views.first;
+      final bottomInset = view.viewInsets.bottom;
       // If keyboard was visible and is now hiding, show it again
       if (bottomInset == 0) {
         Future.delayed(const Duration(milliseconds: 100), () {

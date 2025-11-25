@@ -5,7 +5,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'gemini_service.dart';
 import 'universal_intent_service.dart';
 import 'intent_clarification_service.dart';
-import '../models/user_profile.dart';
 
 class UnifiedIntentProcessor {
   static final UnifiedIntentProcessor _instance = UnifiedIntentProcessor._internal();
@@ -14,8 +13,11 @@ class UnifiedIntentProcessor {
 
   final GeminiService _geminiService = GeminiService();
   final UniversalIntentService _universalService = UniversalIntentService();
+  // ignore: unused_field
   final IntentClarificationService _clarificationService = IntentClarificationService();
+  // ignore: unused_field
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  // ignore: unused_field
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   // Clarification patterns for common ambiguous inputs
@@ -123,21 +125,22 @@ If the intent is clear enough to find matches (even if not perfect), set needsCl
     
     if (clarification != null && clarification['needsClarification'] == true) {
       // Show clarification dialog
+      if (!context.mounted) return {'success': false, 'error': 'Context no longer valid'};
       final answer = await showDialog<String>(
         context: context,
         barrierDismissible: false,
         builder: (BuildContext context) {
           return AlertDialog(
-            title: Text('Quick Clarification'),
+            title: const Text('Quick Clarification'),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(clarification['question']),
-                SizedBox(height: 16),
+                const SizedBox(height: 16),
                 ...List.generate(
                   clarification['options'].length,
                   (index) => Padding(
-                    padding: EdgeInsets.symmetric(vertical: 4),
+                    padding: const EdgeInsets.symmetric(vertical: 4),
                     child: SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(

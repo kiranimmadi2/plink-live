@@ -20,7 +20,6 @@ import 'services/notification_service.dart';
 import 'services/conversation_service.dart';
 import 'services/location_service.dart';
 import 'services/connectivity_service.dart';
-import 'services/database_cleanup_service.dart';
 import 'services/user_migration_service.dart';
 import 'services/conversation_migration_service.dart';
 import 'providers/theme_provider.dart';
@@ -137,7 +136,8 @@ class MyApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final themeState = ref.watch(themeProvider);
+    // Watch theme to trigger rebuilds on theme change
+    ref.watch(themeProvider);
     final themeNotifier = ref.read(themeProvider.notifier);
 
     return MaterialApp(

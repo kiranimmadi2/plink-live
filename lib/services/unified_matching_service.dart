@@ -6,7 +6,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import '../config/api_config.dart';
-import '../models/user_profile.dart';
 import 'cache_service.dart';
 
 /// Unified Matching Service

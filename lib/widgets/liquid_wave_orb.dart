@@ -13,10 +13,10 @@ class LiquidWaveOrb extends StatefulWidget {
   final double size;
 
   const LiquidWaveOrb({
-    Key? key,
+    super.key,
     this.state = VoiceOrbState.idle,
     this.size = 200,
-  }) : super(key: key);
+  });
 
   @override
   State<LiquidWaveOrb> createState() => _LiquidWaveOrbState();
@@ -152,7 +152,7 @@ class _CleanLiquidPainter extends CustomPainter {
     path.moveTo(0, waveY);
 
     // Simple smooth wave - just one clean sine wave
-    final points = 50;
+    const points = 50;
     for (int i = 0; i <= points; i++) {
       final x = (i / points) * size.width;
       final t = i / points;

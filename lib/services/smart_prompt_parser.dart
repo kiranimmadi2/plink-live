@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:flutter/foundation.dart';
 import 'gemini_service.dart';
 
 class SmartPromptParser {
@@ -65,7 +66,7 @@ Be intelligent - extract everything possible!
       // Parse JSON response
       return _parseExtractedData(text);
     } catch (e) {
-      print('Error extracting from prompt: $e');
+      debugPrint('Error extracting from prompt: $e');
       return {'extracted': false};
     }
   }
@@ -86,7 +87,7 @@ Be intelligent - extract everything possible!
       data['extracted'] = _hasExtractedData(data);
       return data;
     } catch (e) {
-      print('Error parsing extracted data: $e');
+      debugPrint('Error parsing extracted data: $e');
       return {'extracted': false};
     }
   }

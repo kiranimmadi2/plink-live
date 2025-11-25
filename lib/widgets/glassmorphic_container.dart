@@ -16,7 +16,7 @@ class GlassmorphicContainer extends StatelessWidget {
   final Gradient? gradient;
 
   const GlassmorphicContainer({
-    Key? key,
+    super.key,
     required this.child,
     this.width,
     this.height,
@@ -29,7 +29,7 @@ class GlassmorphicContainer extends StatelessWidget {
     this.border,
     this.boxShadow,
     this.gradient,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -84,7 +84,7 @@ class GlassmorphicAppBar extends StatelessWidget implements PreferredSizeWidget 
   final double opacity;
 
   const GlassmorphicAppBar({
-    Key? key,
+    super.key,
     this.title,
     this.actions,
     this.leading,
@@ -93,7 +93,7 @@ class GlassmorphicAppBar extends StatelessWidget implements PreferredSizeWidget 
     this.backgroundColor,
     this.blur = 20,
     this.opacity = 0.8,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -160,7 +160,7 @@ class GlassmorphicCard extends StatelessWidget {
   final bool enableShadow;
 
   const GlassmorphicCard({
-    Key? key,
+    super.key,
     required this.child,
     this.padding,
     this.margin,
@@ -170,7 +170,7 @@ class GlassmorphicCard extends StatelessWidget {
     this.blur = 10,
     this.opacity = 0.1,
     this.enableShadow = true,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -236,7 +236,7 @@ class AnimatedGlassmorphicContainer extends StatefulWidget {
   final Curve curve;
 
   const AnimatedGlassmorphicContainer({
-    Key? key,
+    super.key,
     required this.child,
     this.width,
     this.height,
@@ -245,7 +245,7 @@ class AnimatedGlassmorphicContainer extends StatefulWidget {
     this.borderRadius = 20,
     this.duration = const Duration(milliseconds: 300),
     this.curve = Curves.easeInOut,
-  }) : super(key: key);
+  });
 
   @override
   State<AnimatedGlassmorphicContainer> createState() => 

@@ -123,7 +123,7 @@ class ConversationService {
 
     } catch (e) {
       // print('ConversationService: ERROR creating/getting conversation: $e');
-      throw e;
+      rethrow;
     }
   }
 
@@ -204,7 +204,7 @@ class ConversationService {
       // print('ConversationService: Conversation document created successfully');
     } catch (e) {
       // print('ConversationService: ERROR creating conversation document: $e');
-      throw e;
+      rethrow;
     }
   }
 
@@ -232,11 +232,11 @@ class ConversationService {
 
     // Update participant info to ensure it's current
     await _firestore.collection('conversations').doc(conversationId).update({
-      'participantNames.${currentUserId}': currentUserName,
+      'participantNames.$currentUserId': currentUserName,
       'participantNames.${otherUser.uid}': otherUser.name,
-      'participantPhotos.${currentUserId}': currentUserPhoto,
+      'participantPhotos.$currentUserId': currentUserPhoto,
       'participantPhotos.${otherUser.uid}': otherUser.profileImageUrl,
-      'lastSeen.${currentUserId}': FieldValue.serverTimestamp(),
+      'lastSeen.$currentUserId': FieldValue.serverTimestamp(),
     });
   }
 
@@ -307,9 +307,9 @@ class ConversationService {
       // Create conversation
       await _createConversation(conversationId, currentUserId, otherUser);
       return conversationId;
-      
+
     } catch (e) {
-      throw e;
+      rethrow;
     }
   }
 
@@ -326,6 +326,7 @@ class ConversationService {
 
     try {
       // Create message document
+      // ignore: unused_local_variable
       final messageRef = await _firestore
           .collection('conversations')
           .doc(conversationId)
@@ -487,7 +488,7 @@ class ConversationService {
     if (currentUserId == null) return;
 
     await _firestore.collection('conversations').doc(conversationId).update({
-      'lastSeen.${currentUserId}': FieldValue.serverTimestamp(),
+      'lastSeen.$currentUserId': FieldValue.serverTimestamp(),
     });
   }
 

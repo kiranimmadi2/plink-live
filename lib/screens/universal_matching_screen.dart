@@ -1,15 +1,12 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import '../services/universal_intent_service.dart';
 import '../models/user_profile.dart';
 import 'enhanced_chat_screen.dart';
 import '../widgets/user_avatar.dart';
 import '../widgets/conversational_clarification_dialog.dart';
-import '../widgets/match_card_with_actions.dart';
 import '../services/unified_intent_processor.dart';
 import '../services/realtime_matching_service.dart';
 import 'profile_with_history_screen.dart';
@@ -18,7 +15,7 @@ import '../widgets/floating_particles.dart';
 import '../widgets/liquid_wave_orb.dart';
 
 class UniversalMatchingScreen extends StatefulWidget {
-  const UniversalMatchingScreen({Key? key}) : super(key: key);
+  const UniversalMatchingScreen({super.key});
 
   @override
   State<UniversalMatchingScreen> createState() => _UniversalMatchingScreenState();
@@ -35,9 +32,12 @@ class _UniversalMatchingScreenState extends State<UniversalMatchingScreen> {
 
   bool _isProcessing = false;
   bool _isSearchFocused = false;
+  // ignore: unused_field
   bool _hasText = false;
   List<Map<String, dynamic>> _matches = [];
+  // ignore: unused_field
   List<Map<String, dynamic>> _userIntents = [];
+  // ignore: unused_field
   Map<String, dynamic>? _currentIntent;
   String? _errorMessage;
   String _currentUserName = '';
@@ -45,6 +45,7 @@ class _UniversalMatchingScreenState extends State<UniversalMatchingScreen> {
 
   // Voice orb state management
   VoiceOrbState _voiceOrbState = VoiceOrbState.idle;
+  // ignore: unused_field
   String _voiceTranscription = '';
   int _voiceConversationIndex = 0;
 
@@ -122,7 +123,9 @@ class _UniversalMatchingScreenState extends State<UniversalMatchingScreen> {
 
     // Check if clarification is needed
     final clarification = await _unifiedProcessor.checkClarificationNeeded(intent);
-    
+
+    if (!mounted) return;
+
     if (clarification != null && clarification['needsClarification'] == true) {
       // Show clarification dialog
       final answer = await ConversationalClarificationDialog.show(
@@ -201,9 +204,9 @@ class _UniversalMatchingScreenState extends State<UniversalMatchingScreen> {
           _isProcessing = false;
         });
         
-        print('UniversalMatchingScreen: Found ${matches.length} matches');
+        debugPrint('UniversalMatchingScreen: Found ${matches.length} matches');
         for (var match in matches) {
-          print('Match: ${match['userProfile']?['name']} - Score: ${match['matchScore']}');
+          debugPrint('Match: ${match['userProfile']?['name']} - Score: ${match['matchScore']}');
         }
         
         // Reload user intents

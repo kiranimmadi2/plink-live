@@ -22,11 +22,11 @@ class EnhancedChatScreen extends StatefulWidget {
   final String? chatId; // Optional chatId from Live Connect
 
   const EnhancedChatScreen({
-    Key? key,
+    super.key,
     required this.otherUser,
     this.initialMessage,
     this.chatId, // Accept chatId from Live Connect
-  }) : super(key: key);
+  });
 
   @override
   State<EnhancedChatScreen> createState() => _EnhancedChatScreenState();
@@ -53,7 +53,7 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   bool _showScrollButton = false;
-  int _unreadCount = 0;
+  final int _unreadCount = 0;
 
   // Search related variables
   bool _isSearching = false;
@@ -136,7 +136,7 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
           }
         }, onError: (error) {
           // Silently handle any errors
-          print('Error listening for messages: $error');
+          debugPrint('Error listening for messages: $error');
         });
       }
     });
@@ -207,7 +207,7 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
         _isLoadingMore = false;
       });
     } catch (e) {
-      print('Error loading more messages: $e');
+      debugPrint('Error loading more messages: $e');
       setState(() {
         _isLoadingMore = false;
       });
@@ -228,9 +228,9 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
       }
       _markMessagesAsRead();
 
-      // print('EnhancedChatScreen: Conversation initialized with ID: $conversationId');
+      // debugPrint('EnhancedChatScreen: Conversation initialized with ID: $conversationId');
     } catch (e) {
-      print('Error initializing conversation: $e');
+      debugPrint('Error initializing conversation: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error loading conversation: $e')),
@@ -388,7 +388,7 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
                             .collection('conversations')
                             .doc(_conversationId!)
                             .snapshots()
-                        : Stream.empty(),
+                        : const Stream.empty(),
                     builder: (context, snapshot) {
                       if (snapshot.hasData && snapshot.data!.exists) {
                         final data = snapshot.data!.data() as Map<String, dynamic>;
@@ -441,7 +441,7 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
                             }
                             
                             if (isOnline) {
-                              return Text(
+                              return const Text(
                                 'Active now',
                                 style: TextStyle(
                                   fontSize: 12,
@@ -566,7 +566,7 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF007AFF).withOpacity(0.2),
+                  color: const Color(0xFF007AFF).withValues(alpha: 0.2),
                   blurRadius: 30,
                   spreadRadius: 5,
                 ),
@@ -581,10 +581,10 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
               child: widget.otherUser.profileImageUrl == null
                   ? Text(
                       widget.otherUser.name[0].toUpperCase(),
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 40,
                         fontWeight: FontWeight.w600,
-                        color: const Color(0xFF007AFF),
+                        color: Color(0xFF007AFF),
                       ),
                     )
                   : null,
@@ -623,7 +623,7 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
     return MessageStatus.sent;
   }
 
-  // Helper to parse message status from string
+  // ignore: unused_element
   MessageStatus _parseMessageStatus(String? status) {
     switch (status) {
       case 'sending':
@@ -664,7 +664,7 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
                   valueColor: AlwaysStoppedAnimation<Color>(
-                    Theme.of(context).primaryColor.withOpacity(0.5),
+                    Theme.of(context).primaryColor.withValues(alpha: 0.5),
                   ),
                 ),
               ),
@@ -752,8 +752,8 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
             color: isDarkMode
-                ? const Color(0xFF1C1C1E).withOpacity(0.8)
-                : const Color(0xFF000000).withOpacity(0.06),
+                ? const Color(0xFF1C1C1E).withValues(alpha: 0.8)
+                : const Color(0xFF000000).withValues(alpha: 0.06),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Text(
@@ -824,7 +824,7 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.15),
+                        color: Colors.black.withValues(alpha: 0.15),
                         blurRadius: 8,
                         offset: const Offset(0, 2),
                       ),
@@ -832,7 +832,7 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
                   ),
                   child: CircleAvatar(
                     radius: 16,
-                    backgroundColor: const Color(0xFF007AFF).withOpacity(0.15),
+                    backgroundColor: const Color(0xFF007AFF).withValues(alpha: 0.15),
                     backgroundImage: widget.otherUser.profileImageUrl != null
                         ? CachedNetworkImageProvider(widget.otherUser.profileImageUrl!)
                         : null,
@@ -883,8 +883,8 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
                         boxShadow: [
                           BoxShadow(
                             color: isMe
-                                ? const Color(0xFF007AFF).withOpacity(0.25)
-                                : Colors.black.withOpacity(isDarkMode ? 0.2 : 0.06),
+                                ? const Color(0xFF007AFF).withValues(alpha: 0.25)
+                                : Colors.black.withValues(alpha: isDarkMode ? 0.2 : 0.06),
                             blurRadius: isMe ? 12 : 6,
                             offset: const Offset(0, 3),
                             spreadRadius: 0,
@@ -913,7 +913,7 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
                                     child: CircularProgressIndicator(
                                       strokeWidth: 2,
                                       valueColor: AlwaysStoppedAnimation<Color>(
-                                        const Color(0xFF007AFF).withOpacity(0.5),
+                                        const Color(0xFF007AFF).withValues(alpha: 0.5),
                                       ),
                                     ),
                                   ),
@@ -964,7 +964,7 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
                                     'edited ',
                                     style: TextStyle(
                                       color: isMe
-                                          ? Colors.white.withOpacity(0.55)
+                                          ? Colors.white.withValues(alpha: 0.55)
                                           : (isDarkMode ? Colors.grey[500] : Colors.grey[600]),
                                       fontSize: 11,
                                       fontStyle: FontStyle.italic,
@@ -975,7 +975,7 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
                                   formattedTime,
                                   style: TextStyle(
                                     color: isMe
-                                        ? Colors.white.withOpacity(0.65)
+                                        ? Colors.white.withValues(alpha: 0.65)
                                         : (isDarkMode ? Colors.grey[500] : Colors.grey[600]),
                                     fontSize: 11,
                                     fontWeight: FontWeight.w400,
@@ -1000,7 +1000,7 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
                           borderRadius: BorderRadius.circular(14),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
+                              color: Colors.black.withValues(alpha: 0.1),
                               blurRadius: 6,
                               offset: const Offset(0, 2),
                             ),
@@ -1046,17 +1046,17 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
           child: CircularProgressIndicator(
             strokeWidth: 1.5,
             valueColor: AlwaysStoppedAnimation<Color>(
-              Colors.white.withOpacity(0.5),
+              Colors.white.withValues(alpha: 0.5),
             ),
           ),
         );
       case MessageStatus.sent:
         icon = Icons.check_rounded;
-        color = Colors.white.withOpacity(0.65);
+        color = Colors.white.withValues(alpha: 0.65);
         break;
       case MessageStatus.delivered:
         icon = Icons.done_all_rounded;
-        color = Colors.white.withOpacity(0.65);
+        color = Colors.white.withValues(alpha: 0.65);
         break;
       case MessageStatus.read:
         icon = Icons.done_all_rounded;
@@ -1186,7 +1186,7 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
               .collection('conversations')
               .doc(_conversationId!)
               .snapshots()
-          : Stream.empty(),
+          : const Stream.empty(),
       builder: (context, snapshot) {
         if (!snapshot.hasData || !snapshot.data!.exists) {
           return const SizedBox.shrink();
@@ -1260,7 +1260,7 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
           height: 8,
           decoration: BoxDecoration(
             color: (isDarkMode ? const Color(0xFF8E8E93) : const Color(0xFF8E8E93))
-                .withOpacity(value),
+                .withValues(alpha: value),
             shape: BoxShape.circle,
           ),
         );
@@ -1403,7 +1403,7 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
                               padding: const EdgeInsets.all(4),
                               decoration: BoxDecoration(
                                 color: _showEmojiPicker
-                                    ? const Color(0xFF007AFF).withOpacity(0.12)
+                                    ? const Color(0xFF007AFF).withValues(alpha: 0.12)
                                     : Colors.transparent,
                                 borderRadius: BorderRadius.circular(16),
                               ),
@@ -1449,7 +1449,7 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
                               shape: BoxShape.circle,
                               boxShadow: [
                                 BoxShadow(
-                                  color: const Color(0xFF007AFF).withOpacity(0.4),
+                                  color: const Color(0xFF007AFF).withValues(alpha: 0.4),
                                   blurRadius: 8,
                                   offset: const Offset(0, 2),
                                 ),
@@ -1554,6 +1554,7 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
     );
   }
 
+  // ignore: unused_element
   Widget _buildActionButton({
     required IconData icon,
     required VoidCallback onTap,
@@ -1596,12 +1597,12 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
             width: 36,
             decoration: BoxDecoration(
               color: isDarkMode
-                  ? const Color(0xFF1C1C1E).withOpacity(0.9)
-                  : Colors.white.withOpacity(0.95),
+                  ? const Color(0xFF1C1C1E).withValues(alpha: 0.9)
+                  : Colors.white.withValues(alpha: 0.95),
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.15),
+                  color: Colors.black.withValues(alpha: 0.15),
                   blurRadius: 10,
                   offset: const Offset(0, 2),
                 ),
@@ -1616,9 +1617,9 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
             child: Stack(
               alignment: Alignment.center,
               children: [
-                Icon(
+                const Icon(
                   Icons.keyboard_arrow_down_rounded,
-                  color: const Color(0xFF007AFF),
+                  color: Color(0xFF007AFF),
                   size: 24,
                 ),
                 if (_unreadCount > 0)
@@ -1695,6 +1696,7 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
       );
 
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to send message: $e')),
       );
@@ -1734,7 +1736,7 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
 
     } catch (e) {
       // Only log non-critical errors, don't show to user
-      print('Error marking messages as read: $e');
+      debugPrint('Error marking messages as read: $e');
       // Silently fail - this is not critical for chat functionality
     }
   }
@@ -1875,7 +1877,7 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
         'reactions': FieldValue.arrayUnion([reaction]),
       });
     } catch (e) {
-      print('Error adding reaction: $e');
+      debugPrint('Error adding reaction: $e');
     }
   }
 
@@ -1916,6 +1918,7 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
                     'editedAt': FieldValue.serverTimestamp(),
                   });
                 } catch (e) {
+                  if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text('Failed to edit message: $e')),
                   );
@@ -1965,7 +1968,7 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
                       .orderBy('timestamp', descending: true)
                       .get();
                   
-                  print('Remaining messages count: ${allMessages.docs.length}');
+                  debugPrint('Remaining messages count: ${allMessages.docs.length}');
                   
                   // Update the conversation's lastMessage fields
                   if (allMessages.docs.isNotEmpty) {
@@ -1973,7 +1976,7 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
                     final lastMessageDoc = allMessages.docs.first;
                     final lastMessageData = lastMessageDoc.data();
                     
-                    print('Last message data: $lastMessageData');
+                    debugPrint('Last message data: $lastMessageData');
                     
                     // Determine the last message text based on message type
                     String lastMessageText = '';
@@ -1993,7 +1996,7 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
                       lastMessageText = lastMessageData['text'] ?? '';
                     }
                     
-                    print('Updating conversation with last message: $lastMessageText');
+                    debugPrint('Updating conversation with last message: $lastMessageText');
                     
                     // Force update with merge to ensure it happens
                     await _firestore
@@ -2005,9 +2008,9 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
                       'lastMessageSenderId': lastMessageData['senderId'],
                     }, SetOptions(merge: true));
                     
-                    print('Conversation updated successfully');
+                    debugPrint('Conversation updated successfully');
                   } else {
-                    print('No messages left, clearing conversation');
+                    debugPrint('No messages left, clearing conversation');
                     
                     // No messages left, clear the last message fields
                     await _firestore
@@ -2020,7 +2023,7 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
                     }, SetOptions(merge: true));
                   }
                   
-                  if (mounted) {
+                  if (mounted && context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
                         content: Text('Message deleted'),
@@ -2029,8 +2032,8 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
                     );
                   }
                 } catch (e) {
-                  print('Error deleting message: $e');
-                  if (mounted) {
+                  debugPrint('Error deleting message: $e');
+                  if (mounted && context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(content: Text('Failed to delete message: $e')),
                     );
@@ -2049,6 +2052,7 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
     HapticFeedback.lightImpact();
     
     // Keep keyboard focus while showing attachment options
+    // ignore: unused_local_variable
     final hadFocus = _messageFocusNode.hasFocus;
     
     showModalBottomSheet(
@@ -2145,42 +2149,40 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
 
   void _pickImage() async {
     Navigator.pop(context); // Close attachment options
-    
+
     final XFile? image = await _imagePicker.pickImage(
       source: ImageSource.gallery,
       imageQuality: 95,  // High quality to prevent blur
       maxWidth: 1920,    // Max width for optimization
       maxHeight: 1920,   // Max height for optimization
     );
-    
+
     if (image != null) {
       _uploadAndSendImage(File(image.path));
     }
-    
+
     // Restore focus to message input
-    if (mounted) {
-      FocusScope.of(context).requestFocus(_messageFocusNode);
-    }
+    if (!mounted) return;
+    FocusScope.of(context).requestFocus(_messageFocusNode);
   }
 
   void _takePhoto() async {
     Navigator.pop(context); // Close attachment options
-    
+
     final XFile? photo = await _imagePicker.pickImage(
       source: ImageSource.camera,
       imageQuality: 95,  // High quality to prevent blur
       maxWidth: 1920,    // Max width for optimization
       maxHeight: 1920,   // Max height for optimization
     );
-    
+
     if (photo != null) {
       _uploadAndSendImage(File(photo.path));
     }
-    
+
     // Restore focus to message input
-    if (mounted) {
-      FocusScope.of(context).requestFocus(_messageFocusNode);
-    }
+    if (!mounted) return;
+    FocusScope.of(context).requestFocus(_messageFocusNode);
   }
 
   void _uploadAndSendImage(File imageFile) async {
@@ -2216,9 +2218,11 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
       });
       
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to send image: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to send image: $e')),
+        );
+      }
     }
   }
 

@@ -10,10 +10,10 @@ class EditProfileBottomSheet extends StatefulWidget {
   final Function()? onProfileUpdated;
 
   const EditProfileBottomSheet({
-    Key? key,
+    super.key,
     required this.currentProfile,
     this.onProfileUpdated,
-  }) : super(key: key);
+  });
 
   @override
   State<EditProfileBottomSheet> createState() => _EditProfileBottomSheetState();
@@ -73,7 +73,7 @@ class _EditProfileBottomSheetState extends State<EditProfileBottomSheet> {
       }
       return null;
     } catch (e) {
-      print('Error getting photo URL: $e');
+      debugPrint('Error getting photo URL: $e');
       return null;
     }
   }
@@ -130,8 +130,8 @@ class _EditProfileBottomSheetState extends State<EditProfileBottomSheet> {
         }).toList();
       }
     } catch (e) {
-      print('Error loading profile data in EditProfileBottomSheet: $e');
-      print('Profile data: ${widget.currentProfile}');
+      debugPrint('Error loading profile data in EditProfileBottomSheet: $e');
+      debugPrint('Profile data: ${widget.currentProfile}');
       // Initialize with empty values on error
       _nameController.text = '';
       _bioController.text = '';
@@ -167,9 +167,11 @@ class _EditProfileBottomSheetState extends State<EditProfileBottomSheet> {
         });
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error picking image: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error picking image: $e')),
+        );
+      }
     }
   }
 

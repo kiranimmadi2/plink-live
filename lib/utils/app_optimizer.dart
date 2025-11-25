@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 /// App-wide optimization utilities
@@ -173,7 +172,7 @@ class AppOptimizer {
   static void checkMemoryUsage() {
     if (kDebugMode) {
       final imageCache = PaintingBinding.instance.imageCache;
-      print('Image Cache: ${imageCache.currentSize} images, '
+      debugPrint('Image Cache: ${imageCache.currentSize} images, '
             '${(imageCache.currentSizeBytes / 1024 / 1024).toStringAsFixed(2)} MB');
     }
   }

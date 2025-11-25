@@ -5,7 +5,7 @@ import 'dart:ui' as ui;
 class AuroraBackground extends StatefulWidget {
   final Widget child;
 
-  const AuroraBackground({Key? key, required this.child}) : super(key: key);
+  const AuroraBackground({super.key, required this.child});
 
   @override
   State<AuroraBackground> createState() => _AuroraBackgroundState();

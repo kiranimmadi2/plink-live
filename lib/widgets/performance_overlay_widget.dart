@@ -6,10 +6,10 @@ class PerformanceOverlayWidget extends StatefulWidget {
   final bool enabled;
 
   const PerformanceOverlayWidget({
-    Key? key,
+    super.key,
     required this.child,
     this.enabled = false,
-  }) : super(key: key);
+  });
 
   @override
   State<PerformanceOverlayWidget> createState() => _PerformanceOverlayWidgetState();
@@ -23,6 +23,7 @@ class _PerformanceOverlayWidgetState extends State<PerformanceOverlayWidget>
   double _avgFPS = 60.0;
   
   int _frameCount = 0;
+  // ignore: unused_field
   Duration _totalFrameTime = Duration.zero;
   DateTime _lastResetTime = DateTime.now();
   
@@ -60,7 +61,7 @@ class _PerformanceOverlayWidgetState extends State<PerformanceOverlayWidget>
     final elapsed = now.difference(_lastResetTime);
     
     _frameCount++;
-    _totalFrameTime += Duration(microseconds: 16667); // Target 60fps
+    _totalFrameTime += const Duration(microseconds: 16667); // Target 60fps
     
     if (elapsed >= const Duration(seconds: 1)) {
       final fps = (_frameCount * 1000) / elapsed.inMilliseconds;
@@ -232,7 +233,7 @@ class FPSGraphPainter extends CustomPainter {
       ..style = PaintingStyle.stroke;
     
     final path = Path();
-    final maxFPS = 60.0;
+    const maxFPS = 60.0;
     final step = size.width / 60;
     
     for (int i = 0; i < fpsHistory.length; i++) {

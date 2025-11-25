@@ -99,7 +99,7 @@ class ConversationModel {
       'lastSeen': lastSeen.map(
         (key, value) => MapEntry(
           key,
-          value != null ? Timestamp.fromDate(value!) : null
+          value != null ? Timestamp.fromDate(value) : null
         ),
       ),
       'isArchived': isArchived,

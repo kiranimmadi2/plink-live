@@ -1,7 +1,7 @@
-import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/foundation.dart';
 import '../utils/photo_url_helper.dart';
 
 class ProfileService {
@@ -31,7 +31,7 @@ class ProfileService {
       
       return data;
     } catch (e) {
-      print('Error getting current user profile: $e');
+      debugPrint('Error getting current user profile: $e');
       return null;
     }
   }
@@ -59,7 +59,7 @@ class ProfileService {
         });
       }
     } catch (e) {
-      print('Error creating user profile: $e');
+      debugPrint('Error creating user profile: $e');
     }
   }
 
@@ -102,14 +102,14 @@ class ProfileService {
             await user.updatePhotoURL(photoUrl);
             await user.reload();
           } catch (e) {
-            print('Error updating auth photo URL: $e');
+            debugPrint('Error updating auth photo URL: $e');
           }
         }
       }
       
       return photoUrl;
     } catch (e) {
-      print('Error updating profile photo: $e');
+      debugPrint('Error updating profile photo: $e');
       return null;
     }
   }
@@ -123,7 +123,7 @@ class ProfileService {
       }
       return null;
     } catch (e) {
-      print('Error getting user profile: $e');
+      debugPrint('Error getting user profile: $e');
       return null;
     }
   }
@@ -144,11 +144,11 @@ class ProfileService {
           'lastSeen': FieldValue.serverTimestamp(),
           'isOnline': true,
         }).catchError((e) {
-          print('Error updating last seen: $e');
+          debugPrint('Error updating last seen: $e');
         });
       }
     } catch (e) {
-      print('Error ensuring profile exists: $e');
+      debugPrint('Error ensuring profile exists: $e');
     }
   }
 

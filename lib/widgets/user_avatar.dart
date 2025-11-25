@@ -8,11 +8,11 @@ class UserAvatar extends StatelessWidget {
   final String? fallbackText;
   
   const UserAvatar({
-    Key? key,
+    super.key,
     this.profileImageUrl,
     this.radius = 20,
     this.fallbackText,
-  }) : super(key: key);
+  });
 
   String? _fixPhotoUrl(String? url) {
     // Use the centralized helper with rate limiting protection

@@ -1,6 +1,6 @@
 import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:flutter/foundation.dart';
 import 'dart:math';
-import '../models/post_model.dart';
 import '../utils/api_error_handler.dart';
 import '../config/api_config.dart';
 
@@ -36,7 +36,7 @@ class GeminiService {
       fallback: () => _generateFallbackEmbedding(text),
       onError: (errorType) {
         if (errorType == ApiErrorType.quotaExceeded) {
-          print('⚠️ Gemini API quota exceeded. Using fallback embedding.');
+          debugPrint('Gemini API quota exceeded. Using fallback embedding.');
         }
       },
     ) ?? _generateFallbackEmbedding(text);
@@ -76,7 +76,7 @@ class GeminiService {
 
       return response.text;
     } catch (e) {
-      print('Error generating content: $e');
+      debugPrint('Error generating content: $e');
       return null;
     }
   }

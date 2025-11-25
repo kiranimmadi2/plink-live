@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'vector_service.dart';
-import '../models/post_model.dart';
 
 class MigrationService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -16,7 +16,7 @@ class MigrationService {
     Function(int, int)? onProgress,
   }) async {
     try {
-      print('Starting migration of existing posts...');
+      debugPrint('Starting migration of existing posts...');
       
       // Get all posts without embeddings
       final postsQuery = await _firestore
@@ -25,10 +25,10 @@ class MigrationService {
           .get();
       
       final totalPosts = postsQuery.docs.length;
-      print('Found $totalPosts posts to migrate');
-      
+      debugPrint('Found $totalPosts posts to migrate');
+
       if (totalPosts == 0) {
-        print('No posts need migration');
+        debugPrint('No posts need migration');
         return;
       }
       
@@ -82,13 +82,13 @@ class MigrationService {
           if (batchCount >= batchSize) {
             await batch.commit();
             batchCount = 0;
-            print('Migrated $processed/$totalPosts posts');
-            
+            debugPrint('Migrated $processed/$totalPosts posts');
+
             // Small delay to avoid overwhelming the API
             await Future.delayed(const Duration(milliseconds: 500));
           }
         } catch (e) {
-          print('Error migrating post ${doc.id}: $e');
+          debugPrint('Error migrating post ${doc.id}: $e');
           // Continue with next post
         }
       }
@@ -96,13 +96,13 @@ class MigrationService {
       // Commit any remaining updates
       if (batchCount > 0) {
         await batch.commit();
-        print('Migrated $processed/$totalPosts posts');
+        debugPrint('Migrated $processed/$totalPosts posts');
       }
-      
-      print('Migration completed successfully!');
+
+      debugPrint('Migration completed successfully!');
     } catch (e) {
-      print('Migration failed: $e');
-      throw e;
+      debugPrint('Migration failed: $e');
+      rethrow;
     }
   }
 
@@ -129,7 +129,7 @@ class MigrationService {
         'total': (withEmbeddings.count ?? 0) + (withoutEmbeddings.count ?? 0),
       };
     } catch (e) {
-      print('Error getting migration status: $e');
+      debugPrint('Error getting migration status: $e');
       return {
         'migrated': 0,
         'pending': 0,
@@ -141,7 +141,7 @@ class MigrationService {
   // Clean up orphaned embeddings
   Future<void> cleanupOrphanedEmbeddings() async {
     try {
-      print('Cleaning up orphaned embeddings...');
+      debugPrint('Cleaning up orphaned embeddings...');
       
       final embeddingsSnapshot = await _firestore
           .collection('embeddings')
@@ -178,10 +178,10 @@ class MigrationService {
       if (batchCount > 0) {
         await batch.commit();
       }
-      
-      print('Deleted $deleted orphaned embeddings');
+
+      debugPrint('Deleted $deleted orphaned embeddings');
     } catch (e) {
-      print('Error cleaning up embeddings: $e');
+      debugPrint('Error cleaning up embeddings: $e');
     }
   }
 
@@ -236,12 +236,12 @@ class MigrationService {
             },
           );
           
-          print('Recalculated embedding for post $postId');
+          debugPrint('Recalculated embedding for post $postId');
         }
       }
     } catch (e) {
-      print('Error recalculating embeddings: $e');
-      throw e;
+      debugPrint('Error recalculating embeddings: $e');
+      rethrow;
     }
   }
 }

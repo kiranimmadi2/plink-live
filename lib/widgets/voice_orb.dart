@@ -14,10 +14,10 @@ class VoiceOrb extends StatefulWidget {
   final double size;
 
   const VoiceOrb({
-    Key? key,
+    super.key,
     this.state = VoiceOrbState.idle,
     this.size = 200,
-  }) : super(key: key);
+  });
 
   @override
   State<VoiceOrb> createState() => _VoiceOrbState();
@@ -266,10 +266,10 @@ class _VoiceOrbState extends State<VoiceOrb> with TickerProviderStateMixin {
         return LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            const Color(0xFFFFAA00),
-            const Color(0xFFFF6B6B),
-            const Color(0xFF8B5CF6),
+          colors: const [
+            Color(0xFFFFAA00),
+            Color(0xFFFF6B6B),
+            Color(0xFF8B5CF6),
           ],
           transform: GradientRotation(_rotateController.value * math.pi),
         );

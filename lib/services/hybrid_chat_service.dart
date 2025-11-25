@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import '../database/message_database.dart';
 
 /// Hybrid Chat Service - Combines local SQLite storage with Firebase sync
@@ -22,7 +23,7 @@ class HybridChatService {
   static const bool _enableVerboseLogging = false;
   void _log(String message) {
     if (_enableVerboseLogging) {
-      print(message);
+      debugPrint(message);
     }
   }
 

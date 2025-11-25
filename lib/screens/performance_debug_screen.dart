@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import '../utils/performance_monitor.dart';
-import '../widgets/performance_overlay_widget.dart';
 
 class PerformanceDebugScreen extends StatefulWidget {
-  const PerformanceDebugScreen({Key? key}) : super(key: key);
+  const PerformanceDebugScreen({super.key});
 
   @override
   State<PerformanceDebugScreen> createState() => _PerformanceDebugScreenState();
@@ -201,13 +200,13 @@ class _PerformanceDebugScreenState extends State<PerformanceDebugScreen> {
                     ],
                   ),
                 );
-              }).toList(),
+              }),
           ],
         ),
       ),
     );
   }
-  
+
   Widget _buildMetric(String label, String value, bool isDarkMode) {
     return Column(
       children: [
@@ -251,9 +250,7 @@ class _PerformanceDebugScreenState extends State<PerformanceDebugScreen> {
               stream: Stream.periodic(const Duration(seconds: 1)),
               builder: (context, snapshot) {
                 final frameTime = SchedulerBinding.instance.currentFrameTimeStamp;
-                final fps = frameTime != null 
-                    ? (1000000 / frameTime.inMicroseconds).clamp(0, 120)
-                    : 60.0;
+                final fps = (1000000 / frameTime.inMicroseconds).clamp(0, 120);
                 
                 return Column(
                   children: [
@@ -434,10 +431,12 @@ class _PerformanceDebugScreenState extends State<PerformanceDebugScreen> {
     }
     
     PerformanceTracker.stopTracking('HeavyComputation');
-    
+
+    if (!mounted) return;
     Navigator.pop(context);
     _loadPerformanceMetrics();
-    
+
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Computation result: $result')),
     );
@@ -456,7 +455,8 @@ class _PerformanceDebugScreenState extends State<PerformanceDebugScreen> {
     
     PerformanceTracker.stopTracking('NetworkTest');
     _loadPerformanceMetrics();
-    
+
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Network test completed')),
     );
@@ -464,7 +464,7 @@ class _PerformanceDebugScreenState extends State<PerformanceDebugScreen> {
 }
 
 class AnimationTestScreen extends StatefulWidget {
-  const AnimationTestScreen({Key? key}) : super(key: key);
+  const AnimationTestScreen({super.key});
 
   @override
   State<AnimationTestScreen> createState() => _AnimationTestScreenState();
@@ -506,7 +506,7 @@ class _AnimationTestScreenState extends State<AnimationTestScreen>
                   height: 200,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      colors: [
+                      colors: const [
                         Colors.blue,
                         Colors.purple,
                         Colors.red,

@@ -12,6 +12,7 @@ class OptimizedFirestoreService {
   
   // Cache for frequently accessed documents
   final Map<String, CachedDocument> _documentCache = {};
+  // ignore: unused_field
   final Duration _cacheExpiry = const Duration(minutes: 5);
   
   // Pagination helpers

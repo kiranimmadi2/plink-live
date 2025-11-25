@@ -9,17 +9,17 @@ class ProfileViewScreen extends StatefulWidget {
   final PostModel? post;
 
   const ProfileViewScreen({
-    Key? key,
+    super.key,
     required this.userProfile,
     this.post,
-  }) : super(key: key);
+  });
 
   @override
   State<ProfileViewScreen> createState() => _ProfileViewScreenState();
 }
 
 class _ProfileViewScreenState extends State<ProfileViewScreen> {
-  PageController _pageController = PageController();
+  final PageController _pageController = PageController();
   int _currentImageIndex = 0;
 
   @override
@@ -109,8 +109,8 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
     final profileImage = widget.userProfile.profileImageUrl;
     
     // Debug logging
-    print('Profile Image URL: $profileImage');
-    print('Post Images: $images');
+    debugPrint('Profile Image URL: $profileImage');
+    debugPrint('Post Images: $images');
     
     final allImages = <String>[];
     
@@ -150,7 +150,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
       );
     }
 
-    return Container(
+    return SizedBox(
       height: 400,
       child: Stack(
         children: [
@@ -162,7 +162,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
             itemCount: allImages.length,
             itemBuilder: (context, index) {
               final imageUrl = allImages[index];
-              print('Loading image at index $index: $imageUrl');
+              debugPrint('Loading image at index $index: $imageUrl');
               
               // Validate URL before loading
               if (imageUrl.isEmpty) {
@@ -198,8 +198,8 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
                   child: const Center(child: CircularProgressIndicator()),
                 ),
                 errorWidget: (context, url, error) {
-                  print('Error loading image: $url');
-                  print('Error details: $error');
+                  debugPrint('Error loading image: $url');
+                  debugPrint('Error details: $error');
                   return Container(
                     color: Colors.grey.shade300,
                     child: Center(
@@ -361,7 +361,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
               ),
             ),
             const SizedBox(height: 12),
-            ...widget.post!.metadata!.entries.map(
+            ...widget.post!.metadata.entries.map(
               (entry) => Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Row(

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 enum VoiceOrbState {
@@ -14,10 +13,10 @@ class SimpleVoiceOrb extends StatefulWidget {
   final double size;
 
   const SimpleVoiceOrb({
-    Key? key,
+    super.key,
     this.state = VoiceOrbState.idle,
     this.size = 200,
-  }) : super(key: key);
+  });
 
   @override
   State<SimpleVoiceOrb> createState() => _SimpleVoiceOrbState();

@@ -4,7 +4,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 // REMOVED: Call feature imports (feature deleted)
 // import '../models/call_model.dart';
 // import 'simple_call_service.dart' as call_svc;
@@ -29,7 +29,7 @@ class NotificationService {
       await _configureFCM();
       await _updateFCMToken();
     } catch (e) {
-      print('Error initializing notifications: $e');
+      debugPrint('Error initializing notifications: $e');
       // Continue app execution even if notifications fail
     }
   }
@@ -42,7 +42,7 @@ class NotificationService {
       provisional: false,
     );
     
-    print('Notification permissions: ${settings.authorizationStatus}');
+    debugPrint('Notification permissions: ${settings.authorizationStatus}');
   }
 
   Future<void> _configureLocalNotifications() async {
@@ -92,7 +92,7 @@ class NotificationService {
         });
       }
     } catch (e) {
-      print('Error updating FCM token: $e');
+      debugPrint('Error updating FCM token: $e');
       // Continue without crashing the app
     }
 
@@ -106,14 +106,14 @@ class NotificationService {
           });
         }
       } catch (e) {
-        print('Error refreshing FCM token: $e');
+        debugPrint('Error refreshing FCM token: $e');
         // Continue without crashing the app
       }
     });
   }
 
   void _handleForegroundMessage(RemoteMessage message) {
-    print('Foreground message received: ${message.messageId}');
+    debugPrint('Foreground message received: ${message.messageId}');
     
     if (message.notification != null) {
       _showLocalNotification(
@@ -125,7 +125,7 @@ class NotificationService {
   }
 
   void _handleBackgroundMessage(RemoteMessage message) {
-    print('Background message opened: ${message.messageId}');
+    debugPrint('Background message opened: ${message.messageId}');
     
     if (message.data['conversationId'] != null) {
       // Navigate to chat screen
@@ -136,6 +136,7 @@ class NotificationService {
     required String title,
     required String body,
     String? payload,
+    // ignore: unused_element_parameter
     String? channelId,
   }) async {
     const androidDetails = AndroidNotificationDetails(
@@ -259,16 +260,16 @@ class NotificationService {
       // The notification will be shown on the RECEIVER's device via FCM
       // DO NOT show local notification here as this runs on the SENDER's device
 
-      print('📬 Message notification prepared for sending:');
-      print('   To: $recipientToken');
-      print('   From: $senderName');
-      print('   Message: $message');
-      print('   Conversation: $conversationId');
+      debugPrint('Message notification prepared for sending:');
+      debugPrint('   To: $recipientToken');
+      debugPrint('   From: $senderName');
+      debugPrint('   Message: $message');
+      debugPrint('   Conversation: $conversationId');
 
       // TODO: Implement actual FCM push notification sending via backend/Cloud Functions
       // For now, this is just a placeholder that logs the notification details
     } catch (e) {
-      print('Error sending notification: $e');
+      debugPrint('Error sending notification: $e');
     }
   }
 
@@ -284,9 +285,9 @@ class NotificationService {
     try {
       // Send notification with quick reply actions
       // This would be implemented with platform-specific notification actions
-      print('Quick reply notification would be sent to: $recipientToken');
+      debugPrint('Quick reply notification would be sent to: $recipientToken');
     } catch (e) {
-      print('Error sending quick reply notification: $e');
+      debugPrint('Error sending quick reply notification: $e');
     }
   }
 
@@ -306,7 +307,7 @@ class NotificationService {
       }
     } catch (e) {
       // Platform check failed (likely on web), ignore
-      print('Badge count update not supported on this platform');
+      debugPrint('Badge count update not supported on this platform');
     }
   }
 
@@ -320,11 +321,11 @@ class NotificationService {
     
     try {
       // In production, this would send through FCM
-      print('📱 Push notification sent:');
-      print('   To: $recipientToken');
-      print('   Title: $title');
-      print('   Body: $body');
-      print('   Data: $data');
+      debugPrint('Push notification sent:');
+      debugPrint('   To: $recipientToken');
+      debugPrint('   Title: $title');
+      debugPrint('   Body: $body');
+      debugPrint('   Data: $data');
       
       // For now, show local notification
       await _showLocalNotification(
@@ -333,7 +334,7 @@ class NotificationService {
         payload: data != null ? jsonEncode(data) : null,
       );
     } catch (e) {
-      print('Error sending push notification: $e');
+      debugPrint('Error sending push notification: $e');
     }
   }
 
@@ -379,7 +380,7 @@ class NotificationService {
       
       return totalUnread;
     } catch (e) {
-      print('Error getting unread count: $e');
+      debugPrint('Error getting unread count: $e');
       return 0;
     }
   }
@@ -395,5 +396,5 @@ class NotificationService {
 
 // Top-level function for background message handling
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  print('Background message received: ${message.messageId}');
+  debugPrint('Background message received: ${message.messageId}');
 }

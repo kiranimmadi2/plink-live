@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
-import 'dart:typed_data';
 import '../services/profile_service.dart';
 
 class EditProfileBottomSheet extends StatefulWidget {
@@ -11,10 +10,10 @@ class EditProfileBottomSheet extends StatefulWidget {
   final Function()? onProfileUpdated;
 
   const EditProfileBottomSheet({
-    Key? key,
+    super.key,
     required this.currentProfile,
     this.onProfileUpdated,
-  }) : super(key: key);
+  });
 
   @override
   State<EditProfileBottomSheet> createState() => _EditProfileBottomSheetState();
@@ -145,7 +144,7 @@ class _EditProfileBottomSheetState extends State<EditProfileBottomSheet> {
         _initialActivities = List.from(_selectedActivities);
       }
     } catch (e) {
-      print('Error loading profile data: $e');
+      debugPrint('Error loading profile data: $e');
     }
   }
 
@@ -221,9 +220,11 @@ class _EditProfileBottomSheetState extends State<EditProfileBottomSheet> {
         });
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error picking image: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error picking image: $e')),
+        );
+      }
     }
   }
 
@@ -348,8 +349,15 @@ class _EditProfileBottomSheetState extends State<EditProfileBottomSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: _onWillPop,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final shouldPop = await _onWillPop();
+        if (shouldPop && context.mounted) {
+          Navigator.of(context).pop();
+        }
+      },
       child: Container(
         padding: EdgeInsets.only(
           bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -501,10 +509,10 @@ class _EditProfileBottomSheetState extends State<EditProfileBottomSheet> {
           },
         ),
         // Title
-        Expanded(
+        const Expanded(
           child: Text(
             'Edit Profile',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
             ),
@@ -515,7 +523,7 @@ class _EditProfileBottomSheetState extends State<EditProfileBottomSheet> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
-              color: Colors.orange.withOpacity(0.2),
+              color: Colors.orange.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Text(
@@ -686,10 +694,10 @@ class _EditProfileBottomSheetState extends State<EditProfileBottomSheet> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFF00D67D).withOpacity(0.1),
+              color: const Color(0xFF00D67D).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: const Color(0xFF00D67D).withOpacity(0.3),
+                color: const Color(0xFF00D67D).withValues(alpha: 0.3),
                 width: 1,
               ),
             ),
@@ -731,11 +739,11 @@ class _EditProfileBottomSheetState extends State<EditProfileBottomSheet> {
 
         // Popular Items Section
         if (filteredPopular.isNotEmpty) ...[
-          Row(
+          const Row(
             children: [
-              const Icon(Icons.local_fire_department, size: 18, color: Colors.orange),
-              const SizedBox(width: 8),
-              const Text(
+              Icon(Icons.local_fire_department, size: 18, color: Colors.orange),
+              SizedBox(width: 8),
+              Text(
                 'POPULAR',
                 style: TextStyle(
                   fontSize: 14,
@@ -824,7 +832,7 @@ class _EditProfileBottomSheetState extends State<EditProfileBottomSheet> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF00D67D).withOpacity(0.3),
+            color: const Color(0xFF00D67D).withValues(alpha: 0.3),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -870,7 +878,7 @@ class _EditProfileBottomSheetState extends State<EditProfileBottomSheet> {
           color: isSelected
               ? const Color(0xFF00D67D)
               : isPopular
-                  ? const Color(0xFF4A5FE8).withOpacity(0.3) // Blue tint for popular
+                  ? const Color(0xFF4A5FE8).withValues(alpha: 0.3) // Blue tint for popular
                   : Colors.grey[800],
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
@@ -913,7 +921,7 @@ class _EditProfileBottomSheetState extends State<EditProfileBottomSheet> {
         color: Theme.of(context).scaffoldBackgroundColor,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 12,
             offset: const Offset(0, -4),
           ),

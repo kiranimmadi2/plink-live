@@ -4,7 +4,7 @@ import '../widgets/voice_orb.dart';
 import '../widgets/audio_visualizer.dart';
 
 class VoiceAssistantScreen extends StatefulWidget {
-  const VoiceAssistantScreen({Key? key}) : super(key: key);
+  const VoiceAssistantScreen({super.key});
 
   @override
   State<VoiceAssistantScreen> createState() => _VoiceAssistantScreenState();
@@ -146,7 +146,7 @@ class _VoiceAssistantScreenState extends State<VoiceAssistantScreen> {
               // Audio visualizer (shows when listening or speaking)
               if (_currentState == VoiceOrbState.listening ||
                   _currentState == VoiceOrbState.speaking)
-                AudioVisualizer(
+                const AudioVisualizer(
                   isActive: true,
                   height: 60,
                   barCount: 35,

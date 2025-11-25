@@ -11,7 +11,7 @@ import '../services/conversation_service.dart';
 import 'enhanced_chat_screen.dart';
 
 class ConversationsScreen extends StatefulWidget {
-  const ConversationsScreen({Key? key}) : super(key: key);
+  const ConversationsScreen({super.key});
 
   @override
   State<ConversationsScreen> createState() => _ConversationsScreenState();
@@ -207,8 +207,8 @@ class _ConversationsScreenState extends State<ConversationsScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
+            const CircularProgressIndicator(),
+            const SizedBox(height: 16),
             Text(
               'Checking conversations...',
               style: TextStyle(
@@ -245,7 +245,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.error_outline,
                     size: 80,
                     color: Colors.orange,
@@ -295,7 +295,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
+                const Icon(
                   Icons.error_outline,
                   size: 80,
                   color: Colors.red,
@@ -487,7 +487,9 @@ class _ConversationsScreenState extends State<ConversationsScreen>
               otherUserId,
             );
 
+            if (!context.mounted) return;
             Navigator.push(
+              // ignore: use_build_context_synchronously
               context,
               MaterialPageRoute(
                 builder: (context) => EnhancedChatScreen(
@@ -506,10 +508,10 @@ class _ConversationsScreenState extends State<ConversationsScreen>
             // Show a friendly message
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
+                const SnackBar(
                   content: Text('This conversation is no longer available'),
                   backgroundColor: Colors.orange,
-                  duration: const Duration(seconds: 2),
+                  duration: Duration(seconds: 2),
                 ),
               );
             }
@@ -518,10 +520,10 @@ class _ConversationsScreenState extends State<ConversationsScreen>
           debugPrint('Error loading user data: $e');
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
+              const SnackBar(
                 content: Text('Unable to load conversation'),
                 backgroundColor: Colors.orange,
-                duration: const Duration(seconds: 2),
+                duration: Duration(seconds: 2),
               ),
             );
           }
@@ -696,6 +698,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
 
   
 
+  // ignore: unused_element
   Widget _buildActiveUserCard(
     Map<String, dynamic> userData,
     String userId,

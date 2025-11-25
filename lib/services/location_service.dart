@@ -3,7 +3,7 @@ import 'package:geocoding/geocoding.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 import 'geocoding_service.dart';
 
 class LocationService {
@@ -29,7 +29,7 @@ class LocationService {
 
   void _log(String message) {
     if (_enableVerboseLogging) {
-      print(message);
+      debugPrint(message);
     }
   }
 
@@ -107,8 +107,10 @@ class LocationService {
           _log('LocationService: Using HIGH accuracy mode (may take longer)...');
           try {
             final position = await Geolocator.getCurrentPosition(
-              desiredAccuracy: LocationAccuracy.best,
-              timeLimit: const Duration(seconds: 60),
+              locationSettings: const LocationSettings(
+                accuracy: LocationAccuracy.best,
+                timeLimit: Duration(seconds: 60),
+              ),
             );
             _log('LocationService: Got HIGH accuracy position lat=${position.latitude}, lng=${position.longitude}, accuracy=${position.accuracy}m');
             return position;
@@ -145,8 +147,10 @@ class LocationService {
           try {
             _log('LocationService: Trying high accuracy with 45s timeout (user-initiated)...');
             final position = await Geolocator.getCurrentPosition(
-              desiredAccuracy: LocationAccuracy.high,
-              timeLimit: const Duration(seconds: 45),
+              locationSettings: const LocationSettings(
+                accuracy: LocationAccuracy.high,
+                timeLimit: Duration(seconds: 45),
+              ),
             );
             _log('LocationService: Got high accuracy position lat=${position.latitude}, lng=${position.longitude}, accuracy=${position.accuracy}m');
             return position;
@@ -159,8 +163,10 @@ class LocationService {
         try {
           _log('LocationService: Trying medium accuracy with 30s timeout...');
           final position = await Geolocator.getCurrentPosition(
-            desiredAccuracy: LocationAccuracy.medium,
-            timeLimit: const Duration(seconds: 30),
+            locationSettings: const LocationSettings(
+              accuracy: LocationAccuracy.medium,
+              timeLimit: Duration(seconds: 30),
+            ),
           );
           _log('LocationService: Got medium accuracy position lat=${position.latitude}, lng=${position.longitude}, accuracy=${position.accuracy}m');
           return position;
@@ -172,8 +178,10 @@ class LocationService {
         try {
           _log('LocationService: Trying low accuracy with 20s timeout...');
           final position = await Geolocator.getCurrentPosition(
-            desiredAccuracy: LocationAccuracy.low,
-            timeLimit: const Duration(seconds: 20),
+            locationSettings: const LocationSettings(
+              accuracy: LocationAccuracy.low,
+              timeLimit: Duration(seconds: 20),
+            ),
           );
           _log('LocationService: Got low accuracy position lat=${position.latitude}, lng=${position.longitude}, accuracy=${position.accuracy}m');
           return position;
@@ -190,7 +198,9 @@ class LocationService {
         try {
           _log('LocationService: Trying web fallback...');
           final position = await Geolocator.getCurrentPosition(
-            desiredAccuracy: highAccuracy ? LocationAccuracy.best : LocationAccuracy.medium,
+            locationSettings: LocationSettings(
+              accuracy: highAccuracy ? LocationAccuracy.best : LocationAccuracy.medium,
+            ),
           );
           _log('LocationService: Web fallback success lat=${position.latitude}, lng=${position.longitude}');
           return position;
@@ -215,8 +225,10 @@ class LocationService {
     try {
       _log('LocationService: Fetching fresh location in background...');
       final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-        timeLimit: const Duration(seconds: 60),
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 60),
+        ),
       );
       _log('LocationService: Background fetch completed lat=${position.latitude}, lng=${position.longitude}');
 

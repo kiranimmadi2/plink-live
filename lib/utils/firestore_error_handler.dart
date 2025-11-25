@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 
 enum FirestoreErrorType {
   missingIndex,
@@ -80,15 +81,15 @@ class FirestoreErrorHandler {
       final message = getErrorMessage(errorType);
       
       if (logErrors) {
-        print('🔥 Firestore Error: $message');
+        debugPrint('Firestore Error: $message');
         if (error is FirebaseException) {
-          print('Error code: ${error.code}');
-          print('Error details: ${error.message}');
-          
+          debugPrint('Error code: ${error.code}');
+          debugPrint('Error details: ${error.message}');
+
           if (errorType == FirestoreErrorType.missingIndex) {
             final indexUrl = getIndexUrl(error);
             if (indexUrl != null) {
-              print('Create index here: $indexUrl');
+              debugPrint('Create index here: $indexUrl');
             }
           }
         }
@@ -114,7 +115,7 @@ class FirestoreErrorHandler {
       fallback: fallback,
       onError: (errorType, info) {
         if (errorType == FirestoreErrorType.missingIndex && info != null) {
-          print('Please create the index at: $info');
+          debugPrint('Please create the index at: $info');
         }
       },
     );

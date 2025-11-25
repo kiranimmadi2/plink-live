@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
-import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 
 /// Global error handler for the app
 class ErrorHandler {
@@ -36,8 +35,8 @@ class ErrorHandler {
     // Set up async error handling
     PlatformDispatcher.instance.onError = (error, stack) {
       if (kDebugMode) {
-        print('Async error: $error');
-        print('Stack trace: $stack');
+        debugPrint('Async error: $error');
+        debugPrint('Stack trace: $stack');
       } else {
         // In release mode, report to Crashlytics
         // FirebaseCrashlytics.instance.recordError(error, stack);
@@ -74,8 +73,8 @@ class ErrorHandler {
       return await operation();
     } catch (error, stackTrace) {
       if (kDebugMode) {
-        print('Error in $context: $error');
-        print('Stack trace: $stackTrace');
+        debugPrint('Error in $context: $error');
+        debugPrint('Stack trace: $stackTrace');
       }
       
       _instance._logError(
@@ -110,8 +109,8 @@ class ErrorHandler {
       return operation();
     } catch (error, stackTrace) {
       if (kDebugMode) {
-        print('Sync error in $context: $error');
-        print('Stack trace: $stackTrace');
+        debugPrint('Sync error in $context: $error');
+        debugPrint('Stack trace: $stackTrace');
       }
       
       _instance._logError(
@@ -250,15 +249,15 @@ class ErrorHandler {
         if (attempt == maxAttempts - 1) {
           // Last attempt failed
           if (kDebugMode) {
-            print('All retry attempts failed for $context: $error');
+            debugPrint('All retry attempts failed for $context: $error');
           }
           rethrow;
         }
-        
+
         // Wait before retrying with exponential backoff
         final delay = initialDelay * (attempt + 1);
         if (kDebugMode) {
-          print('Retry attempt ${attempt + 1} for $context after ${delay.inSeconds}s');
+          debugPrint('Retry attempt ${attempt + 1} for $context after ${delay.inSeconds}s');
         }
         await Future.delayed(delay);
       }
@@ -294,10 +293,10 @@ class ErrorBoundary extends StatefulWidget {
   final Widget Function(Object error, StackTrace? stack)? errorBuilder;
   
   const ErrorBoundary({
-    Key? key,
+    super.key,
     required this.child,
     this.errorBuilder,
-  }) : super(key: key);
+  });
   
   @override
   State<ErrorBoundary> createState() => _ErrorBoundaryState();

@@ -5,11 +5,8 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:package_info_plus/package_info_plus.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:permission_handler/permission_handler.dart';
 import '../providers/theme_provider.dart';
-import '../widgets/glassmorphic_container.dart';
 import '../services/auth_service.dart';
 import 'profile_edit_screen.dart';
 import 'performance_debug_screen.dart';
@@ -21,7 +18,7 @@ import 'privacy_policy_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
-  const SettingsScreen({Key? key}) : super(key: key);
+  const SettingsScreen({super.key});
 
   @override
   ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
@@ -135,6 +132,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final themeNotifier = ref.read(themeProvider.notifier);
     final isDark = themeState.isDarkMode;
     final isGlass = themeState.isGlassmorphism;
+    // ignore: unused_local_variable
     final authService = AuthService();
     
     return Scaffold(
@@ -280,7 +278,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       child: CupertinoSwitch(
                         value: _showOnlineStatus,
                         onChanged: _isLoading ? null : _updateOnlineStatusPreference,
-                        activeColor: ThemeNotifier.iosGreen,
+                        activeTrackColor: ThemeNotifier.iosGreen,
                       ),
                     ),
                   ),
@@ -752,16 +750,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ),
       ),
       subtitle: Text(subtitle),
-      trailing: Radio<bool>(
-        value: true,
-        groupValue: isSelected,
-        onChanged: (_) => onTap(),
-        activeColor: ThemeNotifier.iosPurple,
+      trailing: Icon(
+        isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+        color: isSelected ? ThemeNotifier.iosPurple : Colors.grey,
       ),
       onTap: onTap,
     );
   }
   
+  // ignore: unused_element
   Widget _buildLogoutButton(BuildContext context, AuthService authService) {
     return ListTile(
       leading: Container(
@@ -808,6 +805,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 onPressed: () async {
                   Navigator.pop(context);
                   await authService.signOut();
+                  if (!context.mounted) return;
                   Navigator.of(context).pushAndRemoveUntil(
                     MaterialPageRoute(builder: (_) => const LoginScreen()),
                     (route) => false,
@@ -1034,6 +1032,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             onPressed: () async {
               Navigator.pop(context);
               await authService.signOut();
+              if (!context.mounted) return;
               Navigator.of(context).pushAndRemoveUntil(
                 MaterialPageRoute(builder: (_) => const LoginScreen()),
                 (route) => false,
@@ -1299,7 +1298,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         });
       }
     } catch (e) {
-      print('Error calculating directory size: $e');
+      debugPrint('Error calculating directory size: $e');
     }
     return size;
   }
@@ -1312,7 +1311,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         await directory.create(recursive: true);
       }
     } catch (e) {
-      print('Error deleting directory: $e');
+      debugPrint('Error deleting directory: $e');
     }
   }
 
@@ -1398,7 +1397,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 DropdownButtonFormField<String>(
-                  value: selectedCategory,
+                  initialValue: selectedCategory,
                   decoration: const InputDecoration(
                     border: OutlineInputBorder(),
                     labelText: 'Problem Type',

@@ -7,11 +7,11 @@ class AnimatedGradientBackground extends StatefulWidget {
   final Duration duration;
 
   const AnimatedGradientBackground({
-    Key? key,
+    super.key,
     required this.child,
     this.colors,
     this.duration = const Duration(seconds: 3),
-  }) : super(key: key);
+  });
 
   @override
   State<AnimatedGradientBackground> createState() => _AnimatedGradientBackgroundState();
@@ -45,9 +45,9 @@ class _AnimatedGradientBackgroundState extends State<AnimatedGradientBackground>
   Widget build(BuildContext context) {
     final colors = widget.colors ??
         [
-          Theme.of(context).primaryColor.withOpacity(0.1),
-          Theme.of(context).colorScheme.secondary.withOpacity(0.1),
-          Theme.of(context).primaryColor.withOpacity(0.2),
+          Theme.of(context).primaryColor.withValues(alpha: 0.1),
+          Theme.of(context).colorScheme.secondary.withValues(alpha: 0.1),
+          Theme.of(context).primaryColor.withValues(alpha: 0.2),
         ];
 
     return AnimatedBuilder(

@@ -27,7 +27,7 @@ void main() {
         }
         
         stopwatch.stop();
-        print('Scroll test completed in ${stopwatch.elapsedMilliseconds}ms');
+        debugPrint('Scroll test completed in ${stopwatch.elapsedMilliseconds}ms');
         
         // Assert that scrolling is smooth (under 3 seconds for 10 scrolls)
         expect(stopwatch.elapsedMilliseconds, lessThan(3000));
@@ -59,7 +59,7 @@ void main() {
           }
           
           stopwatch.stop();
-          print('Message scroll test completed in ${stopwatch.elapsedMilliseconds}ms');
+          debugPrint('Message scroll test completed in ${stopwatch.elapsedMilliseconds}ms');
         }
       }
     });
@@ -85,7 +85,7 @@ void main() {
       }
       
       stopwatch.stop();
-      print('Navigation test completed in ${stopwatch.elapsedMilliseconds}ms');
+      debugPrint('Navigation test completed in ${stopwatch.elapsedMilliseconds}ms');
       
       // Navigation should be quick
       expect(stopwatch.elapsedMilliseconds, lessThan(2000));
@@ -97,7 +97,7 @@ void main() {
 
       // Count cached network images
       final cachedImages = find.byType(Image);
-      print('Found ${cachedImages.evaluate().length} images');
+      debugPrint('Found ${cachedImages.evaluate().length} images');
       
       // Ensure images load within reasonable time
       await tester.pump(const Duration(seconds: 2));

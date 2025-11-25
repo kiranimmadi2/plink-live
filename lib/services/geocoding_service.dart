@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 import 'connectivity_service.dart';
 
 class GeocodingService {
@@ -19,12 +19,12 @@ class GeocodingService {
     double longitude,
   ) async {
     try {
-      print('GeocodingService: Getting address for $latitude, $longitude');
+      debugPrint('GeocodingService: Getting address for $latitude, $longitude');
       
       // Check connectivity first
       final connectivityService = ConnectivityService();
       if (!connectivityService.hasConnection) {
-        print('GeocodingService: No internet connection, cannot geocode');
+        debugPrint('GeocodingService: No internet connection, cannot geocode');
         return null; // Cannot get address without internet
       }
       
@@ -59,13 +59,13 @@ class GeocodingService {
       // The caller should handle this by requesting permission or showing error
       return null;
     } catch (e) {
-      print('GeocodingService: Error getting address: $e');
+      debugPrint('GeocodingService: Error getting address: $e');
       // Return null on error - no fake locations
       return null;
     }
   }
   
-  /// Get default location data when services fail
+  // ignore: unused_element
   static Map<String, dynamic> _getDefaultLocation(double latitude, double longitude) {
     return {
       'formatted': 'Location detected',
@@ -100,7 +100,7 @@ class GeocodingService {
       
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        print('GeocodingService: Nominatim response: $data');
+        debugPrint('GeocodingService: Nominatim response: $data');
         
         final address = data['address'] ?? {};
         
@@ -174,7 +174,7 @@ class GeocodingService {
       
       return null;
     } catch (e) {
-      print('GeocodingService: Nominatim error: $e');
+      debugPrint('GeocodingService: Nominatim error: $e');
       return null;
     }
   }
@@ -221,7 +221,7 @@ class GeocodingService {
       
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        print('GeocodingService: BigDataCloud response: ${data}');
+        debugPrint('GeocodingService: BigDataCloud response: $data');
         
         // Extract location details
         String area = data['locality'] ?? '';
@@ -273,11 +273,11 @@ class GeocodingService {
       
       return null;
     } catch (e) {
-      print('GeocodingService: BigDataCloud error: $e');
+      debugPrint('GeocodingService: BigDataCloud error: $e');
       return null;
     }
   }
-  
+
   /// Get address using OpenCage API (requires free API key)
   static Future<Map<String, dynamic>?> _getOpenCageAddress(
     double latitude,
@@ -320,12 +320,12 @@ class GeocodingService {
       
       return null;
     } catch (e) {
-      print('GeocodingService: OpenCage error: $e');
+      debugPrint('GeocodingService: OpenCage error: $e');
       return null;
     }
   }
-  
-  /// Fallback: Get approximate location using IP address (for web)
+
+  // ignore: unused_element
   static Future<Map<String, dynamic>?> _getIPBasedLocation() async {
     try {
       // Using ipapi.co (free, works with HTTPS)
@@ -350,11 +350,11 @@ class GeocodingService {
       
       return null;
     } catch (e) {
-      print('GeocodingService: IP location error: $e');
+      debugPrint('GeocodingService: IP location error: $e');
       return null;
     }
   }
-  
+
   /// Search for location by text query (for search functionality)
   static Future<List<Map<String, dynamic>>> searchLocation(String query) async {
     try {
@@ -396,7 +396,7 @@ class GeocodingService {
       
       return [];
     } catch (e) {
-      print('GeocodingService: Search error: $e');
+      debugPrint('GeocodingService: Search error: $e');
       return [];
     }
   }

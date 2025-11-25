@@ -44,7 +44,7 @@ class UserMigrationService {
       debugPrint('📊 Found ${usersSnapshot.docs.length} users to migrate');
 
       // Process in batches of 500 (Firestore batch limit)
-      final batchSize = 500;
+      const batchSize = 500;
       for (int i = 0; i < usersSnapshot.docs.length; i += batchSize) {
         final batch = _firestore.batch();
         final batchDocs = usersSnapshot.docs.skip(i).take(batchSize).toList();

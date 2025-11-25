@@ -4,7 +4,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'notification_service.dart';
 import 'gemini_service.dart';
-import '../models/user_profile.dart';
 
 class RealtimeMatchingService {
   static final RealtimeMatchingService _instance = RealtimeMatchingService._internal();
@@ -54,6 +53,7 @@ class RealtimeMatchingService {
     debugPrint('✅ Listening for new posts in real-time');
   }
 
+  // ignore: unused_element
   Future<void> _checkIntentMatch(DocumentSnapshot newIntent, String currentUserId) async {
     try {
       // Get user's active intents
@@ -72,7 +72,7 @@ class RealtimeMatchingService {
 
       // Check each user intent against the new intent
       for (var userIntent in userIntents.docs) {
-        final userIntentData = userIntent.data() as Map<String, dynamic>;
+        final userIntentData = userIntent.data();
         final userEmbedding = List<double>.from(userIntentData['embedding'] ?? []);
         
         if (userEmbedding.isEmpty) continue;
@@ -137,7 +137,7 @@ class RealtimeMatchingService {
       }
 
       for (var userPost in userPosts.docs) {
-        final userPostData = userPost.data() as Map<String, dynamic>;
+        final userPostData = userPost.data();
         var userEmbedding = List<double>.from(userPostData['embedding'] ?? []);
 
         // UPDATED: Generate embedding if missing for user's post too
@@ -216,7 +216,7 @@ Return "true" if they complement each other, "false" otherwise.
     }
 
     // Set timer to prevent duplicate notifications
-    _notificationTimers[notificationKey] = Timer(Duration(minutes: 5), () {
+    _notificationTimers[notificationKey] = Timer(const Duration(minutes: 5), () {
       _notificationTimers.remove(notificationKey);
     });
 
@@ -263,7 +263,7 @@ Return "true" if they complement each other, "false" otherwise.
         .snapshots()
         .map((snapshot) {
       return snapshot.docs.map((doc) {
-        final data = doc.data() as Map<String, dynamic>;
+        final data = doc.data();
         data['id'] = doc.id;
         return data;
       }).toList();

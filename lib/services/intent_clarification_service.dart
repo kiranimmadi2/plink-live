@@ -1,6 +1,7 @@
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'dart:convert';
 import '../config/api_config.dart';
 
@@ -83,8 +84,8 @@ Generate appropriate clarifying questions:
           'data': jsonResponse,
         };
       } catch (e) {
-        print('Error parsing JSON response: $e');
-        print('Cleaned response: $cleanedResponse');
+        debugPrint('Error parsing JSON response: $e');
+        debugPrint('Cleaned response: $cleanedResponse');
         
         // Fallback questions if parsing fails
         return {
@@ -93,7 +94,7 @@ Generate appropriate clarifying questions:
         };
       }
     } catch (e) {
-      print('Error generating clarifying questions: $e');
+      debugPrint('Error generating clarifying questions: $e');
       return {
         'success': false,
         'error': e.toString(),
@@ -136,7 +137,7 @@ Return only the refined intent statement, nothing else:
       
       return refinedIntent;
     } catch (e) {
-      print('Error processing answers: $e');
+      debugPrint('Error processing answers: $e');
       return originalInput; // Fallback to original input
     }
   }
@@ -243,7 +244,7 @@ Return only the refined intent statement, nothing else:
         'timestamp': FieldValue.serverTimestamp(),
       });
     } catch (e) {
-      print('Error storing clarification session: $e');
+      debugPrint('Error storing clarification session: $e');
     }
   }
 }

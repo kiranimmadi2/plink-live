@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 
 class NetworkUtils {
   static Future<bool> hasNetworkConnection() async {
@@ -19,15 +20,15 @@ class NetworkUtils {
     final hasConnection = await hasNetworkConnection();
     
     if (!hasConnection) {
-      print('⚠️ No network connection for: $operationName');
+      debugPrint('No network connection for: $operationName');
       onNoConnection?.call();
       return fallback?.call();
     }
-    
+
     try {
       return await operation();
     } on SocketException catch (e) {
-      print('Network error during $operationName: $e');
+      debugPrint('Network error during $operationName: $e');
       return fallback?.call();
     }
   }

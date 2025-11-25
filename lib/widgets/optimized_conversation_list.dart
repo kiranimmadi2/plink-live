@@ -7,7 +7,6 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import '../models/conversation_model.dart';
 import '../models/user_profile.dart';
-import '../services/conversation_service.dart';
 import '../screens/enhanced_chat_screen.dart';
 import '../utils/app_optimizer.dart';
 
@@ -17,10 +16,10 @@ class OptimizedConversationList extends StatefulWidget {
   final String searchQuery;
   
   const OptimizedConversationList({
-    Key? key,
+    super.key,
     required this.isDarkMode,
     this.searchQuery = '',
-  }) : super(key: key);
+  });
   
   @override
   State<OptimizedConversationList> createState() => _OptimizedConversationListState();
@@ -331,7 +330,7 @@ class _ConversationTile extends StatelessWidget {
     if (otherUser == null) return const SizedBox.shrink();
     
     final unreadCount = conversation.unreadCount[FirebaseAuth.instance.currentUser?.uid] ?? 0;
-    final isOnline = otherUser.isOnline ?? false;
+    final isOnline = otherUser.isOnline;
     
     return Material(
       color: Colors.transparent,

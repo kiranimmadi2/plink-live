@@ -3,7 +3,7 @@ import '../services/connection_service.dart';
 import '../widgets/user_avatar.dart';
 
 class ConnectionRequestsScreen extends StatefulWidget {
-  const ConnectionRequestsScreen({Key? key}) : super(key: key);
+  const ConnectionRequestsScreen({super.key});
 
   @override
   State<ConnectionRequestsScreen> createState() => _ConnectionRequestsScreenState();
@@ -133,7 +133,7 @@ class _ConnectionRequestsScreenState extends State<ConnectionRequestsScreen> {
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.08),
+                      color: Colors.black.withValues(alpha: 0.08),
                       blurRadius: 8,
                       offset: const Offset(0, 2),
                     ),
@@ -195,8 +195,8 @@ class _ConnectionRequestsScreenState extends State<ConnectionRequestsScreen> {
                                     onPressed: () async {
                                       final result = await _connectionService.acceptConnectionRequest(requestId);
 
-                                      if (mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
+                                      if (!context.mounted) return;
+                                      ScaffoldMessenger.of(context).showSnackBar(
                                           SnackBar(
                                             content: Row(
                                               children: [
@@ -219,7 +219,6 @@ class _ConnectionRequestsScreenState extends State<ConnectionRequestsScreen> {
                                                 : Colors.red.shade600,
                                           ),
                                         );
-                                      }
                                     },
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: const Color(0xFF00D67D),
@@ -230,9 +229,9 @@ class _ConnectionRequestsScreenState extends State<ConnectionRequestsScreen> {
                                       ),
                                       elevation: 0,
                                     ),
-                                    child: Row(
+                                    child: const Row(
                                       mainAxisAlignment: MainAxisAlignment.center,
-                                      children: const [
+                                      children: [
                                         Icon(Icons.check, size: 18),
                                         SizedBox(width: 6),
                                         Text(
@@ -252,8 +251,8 @@ class _ConnectionRequestsScreenState extends State<ConnectionRequestsScreen> {
                                     onPressed: () async {
                                       final result = await _connectionService.rejectConnectionRequest(requestId);
 
-                                      if (mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
+                                      if (!context.mounted) return;
+                                      ScaffoldMessenger.of(context).showSnackBar(
                                           SnackBar(
                                             content: Text(
                                               result['success']
@@ -265,7 +264,6 @@ class _ConnectionRequestsScreenState extends State<ConnectionRequestsScreen> {
                                                 : Colors.red.shade600,
                                           ),
                                         );
-                                      }
                                     },
                                     style: OutlinedButton.styleFrom(
                                       foregroundColor: Colors.red.shade600,
