@@ -1,21 +1,21 @@
+import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import '../services/universal_intent_service.dart';
 import '../models/user_profile.dart';
 import 'enhanced_chat_screen.dart';
 import '../widgets/user_avatar.dart';
 import '../widgets/conversational_clarification_dialog.dart';
-import '../widgets/match_card_with_actions.dart';
 import '../services/unified_intent_processor.dart';
 import '../services/realtime_matching_service.dart';
 import 'profile_with_history_screen.dart';
 import '../services/photo_cache_service.dart';
 import '../widgets/floating_particles.dart';
 import '../widgets/liquid_wave_orb.dart';
+import 'package:lottie/lottie.dart';
 
 class UniversalMatchingScreen extends StatefulWidget {
   const UniversalMatchingScreen({super.key});
@@ -25,25 +25,33 @@ class UniversalMatchingScreen extends StatefulWidget {
       _UniversalMatchingScreenState();
 }
 
-class _UniversalMatchingScreenState extends State<UniversalMatchingScreen> {
+class _UniversalMatchingScreenState extends State<UniversalMatchingScreen>
+    with SingleTickerProviderStateMixin {
   final UniversalIntentService _intentService = UniversalIntentService();
   final UnifiedIntentProcessor _unifiedProcessor = UnifiedIntentProcessor();
   final RealtimeMatchingService _realtimeService = RealtimeMatchingService();
-  final TextEditingController _intentController = TextEditingController();
-  final FocusNode _searchFocusNode = FocusNode();
+
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final PhotoCacheService _photoCache = PhotoCacheService();
+  // search field
+  final TextEditingController _intentController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
 
-  bool _isProcessing = false;
   bool _isSearchFocused = false;
+  bool _isProcessing = false;
+
+  List<String> _suggestions = [];
   bool _hasText = false;
   List<Map<String, dynamic>> _matches = [];
   List<Map<String, dynamic>> _userIntents = [];
   Map<String, dynamic>? _currentIntent;
   String? _errorMessage;
   String _currentUserName = '';
-  List<String> _suggestions = [];
 
+  //for home page animation
+  late AnimationController _controller;
+  bool _visible = true;
+  late Timer _timer;
   // Voice orb state management
   VoiceOrbState _voiceOrbState = VoiceOrbState.idle;
   String _voiceTranscription = '';
@@ -55,17 +63,22 @@ class _UniversalMatchingScreenState extends State<UniversalMatchingScreen> {
     _loadUserIntents();
     _loadUserProfile();
     _realtimeService.initialize();
+    //Home screen animation
+    _controller = AnimationController(vsync: this);
+    // Blink timer: toggle opacity every 500ms
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      setState(() {
+        _visible = !_visible;
+      });
+    });
 
-    // Listen to focus changes
+    // search field listnere
     _searchFocusNode.addListener(() {
-      if (_searchFocusNode.hasFocus) {
-        HapticFeedback.selectionClick();
-      }
       setState(() {
         _isSearchFocused = _searchFocusNode.hasFocus;
       });
     });
-
     // Listen to text changes
     _intentController.addListener(() {
       setState(() {
@@ -79,6 +92,8 @@ class _UniversalMatchingScreenState extends State<UniversalMatchingScreen> {
     _intentController.dispose();
     _searchFocusNode.dispose();
     _realtimeService.dispose();
+    _controller.dispose();
+    _timer.cancel();
     super.dispose();
   }
 
@@ -108,47 +123,19 @@ class _UniversalMatchingScreenState extends State<UniversalMatchingScreen> {
     }
   }
 
-  Future<void> _processIntent() async {
-    final intent = _intentController.text.trim();
-    if (intent.isEmpty) {
-      setState(() {
-        _errorMessage = 'Please describe what you\'re looking for';
-      });
-      return;
-    }
+  void _processIntent() async {
+    if (_intentController.text.isEmpty) return;
+    setState(() => _isProcessing = true);
 
+    await Future.delayed(const Duration(seconds: 1)); // simulate processing
+    setState(() => _isProcessing = false);
+  }
+
+  void _loadSuggestions(String value) {
+    // fake suggestions
     setState(() {
-      _errorMessage = null;
+      _suggestions = List.generate(3, (index) => "$value suggestion $index");
     });
-
-    // Check if clarification is needed
-    final clarification = await _unifiedProcessor.checkClarificationNeeded(
-      intent,
-    );
-
-    if (clarification != null && clarification['needsClarification'] == true) {
-      // Show clarification dialog
-      final answer = await ConversationalClarificationDialog.show(
-        context,
-        originalInput: intent,
-        question: clarification['question'],
-        options: List<String>.from(clarification['options']),
-        reason: clarification['reason'],
-      );
-
-      if (answer != null) {
-        // Process with clarified intent
-        final clarifiedIntent = _buildClarifiedIntent(
-          intent,
-          answer,
-          clarification['question'],
-        );
-        await _processWithIntent(clarifiedIntent);
-      }
-    } else {
-      // Direct processing without dialog for immediate results
-      await _processWithIntent(intent);
-    }
   }
 
   String _buildClarifiedIntent(
@@ -249,14 +236,6 @@ class _UniversalMatchingScreenState extends State<UniversalMatchingScreen> {
         _isProcessing = false;
       });
     }
-  }
-
-  // Load smart suggestions as user types
-  Future<void> _loadSuggestions(String input) async {
-    // Suggestions disabled - progressive_intent_service removed
-    setState(() {
-      _suggestions = [];
-    });
   }
 
   String _formatDistance(double distanceInKm) {
@@ -419,19 +398,13 @@ class _UniversalMatchingScreenState extends State<UniversalMatchingScreen> {
                 child: Container(
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    gradient: LinearGradient(
-                      colors: [
-                        Theme.of(context).primaryColor,
-                        Theme.of(context).primaryColor.withValues(alpha: 0.6),
-                      ],
-                    ),
+                    color: Colors.grey,
+                    border: Border.all(color: Colors.white, width: 2),
                     boxShadow: [
                       BoxShadow(
-                        color: Theme.of(
-                          context,
-                        ).primaryColor.withValues(alpha: 0.3),
-                        blurRadius: 8,
-                        spreadRadius: 2,
+                        color: Colors.black.withOpacity(0.2),
+                        blurRadius: 5,
+                        spreadRadius: 1,
                       ),
                     ],
                   ),
@@ -450,7 +423,7 @@ class _UniversalMatchingScreenState extends State<UniversalMatchingScreen> {
       body: Stack(
         children: [
           // Pure black background
-          Container(color: Colors.black),
+          Container(color: Colors.grey.shade700),
           // Subtle floating particles
           const Positioned.fill(child: FloatingParticles(particleCount: 12)),
           // Main content
@@ -468,8 +441,8 @@ class _UniversalMatchingScreenState extends State<UniversalMatchingScreen> {
                                 : Colors.black.withValues(alpha: 0.05),
                             borderRadius: BorderRadius.circular(20),
                           ),
-                          child: CircularProgressIndicator(
-                            color: Theme.of(context).primaryColor,
+                          child: const CircularProgressIndicator(
+                            color: Colors.white,
                             strokeWidth: 3,
                           ),
                         ),
@@ -555,89 +528,112 @@ class _UniversalMatchingScreenState extends State<UniversalMatchingScreen> {
                         maxHeight: 120,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.6),
                         borderRadius: BorderRadius.circular(26),
+                        color: Colors.grey[900],
                         border: Border.all(
                           color: _isSearchFocused
-                              ? Theme.of(context).primaryColor
-                              : Colors.blue.withValues(alpha: 0.5),
-                          width: 1.5,
+                              ? Colors.grey
+                              : const Color.fromARGB(255, 146, 146, 146),
+                          width: 2,
                         ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: _isSearchFocused
+                                ? Colors.grey.withOpacity(0.3)
+                                : Colors.transparent,
+                            blurRadius: 8,
+                            spreadRadius: 1,
+                          ),
+                        ],
                       ),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           const SizedBox(width: 20),
                           Expanded(
-                            child: TextField(
-                              controller: _intentController,
-                              focusNode: _searchFocusNode,
-                              textInputAction: TextInputAction.newline,
-                              keyboardType: TextInputType.multiline,
-                              minLines: 1,
-                              maxLines: null,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 15,
-                                fontWeight: FontWeight.w400,
+                            child: AnimatedDefaultTextStyle(
+                              duration: const Duration(milliseconds: 250),
+                              style: TextStyle(
+                                color: _isSearchFocused
+                                    ? Colors.white
+                                    : Colors.grey[400],
+                                fontSize: _isSearchFocused ? 16 : 15,
+                                fontWeight: _isSearchFocused
+                                    ? FontWeight.w500
+                                    : FontWeight.w400,
                                 height: 1.4,
                               ),
-                              cursorColor: Theme.of(context).primaryColor,
-                              decoration: InputDecoration(
-                                hintText: 'Find Anything Supper',
-                                hintStyle: TextStyle(
-                                  color: Colors.grey[400],
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w400,
+                              child: TextField(
+                                controller: _intentController,
+                                focusNode: _searchFocusNode,
+                                textInputAction: TextInputAction.newline,
+                                keyboardType: TextInputType.multiline,
+                                minLines: 1,
+                                maxLines: null,
+                                cursorColor: Colors.white,
+                                decoration: InputDecoration(
+                                  hintText: 'Find Anything Supper',
+                                  hintStyle: TextStyle(
+                                    color: Colors.grey[400],
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w400,
+                                  ),
+                                  border: InputBorder.none,
+                                  enabledBorder: InputBorder.none,
+                                  focusedBorder: InputBorder.none,
+                                  errorBorder: InputBorder.none,
+                                  disabledBorder: InputBorder.none,
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    vertical: 16,
+                                    horizontal: 16,
+                                  ),
+                                  isDense: true,
+                                  filled: true,
+                                  fillColor: Colors.transparent,
+                                  suffixIcon: GestureDetector(
+                                    onTap: () {
+                                      // TODO: implement microphone input
+                                      print("Mic tapped!");
+                                    },
+                                    child: const Padding(
+                                      padding: EdgeInsets.all(8.0),
+                                      child: Icon(
+                                        Icons.mic,
+                                        color: Colors.white,
+                                        size: 24,
+                                      ),
+                                    ),
+                                  ),
                                 ),
-                                border: InputBorder.none,
-                                enabledBorder: InputBorder.none,
-                                focusedBorder: InputBorder.none,
-                                fillColor: Colors.transparent,
-                                filled: true,
-                                contentPadding: const EdgeInsets.symmetric(
-                                  vertical: 16,
-                                ),
-                                isDense: true,
+                                onChanged: (value) {
+                                  if (value.length >= 2) {
+                                    _loadSuggestions(value);
+                                  } else {
+                                    setState(() => _suggestions = []);
+                                  }
+                                },
+                                onSubmitted: (_) => _processIntent(),
                               ),
-                              onChanged: (value) {
-                                if (value.length >= 2) {
-                                  _loadSuggestions(value);
-                                } else {
-                                  setState(() {
-                                    _suggestions = [];
-                                  });
-                                }
-                              },
-                              onSubmitted: (_) => _processIntent(),
                             ),
                           ),
                           const SizedBox(width: 8),
-                          // Send button
                           GestureDetector(
-                            onTap: _isProcessing
-                                ? null
-                                : () {
-                                    HapticFeedback.mediumImpact();
-                                    _processIntent();
-                                  },
+                            onTap: _isProcessing ? null : _processIntent,
                             child: Container(
                               width: 40,
                               height: 40,
                               margin: const EdgeInsets.only(
                                 right: 6,
-                                bottom: 6,
+                                bottom: 7.5,
                               ),
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                color: Theme.of(context).primaryColor,
+                                color: Colors.grey[800],
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Theme.of(
-                                      context,
-                                    ).primaryColor.withValues(alpha: 0.4),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 2),
+                                    color: Colors.white.withOpacity(0.1),
+                                    blurRadius: 2,
+                                    offset: const Offset(0, 1),
                                   ),
                                 ],
                               ),
@@ -650,7 +646,7 @@ class _UniversalMatchingScreenState extends State<UniversalMatchingScreen> {
                                       ),
                                     )
                                   : const Icon(
-                                      Icons.arrow_upward_rounded,
+                                      Icons.search,
                                       color: Colors.white,
                                       size: 22,
                                     ),
@@ -693,7 +689,8 @@ class _UniversalMatchingScreenState extends State<UniversalMatchingScreen> {
                 'Hello ${_currentUserName.split(' ')[0].toUpperCase()}',
                 style: TextStyle(
                   fontSize: 22,
-                  color: isDarkMode ? Colors.grey[400] : Colors.grey[700],
+                  color: Colors.white,
+                  // color: isDarkMode ? Colors.grey[400] : Colors.grey[700],
                   fontWeight: FontWeight.w500,
                   letterSpacing: 1,
                 ),
@@ -701,75 +698,22 @@ class _UniversalMatchingScreenState extends State<UniversalMatchingScreen> {
             ),
             const SizedBox(height: 40),
             // Voice Orb - Interactive element (all states happen here)
-            TweenAnimationBuilder(
-              tween: Tween<double>(begin: 0, end: 1),
-              duration: const Duration(milliseconds: 800),
-              curve: Curves.easeOutCubic,
-              builder: (context, double value, child) {
-                return Opacity(
-                  opacity: value,
-                  child: Transform.scale(
-                    scale: 0.7 + (0.3 * value),
-                    child: child,
-                  ),
-                );
-              },
-              child: GestureDetector(
-                onTap: _handleVoiceOrbTap,
-                child: LiquidWaveOrb(state: _voiceOrbState, size: 250),
-              ),
-            ),
-            if (_errorMessage != null) ...[
-              const SizedBox(height: 32),
-              TweenAnimationBuilder(
-                tween: Tween<double>(begin: 0, end: 1),
-                duration: const Duration(milliseconds: 400),
-                builder: (context, double value, child) {
-                  return Opacity(opacity: value, child: child);
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 12,
-                  ),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        Colors.red.withValues(alpha: 0.15),
-                        Colors.red.withValues(alpha: 0.08),
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: Colors.red.withValues(alpha: 0.3),
-                      width: 1,
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.info_outline_rounded,
-                        color: Colors.red[400],
-                        size: 20,
-                      ),
-                      const SizedBox(width: 8),
-                      Flexible(
-                        child: Text(
-                          _errorMessage!,
-                          style: TextStyle(
-                            color: Colors.red[400],
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    ],
-                  ),
+            Center(
+              child: AnimatedOpacity(
+                opacity: _visible
+                    ? 1.0
+                    : 0.5, // slight fade to simulate blinking
+                duration: const Duration(milliseconds: 300),
+                child: Lottie.asset(
+                  'assets/animation.json',
+                  width: 350,
+                  height: 350,
+                  fit: BoxFit.contain,
+                  animate: true, // play immediately
+                  repeat: true, // loop continuously
                 ),
               ),
-            ],
+            ),
           ],
         ),
       ),

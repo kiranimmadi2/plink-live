@@ -82,6 +82,8 @@ dependencies:
 
   # Environment variables
   flutter_dotenv: ^5.1.0
+  cubixd: ^0.1.1
+  lottie: ^3.3.2
 
 dev_dependencies:
   flutter_test:
@@ -112,6 +114,7 @@ flutter:
   # To add assets to your application, add an assets section, like this:
   assets:
   - .env
+  - assets/animation.json
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

@@ -18,7 +18,7 @@ class _LoginScreenState extends State<LoginScreen>
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final AuthService _authService = AuthService();
-  
+
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _isSignUpMode = false;
@@ -26,7 +26,7 @@ class _LoginScreenState extends State<LoginScreen>
   bool _acceptTerms = false;
   String _passwordStrength = '';
   Color _passwordStrengthColor = Colors.grey;
-  
+
   late AnimationController _animationController;
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
@@ -46,21 +46,15 @@ class _LoginScreenState extends State<LoginScreen>
     _fadeAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _fadeController,
-      curve: Curves.easeIn,
-    ));
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.1),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeOut,
-    ));
-    
+    ).animate(CurvedAnimation(parent: _fadeController, curve: Curves.easeIn));
+    _slideAnimation =
+        Tween<Offset>(begin: const Offset(0, 0.1), end: Offset.zero).animate(
+          CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
+        );
+
     _animationController.forward();
     _fadeController.forward();
-    
+
     _passwordController.addListener(_checkPasswordStrength);
   }
 
@@ -115,7 +109,9 @@ class _LoginScreenState extends State<LoginScreen>
     if (_formKey.currentState!.validate()) {
       // Check terms acceptance for signup
       if (_isSignUpMode && !_acceptTerms) {
-        _showErrorSnackBar('Please accept the Terms of Service and Privacy Policy to continue');
+        _showErrorSnackBar(
+          'Please accept the Terms of Service and Privacy Policy to continue',
+        );
         return;
       }
 
@@ -137,9 +133,7 @@ class _LoginScreenState extends State<LoginScreen>
         if (user != null && mounted) {
           HapticFeedback.lightImpact();
           _showSuccessSnackBar(
-            _isSignUpMode
-                ? 'Account created successfully!'
-                : 'Welcome back!',
+            _isSignUpMode ? 'Account created successfully!' : 'Welcome back!',
           );
         }
       } catch (e) {
@@ -164,7 +158,7 @@ class _LoginScreenState extends State<LoginScreen>
 
     try {
       final user = await _authService.signInWithGoogle();
-      
+
       if (user != null && mounted) {
         HapticFeedback.lightImpact();
         _showSuccessSnackBar('Welcome, ${user.displayName ?? 'User'}!');
@@ -213,9 +207,7 @@ class _LoginScreenState extends State<LoginScreen>
         ),
         backgroundColor: Colors.green,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         margin: const EdgeInsets.all(16),
       ),
     );
@@ -233,9 +225,7 @@ class _LoginScreenState extends State<LoginScreen>
         ),
         backgroundColor: Colors.red,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         margin: const EdgeInsets.all(16),
       ),
     );
@@ -245,14 +235,12 @@ class _LoginScreenState extends State<LoginScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
+        // color: Colors.white,
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
-              Colors.blue.shade400,
-              Colors.purple.shade400,
-            ],
+            colors: [Colors.blue.shade400, Colors.purple.shade400],
           ),
         ),
         child: SafeArea(
@@ -265,6 +253,22 @@ class _LoginScreenState extends State<LoginScreen>
                   child: Container(
                     margin: const EdgeInsets.all(24),
                     padding: const EdgeInsets.all(32),
+                    // decoration: BoxDecoration(
+                    //   borderRadius: BorderRadius.circular(24),
+                    //   border: Border.all(color: Colors.white),
+                    //   gradient: LinearGradient(
+                    //     begin: Alignment.topLeft,
+                    //     end: Alignment.bottomRight,
+                    //     colors: [Colors.purple.shade400, Colors.blue.shade400],
+                    //   ),
+                    //   boxShadow: [
+                    //     BoxShadow(
+                    //       color: Colors.black.withValues(alpha: 0.1),
+                    //       blurRadius: 20,
+                    //       offset: const Offset(0, 10),
+                    //     ),
+                    //   ],
+                    // ),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(24),
@@ -282,7 +286,8 @@ class _LoginScreenState extends State<LoginScreen>
                         _buildHeader(),
                         const SizedBox(height: 32),
                         _buildForm(),
-                        if (_isSignUpMode && _passwordController.text.isNotEmpty)
+                        if (_isSignUpMode &&
+                            _passwordController.text.isNotEmpty)
                           _buildPasswordStrengthIndicator(),
                         const SizedBox(height: 24),
                         _buildRememberMeAndForgot(),
@@ -334,13 +339,8 @@ class _LoginScreenState extends State<LoginScreen>
         ),
         const SizedBox(height: 8),
         Text(
-          _isSignUpMode
-              ? 'Sign up to get started'
-              : 'Sign in to continue',
-          style: TextStyle(
-            fontSize: 16,
-            color: Colors.grey[600],
-          ),
+          _isSignUpMode ? 'Sign up to get started' : 'Sign in to continue',
+          style: TextStyle(fontSize: 16, color: Colors.grey[600]),
         ),
       ],
     );
@@ -358,16 +358,13 @@ class _LoginScreenState extends State<LoginScreen>
             decoration: InputDecoration(
               labelText: 'Email',
               hintText: 'Enter your email',
-              prefixIcon: Icon(
-                Icons.email_outlined,
-                color: Colors.grey[600],
-              ),
+              prefixIcon: Icon(Icons.email_outlined, color: Colors.grey[600]),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
                 borderSide: BorderSide.none,
               ),
               filled: true,
-              fillColor: Colors.grey[100],
+              fillColor: Colors.blue,
               errorStyle: const TextStyle(height: 0.8),
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 20,
@@ -378,8 +375,9 @@ class _LoginScreenState extends State<LoginScreen>
               if (value == null || value.isEmpty) {
                 return 'Please enter your email';
               }
-              if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
-                  .hasMatch(value)) {
+              if (!RegExp(
+                r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+              ).hasMatch(value)) {
                 return 'Please enter a valid email';
               }
               return null;
@@ -394,10 +392,7 @@ class _LoginScreenState extends State<LoginScreen>
             decoration: InputDecoration(
               labelText: 'Password',
               hintText: 'Enter your password',
-              prefixIcon: Icon(
-                Icons.lock_outline,
-                color: Colors.grey[600],
-              ),
+              prefixIcon: Icon(Icons.lock_outline, color: Colors.grey[600]),
               suffixIcon: IconButton(
                 icon: Icon(
                   _obscurePassword
@@ -416,7 +411,7 @@ class _LoginScreenState extends State<LoginScreen>
                 borderSide: BorderSide.none,
               ),
               filled: true,
-              fillColor: Colors.grey[100],
+              fillColor: Colors.blue,
               errorStyle: const TextStyle(height: 0.8),
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 20,
@@ -449,8 +444,8 @@ class _LoginScreenState extends State<LoginScreen>
                 value: _passwordStrength == 'Weak'
                     ? 0.33
                     : _passwordStrength == 'Medium'
-                        ? 0.66
-                        : 1.0,
+                    ? 0.66
+                    : 1.0,
                 backgroundColor: Colors.grey[300],
                 color: _passwordStrengthColor,
                 minHeight: 4,
@@ -473,7 +468,7 @@ class _LoginScreenState extends State<LoginScreen>
 
   Widget _buildRememberMeAndForgot() {
     if (_isSignUpMode) return const SizedBox.shrink();
-    
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -501,10 +496,7 @@ class _LoginScreenState extends State<LoginScreen>
                   Expanded(
                     child: RichText(
                       text: TextSpan(
-                        style: TextStyle(
-                          color: Colors.grey[700],
-                          fontSize: 13,
-                        ),
+                        style: TextStyle(color: Colors.grey[700], fontSize: 13),
                         children: [
                           const TextSpan(text: 'I agree to the '),
                           TextSpan(
@@ -519,7 +511,8 @@ class _LoginScreenState extends State<LoginScreen>
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (context) => const TermsOfServiceScreen(),
+                                    builder: (context) =>
+                                        const TermsOfServiceScreen(),
                                   ),
                                 );
                               },
@@ -537,7 +530,8 @@ class _LoginScreenState extends State<LoginScreen>
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (context) => const PrivacyPolicyScreen(),
+                                    builder: (context) =>
+                                        const PrivacyPolicyScreen(),
                                   ),
                                 );
                               },
@@ -568,10 +562,7 @@ class _LoginScreenState extends State<LoginScreen>
                   const SizedBox(width: 8),
                   Text(
                     'Remember me',
-                    style: TextStyle(
-                      color: Colors.grey[700],
-                      fontSize: 14,
-                    ),
+                    style: TextStyle(color: Colors.grey[700], fontSize: 14),
                   ),
                 ],
               ),
@@ -579,10 +570,7 @@ class _LoginScreenState extends State<LoginScreen>
           onPressed: _forgotPassword,
           child: const Text(
             'Forgot Password?',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-            ),
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
           ),
         ),
       ],
@@ -636,10 +624,7 @@ class _LoginScreenState extends State<LoginScreen>
           text: _isSignUpMode
               ? 'Already have an account? '
               : "Don't have an account? ",
-          style: TextStyle(
-            color: Colors.grey[600],
-            fontSize: 14,
-          ),
+          style: TextStyle(color: Colors.grey[600], fontSize: 14),
           children: [
             TextSpan(
               text: _isSignUpMode ? 'Sign In' : 'Sign Up',
@@ -657,12 +642,7 @@ class _LoginScreenState extends State<LoginScreen>
   Widget _buildDivider() {
     return Row(
       children: [
-        Expanded(
-          child: Divider(
-            color: Colors.grey[300],
-            thickness: 1,
-          ),
-        ),
+        Expanded(child: Divider(color: Colors.grey[300], thickness: 1)),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Text(
@@ -673,12 +653,7 @@ class _LoginScreenState extends State<LoginScreen>
             ),
           ),
         ),
-        Expanded(
-          child: Divider(
-            color: Colors.grey[300],
-            thickness: 1,
-          ),
-        ),
+        Expanded(child: Divider(color: Colors.grey[300], thickness: 1)),
       ],
     );
   }
