@@ -4,12 +4,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
-import '../services/firebase_storage_service.dart';
-import '../services/auth_service.dart';
-import '../services/profile_service.dart';
-import '../services/user_manager.dart';
-import '../services/location_service.dart';
-import '../widgets/user_avatar.dart';
+import '../../services/firebase_storage_service.dart';
+import '../../services/auth_service.dart';
+import '../../services/profile_service.dart';
+import '../../services/user_manager.dart';
+import '../../services/location_service.dart';
+import '../../widgets/user_avatar.dart';
 
 class ProfileEditScreen extends StatefulWidget {
   const ProfileEditScreen({super.key});
@@ -300,12 +300,10 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       print('Profile updated successfully');
 
       // Update local state with new photo URL and clear selected image
-      if (photoUrl != null) {
-        setState(() {
-          _currentPhotoUrl = photoUrl;
-          _selectedImage = null; // Clear selected image after successful upload
-        });
-      }
+      setState(() {
+        _currentPhotoUrl = photoUrl;
+        _selectedImage = null; // Clear selected image after successful upload
+      });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

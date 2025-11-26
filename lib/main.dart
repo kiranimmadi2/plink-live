@@ -8,9 +8,11 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:supper/screens/login/onboarding_screen.dart';
+import 'package:supper/screens/login/splash_screen.dart';
 
 import 'firebase_options.dart';
-import 'screens/login_screen.dart';
+import 'screens/login/login_screen.dart';
 import 'screens/main_navigation_screen.dart';
 import 'services/auth_service.dart';
 import 'services/profile_service.dart';
@@ -112,7 +114,7 @@ class MyApp extends ConsumerWidget {
     return MaterialApp(
       title: 'Supper',
       theme: themeNotifier.themeData,
-      home: const AuthWrapper(),
+      home: SplashScreen(),
       debugShowCheckedModeBanner: false,
     );
   }

@@ -14,7 +14,7 @@ import '../models/message_model.dart';
 import '../services/notification_service.dart';
 import '../services/conversation_service.dart';
 import '../services/hybrid_chat_service.dart';
-import 'profile_view_screen.dart';
+import 'profile/profile_view_screen.dart';
 
 class EnhancedChatScreen extends StatefulWidget {
   final UserProfile otherUser;

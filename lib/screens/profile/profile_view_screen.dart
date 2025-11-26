@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import '../models/post_model.dart';
-import '../models/user_profile.dart';
-import 'enhanced_chat_screen.dart';
+import '../../models/post_model.dart';
+import '../../models/user_profile.dart';
+import '../enhanced_chat_screen.dart';
 
 class ProfileViewScreen extends StatefulWidget {
   final UserProfile userProfile;

@@ -3,7 +3,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../screens/enhanced_chat_screen.dart';
-import '../screens/profile_view_screen.dart';
+import '../screens/profile/profile_view_screen.dart';
 // REMOVED: Call feature imports (feature deleted)
 // import '../services/simple_call_service.dart';
 import '../models/user_profile.dart';

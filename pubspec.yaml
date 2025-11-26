@@ -82,8 +82,10 @@ dependencies:
 
   # Environment variables
   flutter_dotenv: ^5.1.0
-  cubixd: ^0.1.1
+
   lottie: ^3.3.2
+  flutter_3d_choice_chip: ^0.1.4
+
 
 dev_dependencies:
   flutter_test:
@@ -115,6 +117,7 @@ flutter:
   assets:
   - .env
   - assets/animation.json
+  - assets/logo/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

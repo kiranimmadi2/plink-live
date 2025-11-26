@@ -7,17 +7,17 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../services/universal_intent_service.dart';
-import '../services/location_service.dart';
-import '../services/activity_migration_service.dart';
-import '../widgets/user_avatar.dart';
-import '../providers/theme_provider.dart';
-import 'login_screen.dart';
+import '../../services/universal_intent_service.dart';
+import '../../services/location_service.dart';
+import '../../services/activity_migration_service.dart';
+import '../../widgets/user_avatar.dart';
+import '../../providers/theme_provider.dart';
+import '../login/login_screen.dart';
 import 'profile_edit_screen.dart';
 import 'profile_view_screen.dart';
 import 'settings_screen.dart';
-import 'enhanced_chat_screen.dart';
-import '../models/user_profile.dart';
+import '../enhanced_chat_screen.dart';
+import '../../models/user_profile.dart';
 
 class ProfileWithHistoryScreen extends ConsumerStatefulWidget {
   const ProfileWithHistoryScreen({super.key});

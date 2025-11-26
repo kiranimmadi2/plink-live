@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart';
-import '../services/auth_service.dart';
-import 'terms_of_service_screen.dart';
-import 'privacy_policy_screen.dart';
+import '../../services/auth_service.dart';
+import '../profile/terms_of_service_screen.dart';
+import '../profile/privacy_policy_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -82,19 +82,6 @@ class _LoginScreenState extends State<LoginScreen>
     if (password.contains(RegExp(r'[A-Z]'))) strength++;
     if (password.contains(RegExp(r'[0-9]'))) strength++;
     if (password.contains(RegExp(r'[!@#\$%^&*(),.?":{}|<>]'))) strength++;
-
-    setState(() {
-      if (strength <= 2) {
-        _passwordStrength = 'Weak';
-        _passwordStrengthColor = Colors.red;
-      } else if (strength == 3) {
-        _passwordStrength = 'Medium';
-        _passwordStrengthColor = Colors.orange;
-      } else {
-        _passwordStrength = 'Strong';
-        _passwordStrengthColor = Colors.green;
-      }
-    });
   }
 
   void _toggleSignUpMode() {
@@ -234,73 +221,48 @@ class _LoginScreenState extends State<LoginScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        // color: Colors.white,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Colors.blue.shade400, Colors.purple.shade400],
-          ),
-        ),
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              child: FadeTransition(
-                opacity: _fadeAnimation,
-                child: SlideTransition(
-                  position: _slideAnimation,
-                  child: Container(
-                    margin: const EdgeInsets.all(24),
-                    padding: const EdgeInsets.all(32),
-                    // decoration: BoxDecoration(
-                    //   borderRadius: BorderRadius.circular(24),
-                    //   border: Border.all(color: Colors.white),
-                    //   gradient: LinearGradient(
-                    //     begin: Alignment.topLeft,
-                    //     end: Alignment.bottomRight,
-                    //     colors: [Colors.purple.shade400, Colors.blue.shade400],
-                    //   ),
-                    //   boxShadow: [
-                    //     BoxShadow(
-                    //       color: Colors.black.withValues(alpha: 0.1),
-                    //       blurRadius: 20,
-                    //       offset: const Offset(0, 10),
-                    //     ),
-                    //   ],
-                    // ),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(24),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.1),
-                          blurRadius: 20,
-                          offset: const Offset(0, 10),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _buildHeader(),
-                        const SizedBox(height: 32),
-                        _buildForm(),
-                        if (_isSignUpMode &&
-                            _passwordController.text.isNotEmpty)
-                          _buildPasswordStrengthIndicator(),
-                        const SizedBox(height: 24),
-                        _buildRememberMeAndForgot(),
-                        const SizedBox(height: 24),
-                        _buildAuthButton(),
-                        const SizedBox(height: 16),
-                        _buildToggleModeButton(),
-                        const SizedBox(height: 24),
-                        _buildDivider(),
-                        const SizedBox(height: 24),
-                        _buildSocialLogin(),
-                      ],
-                    ),
+      backgroundColor: Colors.grey.shade700,
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            child: FadeTransition(
+              opacity: _fadeAnimation,
+              child: SlideTransition(
+                position: _slideAnimation,
+                child: Container(
+                  margin: const EdgeInsets.all(24),
+                  padding: const EdgeInsets.all(32),
+
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.1),
+                        blurRadius: 20,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildHeader(),
+                      const SizedBox(height: 32),
+                      _buildForm(),
+                      if (_isSignUpMode && _passwordController.text.isNotEmpty)
+                        _buildPasswordStrengthIndicator(),
+                      const SizedBox(height: 24),
+                      _buildRememberMeAndForgot(),
+                      const SizedBox(height: 24),
+                      _buildAuthButton(),
+                      const SizedBox(height: 16),
+                      _buildToggleModeButton(),
+                      const SizedBox(height: 24),
+                      _buildDivider(),
+                      const SizedBox(height: 24),
+                      _buildSocialLogin(),
+                    ],
                   ),
                 ),
               ),
@@ -316,10 +278,8 @@ class _LoginScreenState extends State<LoginScreen>
       children: [
         Container(
           padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Colors.blue.shade400, Colors.purple.shade400],
-            ),
+          decoration: const BoxDecoration(
+            color: Colors.grey,
             shape: BoxShape.circle,
           ),
           child: Icon(
@@ -329,18 +289,13 @@ class _LoginScreenState extends State<LoginScreen>
           ),
         ),
         const SizedBox(height: 16),
-        Text(
-          _isSignUpMode ? 'Create Account' : 'Welcome Back',
-          style: const TextStyle(
+        const Text(
+          'Welcome Back',
+          style: TextStyle(
             fontSize: 28,
             fontWeight: FontWeight.bold,
             color: Colors.black87,
           ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          _isSignUpMode ? 'Sign up to get started' : 'Sign in to continue',
-          style: TextStyle(fontSize: 16, color: Colors.grey[600]),
         ),
       ],
     );
@@ -364,7 +319,7 @@ class _LoginScreenState extends State<LoginScreen>
                 borderSide: BorderSide.none,
               ),
               filled: true,
-              fillColor: Colors.blue,
+              fillColor: const Color.fromARGB(255, 135, 136, 138),
               errorStyle: const TextStyle(height: 0.8),
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 20,
@@ -392,7 +347,10 @@ class _LoginScreenState extends State<LoginScreen>
             decoration: InputDecoration(
               labelText: 'Password',
               hintText: 'Enter your password',
-              prefixIcon: Icon(Icons.lock_outline, color: Colors.grey[600]),
+              prefixIcon: Icon(
+                Icons.lock_outline,
+                color: const Color.fromARGB(255, 221, 216, 216),
+              ),
               suffixIcon: IconButton(
                 icon: Icon(
                   _obscurePassword

@@ -16,19 +16,21 @@ class ProfileService {
       if (user == null) return null;
 
       final doc = await _firestore.collection('users').doc(user.uid).get();
-      
+
       if (!doc.exists) {
         // Create profile if it doesn't exist
         await createUserProfile(user);
         return await getCurrentUserProfile();
       }
-      
+
       final data = doc.data();
       if (data != null && data['photoUrl'] != null) {
         // Fix Google photo URL if needed
-        data['photoUrl'] = PhotoUrlHelper.getHighQualityGooglePhoto(data['photoUrl']);
+        data['photoUrl'] = PhotoUrlHelper.getHighQualityGooglePhoto(
+          data['photoUrl'],
+        );
       }
-      
+
       return data;
     } catch (e) {
       print('Error getting current user profile: $e');
@@ -39,15 +41,16 @@ class ProfileService {
   // Create initial user profile
   Future<void> createUserProfile(User user) async {
     try {
-      final existingDoc = await _firestore.collection('users').doc(user.uid).get();
-      
+      final existingDoc = await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
       if (!existingDoc.exists) {
         // Fix Google photo URL if present
         String? photoUrl = user.photoURL;
-        if (photoUrl != null) {
-          photoUrl = PhotoUrlHelper.getHighQualityGooglePhoto(photoUrl);
-        }
-        
+        photoUrl = PhotoUrlHelper.getHighQualityGooglePhoto(photoUrl);
+
         await _firestore.collection('users').doc(user.uid).set({
           'uid': user.uid,
           'email': user.email ?? '',
@@ -71,12 +74,12 @@ class ProfileService {
   }) async {
     try {
       String? photoUrl = imageUrl;
-      
+
       // Upload image if bytes provided
       if (imageBytes != null) {
         final fileName = 'profile_${DateTime.now().millisecondsSinceEpoch}.jpg';
         final ref = _storage.ref().child('profiles/$userId/$fileName');
-        
+
         final uploadTask = await ref.putData(
           imageBytes,
           SettableMetadata(
@@ -84,17 +87,17 @@ class ProfileService {
             customMetadata: {'userId': userId},
           ),
         );
-        
+
         photoUrl = await uploadTask.ref.getDownloadURL();
       }
-      
+
       // Update Firestore
       if (photoUrl != null) {
         await _firestore.collection('users').doc(userId).update({
           'photoUrl': photoUrl,
           'lastSeen': FieldValue.serverTimestamp(),
         });
-        
+
         // Also update Firebase Auth profile
         final user = _auth.currentUser;
         if (user != null && user.uid == userId) {
@@ -106,7 +109,7 @@ class ProfileService {
           }
         }
       }
-      
+
       return photoUrl;
     } catch (e) {
       print('Error updating profile photo: $e');
@@ -135,17 +138,21 @@ class ProfileService {
       if (user == null) return;
 
       final doc = await _firestore.collection('users').doc(user.uid).get();
-      
+
       if (!doc.exists) {
         await createUserProfile(user);
       } else {
         // Update last seen
-        await _firestore.collection('users').doc(user.uid).update({
-          'lastSeen': FieldValue.serverTimestamp(),
-          'isOnline': true,
-        }).catchError((e) {
-          print('Error updating last seen: $e');
-        });
+        await _firestore
+            .collection('users')
+            .doc(user.uid)
+            .update({
+              'lastSeen': FieldValue.serverTimestamp(),
+              'isOnline': true,
+            })
+            .catchError((e) {
+              print('Error updating last seen: $e');
+            });
       }
     } catch (e) {
       print('Error ensuring profile exists: $e');

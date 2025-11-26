@@ -4,10 +4,10 @@ import 'package:flutter/services.dart';
 import 'package:badges/badges.dart' as badges;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'universal_matching_screen.dart';
+import 'home/home_screen.dart';
 import 'conversations_screen.dart';
 import 'live_connect_tab_screen.dart';
-import 'profile_with_history_screen.dart';
+import 'profile/profile_with_history_screen.dart';
 import 'performance_debug_screen.dart';
 import '../services/notification_service.dart';
 import '../services/location_service.dart';
@@ -28,7 +28,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
   int _unreadMessageCount = 0;
 
   final List<Widget> _screens = [
-    const UniversalMatchingScreen(),
+    const HomeScreen(),
     const ConversationsScreen(),
     const LiveConnectTabScreen(), // Production Live Connect screen with enhanced features
     const ProfileWithHistoryScreen(),

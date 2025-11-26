@@ -70,7 +70,7 @@ class UserManager {
       String? photoUrl = user.photoURL;
 
       // If it's a Google photo, ensure it's high quality
-      if (photoUrl != null && photoUrl.contains('googleusercontent.com')) {
+      if (photoUrl!.contains('googleusercontent.com')) {
         // Remove size parameters and set to higher quality
         final baseUrl = photoUrl.split('=')[0];
         photoUrl = '$baseUrl=s400-c'; // 400x400 cropped

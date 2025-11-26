@@ -3,7 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
-import '../services/location_service.dart';
+import '../../services/location_service.dart';
 
 class LocationSettingsScreen extends StatefulWidget {
   const LocationSettingsScreen({super.key});
