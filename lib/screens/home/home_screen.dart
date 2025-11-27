@@ -358,65 +358,63 @@ class _HomeScreenState extends State<HomeScreen>
     return Scaffold(
       extendBodyBehindAppBar: true,
       backgroundColor: Colors.transparent,
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(60),
-        child: AppBar(
-          elevation: 0,
-          backgroundColor: Colors.transparent,
-          centerTitle: false,
-          title: ShaderMask(
-            shaderCallback: (bounds) => LinearGradient(
-              colors: isDarkMode
-                  ? [Colors.white, Colors.grey[400]!]
-                  : [Colors.black, Colors.grey[800]!],
-            ).createShader(bounds),
-            child: const Text(
-              'Supper',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w700,
-                fontSize: 24,
-                letterSpacing: 0.5,
-              ),
+      appBar: AppBar(
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        toolbarHeight: 100, // <-- FINAL height control
+        centerTitle: false,
+        title: ShaderMask(
+          shaderCallback: (bounds) => LinearGradient(
+            colors: isDarkMode
+                ? [Colors.white, Colors.grey[400]!]
+                : [Colors.black, Colors.grey[800]!],
+          ).createShader(bounds),
+          child: const Text(
+            'Supper',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+              fontSize: 24,
+              letterSpacing: 0.5,
             ),
           ),
-          actions: [
-            Padding(
-              padding: const EdgeInsets.only(right: 16),
-              child: GestureDetector(
-                onTap: () {
-                  HapticFeedback.lightImpact();
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const ProfileWithHistoryScreen(),
+        ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: GestureDetector(
+              onTap: () {
+                HapticFeedback.lightImpact();
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ProfileWithHistoryScreen(),
+                  ),
+                ).then((_) => _loadUserProfile());
+              },
+              child: Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.grey,
+                  border: Border.all(color: Colors.white, width: 2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.2),
+                      blurRadius: 5,
+                      spreadRadius: 1,
                     ),
-                  ).then((_) => _loadUserProfile());
-                },
-                child: Container(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.grey,
-                    border: Border.all(color: Colors.white, width: 2),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.2),
-                        blurRadius: 5,
-                        spreadRadius: 1,
-                      ),
-                    ],
-                  ),
-                  padding: const EdgeInsets.all(2),
-                  child: UserAvatar(
-                    profileImageUrl: _auth.currentUser?.photoURL,
-                    radius: 20,
-                    fallbackText: _currentUserName,
-                  ),
+                  ],
+                ),
+                padding: const EdgeInsets.all(2),
+                child: UserAvatar(
+                  profileImageUrl: _auth.currentUser?.photoURL,
+                  radius: 20,
+                  fallbackText: _currentUserName,
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
       body: Stack(
         children: [
@@ -435,125 +433,139 @@ class _HomeScreenState extends State<HomeScreen>
                     : _buildChatState(isDarkMode),
               ),
 
+              // Voice recording overlay - HALF SCREEN MODAL
+              if (_isRecording || _isVoiceProcessing)
+                _buildVoiceRecordingOverlay(isDarkMode),
+
               // Bottom input section
-              _buildInputSection(isDarkMode),
+              if (!_isRecording && !_isVoiceProcessing)
+                _buildInputSection(isDarkMode),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVoiceRecordingOverlay(bool isDarkMode) {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.5, // Half screen height
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.95),
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(20),
+          topRight: Radius.circular(20),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.5),
+            blurRadius: 20,
+            spreadRadius: 5,
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // Animated voice waves
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              if (_isRecording) ...[
+                _buildVoiceWave(120, 0.3, 0),
+                _buildVoiceWave(100, 0.5, 500),
+                _buildVoiceWave(80, 0.7, 1000),
+              ],
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: _isRecording ? Colors.red : Colors.blue,
+                  boxShadow: [
+                    BoxShadow(
+                      color: (_isRecording ? Colors.red : Colors.blue)
+                          .withOpacity(0.5),
+                      blurRadius: 15,
+                      spreadRadius: 5,
+                    ),
+                  ],
+                ),
+                child: Icon(
+                  _isRecording ? Icons.mic : Icons.auto_awesome,
+                  color: Colors.white,
+                  size: 40,
+                ),
+              ),
             ],
           ),
 
-          // Voice recording overlay - ABOVE EVERYTHING
-          if (_isRecording || _isVoiceProcessing)
-            Container(
-              width: double.infinity,
-              height: double.infinity,
-              color: Colors.black.withOpacity(0.9),
-              child: SafeArea(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // Animated voice waves
-                    Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        if (_isRecording) ...[
-                          _buildVoiceWave(120, 0.3, 0),
-                          _buildVoiceWave(100, 0.5, 500),
-                          _buildVoiceWave(80, 0.7, 1000),
-                        ],
-                        Container(
-                          width: 80,
-                          height: 80,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: _isRecording ? Colors.red : Colors.blue,
-                            boxShadow: [
-                              BoxShadow(
-                                color: (_isRecording ? Colors.red : Colors.blue)
-                                    .withOpacity(0.5),
-                                blurRadius: 15,
-                                spreadRadius: 5,
-                              ),
-                            ],
-                          ),
-                          child: Icon(
-                            _isRecording ? Icons.mic : Icons.auto_awesome,
-                            color: Colors.white,
-                            size: 40,
-                          ),
-                        ),
-                      ],
+          const SizedBox(height: 40),
+
+          // Status text
+          Text(
+            _voiceText,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+            ),
+            textAlign: TextAlign.center,
+          ),
+
+          const SizedBox(height: 20),
+
+          // Additional guidance
+          if (_isRecording)
+            Text(
+              'Tap anywhere to stop recording',
+              style: TextStyle(color: Colors.grey[400], fontSize: 16),
+            ),
+
+          if (_isVoiceProcessing)
+            const Column(
+              children: [
+                SizedBox(height: 20),
+                CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+                  strokeWidth: 3,
+                ),
+              ],
+            ),
+
+          const Spacer(),
+
+          // Close button
+          if (_isRecording)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 30),
+              child: GestureDetector(
+                onTap: _stopVoiceRecording,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 32,
+                    vertical: 16,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.red,
+                    borderRadius: BorderRadius.circular(25),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.red.withOpacity(0.3),
+                        blurRadius: 10,
+                        spreadRadius: 2,
+                      ),
+                    ],
+                  ),
+                  child: const Text(
+                    'Stop Recording',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
                     ),
-
-                    const SizedBox(height: 40),
-
-                    // Status text
-                    Text(
-                      _voiceText,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    // Additional guidance
-                    if (_isRecording)
-                      Text(
-                        'Tap anywhere to stop recording',
-                        style: TextStyle(color: Colors.grey[400], fontSize: 16),
-                      ),
-
-                    if (_isVoiceProcessing)
-                      const Column(
-                        children: [
-                          SizedBox(height: 20),
-                          CircularProgressIndicator(
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              Colors.blue,
-                            ),
-                            strokeWidth: 3,
-                          ),
-                        ],
-                      ),
-
-                    const Spacer(),
-
-                    // Close button
-                    if (_isRecording)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 30),
-                        child: GestureDetector(
-                          onTap: _stopVoiceRecording,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 32,
-                              vertical: 16,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.red,
-                              borderRadius: BorderRadius.circular(25),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.red.withOpacity(0.3),
-                                  blurRadius: 10,
-                                  spreadRadius: 2,
-                                ),
-                              ],
-                            ),
-                            child: const Text(
-                              'Stop Recording',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -1238,5 +1250,3 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 }
-
-//
