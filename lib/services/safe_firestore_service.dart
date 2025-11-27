@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import '../utils/firestore_error_handler.dart';
 import '../utils/network_utils.dart';
 
@@ -11,7 +12,7 @@ class SafeFirestoreService {
   }) async {
     final hasConnection = await NetworkUtils.hasNetworkConnection();
     if (!hasConnection) {
-      print('Cannot fetch messages - no network connection');
+      debugPrint('Cannot fetch messages - no network connection');
       return null;
     }
 
@@ -24,7 +25,7 @@ class SafeFirestoreService {
     return FirestoreErrorHandler.safeQuery(
       query: query,
       fallback: () {
-        print('Using cached data or empty result');
+        debugPrint('Using cached data or empty result');
         return null;
       },
     );
@@ -51,20 +52,20 @@ class SafeFirestoreService {
             ...?metadata,
           },
           onSuccess: () {
-            print('Message sent successfully');
+            debugPrint('Message sent successfully');
           },
           onError: (errorType) {
             if (errorType == FirestoreErrorType.permissionDenied) {
-              print('User does not have permission to send messages');
+              debugPrint('User does not have permission to send messages');
             } else if (errorType == FirestoreErrorType.quotaExceeded) {
-              print('Firestore quota exceeded - please check billing');
+              debugPrint('Firestore quota exceeded - please check billing');
             }
           },
         );
       },
       operationName: 'Send message',
       onNoConnection: () {
-        print('Message queued for sending when connection is restored');
+        debugPrint('Message queued for sending when connection is restored');
       },
     );
   }
@@ -84,12 +85,12 @@ class SafeFirestoreService {
         .snapshots()
         .handleError((error) {
           final errorType = FirestoreErrorHandler.getErrorType(error);
-          print('Stream error: ${FirestoreErrorHandler.getErrorMessage(errorType)}');
-          
+          debugPrint('Stream error: ${FirestoreErrorHandler.getErrorMessage(errorType)}');
+
           if (errorType == FirestoreErrorType.missingIndex && error is FirebaseException) {
             final indexUrl = FirestoreErrorHandler.getIndexUrl(error);
             if (indexUrl != null) {
-              print('Create index at: $indexUrl');
+              debugPrint('Create index at: $indexUrl');
             }
           }
         });
@@ -106,7 +107,7 @@ class SafeFirestoreService {
     await FirestoreErrorHandler.handleFirestoreOperation(
       operation: () => batch.commit(),
       onError: (errorType, _) {
-        print('Batch update failed: ${FirestoreErrorHandler.getErrorMessage(errorType)}');
+        debugPrint('Batch update failed: ${FirestoreErrorHandler.getErrorMessage(errorType)}');
       },
     );
   }

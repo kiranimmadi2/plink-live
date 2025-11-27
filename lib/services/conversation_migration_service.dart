@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/foundation.dart';
 
 /// Service to migrate and fix corrupted conversation documents
 ///
@@ -19,7 +20,7 @@ class ConversationMigrationService {
       final prefs = await SharedPreferences.getInstance();
       return prefs.getBool(_migrationKey) ?? false;
     } catch (e) {
-      print('ConversationMigration: Error checking migration status: $e');
+      debugPrint('ConversationMigration: Error checking migration status: $e');
       return false;
     }
   }
@@ -29,9 +30,9 @@ class ConversationMigrationService {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_migrationKey, true);
-      print('ConversationMigration: Migration marked as completed');
+      debugPrint('ConversationMigration: Migration marked as completed');
     } catch (e) {
-      print('ConversationMigration: Error marking migration as completed: $e');
+      debugPrint('ConversationMigration: Error marking migration as completed: $e');
     }
   }
 
@@ -45,7 +46,7 @@ class ConversationMigrationService {
   Future<Map<String, dynamic>> runMigration() async {
     final currentUserId = _auth.currentUser?.uid;
     if (currentUserId == null) {
-      print('ConversationMigration: ERROR - No authenticated user');
+      debugPrint('ConversationMigration: ERROR - No authenticated user');
       return {
         'success': false,
         'fixed': 0,
@@ -54,7 +55,7 @@ class ConversationMigrationService {
       };
     }
 
-    print('ConversationMigration: Starting migration for user: $currentUserId');
+    debugPrint('ConversationMigration: Starting migration for user: $currentUserId');
 
     int scanned = 0;
     int fixed = 0;
@@ -67,7 +68,7 @@ class ConversationMigrationService {
           .collection('conversations')
           .get();
 
-      print('ConversationMigration: Found ${allConversationsSnapshot.docs.length} total conversations');
+      debugPrint('ConversationMigration: Found ${allConversationsSnapshot.docs.length} total conversations');
 
       for (var doc in allConversationsSnapshot.docs) {
         try {
@@ -83,20 +84,20 @@ class ConversationMigrationService {
           final data = doc.data();
           final participants = data['participants'] as List<dynamic>?;
 
-          print('ConversationMigration: Scanning conversation: $conversationId');
-          print('ConversationMigration: Current participants: $participants');
+          debugPrint('ConversationMigration: Scanning conversation: $conversationId');
+          debugPrint('ConversationMigration: Current participants: $participants');
 
           // Check if participants array is missing or corrupted
           bool needsFix = false;
 
           if (participants == null || participants.isEmpty) {
-            print('ConversationMigration: CORRUPTED - participants array is null or empty');
+            debugPrint('ConversationMigration: CORRUPTED - participants array is null or empty');
             needsFix = true;
           } else if (!participants.contains(currentUserId)) {
-            print('ConversationMigration: CORRUPTED - participants array missing current user');
+            debugPrint('ConversationMigration: CORRUPTED - participants array missing current user');
             needsFix = true;
           } else if (participants.length != 2) {
-            print('ConversationMigration: CORRUPTED - participants array has incorrect length: ${participants.length}');
+            debugPrint('ConversationMigration: CORRUPTED - participants array has incorrect length: ${participants.length}');
             needsFix = true;
           }
 
@@ -104,7 +105,7 @@ class ConversationMigrationService {
             // Extract user IDs from conversation ID
             final userIds = conversationId.split('_');
             if (userIds.length != 2) {
-              print('ConversationMigration: ERROR - Invalid conversation ID format: $conversationId');
+              debugPrint('ConversationMigration: ERROR - Invalid conversation ID format: $conversationId');
               errors.add('Invalid conversation ID format: $conversationId');
               continue;
             }
@@ -115,19 +116,19 @@ class ConversationMigrationService {
             });
 
             fixed++;
-            print('ConversationMigration: FIXED conversation: $conversationId');
-            print('ConversationMigration: Updated participants to: $userIds');
+            debugPrint('ConversationMigration: FIXED conversation: $conversationId');
+            debugPrint('ConversationMigration: Updated participants to: $userIds');
           } else {
-            print('ConversationMigration: OK - conversation is valid');
+            debugPrint('ConversationMigration: OK - conversation is valid');
           }
         } catch (e) {
-          print('ConversationMigration: ERROR processing conversation ${doc.id}: $e');
+          debugPrint('ConversationMigration: ERROR processing conversation ${doc.id}: $e');
           errors.add('Error processing ${doc.id}: $e');
         }
       }
 
-      print('ConversationMigration: Migration completed');
-      print('ConversationMigration: Scanned: $scanned, Fixed: $fixed, Errors: ${errors.length}');
+      debugPrint('ConversationMigration: Migration completed');
+      debugPrint('ConversationMigration: Scanned: $scanned, Fixed: $fixed, Errors: ${errors.length}');
 
       // Mark migration as completed
       await _markMigrationCompleted();
@@ -139,7 +140,7 @@ class ConversationMigrationService {
         'errors': errors,
       };
     } catch (e) {
-      print('ConversationMigration: FATAL ERROR during migration: $e');
+      debugPrint('ConversationMigration: FATAL ERROR during migration: $e');
       return {
         'success': false,
         'fixed': fixed,
@@ -152,7 +153,7 @@ class ConversationMigrationService {
   /// Force run migration again (ignores completed status)
   /// Useful for testing or manual fixes
   Future<Map<String, dynamic>> forceRunMigration() async {
-    print('ConversationMigration: Force running migration...');
+    debugPrint('ConversationMigration: Force running migration...');
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_migrationKey);
     return await runMigration();
@@ -163,7 +164,7 @@ class ConversationMigrationService {
   Future<bool> validateAndFixConversation(String conversationId) async {
     final currentUserId = _auth.currentUser?.uid;
     if (currentUserId == null) {
-      print('ConversationMigration: ERROR - No authenticated user');
+      debugPrint('ConversationMigration: ERROR - No authenticated user');
       return false;
     }
 
@@ -174,7 +175,7 @@ class ConversationMigrationService {
           .get();
 
       if (!doc.exists) {
-        print('ConversationMigration: Conversation does not exist: $conversationId');
+        debugPrint('ConversationMigration: Conversation does not exist: $conversationId');
         return false;
       }
 
@@ -196,7 +197,7 @@ class ConversationMigrationService {
         // Extract user IDs from conversation ID
         final userIds = conversationId.split('_');
         if (userIds.length != 2) {
-          print('ConversationMigration: ERROR - Invalid conversation ID format: $conversationId');
+          debugPrint('ConversationMigration: ERROR - Invalid conversation ID format: $conversationId');
           return false;
         }
 
@@ -205,13 +206,13 @@ class ConversationMigrationService {
           'participants': userIds,
         });
 
-        print('ConversationMigration: Fixed conversation: $conversationId');
+        debugPrint('ConversationMigration: Fixed conversation: $conversationId');
         return true;
       }
 
       return false;
     } catch (e) {
-      print('ConversationMigration: ERROR validating conversation $conversationId: $e');
+      debugPrint('ConversationMigration: ERROR validating conversation $conversationId: $e');
       return false;
     }
   }

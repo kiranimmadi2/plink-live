@@ -9,6 +9,7 @@ import '../services/gemini_service.dart';
 /// Ensures all required fields are present and valid
 class PostValidator {
   static final VectorService _vectorService = VectorService();
+  // ignore: unused_field
   static final GeminiService _geminiService = GeminiService();
 
   /// Validate a post model

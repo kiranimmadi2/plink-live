@@ -14,6 +14,7 @@ class LocationSettingsScreen extends StatefulWidget {
 
 class _LocationSettingsScreenState extends State<LocationSettingsScreen> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  // ignore: unused_field
   final LocationService _locationService = LocationService();
 
   bool _isLoading = false;
@@ -48,7 +49,7 @@ class _LocationSettingsScreenState extends State<LocationSettingsScreen> {
         });
       }
     } catch (e) {
-      print('Error loading location: $e');
+      debugPrint('Error loading location: $e');
     }
   }
 
@@ -73,7 +74,9 @@ class _LocationSettingsScreenState extends State<LocationSettingsScreen> {
 
       // Get current position
       final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
       );
 
       // Get address from coordinates
@@ -186,9 +189,9 @@ class _LocationSettingsScreenState extends State<LocationSettingsScreen> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.blue.withOpacity(0.1),
+                color: Colors.blue.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -229,13 +232,13 @@ class _LocationSettingsScreenState extends State<LocationSettingsScreen> {
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: _locationEnabled
-                    ? Colors.green.withOpacity(0.1)
-                    : Colors.grey.withOpacity(0.1),
+                    ? Colors.green.withValues(alpha: 0.1)
+                    : Colors.grey.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
                   color: _locationEnabled
-                      ? Colors.green.withOpacity(0.3)
-                      : Colors.grey.withOpacity(0.3),
+                      ? Colors.green.withValues(alpha: 0.3)
+                      : Colors.grey.withValues(alpha: 0.3),
                 ),
               ),
               child: Row(
@@ -319,7 +322,7 @@ class _LocationSettingsScreenState extends State<LocationSettingsScreen> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.grey.withOpacity(0.1),
+                color: Colors.grey.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Column(

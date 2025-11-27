@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import '../utils/photo_url_helper.dart';
 
 class AuthService {
@@ -195,7 +196,7 @@ class AuthService {
           try {
             await user.updatePhotoURL(photoUrl);
           } catch (e) {
-            print('Could not update auth photo URL: $e');
+            debugPrint('Could not update auth photo URL: $e');
           }
         }
       }
@@ -414,7 +415,7 @@ class AuthService {
       });
     } catch (e) {
       // Don't fail the password change if logging fails
-      print('Failed to record password change: $e');
+      debugPrint('Failed to record password change: $e');
     }
   }
 }

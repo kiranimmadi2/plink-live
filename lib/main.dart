@@ -109,6 +109,8 @@ class MyApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Watch theme to trigger rebuilds on theme change
+    ref.watch(themeProvider);
     final themeNotifier = ref.read(themeProvider.notifier);
 
     return MaterialApp(

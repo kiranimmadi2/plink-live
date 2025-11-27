@@ -26,13 +26,12 @@ class KeyboardHelper {
     EdgeInsetsGeometry? contentPadding,
     InputDecoration? decoration,
   }) {
-    return WillPopScope(
-      onWillPop: () async {
-        if (focusNode.hasFocus) {
+    return PopScope(
+      canPop: !focusNode.hasFocus,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop && focusNode.hasFocus) {
           focusNode.unfocus();
-          return false;
         }
-        return true;
       },
       child: TextField(
         controller: controller,

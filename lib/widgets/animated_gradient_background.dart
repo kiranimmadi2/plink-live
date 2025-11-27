@@ -46,9 +46,9 @@ class _AnimatedGradientBackgroundState extends State<AnimatedGradientBackground>
     final colors =
         widget.colors ??
         [
-          Theme.of(context).primaryColor.withOpacity(0.1),
-          Theme.of(context).colorScheme.secondary.withOpacity(0.1),
-          Theme.of(context).primaryColor.withOpacity(0.2),
+          Theme.of(context).primaryColor.withValues(alpha: 0.1),
+          Theme.of(context).colorScheme.secondary.withValues(alpha: 0.1),
+          Theme.of(context).primaryColor.withValues(alpha: 0.2),
         ];
 
     return AnimatedBuilder(
