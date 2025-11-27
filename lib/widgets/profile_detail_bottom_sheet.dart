@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../models/extended_user_profile.dart';
 import 'dart:math' as math;
@@ -84,19 +84,19 @@ class _ProfileDetailBottomSheetState extends State<ProfileDetailBottomSheet>
             // Subtle border for the entire card
             border: Border.all(
               color: isDarkMode
-                  ? Colors.white.withOpacity(0.08)
-                  : Colors.black.withOpacity(0.05),
+                  ? Colors.white.withValues(alpha: 0.08)
+                  : Colors.black.withValues(alpha: 0.05),
               width: 1,
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.3),
+                color: Colors.black.withValues(alpha: 0.3),
                 blurRadius: 30,
                 offset: const Offset(0, -10),
               ),
               // Subtle glow effect
               BoxShadow(
-                color: const Color(0xFF6366F1).withOpacity(0.1),
+                color: const Color(0xFF6366F1).withValues(alpha: 0.1),
                 blurRadius: 40,
                 offset: const Offset(0, -5),
               ),
@@ -225,12 +225,12 @@ class _ProfileDetailBottomSheetState extends State<ProfileDetailBottomSheet>
                   ),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                    color: Colors.white.withOpacity(0.15),
+                    color: Colors.white.withValues(alpha: 0.15),
                     width: 1,
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFF8B5CF6).withOpacity(0.4),
+                      color: const Color(0xFF8B5CF6).withValues(alpha: 0.4),
                       blurRadius: 20,
                       offset: const Offset(0, 8),
                     ),
@@ -350,13 +350,13 @@ class _ProfileDetailBottomSheetState extends State<ProfileDetailBottomSheet>
               borderRadius: BorderRadius.circular(25),
               boxShadow: [
                 BoxShadow(
-                  color: gradientColors[0].withOpacity(0.4),
+                  color: gradientColors[0].withValues(alpha: 0.4),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 ),
               ],
               border: Border.all(
-                color: Colors.white.withOpacity(0.2),
+                color: Colors.white.withValues(alpha: 0.2),
                 width: 1,
               ),
             ),
@@ -392,8 +392,8 @@ class _ProfileDetailBottomSheetState extends State<ProfileDetailBottomSheet>
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
             color: isDarkMode
-                ? Colors.white.withOpacity(0.08)
-                : Colors.black.withOpacity(0.05),
+                ? Colors.white.withValues(alpha: 0.08)
+                : Colors.black.withValues(alpha: 0.05),
             width: 1,
           ),
         ),
@@ -426,7 +426,7 @@ class _ProfileDetailBottomSheetState extends State<ProfileDetailBottomSheet>
                 fontSize: 15,
                 height: 1.6,
                 color: isDarkMode
-                    ? Colors.white.withOpacity(0.9)
+                    ? Colors.white.withValues(alpha: 0.9)
                     : const Color(0xFF1C1C1E),
               ),
             ),
@@ -458,7 +458,7 @@ class _ProfileDetailBottomSheetState extends State<ProfileDetailBottomSheet>
         border: Border(
           top: BorderSide(
             color: isDarkMode
-                ? const Color(0xFF38383A).withOpacity(0.5)
+                ? const Color(0xFF38383A).withValues(alpha: 0.5)
                 : const Color(0xFFE5E5EA),
             width: 0.5,
           ),
@@ -484,7 +484,7 @@ class _ProfileDetailBottomSheetState extends State<ProfileDetailBottomSheet>
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFF6366F1).withOpacity(0.4),
+                      color: const Color(0xFF6366F1).withValues(alpha: 0.4),
                       blurRadius: 15,
                       offset: const Offset(0, 6),
                     ),
@@ -533,7 +533,7 @@ class _ProfileDetailBottomSheetState extends State<ProfileDetailBottomSheet>
                         borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFF10B981).withOpacity(0.4),
+                            color: const Color(0xFF10B981).withValues(alpha: 0.4),
                             blurRadius: 12,
                             offset: const Offset(0, 5),
                           ),
@@ -573,7 +573,7 @@ class _ProfileDetailBottomSheetState extends State<ProfileDetailBottomSheet>
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF6366F1).withOpacity(0.3),
+                          color: const Color(0xFF6366F1).withValues(alpha: 0.3),
                           blurRadius: 10,
                           offset: const Offset(0, 4),
                         ),
@@ -641,7 +641,7 @@ class _ProfileDetailBottomSheetState extends State<ProfileDetailBottomSheet>
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: badgeColor.withOpacity(0.4),
+            color: badgeColor.withValues(alpha: 0.4),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -719,7 +719,7 @@ class _ProfileDetailBottomSheetState extends State<ProfileDetailBottomSheet>
               width: 4,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.4),
+                color: Colors.white.withValues(alpha: 0.4),
                 shape: BoxShape.circle,
               ),
             ),
@@ -735,13 +735,13 @@ class _ProfileDetailBottomSheetState extends State<ProfileDetailBottomSheet>
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 13, color: Colors.white.withOpacity(0.6)),
+        Icon(icon, size: 13, color: Colors.white.withValues(alpha: 0.6)),
         const SizedBox(width: 4),
         Text(
           text,
           style: TextStyle(
             fontSize: 12, // Smaller
-            color: Colors.white.withOpacity(0.8),
+            color: Colors.white.withValues(alpha: 0.8),
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -802,9 +802,9 @@ class ShimmerPainter extends CustomPainter {
             end: Alignment.bottomRight,
             colors: [
               Colors.transparent,
-              Colors.white.withOpacity(0.03),
-              Colors.white.withOpacity(0.08),
-              Colors.white.withOpacity(0.03),
+              Colors.white.withValues(alpha: 0.03),
+              Colors.white.withValues(alpha: 0.08),
+              Colors.white.withValues(alpha: 0.03),
               Colors.transparent,
             ],
             stops: const [0.0, 0.35, 0.5, 0.65, 1.0],

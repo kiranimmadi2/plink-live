@@ -1,3 +1,5 @@
+﻿import 'package:flutter/foundation.dart';
+
 enum ApiErrorType {
   quotaExceeded,
   networkError,
@@ -52,8 +54,8 @@ class ApiErrorHandler {
     } catch (error) {
       final errorType = getErrorType(error);
 
-      print('API Error: ${getErrorMessage(errorType)}');
-      print('Original error: $error');
+      debugPrint('API Error: ${getErrorMessage(errorType)}');
+      debugPrint('Original error: $error');
 
       onError?.call(errorType);
 

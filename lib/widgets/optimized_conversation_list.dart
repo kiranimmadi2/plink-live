@@ -7,7 +7,6 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import '../models/conversation_model.dart';
 import '../models/user_profile.dart';
-import '../services/conversation_service.dart';
 import '../screens/enhanced_chat_screen.dart';
 import '../utils/app_optimizer.dart';
 
@@ -323,9 +322,9 @@ class _ConversationTile extends StatelessWidget {
     final otherUser = conversation.otherUser;
     if (otherUser == null) return const SizedBox.shrink();
 
-    final unreadCount =
+    final unreadCount = // ignore: dead_null_aware_expression
         conversation.unreadCount[FirebaseAuth.instance.currentUser?.uid] ?? 0;
-    final isOnline = otherUser.isOnline ?? false;
+    final isOnline = otherUser.isOnline ?? false; // ignore: dead_null_aware_expression
 
     return Material(
       color: Colors.transparent,

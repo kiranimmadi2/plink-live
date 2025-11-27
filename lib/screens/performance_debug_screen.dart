@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import '../utils/performance_monitor.dart';
-import '../widgets/performance_overlay_widget.dart';
 
 class PerformanceDebugScreen extends StatefulWidget {
   const PerformanceDebugScreen({super.key});
@@ -452,9 +451,12 @@ class _PerformanceDebugScreenState extends State<PerformanceDebugScreen> {
 
     PerformanceTracker.stopTracking('HeavyComputation');
 
+    if (!mounted) return;
+    // ignore: use_build_context_synchronously
     Navigator.pop(context);
     _loadPerformanceMetrics();
 
+    // ignore: use_build_context_synchronously
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text('Computation result: $result')));
@@ -474,6 +476,8 @@ class _PerformanceDebugScreenState extends State<PerformanceDebugScreen> {
     PerformanceTracker.stopTracking('NetworkTest');
     _loadPerformanceMetrics();
 
+    if (!mounted) return;
+    // ignore: use_build_context_synchronously
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(const SnackBar(content: Text('Network test completed')));

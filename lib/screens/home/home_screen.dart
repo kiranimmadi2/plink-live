@@ -1,5 +1,4 @@
-import 'dart:async';
-import 'dart:ui';
+﻿import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -8,7 +7,6 @@ import '../../services/universal_intent_service.dart';
 import '../../models/user_profile.dart';
 import '../enhanced_chat_screen.dart';
 import '../../widgets/user_avatar.dart';
-import '../../services/unified_intent_processor.dart';
 import '../../services/realtime_matching_service.dart';
 import '../profile/profile_with_history_screen.dart';
 import '../../services/photo_cache_service.dart';
@@ -37,20 +35,20 @@ class _HomeScreenState extends State<HomeScreen>
   bool _isProcessing = false;
 
   List<String> _suggestions = [];
-  bool _hasText = false;
+  bool _hasText = false; // ignore: unused_field
   List<Map<String, dynamic>> _matches = [];
-  List<Map<String, dynamic>> _userIntents = [];
-  Map<String, dynamic>? _currentIntent;
-  String? _errorMessage;
+  List<Map<String, dynamic>> _userIntents = []; // ignore: unused_field
+  Map<String, dynamic>? _currentIntent; // ignore: unused_field
+  String? _errorMessage; // ignore: unused_field
   String _currentUserName = '';
 
   late AnimationController _controller;
   bool _visible = true;
   late Timer _timer;
 
-  List<Map<String, dynamic>> _conversation = [];
-  bool _showChatResponse = false;
-  String _currentResponse = '';
+  final List<Map<String, dynamic>> _conversation = [];
+  bool _showChatResponse = false; // ignore: unused_field
+  String _currentResponse = ''; // ignore: unused_field
 
   // Voice recording state
   bool _isRecording = false;
@@ -399,7 +397,7 @@ class _HomeScreenState extends State<HomeScreen>
                   border: Border.all(color: Colors.white, width: 2),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.2),
+                      color: Colors.black.withValues(alpha: 0.2),
                       blurRadius: 5,
                       spreadRadius: 1,
                     ),
@@ -452,14 +450,14 @@ class _HomeScreenState extends State<HomeScreen>
       height: MediaQuery.of(context).size.height * 0.5, // Half screen height
       width: double.infinity,
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.95),
+        color: Colors.black.withValues(alpha: 0.95),
         borderRadius: const BorderRadius.only(
           topLeft: Radius.circular(20),
           topRight: Radius.circular(20),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.5),
+            color: Colors.black.withValues(alpha: 0.5),
             blurRadius: 20,
             spreadRadius: 5,
           ),
@@ -486,7 +484,7 @@ class _HomeScreenState extends State<HomeScreen>
                   boxShadow: [
                     BoxShadow(
                       color: (_isRecording ? Colors.red : Colors.blue)
-                          .withOpacity(0.5),
+                          .withValues(alpha: 0.5),
                       blurRadius: 15,
                       spreadRadius: 5,
                     ),
@@ -552,7 +550,7 @@ class _HomeScreenState extends State<HomeScreen>
                     borderRadius: BorderRadius.circular(25),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.red.withOpacity(0.3),
+                        color: Colors.red.withValues(alpha: 0.3),
                         blurRadius: 10,
                         spreadRadius: 2,
                       ),
@@ -587,7 +585,7 @@ class _HomeScreenState extends State<HomeScreen>
             height: size + (value * 100),
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              border: Border.all(color: Colors.red.withOpacity(0.5), width: 2),
+              border: Border.all(color: Colors.red.withValues(alpha: 0.5), width: 2),
             ),
           ),
         );
@@ -631,15 +629,15 @@ class _HomeScreenState extends State<HomeScreen>
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             colors: [
-                              Theme.of(context).primaryColor.withOpacity(0.2),
-                              Theme.of(context).primaryColor.withOpacity(0.1),
+                              Theme.of(context).primaryColor.withValues(alpha: 0.2),
+                              Theme.of(context).primaryColor.withValues(alpha: 0.1),
                             ],
                           ),
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
                             color: Theme.of(
                               context,
-                            ).primaryColor.withOpacity(0.3),
+                            ).primaryColor.withValues(alpha: 0.3),
                           ),
                         ),
                         child: Text(
@@ -753,7 +751,7 @@ class _HomeScreenState extends State<HomeScreen>
                       color: _isRecording ? Colors.red : Colors.grey[800],
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.white.withOpacity(0.1),
+                          color: Colors.white.withValues(alpha: 0.1),
                           blurRadius: 2,
                           offset: const Offset(0, 1),
                         ),
@@ -886,7 +884,7 @@ class _HomeScreenState extends State<HomeScreen>
               decoration: BoxDecoration(
                 color: isUser
                     ? Theme.of(context).primaryColor
-                    : Colors.grey[800]!.withOpacity(0.8),
+                    : Colors.grey[800]!.withValues(alpha: 0.8),
                 borderRadius: BorderRadius.only(
                   topLeft: const Radius.circular(20),
                   topRight: const Radius.circular(20),
@@ -899,7 +897,7 @@ class _HomeScreenState extends State<HomeScreen>
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.2),
+                    color: Colors.black.withValues(alpha: 0.2),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -947,9 +945,9 @@ class _HomeScreenState extends State<HomeScreen>
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.green.withOpacity(0.1),
+            color: Colors.green.withValues(alpha: 0.1),
             border: Border(
-              bottom: BorderSide(color: Colors.green.withOpacity(0.2)),
+              bottom: BorderSide(color: Colors.green.withValues(alpha: 0.2)),
             ),
           ),
           child: Row(
@@ -1079,7 +1077,7 @@ class _HomeScreenState extends State<HomeScreen>
                             vertical: 6,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.blue.withOpacity(0.1),
+                            color: Colors.blue.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Row(
@@ -1110,7 +1108,7 @@ class _HomeScreenState extends State<HomeScreen>
                               vertical: 6,
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.green.withOpacity(0.1),
+                              color: Colors.green.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Row(
@@ -1140,7 +1138,7 @@ class _HomeScreenState extends State<HomeScreen>
                               vertical: 6,
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.orange.withOpacity(0.1),
+                              color: Colors.orange.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Row(

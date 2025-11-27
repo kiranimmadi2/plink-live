@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
 class PerformanceMonitor extends StatefulWidget {
@@ -21,10 +21,10 @@ class _PerformanceMonitorState extends State<PerformanceMonitor> {
   DateTime _lastTime = DateTime.now();
 
   // Memory tracking
-  final int _memoryUsage = 0;
+  final int _memoryUsage = 0; // ignore: unused_field
 
   // Frame timing
-  final Duration _lastFrameDuration = Duration.zero;
+  final Duration _lastFrameDuration = Duration.zero; // ignore: unused_field
   int _droppedFrames = 0;
 
   @override
@@ -181,16 +181,16 @@ class PerformanceTracker {
 
   /// Print performance report to console
   static void printReport() {
-    print('=== Performance Report ===');
+    debugPrint('=== Performance Report ===');
     final report = getReport();
     report.forEach((operation, metrics) {
-      print('$operation:');
-      print('  Average: ${metrics['average']}ms');
-      print('  Max: ${metrics['max']}ms');
-      print('  Min: ${metrics['min']}ms');
-      print('  Count: ${metrics['count']}');
+      debugPrint('$operation:');
+      debugPrint('  Average: ${metrics['average']}ms');
+      debugPrint('  Max: ${metrics['max']}ms');
+      debugPrint('  Min: ${metrics['min']}ms');
+      debugPrint('  Count: ${metrics['count']}');
     });
-    print('========================');
+    debugPrint('========================');
   }
 }
 
@@ -215,7 +215,7 @@ mixin PerformanceAware<T extends StatefulWidget> on State<T> {
     }
   }
 
-  Future<T> measureAsync<T>(String name, Future<T> Function() operation) async {
+  Future<R> measureAsync<R>(String name, Future<R> Function() operation) async {
     startTimer(name);
     try {
       final result = await operation();
@@ -225,7 +225,7 @@ mixin PerformanceAware<T extends StatefulWidget> on State<T> {
     }
   }
 
-  T measureSync<T>(String name, T Function() operation) {
+  R measureSync<R>(String name, R Function() operation) {
     startTimer(name);
     try {
       final result = operation();

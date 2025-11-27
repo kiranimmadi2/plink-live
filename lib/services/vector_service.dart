@@ -1,7 +1,7 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+﻿import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:flutter/foundation.dart';
 import 'dart:math';
-import '../models/post_model.dart';
 import '../config/api_config.dart';
 
 class VectorService {
@@ -31,7 +31,7 @@ class VectorService {
       final response = await _embeddingModel.embedContent(content);
       return response.embedding.values;
     } catch (e) {
-      print('Error generating embedding: $e');
+      debugPrint('Error generating embedding: $e');
       // Fallback to deterministic embedding based on text
       return _generateDeterministicEmbedding(text);
     }
@@ -53,7 +53,7 @@ class VectorService {
 
       return embeddings;
     } catch (e) {
-      print('Error generating batch embeddings: $e');
+      debugPrint('Error generating batch embeddings: $e');
       return texts
           .map((text) => _generateDeterministicEmbedding(text))
           .toList();
@@ -67,7 +67,7 @@ class VectorService {
   ) {
     if (embedding1.isEmpty || embedding2.isEmpty) return 0.0;
     if (embedding1.length != embedding2.length) {
-      print('Warning: Embedding dimensions mismatch');
+      debugPrint('Warning: Embedding dimensions mismatch');
       return 0.0;
     }
 
@@ -137,7 +137,7 @@ class VectorService {
       // Return top results
       return results.take(limit).toList();
     } catch (e) {
-      print('Error finding similar posts: $e');
+      debugPrint('Error finding similar posts: $e');
       return [];
     }
   }
@@ -163,7 +163,7 @@ class VectorService {
           .doc(documentId)
           .set(data, SetOptions(merge: true));
     } catch (e) {
-      print('Error storing embedding: $e');
+      debugPrint('Error storing embedding: $e');
       rethrow;
     }
   }
@@ -237,7 +237,6 @@ class VectorService {
       'might',
       'must',
       'can',
-      'could',
       'i',
       'you',
       'he',
@@ -315,7 +314,7 @@ class VectorService {
       try {
         return List<double>.from(embeddingData.map((e) => e.toDouble()));
       } catch (e) {
-        print('Error parsing embedding: $e');
+        debugPrint('Error parsing embedding: $e');
         return [];
       }
     }
@@ -386,9 +385,9 @@ class VectorService {
         await batch.commit();
       }
 
-      print('Updated ${postsSnapshot.docs.length} posts with embeddings');
+      debugPrint('Updated ${postsSnapshot.docs.length} posts with embeddings');
     } catch (e) {
-      print('Error updating posts with embeddings: $e');
+      debugPrint('Error updating posts with embeddings: $e');
     }
   }
 }

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
@@ -142,7 +142,7 @@ class _EditProfileBottomSheetState extends State<EditProfileBottomSheet> {
       }
       return null;
     } catch (e) {
-      print('Error getting photo URL: $e');
+      debugPrint('Error getting photo URL: $e');
       return null;
     }
   }
@@ -201,8 +201,8 @@ class _EditProfileBottomSheetState extends State<EditProfileBottomSheet> {
         }).toList();
       }
     } catch (e) {
-      print('Error loading profile data in EditProfileBottomSheet: $e');
-      print('Profile data: ${widget.currentProfile}');
+      debugPrint('Error loading profile data in EditProfileBottomSheet: $e');
+      debugPrint('Profile data: ${widget.currentProfile}');
       // Initialize with empty values on error
       _nameController.text = '';
       _bioController.text = '';
@@ -238,6 +238,8 @@ class _EditProfileBottomSheetState extends State<EditProfileBottomSheet> {
         });
       }
     } catch (e) {
+      if (!mounted) return;
+      // ignore: use_build_context_synchronously
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Error picking image: $e')));

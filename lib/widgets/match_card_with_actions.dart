@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -23,7 +23,7 @@ class MatchCardWithActions extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       elevation: isDark ? 8 : 4,
-      shadowColor: theme.primaryColor.withOpacity(0.2),
+      shadowColor: theme.primaryColor.withValues(alpha: 0.2),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: InkWell(
         onTap: onTap ?? () => _viewProfile(context),
@@ -36,7 +36,7 @@ class MatchCardWithActions extends StatelessWidget {
                 ? LinearGradient(
                     colors: [
                       theme.cardColor,
-                      theme.cardColor.withOpacity(0.95),
+                      theme.cardColor.withValues(alpha: 0.95),
                     ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
@@ -104,10 +104,10 @@ class MatchCardWithActions extends StatelessWidget {
                   margin: const EdgeInsets.only(top: 12),
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: theme.primaryColor.withOpacity(0.05),
+                    color: theme.primaryColor.withValues(alpha: 0.05),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: theme.primaryColor.withOpacity(0.1),
+                      color: theme.primaryColor.withValues(alpha: 0.1),
                       width: 1,
                     ),
                   ),
@@ -165,6 +165,7 @@ class MatchCardWithActions extends StatelessWidget {
     );
   }
 
+  // ignore: unused_element
   Color _getScoreColor(double score) {
     if (score >= 0.9) return Colors.green;
     if (score >= 0.8) return Colors.teal;
@@ -187,6 +188,8 @@ class MatchCardWithActions extends StatelessWidget {
     final receiver = UserProfile.fromFirestore(receiverDoc);
 
     // Navigate to chat
+    if (!context.mounted) return;
+    // ignore: use_build_context_synchronously
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -216,6 +219,8 @@ class MatchCardWithActions extends StatelessWidget {
 
     final profile = UserProfile.fromFirestore(userDoc);
 
+    if (!context.mounted) return;
+    // ignore: use_build_context_synchronously
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -251,9 +256,9 @@ class _ActionButton extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
-            color: color.withOpacity(isDark ? 0.2 : 0.1),
+            color: color.withValues(alpha: isDark ? 0.2 : 0.1),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: color.withOpacity(0.3), width: 1),
+            border: Border.all(color: color.withValues(alpha: 0.3), width: 1),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,

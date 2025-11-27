@@ -1,14 +1,12 @@
-import 'dart:ui';
+﻿import 'dart:ui';
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:supper/providers/theme_provider.dart';
 import '../widgets/user_avatar.dart';
 import 'enhanced_chat_screen.dart';
@@ -266,6 +264,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
   }
 
   /// Get connection status info for displaying badge
+  // ignore: unused_element
   Future<Map<String, dynamic>> _getConnectionStatusInfo(String userId) async {
     // Check if already connected (using cache)
     final isConnected = _isConnectedCached(userId);
@@ -321,7 +320,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
         _loadNearbyPeople();
       }
     } catch (e) {
-      print('Error loading user profile: $e');
+      debugPrint('Error loading user profile: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -439,16 +438,21 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
       bool hasInMemoryFilters = false;
 
       // Check if we have in-memory filters that might reduce results
-      if (_locationFilter == 'Near me')
+      if (_locationFilter == 'Near me') {
         hasInMemoryFilters = true; // Distance filtering
-      if (_filterByInterests && _selectedInterests.isNotEmpty)
+      }
+      if (_filterByInterests && _selectedInterests.isNotEmpty) {
         hasInMemoryFilters = true;
-      if (_filterByGender && _selectedGenders.length > 1)
+      }
+      if (_filterByGender && _selectedGenders.length > 1) {
         hasInMemoryFilters = true; // Multi-gender
-      if (_filterByConnectionTypes && _selectedConnectionTypes.isNotEmpty)
+      }
+      if (_filterByConnectionTypes && _selectedConnectionTypes.isNotEmpty) {
         hasInMemoryFilters = true;
-      if (_filterByActivities && _selectedActivities.isNotEmpty)
+      }
+      if (_filterByActivities && _selectedActivities.isNotEmpty) {
         hasInMemoryFilters = true;
+      }
 
       // Over-fetch by 3x when in-memory filters are active to ensure we get enough results
       if (hasInMemoryFilters) {
@@ -625,7 +629,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
         });
       }
     } catch (e) {
-      print('Error loading nearby people: $e');
+      debugPrint('Error loading nearby people: $e');
       if (mounted) {
         setState(() {
           _isLoadingPeople = false;
@@ -718,6 +722,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
     final userId = _auth.currentUser?.uid;
     if (userId == null) return;
 
+    // ignore: unused_local_variable
     final myProfile = ExtendedUserProfile.fromMap(_userProfile!, userId);
 
     showModalBottomSheet(
@@ -784,7 +789,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
       // Reload nearby people
       _loadNearbyPeople();
     } catch (e) {
-      print('Error updating interests: $e');
+      debugPrint('Error updating interests: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -995,7 +1000,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                     thumbColor: const Color(0xFF00D67D),
                                     overlayColor: const Color(
                                       0xFF00D67D,
-                                    ).withOpacity(0.2),
+                                    ).withValues(alpha: 0.2),
                                     trackHeight: 4,
                                   ),
                                   child: Slider(
@@ -1213,7 +1218,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                         color: isSelected
                                             ? Theme.of(
                                                 context,
-                                              ).primaryColor.withOpacity(0.2)
+                                              ).primaryColor.withValues(alpha: 0.2)
                                             : Colors.grey[800],
                                         borderRadius: BorderRadius.circular(16),
                                         border: Border.all(
@@ -1360,7 +1365,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                       color: isSelected
                                           ? const Color(
                                               0xFF4A90E2,
-                                            ).withOpacity(0.2)
+                                            ).withValues(alpha: 0.2)
                                           : Colors.grey[800],
                                       borderRadius: BorderRadius.circular(20),
                                       border: isSelected
@@ -1505,12 +1510,12 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                       decoration: BoxDecoration(
                                         color: const Color(
                                           0xFF9C27B0,
-                                        ).withOpacity(0.15),
+                                        ).withValues(alpha: 0.15),
                                         borderRadius: BorderRadius.circular(12),
                                         border: Border.all(
                                           color: const Color(
                                             0xFF9C27B0,
-                                          ).withOpacity(0.3),
+                                          ).withValues(alpha: 0.3),
                                         ),
                                       ),
                                       child: Row(
@@ -1588,11 +1593,11 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                                 color: isSelected
                                                     ? const Color(
                                                         0xFF00D67D,
-                                                      ).withOpacity(0.2)
+                                                      ).withValues(alpha: 0.2)
                                                     : isUserOwn
                                                     ? const Color(
                                                         0xFF9C27B0,
-                                                      ).withOpacity(0.1)
+                                                      ).withValues(alpha: 0.1)
                                                     : Colors.grey[800],
                                                 borderRadius:
                                                     BorderRadius.circular(16),
@@ -1602,7 +1607,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                                       : isUserOwn
                                                       ? const Color(
                                                           0xFF9C27B0,
-                                                        ).withOpacity(0.5)
+                                                        ).withValues(alpha: 0.5)
                                                       : Colors.grey[600]!,
                                                   width: isSelected ? 2 : 1,
                                                 ),
@@ -1760,12 +1765,12 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                       decoration: BoxDecoration(
                                         color: const Color(
                                           0xFF9C27B0,
-                                        ).withOpacity(0.15),
+                                        ).withValues(alpha: 0.15),
                                         borderRadius: BorderRadius.circular(12),
                                         border: Border.all(
                                           color: const Color(
                                             0xFF9C27B0,
-                                          ).withOpacity(0.3),
+                                          ).withValues(alpha: 0.3),
                                         ),
                                       ),
                                       child: Row(
@@ -1842,11 +1847,11 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                                 color: isSelected
                                                     ? const Color(
                                                         0xFF00D67D,
-                                                      ).withOpacity(0.2)
+                                                      ).withValues(alpha: 0.2)
                                                     : isUserOwn
                                                     ? const Color(
                                                         0xFF9C27B0,
-                                                      ).withOpacity(0.1)
+                                                      ).withValues(alpha: 0.1)
                                                     : Colors.grey[800],
                                                 borderRadius:
                                                     BorderRadius.circular(16),
@@ -1856,7 +1861,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                                       : isUserOwn
                                                       ? const Color(
                                                           0xFF9C27B0,
-                                                        ).withOpacity(0.5)
+                                                        ).withValues(alpha: 0.5)
                                                       : Colors.grey[600]!,
                                                   width: isSelected ? 2 : 1,
                                                 ),
@@ -1954,7 +1959,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                           : Colors.white,
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
+                          color: Colors.black.withValues(alpha: 0.1),
                           blurRadius: 12,
                           offset: const Offset(0, -4),
                         ),
@@ -2025,6 +2030,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
     );
   }
 
+  // ignore: unused_element
   void _openChat(Map<String, dynamic> userData, String userId) {
     // Create UserProfile from userData
     final userProfile = UserProfile.fromMap(userData, userId);
@@ -2057,6 +2063,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
   }
 
   // Helper method to get varied colors for interest tags
+  // ignore: unused_element
   Color _getInterestTagColor(String interest, int index) {
     final colors = [
       const Color(0xFF00D67D), // Vibrant green
@@ -2069,6 +2076,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
     return colors[index % colors.length];
   }
 
+  // ignore: unused_element
   Future<void> _toggleFavorite(String userId, String userName) async {
     final currentUserId = _auth.currentUser?.uid;
     if (currentUserId == null) return;
@@ -2108,7 +2116,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
         }
       }
     } catch (e) {
-      print('Error toggling favorite: $e');
+      debugPrint('Error toggling favorite: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -2185,6 +2193,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
 
                 if (result['success']) {
                   // Request succeeded - cache is already updated optimistically
+                  // ignore: use_build_context_synchronously
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Row(
@@ -2202,6 +2211,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                   // Request failed - revert optimistic update
                   _updateConnectionCache(user.uid, false, requestStatus: null);
 
+                  // ignore: use_build_context_synchronously
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Row(
@@ -3212,7 +3222,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
           final person = _filteredPeople[index];
           final userData = person['userData'] as Map<String, dynamic>;
           final commonInterests = person['commonInterests'] as List<String>;
-          final matchScore = person['matchScore'] as double;
+          final matchScore = person['matchScore'] as double; // ignore: unused_local_variable
           final userId = person['userId'] as String;
           final distance = person['distance'] as double?;
 
@@ -3297,7 +3307,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                 ),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: gradientColors[0].withOpacity(0.3),
+                                    color: gradientColors[0].withValues(alpha: 0.3),
                                     blurRadius: 12,
                                     offset: const Offset(0, 4),
                                   ),
@@ -3323,7 +3333,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                 shape: BoxShape.circle,
                                 boxShadow: [
                                   BoxShadow(
-                                    color: gradientColors[0].withOpacity(0.3),
+                                    color: gradientColors[0].withValues(alpha: 0.3),
                                     blurRadius: 12,
                                     offset: const Offset(0, 4),
                                   ),

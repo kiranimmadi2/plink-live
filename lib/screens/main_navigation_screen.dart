@@ -1,4 +1,4 @@
-import 'dart:ui';
+﻿import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:badges/badges.dart' as badges;
@@ -8,7 +8,6 @@ import 'home/home_screen.dart';
 import 'conversations_screen.dart';
 import 'live_connect_tab_screen.dart';
 import 'profile/profile_with_history_screen.dart';
-import 'performance_debug_screen.dart';
 import '../services/notification_service.dart';
 import '../services/location_service.dart';
 
@@ -34,6 +33,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     const ProfileWithHistoryScreen(),
   ];
 
+  // ignore: unused_field
   final List<String> _titles = [
     'Discover',
     'Messages',
@@ -56,7 +56,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     try {
       await _locationService.checkAndRefreshStaleLocation();
     } catch (e) {
-      print('MainNavigation: Error checking location freshness: $e');
+      debugPrint('MainNavigation: Error checking location freshness: $e');
     }
   }
 
@@ -99,7 +99,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
           'lastSeen': FieldValue.serverTimestamp(),
         });
       } catch (e) {
-        print('Error updating online status: $e');
+        debugPrint('Error updating online status: $e');
       }
     }
   }

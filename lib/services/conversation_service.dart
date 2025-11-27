@@ -1,4 +1,4 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+﻿import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/conversation_model.dart';
 import '../models/user_profile.dart';
@@ -21,7 +21,7 @@ class ConversationService {
           .get();
 
       if (!doc.exists) {
-        // print('ConversationService: VALIDATION - Conversation does not exist: $conversationId');
+        // debugPrint('ConversationService: VALIDATION - Conversation does not exist: $conversationId');
         return false;
       }
 
@@ -31,7 +31,7 @@ class ConversationService {
       // Extract expected user IDs from conversation ID
       final expectedUserIds = conversationId.split('_');
       if (expectedUserIds.length != 2) {
-        // print('ConversationService: VALIDATION - Invalid conversation ID format: $conversationId');
+        // debugPrint('ConversationService: VALIDATION - Invalid conversation ID format: $conversationId');
         return false;
       }
 
@@ -39,17 +39,17 @@ class ConversationService {
       bool needsFix = false;
 
       if (participants == null || participants.isEmpty) {
-        // print('ConversationService: VALIDATION - Participants array is null or empty');
+        // debugPrint('ConversationService: VALIDATION - Participants array is null or empty');
         needsFix = true;
       } else if (participants.length != 2) {
-        // print('ConversationService: VALIDATION - Participants array has wrong length: ${participants.length}');
+        // debugPrint('ConversationService: VALIDATION - Participants array has wrong length: ${participants.length}');
         needsFix = true;
       } else {
         // Check if both expected users are in the array
         final participantsList = participants.cast<String>();
         for (final userId in expectedUserIds) {
           if (!participantsList.contains(userId)) {
-            // print('ConversationService: VALIDATION - Missing user $userId in participants array');
+            // debugPrint('ConversationService: VALIDATION - Missing user $userId in participants array');
             needsFix = true;
             break;
           }
@@ -57,15 +57,15 @@ class ConversationService {
       }
 
       if (needsFix) {
-        // print('ConversationService: VALIDATION - Fixing participants array for $conversationId');
+        // debugPrint('ConversationService: VALIDATION - Fixing participants array for $conversationId');
         await doc.reference.update({'participants': expectedUserIds});
-        // print('ConversationService: VALIDATION - Fixed! Updated to: $expectedUserIds');
+        // debugPrint('ConversationService: VALIDATION - Fixed! Updated to: $expectedUserIds');
         return true;
       }
 
       return false;
     } catch (e) {
-      // print('ConversationService: VALIDATION ERROR for $conversationId: $e');
+      // debugPrint('ConversationService: VALIDATION ERROR for $conversationId: $e');
       return false;
     }
   }
@@ -82,14 +82,14 @@ class ConversationService {
   Future<String> getOrCreateConversation(UserProfile otherUser) async {
     final currentUserId = _auth.currentUser?.uid;
     if (currentUserId == null) {
-      // print('ConversationService: ERROR - No authenticated user');
+      // debugPrint('ConversationService: ERROR - No authenticated user');
       throw Exception('No authenticated user');
     }
 
     // Generate consistent conversation ID
     final conversationId = generateConversationId(currentUserId, otherUser.uid);
-    // print('ConversationService: Getting or creating conversation: $conversationId');
-    // print('ConversationService: Current user: $currentUserId, Other user: ${otherUser.uid}');
+    // debugPrint('ConversationService: Getting or creating conversation: $conversationId');
+    // debugPrint('ConversationService: Current user: $currentUserId, Other user: ${otherUser.uid}');
 
     try {
       // First, try to get existing conversation
@@ -99,13 +99,13 @@ class ConversationService {
           .get();
 
       if (conversationDoc.exists) {
-        // print('ConversationService: Conversation already exists: $conversationId');
+        // debugPrint('ConversationService: Conversation already exists: $conversationId');
 
         // IMPORTANT: Validate and fix participants array if corrupted
         // This ensures the conversation will appear in the Messages screen
         final wasFixed = await _validateAndFixParticipants(conversationId);
         if (wasFixed) {
-          // print('ConversationService: ⚠️ Fixed corrupted participants array for $conversationId');
+          // debugPrint('ConversationService: ⚠️ Fixed corrupted participants array for $conversationId');
         }
 
         // Update participant info if needed
@@ -113,13 +113,13 @@ class ConversationService {
         return conversationId;
       }
 
-      // print('ConversationService: Conversation does not exist, creating new one: $conversationId');
+      // debugPrint('ConversationService: Conversation does not exist, creating new one: $conversationId');
       // Conversation doesn't exist, create it
       await _createConversation(conversationId, currentUserId, otherUser);
-      // print('ConversationService: Conversation created successfully: $conversationId');
+      // debugPrint('ConversationService: Conversation created successfully: $conversationId');
       return conversationId;
     } catch (e) {
-      // print('ConversationService: ERROR creating/getting conversation: $e');
+      // debugPrint('ConversationService: ERROR creating/getting conversation: $e');
       rethrow;
     }
   }
@@ -130,7 +130,7 @@ class ConversationService {
     String currentUserId,
     UserProfile otherUser,
   ) async {
-    // print('ConversationService: Creating conversation document...');
+    // debugPrint('ConversationService: Creating conversation document...');
 
     // VALIDATION: Ensure user IDs are valid and different
     if (currentUserId.isEmpty || otherUser.uid.isEmpty) {
@@ -156,9 +156,9 @@ class ConversationService {
     final currentUserPhoto =
         currentUserData['photoUrl'] ?? _auth.currentUser?.photoURL;
 
-    // print('ConversationService: Current user name: $currentUserName');
-    // print('ConversationService: Other user name: ${otherUser.name}');
-    // print('ConversationService: Participants: [$currentUserId, ${otherUser.uid}]');
+    // debugPrint('ConversationService: Current user name: $currentUserName');
+    // debugPrint('ConversationService: Other user name: ${otherUser.name}');
+    // debugPrint('ConversationService: Participants: [$currentUserId, ${otherUser.uid}]');
 
     // CRITICAL: Create participants array with both user IDs
     final participantsArray = [currentUserId, otherUser.uid];
@@ -204,9 +204,9 @@ class ConversationService {
           .collection('conversations')
           .doc(conversationId)
           .set(conversationData);
-      // print('ConversationService: Conversation document created successfully');
+      // debugPrint('ConversationService: Conversation document created successfully');
     } catch (e) {
-      // print('ConversationService: ERROR creating conversation document: $e');
+      // debugPrint('ConversationService: ERROR creating conversation document: $e');
       rethrow;
     }
   }
@@ -331,7 +331,7 @@ class ConversationService {
 
     try {
       // Create message document
-      final messageRef = await _firestore
+      final messageRef = await _firestore // ignore: unused_local_variable
           .collection('conversations')
           .doc(conversationId)
           .collection('messages')
@@ -508,14 +508,14 @@ class ConversationService {
   Future<int> deleteOrphanedConversations() async {
     final currentUserId = _auth.currentUser?.uid;
     if (currentUserId == null) {
-      // print('ConversationService: No authenticated user for cleanup');
+      // debugPrint('ConversationService: No authenticated user for cleanup');
       return 0;
     }
 
     int deletedCount = 0;
 
     try {
-      // print('ConversationService: Starting orphaned conversations cleanup...');
+      // debugPrint('ConversationService: Starting orphaned conversations cleanup...');
 
       // Get all conversations for current user
       final conversationsSnapshot = await _firestore
@@ -523,7 +523,7 @@ class ConversationService {
           .where('participants', arrayContains: currentUserId)
           .get();
 
-      // print('ConversationService: Found ${conversationsSnapshot.docs.length} conversations to check');
+      // debugPrint('ConversationService: Found ${conversationsSnapshot.docs.length} conversations to check');
 
       for (var conversationDoc in conversationsSnapshot.docs) {
         try {
@@ -540,7 +540,7 @@ class ConversationService {
                 .get();
 
             if (!userDoc.exists) {
-              // print('ConversationService: Found orphaned user: $userId in conversation ${conversationDoc.id}');
+              // debugPrint('ConversationService: Found orphaned user: $userId in conversation ${conversationDoc.id}');
               hasOrphanedUser = true;
               break;
             }
@@ -548,7 +548,7 @@ class ConversationService {
 
           // Delete conversation if it has orphaned users
           if (hasOrphanedUser) {
-            // print('ConversationService: Deleting orphaned conversation: ${conversationDoc.id}');
+            // debugPrint('ConversationService: Deleting orphaned conversation: ${conversationDoc.id}');
 
             // Delete all messages in the conversation first
             final messagesSnapshot = await _firestore
@@ -567,17 +567,17 @@ class ConversationService {
 
             await batch.commit();
             deletedCount++;
-            // print('ConversationService: Successfully deleted orphaned conversation: ${conversationDoc.id}');
+            // debugPrint('ConversationService: Successfully deleted orphaned conversation: ${conversationDoc.id}');
           }
         } catch (e) {
-          // print('ConversationService: Error processing conversation ${conversationDoc.id}: $e');
+          // debugPrint('ConversationService: Error processing conversation ${conversationDoc.id}: $e');
         }
       }
 
-      // print('ConversationService: Cleanup complete. Deleted $deletedCount orphaned conversations');
+      // debugPrint('ConversationService: Cleanup complete. Deleted $deletedCount orphaned conversations');
       return deletedCount;
     } catch (e) {
-      // print('ConversationService: Error during orphaned conversations cleanup: $e');
+      // debugPrint('ConversationService: Error during orphaned conversations cleanup: $e');
       return deletedCount;
     }
   }
@@ -608,7 +608,7 @@ class ConversationService {
 
       return false; // All participants exist
     } catch (e) {
-      // print('ConversationService: Error checking if conversation is orphaned: $e');
+      // debugPrint('ConversationService: Error checking if conversation is orphaned: $e');
       return false;
     }
   }

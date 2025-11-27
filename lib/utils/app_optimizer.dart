@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -167,7 +167,7 @@ class AppOptimizer {
   static void checkMemoryUsage() {
     if (kDebugMode) {
       final imageCache = PaintingBinding.instance.imageCache;
-      print(
+      debugPrint(
         'Image Cache: ${imageCache.currentSize} images, '
         '${(imageCache.currentSizeBytes / 1024 / 1024).toStringAsFixed(2)} MB',
       );

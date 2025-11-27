@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supper/screens/home/home_screen.dart';
 import 'package:supper/screens/login/login_screen.dart';
@@ -208,7 +208,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           alignment: Alignment.center,
           transform: Matrix4.identity()
             ..setEntry(3, 2, 0.001)
-            ..scale(scale)
+            ..scale(scale) // ignore: deprecated_member_use
             ..rotateY(rotation),
           child: Opacity(opacity: opacity, child: child),
         );
@@ -257,8 +257,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
         return Transform(
           transform: Matrix4.identity()
-            ..scale(scale)
-            ..translate(0.0, offset, 0.0),
+            ..scale(scale) // ignore: deprecated_member_use
+            ..translate(0.0, offset, 0.0), // ignore: deprecated_member_use
           child: child,
         );
       },
@@ -267,11 +267,11 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         height: 260,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: Colors.white.withOpacity(0.08),
+          color: Colors.white.withValues(alpha: 0.08),
           border: Border.all(color: const Color.fromARGB(255, 231, 215, 215)),
           boxShadow: [
             BoxShadow(
-              color: color.withOpacity(0.5),
+              color: color.withValues(alpha: 0.5),
               blurRadius: 40,
               spreadRadius: 8,
               offset: const Offset(0, 12),
@@ -289,8 +289,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
                   colors: [
-                    color.withOpacity(0.35),
-                    color.withOpacity(0.15),
+                    color.withValues(alpha: 0.35),
+                    color.withValues(alpha: 0.15),
                     Colors.transparent,
                   ],
                 ),
@@ -304,7 +304,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   }
 
   Widget _buildPageIndicators() {
-    return Container(
+    return SizedBox(
       height: 60,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -323,7 +323,11 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 color: const Color.fromARGB(255, 155, 149, 149),
               ),
               boxShadow: _currentPage == index
-                  ? [BoxShadow(color: _pages[index].color.withOpacity(0.5))]
+                  ? [
+                      BoxShadow(
+                        color: _pages[index].color.withValues(alpha: 0.5),
+                      ),
+                    ]
                   : null,
             ),
           );
@@ -411,7 +415,7 @@ class _BackgroundPatternPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = color.withOpacity(0.1)
+      ..color = color.withValues(alpha: 0.1)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1;
 
@@ -425,7 +429,7 @@ class _BackgroundPatternPainter extends CustomPainter {
 
     // Draw circles
     final circlePaint = Paint()
-      ..color = color.withOpacity(0.05)
+      ..color = color.withValues(alpha: 0.05)
       ..style = PaintingStyle.fill;
 
     canvas.drawCircle(

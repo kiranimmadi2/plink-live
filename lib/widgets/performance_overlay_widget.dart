@@ -24,7 +24,7 @@ class _PerformanceOverlayWidgetState extends State<PerformanceOverlayWidget>
   double _avgFPS = 60.0;
 
   int _frameCount = 0;
-  Duration _totalFrameTime = Duration.zero;
+  Duration _totalFrameTime = Duration.zero; // ignore: unused_field
   DateTime _lastResetTime = DateTime.now();
 
   final List<double> _fpsHistory = [];

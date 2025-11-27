@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'dart:async';
 
 import 'package:supper/screens/login/onboarding_screen.dart';
@@ -27,7 +27,7 @@ class _SplashScreenState extends State<SplashScreen>
     Timer(const Duration(seconds: 3), () {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => OnboardingScreen()),
+        MaterialPageRoute(builder: (context) => const OnboardingScreen()),
       );
     });
   }
@@ -76,7 +76,7 @@ class _SplashScreenState extends State<SplashScreen>
                 return Transform(
                   alignment: Alignment.center,
                   transform: Matrix4.identity()
-                    ..scale(scale)
+                    ..scale(scale) // ignore: deprecated_member_use
                     ..rotateY(rotationY),
                   child: child,
                 );
@@ -86,14 +86,14 @@ class _SplashScreenState extends State<SplashScreen>
                 height: 280,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.1),
+                  color: Colors.white.withValues(alpha: 0.1),
                   border: Border.all(
-                    color: Colors.white.withOpacity(0.3),
+                    color: Colors.white.withValues(alpha: 0.3),
                     width: 3,
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.white.withOpacity(0.5),
+                      color: Colors.white.withValues(alpha: 0.5),
                       blurRadius: 30,
                       spreadRadius: 5,
                       offset: const Offset(0, 10),
@@ -148,7 +148,7 @@ class _BackgroundPatternPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = color.withOpacity(0.05)
+      ..color = color.withValues(alpha: 0.05)
       ..style = PaintingStyle.fill;
 
     // Big circles

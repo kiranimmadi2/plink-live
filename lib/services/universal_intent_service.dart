@@ -1,5 +1,6 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+﻿import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'dart:convert';
 import 'dart:math' as math;
@@ -12,7 +13,7 @@ class UniversalIntentService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final GeminiService _geminiService = GeminiService();
-  late final GenerativeModel _model;
+  late final GenerativeModel _model; // ignore: unused_field
 
   UniversalIntentService() {
     _model = GenerativeModel(
@@ -79,7 +80,7 @@ class UniversalIntentService {
       final userDoc = await _firestore.collection('users').doc(userId).get();
       final userProfile = userDoc.data() ?? {};
 
-      print('📝 Processing intent: $userInput');
+      debugPrint('📝 Processing intent: $userInput');
 
       // Import and use UnifiedPostService
       final unifiedService = UnifiedPostService();
@@ -97,11 +98,11 @@ class UniversalIntentService {
       }
 
       final postId = result['postId'];
-      print('✅ Post created: $postId');
+      debugPrint('✅ Post created: $postId');
 
       // Find matches using unified service
       final matches = await unifiedService.findMatches(postId);
-      print('🔍 Found ${matches.length} matches');
+      debugPrint('🔍 Found ${matches.length} matches');
 
       // Convert matches to format expected by UI
       final matchesWithProfile = await _enrichMatchesWithProfiles(matches);
@@ -113,7 +114,7 @@ class UniversalIntentService {
         'matches': matchesWithProfile,
       };
     } catch (e) {
-      print('❌ Error processing intent: $e');
+      debugPrint('❌ Error processing intent: $e');
       return {'success': false, 'error': e.toString()};
     }
   }
@@ -155,6 +156,7 @@ class UniversalIntentService {
     return enrichedMatches;
   }
 
+  // ignore: unused_element
   String _buildIntentPrompt(
     String userInput,
     Map<String, dynamic> userProfile,
@@ -193,6 +195,7 @@ Examples:
 ''';
   }
 
+  // ignore: unused_element
   Map<String, dynamic> _parseGeminiResponse(String response) {
     try {
       // Clean the response to get only JSON
@@ -223,7 +226,7 @@ Examples:
         'tags': parsed['tags'] ?? [],
       };
     } catch (e) {
-      print('Error parsing Gemini response: $e');
+      debugPrint('Error parsing Gemini response: $e');
       // Return default structure if parsing fails
       return {
         'intent_type': 'UNIVERSAL',
@@ -238,6 +241,7 @@ Examples:
     }
   }
 
+  // ignore: unused_element
   Future<Map<String, dynamic>> _storeIntent(
     Map<String, dynamic> intentData,
     String userId,
@@ -279,7 +283,7 @@ Examples:
 
       return intentDoc;
     } catch (e) {
-      print('Error storing intent: $e');
+      debugPrint('Error storing intent: $e');
       rethrow;
     }
   }
@@ -289,12 +293,13 @@ Examples:
       // Use GeminiService to generate actual embeddings
       return await _geminiService.generateEmbedding(text);
     } catch (e) {
-      print('Error generating embeddings: $e');
+      debugPrint('Error generating embeddings: $e');
       // Return random embeddings as fallback
       return List.generate(768, (i) => (i * 0.001) % 1);
     }
   }
 
+  // ignore: unused_element
   Future<List<Map<String, dynamic>>> _findComplementaryMatches(
     Map<String, dynamic> intentData,
   ) async {
@@ -319,7 +324,7 @@ Examples:
       // Get what user is looking for to find semantic matches
       final lookingFor =
           intentData['looking_for'] ?? intentData['description'] ?? '';
-      final tags = List<String>.from(intentData['tags'] ?? []);
+      final tags = List<String>.from(intentData['tags'] ?? []); // ignore: unused_local_variable
 
       // Generate embedding for semantic search
       final searchEmbedding = await _generateEmbeddings(lookingFor);
@@ -415,7 +420,7 @@ Examples:
 
       return matches.take(10).toList();
     } catch (e) {
-      print('Error finding matches: $e');
+      debugPrint('Error finding matches: $e');
       return [];
     }
   }
@@ -445,6 +450,7 @@ Examples:
     return degree * (3.14159265359 / 180);
   }
 
+  // ignore: unused_element
   double _calculateMatchScore(
     Map<String, dynamic> userIntent,
     Map<String, dynamic> matchIntent,
@@ -523,7 +529,7 @@ Examples:
   // UPDATED: Get user's active posts (changed from user_intents to posts)
   Future<List<Map<String, dynamic>>> getUserIntents(String userId) async {
     try {
-      print('📋 Getting user posts from posts collection');
+      debugPrint('📋 Getting user posts from posts collection');
 
       final querySnapshot = await _firestore
           .collection('posts')
@@ -538,7 +544,7 @@ Examples:
         return data;
       }).toList();
     } catch (e) {
-      print('❌ Error getting user posts: $e');
+      debugPrint('❌ Error getting user posts: $e');
       return [];
     }
   }
@@ -546,31 +552,31 @@ Examples:
   // UPDATED: Deactivate a post (uses posts collection)
   Future<void> deactivateIntent(String intentId) async {
     try {
-      print('🗑️ Deactivating post: $intentId');
+      debugPrint('🗑️ Deactivating post: $intentId');
       final unifiedService = UnifiedPostService();
       await unifiedService.deactivatePost(intentId);
-      print('✅ Post deactivated');
+      debugPrint('✅ Post deactivated');
     } catch (e) {
-      print('❌ Error deactivating post: $e');
+      debugPrint('❌ Error deactivating post: $e');
     }
   }
 
   // UPDATED: Permanently delete a post (uses posts collection)
   Future<bool> deleteIntent(String intentId) async {
     try {
-      print('🗑️ Deleting post: $intentId');
+      debugPrint('🗑️ Deleting post: $intentId');
       final unifiedService = UnifiedPostService();
       final result = await unifiedService.deletePost(intentId);
 
       if (result) {
-        print('✅ Post deleted successfully');
+        debugPrint('✅ Post deleted successfully');
       } else {
-        print('⚠️ Post deletion failed');
+        debugPrint('⚠️ Post deletion failed');
       }
 
       return result;
     } catch (e) {
-      print('❌ Error deleting post: $e');
+      debugPrint('❌ Error deleting post: $e');
       return false;
     }
   }

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/connection_service.dart';
@@ -386,7 +386,7 @@ class _MyConnectionsScreenState extends State<MyConnectionsScreen> {
                   onPressed: () => _rejectRequest(senderId),
                   icon: const Icon(Icons.close, color: Colors.red),
                   style: IconButton.styleFrom(
-                    backgroundColor: Colors.red.withOpacity(0.1),
+                    backgroundColor: Colors.red.withValues(alpha: 0.1),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -394,7 +394,7 @@ class _MyConnectionsScreenState extends State<MyConnectionsScreen> {
                   onPressed: () => _acceptRequest(senderId),
                   icon: const Icon(Icons.check, color: Color(0xFF00D67D)),
                   style: IconButton.styleFrom(
-                    backgroundColor: const Color(0xFF00D67D).withOpacity(0.1),
+                    backgroundColor: const Color(0xFF00D67D).withValues(alpha: 0.1),
                   ),
                 ),
               ],
@@ -473,7 +473,7 @@ class _MyConnectionsScreenState extends State<MyConnectionsScreen> {
                   ),
                   tooltip: 'Message',
                   style: IconButton.styleFrom(
-                    backgroundColor: const Color(0xFF00D67D).withOpacity(0.1),
+                    backgroundColor: const Color(0xFF00D67D).withValues(alpha: 0.1),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -485,7 +485,7 @@ class _MyConnectionsScreenState extends State<MyConnectionsScreen> {
                   ),
                   tooltip: 'Remove Connection',
                   style: IconButton.styleFrom(
-                    backgroundColor: Colors.red.withOpacity(0.1),
+                    backgroundColor: Colors.red.withValues(alpha: 0.1),
                   ),
                 ),
               ],

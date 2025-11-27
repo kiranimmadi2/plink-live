@@ -36,7 +36,7 @@ class SafeNetworkService {
                 ? i + MemoryManager.optimalBufferSize
                 : chunkSize;
 
-            final subChunk = chunk.sublist(i, end);
+            final subChunk = chunk.sublist(i, end); // ignore: unused_local_variable
 
             // Process sub-chunk
             await Future.delayed(

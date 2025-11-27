@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 class ConversationalClarificationDialog extends StatefulWidget {
@@ -75,7 +75,7 @@ class _ConversationalClarificationDialogState
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final isDark = theme.brightness == Brightness.dark; // ignore: unused_local_variable
 
     return AnimatedBuilder(
       animation: _animationController,
@@ -93,11 +93,11 @@ class _ConversationalClarificationDialogState
               child: Container(
                 constraints: const BoxConstraints(maxWidth: 400),
                 decoration: BoxDecoration(
-                  color: theme.dialogBackgroundColor,
+                  color: theme.dialogTheme.backgroundColor ?? theme.scaffoldBackgroundColor,
                   borderRadius: BorderRadius.circular(24),
                   boxShadow: [
                     BoxShadow(
-                      color: theme.primaryColor.withOpacity(0.2),
+                      color: theme.primaryColor.withValues(alpha: 0.2),
                       blurRadius: 20,
                       spreadRadius: 5,
                     ),
@@ -113,7 +113,7 @@ class _ConversationalClarificationDialogState
                         gradient: LinearGradient(
                           colors: [
                             theme.primaryColor,
-                            theme.primaryColor.withOpacity(0.8),
+                            theme.primaryColor.withValues(alpha: 0.8),
                           ],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
@@ -155,10 +155,10 @@ class _ConversationalClarificationDialogState
                               vertical: 6,
                             ),
                             decoration: BoxDecoration(
-                              color: theme.primaryColor.withOpacity(0.1),
+                              color: theme.primaryColor.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(20),
                               border: Border.all(
-                                color: theme.primaryColor.withOpacity(0.3),
+                                color: theme.primaryColor.withValues(alpha: 0.3),
                               ),
                             ),
                             child: Row(
@@ -200,7 +200,7 @@ class _ConversationalClarificationDialogState
                               widget.reason!,
                               style: theme.textTheme.bodySmall?.copyWith(
                                 color: theme.textTheme.bodySmall?.color
-                                    ?.withOpacity(0.7),
+                                    ?.withValues(alpha: 0.7),
                               ),
                             ),
                           ],
@@ -224,6 +224,7 @@ class _ConversationalClarificationDialogState
                                       Future.delayed(
                                         const Duration(milliseconds: 200),
                                         () {
+                                          // ignore: use_build_context_synchronously
                                           Navigator.of(context).pop(option);
                                         },
                                       );
@@ -239,7 +240,7 @@ class _ConversationalClarificationDialogState
                                       ),
                                       decoration: BoxDecoration(
                                         color: isSelected
-                                            ? theme.primaryColor.withOpacity(
+                                            ? theme.primaryColor.withValues(alpha: 
                                                 0.1,
                                               )
                                             : Colors.transparent,

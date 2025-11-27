@@ -1,3 +1,5 @@
+﻿import 'package:flutter/foundation.dart';
+
 class PhotoCacheService {
   static final PhotoCacheService _instance = PhotoCacheService._internal();
   factory PhotoCacheService() => _instance;
@@ -16,7 +18,7 @@ class PhotoCacheService {
   String? getCachedPhotoUrl(String userId) {
     final cached = _photoCache[userId];
     if (cached != null && !cached.isExpired) {
-      print('Photo cache hit for user: $userId');
+      debugPrint('Photo cache hit for user: $userId');
       return cached.url;
     }
 
@@ -39,7 +41,7 @@ class PhotoCacheService {
 
     _photoCache[userId] = CachedPhoto(url: photoUrl, timestamp: DateTime.now());
 
-    print('Cached photo for user: $userId');
+    debugPrint('Cached photo for user: $userId');
   }
 
   // Batch cache photo URLs
@@ -59,7 +61,7 @@ class PhotoCacheService {
   // Clear all cache
   void clearAllCache() {
     _photoCache.clear();
-    print('Photo cache cleared');
+    debugPrint('Photo cache cleared');
   }
 
   // Remove oldest cache entry

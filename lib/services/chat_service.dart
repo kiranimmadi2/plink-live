@@ -1,5 +1,6 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+﻿import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 
 /// ChatService - Handles all chat-related operations
 ///
@@ -13,7 +14,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 /// that a chat between two users always has the same ID, preventing duplicates.
 class ChatService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance; // ignore: unused_field
 
   // ═══════════════════════════════════════════════════════════════
   // 2️⃣ CHAT ID GENERATION FORMULA
@@ -44,7 +45,7 @@ class ChatService {
     // Join with underscore
     final chatId = '${sortedUids[0]}_${sortedUids[1]}';
 
-    print('ChatService: Generated chatId=$chatId for users $uid1 and $uid2');
+    debugPrint('ChatService: Generated chatId=$chatId for users $uid1 and $uid2');
     return chatId;
   }
 
@@ -78,7 +79,7 @@ class ChatService {
     String? otherUserPhoto,
   }) async {
     try {
-      print('ChatService: getOrCreateChat called for $myUid and $otherUid');
+      debugPrint('ChatService: getOrCreateChat called for $myUid and $otherUid');
 
       // STEP 1: Generate deterministic chat ID
       final chatId = generateChatId(myUid, otherUid);
@@ -91,13 +92,13 @@ class ChatService {
 
       if (chatSnapshot.exists) {
         // Chat already exists - just return the ID
-        print('ChatService: Chat already exists: $chatId');
+        debugPrint('ChatService: Chat already exists: $chatId');
         return chatId;
       }
 
       // STEP 3: Chat doesn't exist - create it using TRANSACTION
       // Transactions prevent race conditions when both users click simultaneously
-      print('ChatService: Creating new chat: $chatId');
+      debugPrint('ChatService: Creating new chat: $chatId');
 
       await _firestore.runTransaction((transaction) async {
         // Double-check within transaction (another user might have created it)
@@ -154,9 +155,9 @@ class ChatService {
             'isMuted': false,
           });
 
-          print('ChatService: Chat created successfully: $chatId');
+          debugPrint('ChatService: Chat created successfully: $chatId');
         } else {
-          print(
+          debugPrint(
             'ChatService: Chat was created by another transaction: $chatId',
           );
         }
@@ -164,7 +165,7 @@ class ChatService {
 
       return chatId;
     } catch (e) {
-      print('ChatService ERROR in getOrCreateChat: $e');
+      debugPrint('ChatService ERROR in getOrCreateChat: $e');
       rethrow;
     }
   }
@@ -216,9 +217,9 @@ class ChatService {
         'lastMessageTime': now,
       });
 
-      print('ChatService: Message sent successfully in chat $chatId');
+      debugPrint('ChatService: Message sent successfully in chat $chatId');
     } catch (e) {
-      print('ChatService ERROR in sendMessage: $e');
+      debugPrint('ChatService ERROR in sendMessage: $e');
       rethrow;
     }
   }
@@ -248,7 +249,7 @@ class ChatService {
       // Update unread count for this user
       await chatRef.update({'unreadCount.$userId': 0});
     } catch (e) {
-      print('ChatService ERROR in markMessagesAsRead: $e');
+      debugPrint('ChatService ERROR in markMessagesAsRead: $e');
     }
   }
 
@@ -268,9 +269,9 @@ class ChatService {
       // Delete the chat document
       await chatRef.delete();
 
-      print('ChatService: Chat deleted: $chatId');
+      debugPrint('ChatService: Chat deleted: $chatId');
     } catch (e) {
-      print('ChatService ERROR in deleteChat: $e');
+      debugPrint('ChatService ERROR in deleteChat: $e');
       rethrow;
     }
   }

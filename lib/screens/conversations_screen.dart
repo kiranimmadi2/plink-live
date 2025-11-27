@@ -503,6 +503,8 @@ class _ConversationsScreenState extends State<ConversationsScreen>
               otherUserId,
             );
 
+            if (!mounted) return;
+            // ignore: use_build_context_synchronously
             Navigator.push(
               context,
               MaterialPageRoute(
@@ -723,6 +725,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
     );
   }
 
+  // ignore: unused_element
   Widget _buildActiveUserCard(
     Map<String, dynamic> userData,
     String userId,

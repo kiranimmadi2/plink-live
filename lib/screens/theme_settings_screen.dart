@@ -195,7 +195,7 @@ class _ThemeSettingsScreenState extends ConsumerState<ThemeSettingsScreen>
                               children: [
                                 Row(
                                   children: [
-                                    Icon(
+                                    const Icon(
                                       CupertinoIcons.paintbrush_fill,
                                       color: AppColors.iosPurple,
                                     ),

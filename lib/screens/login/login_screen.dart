@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/gestures.dart';
 import '../../services/auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -21,9 +20,9 @@ class _LoginScreenState extends State<LoginScreen>
   bool _obscurePassword = true;
   bool _isSignUpMode = false;
   bool _rememberMe = false;
-  bool _acceptTerms = false;
-  String _passwordStrength = '';
-  Color _passwordStrengthColor = Colors.grey;
+  final bool _acceptTerms = false; // ignore: unused_field
+  String _passwordStrength = ''; // ignore: unused_field, prefer_final_fields
+  final Color _passwordStrengthColor = Colors.grey; // ignore: unused_field
 
   late AnimationController _animationController;
   late AnimationController _fadeController;
@@ -74,6 +73,7 @@ class _LoginScreenState extends State<LoginScreen>
       return;
     }
 
+    // ignore: unused_local_variable
     int strength = 0;
     if (password.length >= 8) strength++;
     if (password.contains(RegExp(r'[a-z]'))) strength++;
@@ -313,7 +313,7 @@ class _LoginScreenState extends State<LoginScreen>
           TextFormField(
             controller: _emailController,
             keyboardType: TextInputType.emailAddress,
-            cursorColor: Color.fromARGB(255, 247, 245, 245),
+            cursorColor: const Color.fromARGB(255, 247, 245, 245),
             textInputAction: TextInputAction.next,
             decoration: InputDecoration(
               labelText: 'Email',
@@ -367,7 +367,7 @@ class _LoginScreenState extends State<LoginScreen>
           TextFormField(
             controller: _passwordController,
             obscureText: _obscurePassword,
-            cursorColor: Color.fromARGB(255, 247, 245, 245),
+            cursorColor: const Color.fromARGB(255, 247, 245, 245),
             textInputAction: TextInputAction.done,
             onFieldSubmitted: (_) => _handleAuth(),
             decoration: InputDecoration(
@@ -562,7 +562,7 @@ class _LoginScreenState extends State<LoginScreen>
       child: ElevatedButton(
         onPressed: _isLoading ? null : _handleAuth,
         style: ElevatedButton.styleFrom(
-          backgroundColor: Color.fromARGB(255, 141, 112, 112),
+          backgroundColor: const Color.fromARGB(255, 141, 112, 112),
           foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
@@ -601,8 +601,8 @@ class _LoginScreenState extends State<LoginScreen>
           text: _isSignUpMode
               ? 'Already have an account? '
               : "Don't have an account? ",
-          style: TextStyle(
-            color: const Color.fromARGB(255, 238, 237, 237),
+          style: const TextStyle(
+            color: Color.fromARGB(255, 238, 237, 237),
             fontSize: 14,
           ),
           children: [
@@ -670,7 +670,7 @@ class _LoginScreenState extends State<LoginScreen>
                 borderRadius: BorderRadius.circular(16),
               ),
               side: BorderSide(color: Colors.grey[300]!),
-              backgroundColor: Color.fromARGB(255, 141, 112, 112),
+              backgroundColor: const Color.fromARGB(255, 141, 112, 112),
             ),
           ),
         ),

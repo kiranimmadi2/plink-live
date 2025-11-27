@@ -4,7 +4,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'notification_service.dart';
 import 'gemini_service.dart';
-import '../models/user_profile.dart';
 
 class RealtimeMatchingService {
   static final RealtimeMatchingService _instance =
@@ -55,6 +54,7 @@ class RealtimeMatchingService {
     debugPrint('✅ Listening for new posts in real-time');
   }
 
+  // ignore: unused_element
   Future<void> _checkIntentMatch(
     DocumentSnapshot newIntent,
     String currentUserId,

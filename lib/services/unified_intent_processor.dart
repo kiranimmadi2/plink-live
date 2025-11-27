@@ -5,7 +5,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'gemini_service.dart';
 import 'universal_intent_service.dart';
 import 'intent_clarification_service.dart';
-import '../models/user_profile.dart';
 
 class UnifiedIntentProcessor {
   static final UnifiedIntentProcessor _instance =
@@ -15,10 +14,10 @@ class UnifiedIntentProcessor {
 
   final GeminiService _geminiService = GeminiService();
   final UniversalIntentService _universalService = UniversalIntentService();
-  final IntentClarificationService _clarificationService =
+  final IntentClarificationService _clarificationService = // ignore: unused_field
       IntentClarificationService();
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance; // ignore: unused_field
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance; // ignore: unused_field
 
   // Clarification patterns for common ambiguous inputs
   final Map<String, List<String>> _clarificationPatterns = {
@@ -160,7 +159,7 @@ If the intent is clear enough to find matches (even if not perfect), set needsCl
     if (clarification != null && clarification['needsClarification'] == true) {
       // Show clarification dialog
       final answer = await showDialog<String>(
-        context: context,
+        context: context, // ignore: use_build_context_synchronously
         barrierDismissible: false,
         builder: (BuildContext context) {
           return AlertDialog(

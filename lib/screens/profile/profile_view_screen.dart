@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../models/post_model.dart';
 import '../../models/user_profile.dart';
@@ -105,8 +105,8 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
     final profileImage = widget.userProfile.profileImageUrl;
 
     // Debug logging
-    print('Profile Image URL: $profileImage');
-    print('Post Images: $images');
+    debugPrint('Profile Image URL: $profileImage');
+    debugPrint('Post Images: $images');
 
     final allImages = <String>[];
 
@@ -154,7 +154,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
             itemCount: allImages.length,
             itemBuilder: (context, index) {
               final imageUrl = allImages[index];
-              print('Loading image at index $index: $imageUrl');
+              debugPrint('Loading image at index $index: $imageUrl');
 
               // Validate URL before loading
               if (imageUrl.isEmpty) {
@@ -188,8 +188,8 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
                   child: const Center(child: CircularProgressIndicator()),
                 ),
                 errorWidget: (context, url, error) {
-                  print('Error loading image: $url');
-                  print('Error details: $error');
+                  debugPrint('Error loading image: $url');
+                  debugPrint('Error details: $error');
                   return Container(
                     color: Colors.grey.shade300,
                     child: Center(

@@ -1,10 +1,9 @@
-import 'dart:ui';
+﻿import 'dart:ui';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../services/universal_intent_service.dart';
@@ -13,7 +12,6 @@ import '../../services/activity_migration_service.dart';
 import '../../widgets/user_avatar.dart';
 import '../../providers/theme_provider.dart';
 import '../login/login_screen.dart';
-import 'profile_edit_screen.dart';
 import 'profile_view_screen.dart';
 import 'settings_screen.dart';
 import '../enhanced_chat_screen.dart';
@@ -260,7 +258,7 @@ class _ProfileWithHistoryScreenState
         });
 
         // Debug logging disabled for production
-        // print('User profile loaded: city=${userData?['city']}, location=${userData?['location']}, interests=$_selectedInterests');
+        // debugPrint('User profile loaded: city=${userData?['city']}, location=${userData?['location']}, interests=$_selectedInterests');
 
         // Always load nearby people (filters can be applied via filter dialog)
         _loadNearbyPeople();
@@ -293,7 +291,7 @@ class _ProfileWithHistoryScreenState
           });
         }
       } catch (e) {
-        print('Error loading search history: $e');
+        debugPrint('Error loading search history: $e');
       }
 
       if (mounted) {
@@ -302,7 +300,7 @@ class _ProfileWithHistoryScreenState
         });
       }
     } catch (e) {
-      print('Error loading user data: $e');
+      debugPrint('Error loading user data: $e');
       if (mounted) {
         setState(() {
           _error = 'Error loading profile data';
@@ -352,7 +350,7 @@ class _ProfileWithHistoryScreenState
       if (userId == null) return;
 
       final userCity = _userProfile?['city'];
-      final userLocation = _userProfile?['location'];
+      final userLocation = _userProfile?['location']; // ignore: unused_local_variable
 
       // Build query based on filters
       Query<Map<String, dynamic>> usersQuery = _firestore.collection('users');
@@ -431,7 +429,7 @@ class _ProfileWithHistoryScreenState
         });
       }
     } catch (e) {
-      print('Error loading nearby people: $e');
+      debugPrint('Error loading nearby people: $e');
       if (mounted) {
         setState(() {
           _isLoadingPeople = false;
@@ -461,7 +459,7 @@ class _ProfileWithHistoryScreenState
       // Reload nearby people
       _loadNearbyPeople();
     } catch (e) {
-      print('Error updating interests: $e');
+      debugPrint('Error updating interests: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -715,6 +713,7 @@ class _ProfileWithHistoryScreenState
     );
   }
 
+  // ignore: unused_element
   Future<void> _logout() async {
     HapticFeedback.mediumImpact();
 
@@ -749,12 +748,14 @@ class _ProfileWithHistoryScreenState
     }
   }
 
+  // ignore: unused_element
   void _toggleEditMode() {
     setState(() {
       _isEditMode = !_isEditMode;
     });
   }
 
+  // ignore: unused_element
   Future<void> _saveProfile() async {
     final userId = _auth.currentUser?.uid;
     if (userId == null) return;
@@ -787,7 +788,7 @@ class _ProfileWithHistoryScreenState
         _loadUserData();
       }
     } catch (e) {
-      print('Error updating profile: $e');
+      debugPrint('Error updating profile: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -1106,9 +1107,7 @@ class _ProfileWithHistoryScreenState
                                                   _loadUserData();
 
                                                   if (mounted) {
-                                                    ScaffoldMessenger.of(
-                                                      context,
-                                                    ).showSnackBar(
+                                                    ScaffoldMessenger.of(context).showSnackBar( // ignore: use_build_context_synchronously
                                                       const SnackBar(
                                                         content: Text(
                                                           'Location updated successfully',
@@ -1120,9 +1119,7 @@ class _ProfileWithHistoryScreenState
                                                   }
                                                 } else {
                                                   if (mounted) {
-                                                    ScaffoldMessenger.of(
-                                                      context,
-                                                    ).showSnackBar(
+                                                    ScaffoldMessenger.of(context).showSnackBar( // ignore: use_build_context_synchronously
                                                       const SnackBar(
                                                         content: Text(
                                                           'Could not update location',
@@ -1134,13 +1131,11 @@ class _ProfileWithHistoryScreenState
                                                   }
                                                 }
                                               } catch (e) {
-                                                print(
+                                                debugPrint(
                                                   'Error during manual location update: $e',
                                                 );
                                                 if (mounted) {
-                                                  ScaffoldMessenger.of(
-                                                    context,
-                                                  ).showSnackBar(
+                                                  ScaffoldMessenger.of(context).showSnackBar( // ignore: use_build_context_synchronously
                                                     const SnackBar(
                                                       content: Text(
                                                         'Location update failed',
@@ -1316,6 +1311,7 @@ class _ProfileWithHistoryScreenState
     );
   }
 
+  // ignore: unused_element
   Widget _buildConnectionTypesSection(bool isDarkMode, bool isGlass) {
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
@@ -1415,6 +1411,7 @@ class _ProfileWithHistoryScreenState
     );
   }
 
+  // ignore: unused_element
   Widget _buildActivitiesSection(bool isDarkMode, bool isGlass) {
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
@@ -1551,6 +1548,7 @@ class _ProfileWithHistoryScreenState
                                       'activities': _selectedActivities,
                                     });
                                 if (mounted) {
+                                  // ignore: use_build_context_synchronously
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
                                       content: Text('Deleted $activity'),
@@ -1559,6 +1557,7 @@ class _ProfileWithHistoryScreenState
                                 }
                               } catch (e) {
                                 if (mounted) {
+                                  // ignore: use_build_context_synchronously
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
                                       content: Text(
@@ -1604,6 +1603,7 @@ class _ProfileWithHistoryScreenState
     );
   }
 
+  // ignore: unused_element
   Widget _buildAboutSection(bool isDarkMode, bool isGlass) {
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
@@ -1669,6 +1669,7 @@ class _ProfileWithHistoryScreenState
     );
   }
 
+  // ignore: unused_element
   Widget _buildInterestsSection(bool isDarkMode, bool isGlass) {
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
@@ -1820,13 +1821,15 @@ class _ProfileWithHistoryScreenState
       final result = await _migrationService.migrateCurrentUserActivities();
 
       if (mounted) {
+        // ignore: use_build_context_synchronously
         Navigator.pop(context); // Close loading dialog
 
         if (result['success']) {
           // Reload profile data
           await _loadUserData();
 
-          showDialog(
+          if (!mounted) return;
+          showDialog( // ignore: use_build_context_synchronously
             context: context,
             builder: (context) => AlertDialog(
               title: const Text('Migration Complete'),
@@ -1991,6 +1994,7 @@ class _ProfileWithHistoryScreenState
                 if (!mounted) return;
 
                 if (success) {
+                  // ignore: use_build_context_synchronously
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('Search history deleted successfully'),
@@ -1999,6 +2003,7 @@ class _ProfileWithHistoryScreenState
                   );
                   _loadUserData();
                 } else {
+                  // ignore: use_build_context_synchronously
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('Failed to delete search history'),
@@ -2109,11 +2114,13 @@ class _ProfileWithHistoryScreenState
     ];
   }
 
+  // ignore: unused_element
   Widget _buildHistoryTab(bool isDarkMode, bool isGlass) {
     // This method is kept for compatibility but uses the sliver version
     return const SizedBox.shrink();
   }
 
+  // ignore: unused_element
   Widget _buildLiveConnectTab(bool isDarkMode, bool isGlass) {
     // Show empty state only if interest filter is on AND no interests selected
     if (_filterByInterests && _selectedInterests.isEmpty) {
@@ -2223,7 +2230,7 @@ class _ProfileWithHistoryScreenState
         final person = _nearbyPeople[index];
         final userData = person['userData'] as Map<String, dynamic>;
         final commonInterests = person['commonInterests'] as List<String>;
-        final matchScore = person['matchScore'] as double;
+        final matchScore = person['matchScore'] as double; // ignore: unused_local_variable
 
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
@@ -2379,6 +2386,7 @@ class _ProfileWithHistoryScreenState
     );
   }
 
+  // ignore: unused_element
   Color _getMatchColor(double score) {
     if (score >= 0.8) return Colors.green;
     if (score >= 0.6) return Colors.orange;

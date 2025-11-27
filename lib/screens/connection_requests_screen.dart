@@ -131,7 +131,7 @@ class _ConnectionRequestsScreenState extends State<ConnectionRequestsScreen> {
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.08),
+                      color: Colors.black.withValues(alpha: 0.08),
                       blurRadius: 8,
                       offset: const Offset(0, 2),
                     ),
@@ -201,9 +201,7 @@ class _ConnectionRequestsScreenState extends State<ConnectionRequestsScreen> {
                                           .acceptConnectionRequest(requestId);
 
                                       if (mounted) {
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
+                                        ScaffoldMessenger.of(context).showSnackBar( // ignore: use_build_context_synchronously
                                           SnackBar(
                                             content: Row(
                                               children: [
@@ -267,9 +265,7 @@ class _ConnectionRequestsScreenState extends State<ConnectionRequestsScreen> {
                                           .rejectConnectionRequest(requestId);
 
                                       if (mounted) {
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
+                                        ScaffoldMessenger.of(context).showSnackBar( // ignore: use_build_context_synchronously
                                           SnackBar(
                                             content: Text(
                                               result['success']
