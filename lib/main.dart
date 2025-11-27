@@ -33,11 +33,34 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   debugPrint('Background message received: ${message.messageId}');
 }
 
+/// Validate that Firebase configuration is loaded from .env
+void _validateFirebaseConfig() {
+  final projectId = dotenv.env['FIREBASE_WEB_PROJECT_ID'];
+  final apiKey = dotenv.env['FIREBASE_ANDROID_API_KEY'] ?? dotenv.env['FIREBASE_WEB_API_KEY'];
+
+  if (projectId == null || projectId.isEmpty) {
+    debugPrint('⚠️ WARNING: Firebase project ID is missing!');
+    debugPrint('   Please ensure .env file exists with FIREBASE_WEB_PROJECT_ID');
+  }
+
+  if (apiKey == null || apiKey.isEmpty) {
+    debugPrint('⚠️ WARNING: Firebase API key is missing!');
+    debugPrint('   Please ensure .env file exists with FIREBASE_ANDROID_API_KEY or FIREBASE_WEB_API_KEY');
+  }
+
+  if ((projectId?.isNotEmpty ?? false) && (apiKey?.isNotEmpty ?? false)) {
+    debugPrint('✓ Firebase configuration loaded successfully');
+  }
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Load environment variables
   await dotenv.load(fileName: ".env");
+
+  // Validate Firebase configuration
+  _validateFirebaseConfig();
 
   // Initialize Firebase only once
   if (Firebase.apps.isEmpty) {
@@ -136,16 +159,22 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
   bool _hasInitializedServices = false;
   String? _lastInitializedUserId;
+  bool _isInitializing = false;
 
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<User?>(
       stream: _authService.authStateChanges,
       builder: (context, snapshot) {
+        // Show loading only on initial connection
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
+          return _buildLoadingScreen();
+        }
+
+        // Handle errors in auth stream
+        if (snapshot.hasError) {
+          debugPrint('AuthWrapper: Auth stream error: ${snapshot.error}');
+          return _buildErrorScreen(snapshot.error.toString());
         }
 
         if (snapshot.hasData && snapshot.data != null) {
@@ -154,12 +183,17 @@ class _AuthWrapperState extends State<AuthWrapper> {
           // Initialize user-dependent services only once per session
           if (!_hasInitializedServices ||
               _lastInitializedUserId != currentUserId) {
-            _hasInitializedServices = true;
-            _lastInitializedUserId = currentUserId;
+            if (!_isInitializing) {
+              _isInitializing = true;
+              _hasInitializedServices = true;
+              _lastInitializedUserId = currentUserId;
 
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              _initializeUserServices();
-            });
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                _initializeUserServices().then((_) {
+                  _isInitializing = false;
+                });
+              });
+            }
           }
 
           return const MainNavigationScreen();
@@ -168,19 +202,99 @@ class _AuthWrapperState extends State<AuthWrapper> {
         // Reset when user logs out
         _hasInitializedServices = false;
         _lastInitializedUserId = null;
+        _isInitializing = false;
 
         return const LoginScreen();
       },
     );
   }
 
+  Widget _buildLoadingScreen() {
+    return Scaffold(
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Colors.blue.shade400,
+              Colors.purple.shade400,
+            ],
+          ),
+        ),
+        child: const Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(color: Colors.white),
+              SizedBox(height: 16),
+              Text(
+                'Loading...',
+                style: TextStyle(color: Colors.white, fontSize: 16),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorScreen(String error) {
+    return Scaffold(
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, size: 64, color: Colors.red),
+              const SizedBox(height: 16),
+              const Text(
+                'Something went wrong',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                error,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.grey),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: () {
+                  setState(() {});
+                },
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _initializeUserServices() async {
     try {
-      await _profileService.ensureProfileExists();
+      debugPrint('AuthWrapper: Initializing user services...');
+
+      // Ensure profile exists with timeout
+      try {
+        await _profileService.ensureProfileExists().timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {
+            debugPrint('⚠️ Profile service timed out');
+          },
+        );
+      } catch (e) {
+        debugPrint('⚠️ Profile service error (non-fatal): $e');
+      }
+
       await Future.delayed(const Duration(milliseconds: 100));
       _locationService.initializeLocation();
       _locationService.startPeriodicLocationUpdates();
       _conversationService.cleanupDuplicateConversations();
+
+      debugPrint('✓ AuthWrapper: User services initialized');
     } catch (e) {
       debugPrint('Error initializing user services: $e');
     }

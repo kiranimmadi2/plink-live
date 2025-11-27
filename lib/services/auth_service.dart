@@ -3,10 +3,15 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import '../utils/photo_url_helper.dart';
+import 'location_service.dart';
+import 'user_manager.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   static final GoogleSignIn _googleSignIn = GoogleSignIn();
+
+  // Timeout for profile operations to prevent hanging
+  static const Duration _profileTimeout = Duration(seconds: 10);
 
   User? get currentUser => _auth.currentUser;
 
@@ -18,42 +23,21 @@ class AuthService {
         email: email,
         password: password,
       );
-      
-      // Update last seen and ensure profile exists
+
+      // Update profile with timeout - don't block login indefinitely
       if (result.user != null) {
         final user = result.user!;
-        
-        // Check if profile exists
-        final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
-        
-        if (!doc.exists) {
-          // Create profile if it doesn't exist
-          await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-            'uid': user.uid,
-            'email': user.email ?? email,
-            'name': user.displayName ?? email.split('@')[0],
-            'profileImageUrl': user.photoURL,
-            'photoUrl': user.photoURL,
-            'createdAt': FieldValue.serverTimestamp(),
-            'lastSeen': FieldValue.serverTimestamp(),
-            'isOnline': true,
-            'discoveryModeEnabled': true, // Enable Live Connect discovery by default
-            'interests': [], // Initialize empty interests
-            'connections': [], // Initialize empty connections
-            'connectionCount': 0,
-            'blockedUsers': [], // Initialize empty blocked users
-            'connectionTypes': [], // Initialize empty connection types
-            'activities': [], // Initialize empty activities
+        try {
+          await _updateUserProfileOnLogin(user, email)
+              .timeout(_profileTimeout, onTimeout: () {
+            debugPrint('⚠️ Profile update timed out, continuing with login');
           });
-        } else {
-          // Just update last seen
-          await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
-            'lastSeen': FieldValue.serverTimestamp(),
-            'isOnline': true,
-          });
+        } catch (e) {
+          // Log but don't fail login
+          debugPrint('⚠️ Profile update failed (non-fatal): $e');
         }
       }
-      
+
       return result.user;
     } on FirebaseAuthException catch (e) {
       String message;
@@ -88,29 +72,21 @@ class AuthService {
         email: email,
         password: password,
       );
-      
-      // Create initial Firestore profile for email signup
+
+      // Create profile with timeout - essential for new users
       if (result.user != null) {
         final user = result.user!;
-        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-          'uid': user.uid,
-          'name': email.split('@')[0], // Use email prefix as initial name
-          'email': user.email ?? email,
-          'profileImageUrl': null,
-          'photoUrl': null, // Keep for backward compatibility
-          'lastSeen': FieldValue.serverTimestamp(),
-          'createdAt': FieldValue.serverTimestamp(),
-          'isOnline': true,
-          'discoveryModeEnabled': true, // Enable Live Connect discovery by default
-          'interests': [], // Initialize empty interests
-          'connections': [], // Initialize empty connections
-          'connectionCount': 0,
-          'blockedUsers': [], // Initialize empty blocked users
-          'connectionTypes': [], // Initialize empty connection types
-          'activities': [], // Initialize empty activities
-        }, SetOptions(merge: true));
+        try {
+          await _createNewUserProfile(user, email)
+              .timeout(_profileTimeout, onTimeout: () {
+            debugPrint('⚠️ Profile creation timed out, continuing with signup');
+          });
+        } catch (e) {
+          // Log but don't fail signup - profile will be created on next login
+          debugPrint('⚠️ Profile creation failed (non-fatal): $e');
+        }
       }
-      
+
       return result.user;
     } on FirebaseAuthException catch (e) {
       String message;
@@ -138,16 +114,20 @@ class AuthService {
 
   Future<User?> signInWithGoogle() async {
     try {
-      // Check if already signed in
-      await _googleSignIn.signOut();
-      
-      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-      
+      // Try silent sign-in first (better UX if user already signed in)
+      GoogleSignInAccount? googleUser = await _googleSignIn.signInSilently();
+
+      // If silent fails, show account picker
       if (googleUser == null) {
+        googleUser = await _googleSignIn.signIn();
+      }
+
+      if (googleUser == null) {
+        // User cancelled
         return null;
       }
 
-      final GoogleSignInAuthentication googleAuth = 
+      final GoogleSignInAuthentication googleAuth =
           await googleUser.authentication;
 
       final credential = GoogleAuthProvider.credential(
@@ -155,52 +135,24 @@ class AuthService {
         idToken: googleAuth.idToken,
       );
 
-      final UserCredential result = 
+      final UserCredential result =
           await _auth.signInWithCredential(credential);
-      
-      // Save Google profile photo URL to Firestore
+
+      // Update Google profile with timeout
       if (result.user != null) {
         final user = result.user!;
-        
-        // Fix Google photo URL to get higher quality version
         String? photoUrl = user.photoURL ?? googleUser.photoUrl;
         photoUrl = PhotoUrlHelper.getHighQualityGooglePhoto(photoUrl);
-        
-        // Check if this is a new user or existing user
-        final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
-        final isNewUser = !doc.exists;
-
-        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-          'uid': user.uid,
-          'name': user.displayName ?? googleUser.displayName ?? '',
-          'email': user.email ?? googleUser.email,
-          'profileImageUrl': photoUrl,
-          'photoUrl': photoUrl, // Keep for backward compatibility
-          'lastSeen': FieldValue.serverTimestamp(),
-          if (isNewUser) 'createdAt': FieldValue.serverTimestamp(),
-          'isOnline': true,
-          // Only set these for new users to avoid overwriting existing values
-          if (isNewUser) ...{
-            'discoveryModeEnabled': true, // Enable Live Connect discovery by default
-            'interests': [], // Initialize empty interests
-            'connections': [], // Initialize empty connections
-            'connectionCount': 0,
-            'blockedUsers': [], // Initialize empty blocked users
-            'connectionTypes': [], // Initialize empty connection types
-            'activities': [], // Initialize empty activities
-          },
-        }, SetOptions(merge: true));
-        
-        // Also update the auth profile with fixed URL
-        if (photoUrl != null && photoUrl != user.photoURL) {
-          try {
-            await user.updatePhotoURL(photoUrl);
-          } catch (e) {
-            debugPrint('Could not update auth photo URL: $e');
-          }
+        try {
+          await _updateGoogleUserProfile(user, googleUser, photoUrl)
+              .timeout(_profileTimeout, onTimeout: () {
+            debugPrint('⚠️ Google profile update timed out, continuing with login');
+          });
+        } catch (e) {
+          debugPrint('⚠️ Google profile update failed (non-fatal): $e');
         }
       }
-      
+
       return result.user;
     } on FirebaseAuthException catch (e) {
       String message;
@@ -231,18 +183,48 @@ class AuthService {
       // Update user's online status to false before signing out
       final user = _auth.currentUser;
       if (user != null) {
-        await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
-          'isOnline': false,
-          'lastSeen': FieldValue.serverTimestamp(),
-        });
+        try {
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .update({
+            'isOnline': false,
+            'lastSeen': FieldValue.serverTimestamp(),
+          }).timeout(const Duration(seconds: 5));
+        } catch (e) {
+          debugPrint('⚠️ Failed to update online status on logout: $e');
+        }
       }
-      
+
+      // Clear all service states
+      _clearAllServices();
+
+      // Sign out from Firebase and Google
       await Future.wait([
         _auth.signOut(),
         _googleSignIn.signOut(),
       ]);
+
+      debugPrint('✓ User signed out successfully');
     } catch (e) {
+      // Still try to clear services even if signout fails
+      _clearAllServices();
       throw Exception('Sign out failed: ${e.toString()}');
+    }
+  }
+
+  /// Clear all service states on logout
+  void _clearAllServices() {
+    try {
+      // Reset location service
+      LocationService().reset();
+
+      // Clear user manager cache
+      UserManager().signOut();
+
+      debugPrint('✓ All services cleared');
+    } catch (e) {
+      debugPrint('⚠️ Error clearing services: $e');
     }
   }
 
@@ -416,6 +398,120 @@ class AuthService {
     } catch (e) {
       // Don't fail the password change if logging fails
       debugPrint('Failed to record password change: $e');
+    }
+  }
+
+  /// Create new user profile on signup
+  Future<void> _createNewUserProfile(User user, String email) async {
+    try {
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+        'uid': user.uid,
+        'name': email.split('@')[0],
+        'email': user.email ?? email,
+        'profileImageUrl': null,
+        'photoUrl': null,
+        'lastSeen': FieldValue.serverTimestamp(),
+        'createdAt': FieldValue.serverTimestamp(),
+        'isOnline': true,
+        'discoveryModeEnabled': true,
+        'interests': [],
+        'connections': [],
+        'connectionCount': 0,
+        'blockedUsers': [],
+        'connectionTypes': [],
+        'activities': [],
+      }, SetOptions(merge: true));
+      debugPrint('✓ New user profile created');
+    } catch (e) {
+      debugPrint('⚠️ Failed to create profile on signup: $e');
+      rethrow;
+    }
+  }
+
+  /// Update user profile on login
+  Future<void> _updateUserProfileOnLogin(User user, String email) async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+      if (!doc.exists) {
+        // Create profile if it doesn't exist
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+          'uid': user.uid,
+          'email': user.email ?? email,
+          'name': user.displayName ?? email.split('@')[0],
+          'profileImageUrl': user.photoURL,
+          'photoUrl': user.photoURL,
+          'createdAt': FieldValue.serverTimestamp(),
+          'lastSeen': FieldValue.serverTimestamp(),
+          'isOnline': true,
+          'discoveryModeEnabled': true,
+          'interests': [],
+          'connections': [],
+          'connectionCount': 0,
+          'blockedUsers': [],
+          'connectionTypes': [],
+          'activities': [],
+        });
+      } else {
+        // Just update last seen
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+          'lastSeen': FieldValue.serverTimestamp(),
+          'isOnline': true,
+        });
+      }
+      debugPrint('✓ User profile updated on login');
+    } catch (e) {
+      debugPrint('⚠️ Failed to update profile on login: $e');
+      rethrow;
+    }
+  }
+
+  /// Update Google user profile on login
+  Future<void> _updateGoogleUserProfile(
+      User user, GoogleSignInAccount googleUser, String? photoUrl) async {
+    try {
+      // Check if this is a new user or existing user
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      final isNewUser = !doc.exists;
+
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+        'uid': user.uid,
+        'name': user.displayName ?? googleUser.displayName ?? '',
+        'email': user.email ?? googleUser.email,
+        'profileImageUrl': photoUrl,
+        'photoUrl': photoUrl,
+        'lastSeen': FieldValue.serverTimestamp(),
+        if (isNewUser) 'createdAt': FieldValue.serverTimestamp(),
+        'isOnline': true,
+        if (isNewUser) ...{
+          'discoveryModeEnabled': true,
+          'interests': [],
+          'connections': [],
+          'connectionCount': 0,
+          'blockedUsers': [],
+          'connectionTypes': [],
+          'activities': [],
+        },
+      }, SetOptions(merge: true));
+
+      // Also update the auth profile with fixed URL
+      if (photoUrl != null && photoUrl != user.photoURL) {
+        try {
+          await user.updatePhotoURL(photoUrl);
+        } catch (e) {
+          debugPrint('Could not update auth photo URL: $e');
+        }
+      }
+      debugPrint('✓ Google user profile updated on login');
+    } catch (e) {
+      debugPrint('⚠️ Failed to update Google profile on login: $e');
+      rethrow;
     }
   }
 }
