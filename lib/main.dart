@@ -56,6 +56,20 @@ void _validateFirebaseConfig() {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Set up global error handling for image decode errors
+  FlutterError.onError = (FlutterErrorDetails details) {
+    final exception = details.exception;
+    // Suppress image decode errors - they're non-fatal
+    if (exception.toString().contains('ImageDecoder') ||
+        exception.toString().contains('Failed to decode image') ||
+        exception.toString().contains('codec')) {
+      debugPrint('⚠️ Image decode error (suppressed): ${details.exceptionAsString()}');
+      return; // Don't propagate
+    }
+    // For other errors, use default handler
+    FlutterError.presentError(details);
+  };
+
   // Load environment variables
   await dotenv.load(fileName: ".env");
 
@@ -91,39 +105,46 @@ void main() async {
     );
   }
 
-  // FCM background handler
+  // Run app immediately - defer ALL heavy initializations
+  runApp(const ProviderScope(child: MyApp()));
+
+  // Defer all non-critical initialization to AFTER first frame
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    _initializeServicesInBackground();
+  });
+}
+
+/// Initialize non-critical services after app has started rendering
+Future<void> _initializeServicesInBackground() async {
+  // Longer delay to let UI fully render and become responsive
+  await Future.delayed(const Duration(milliseconds: 500));
+
+  // FCM background handler - set up after app is responsive
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
-  // Initialize utilities and services
+  // Initialize utilities in sequence with small delays to prevent jank
   await AppOptimizer.initialize();
+  await Future.delayed(const Duration(milliseconds: 50));
+
   MemoryManager().initialize();
+  await Future.delayed(const Duration(milliseconds: 50));
+
   UserManager().initialize();
-  await NotificationService().initialize();
-  await ConnectivityService().initialize();
+  await Future.delayed(const Duration(milliseconds: 50));
 
-  // Run user migration
-  try {
-    final userMigration = UserMigrationService();
-    await userMigration.checkAndRunMigration();
-  } catch (e) {
-    debugPrint('User migration failed (non-fatal): $e');
-  }
+  // Initialize notification service (can run in parallel, but don't block)
+  unawaited(NotificationService().initialize().catchError((e) {
+    debugPrint('NotificationService init error (non-fatal): $e');
+  }));
 
-  // Run conversation migration
-  try {
-    final conversationMigration = ConversationMigrationService();
-    final isCompleted = await conversationMigration.isMigrationCompleted();
-    if (!isCompleted) {
-      final result = await conversationMigration.runMigration();
-      debugPrint('Conversation migration result: $result');
-    } else {
-      debugPrint('Conversation migration already completed');
-    }
-  } catch (e) {
-    debugPrint('Conversation migration failed (non-fatal): $e');
-  }
+  // Initialize connectivity service after a small delay
+  await Future.delayed(const Duration(milliseconds: 100));
+  unawaited(ConnectivityService().initialize().catchError((e) {
+    debugPrint('ConnectivityService init error (non-fatal): $e');
+  }));
 
-  runApp(const ProviderScope(child: MyApp()));
+  // NOTE: Migrations are now run in AuthWrapper._initializeUserServices()
+  // after the user is authenticated to avoid permission errors
 }
 
 class MyApp extends ConsumerWidget {
@@ -294,9 +315,37 @@ class _AuthWrapperState extends State<AuthWrapper> {
       _locationService.startPeriodicLocationUpdates();
       _conversationService.cleanupDuplicateConversations();
 
+      // Run migrations now that user is authenticated
+      _runMigrationsInBackground();
+
       debugPrint('✓ AuthWrapper: User services initialized');
     } catch (e) {
       debugPrint('Error initializing user services: $e');
     }
+  }
+
+  /// Run database migrations in background after user is authenticated
+  void _runMigrationsInBackground() {
+    Future.delayed(const Duration(milliseconds: 300), () async {
+      // Run user migration
+      try {
+        final userMigration = UserMigrationService();
+        await userMigration.checkAndRunMigration();
+      } catch (e) {
+        debugPrint('User migration failed (non-fatal): $e');
+      }
+
+      // Run conversation migration
+      try {
+        final conversationMigration = ConversationMigrationService();
+        final isCompleted = await conversationMigration.isMigrationCompleted();
+        if (!isCompleted) {
+          final result = await conversationMigration.runMigration();
+          debugPrint('Conversation migration result: $result');
+        }
+      } catch (e) {
+        debugPrint('Conversation migration failed (non-fatal): $e');
+      }
+    });
   }
 }
