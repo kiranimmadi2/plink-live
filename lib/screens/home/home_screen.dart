@@ -1,4 +1,5 @@
 ﻿import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -13,6 +14,7 @@ import '../../services/photo_cache_service.dart';
 import '../../widgets/floating_particles.dart';
 import 'package:lottie/lottie.dart';
 
+@immutable
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -30,16 +32,13 @@ class _HomeScreenState extends State<HomeScreen>
 
   final TextEditingController _intentController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
+  final ScrollController _voiceScrollController = ScrollController();
 
   bool _isSearchFocused = false;
   bool _isProcessing = false;
 
   List<String> _suggestions = [];
-  bool _hasText = false; // ignore: unused_field
   List<Map<String, dynamic>> _matches = [];
-  List<Map<String, dynamic>> _userIntents = []; // ignore: unused_field
-  Map<String, dynamic>? _currentIntent; // ignore: unused_field
-  String? _errorMessage; // ignore: unused_field
   String _currentUserName = '';
 
   late AnimationController _controller;
@@ -47,8 +46,6 @@ class _HomeScreenState extends State<HomeScreen>
   late Timer _timer;
 
   final List<Map<String, dynamic>> _conversation = [];
-  bool _showChatResponse = false; // ignore: unused_field
-  String _currentResponse = ''; // ignore: unused_field
 
   // Voice recording state
   bool _isRecording = false;
@@ -77,9 +74,7 @@ class _HomeScreenState extends State<HomeScreen>
     });
 
     _intentController.addListener(() {
-      setState(() {
-        _hasText = _intentController.text.isNotEmpty;
-      });
+      setState(() {});
     });
 
     _conversation.add({
@@ -97,6 +92,7 @@ class _HomeScreenState extends State<HomeScreen>
     _realtimeService.dispose();
     _controller.dispose();
     _timer.cancel();
+    _voiceScrollController.dispose();
     super.dispose();
   }
 
@@ -120,9 +116,7 @@ class _HomeScreenState extends State<HomeScreen>
     final userId = _auth.currentUser?.uid;
     if (userId != null) {
       final intents = await _intentService.getUserIntents(userId);
-      setState(() {
-        _userIntents = intents;
-      });
+      setState(() {});
     }
   }
 
@@ -139,7 +133,6 @@ class _HomeScreenState extends State<HomeScreen>
         'timestamp': DateTime.now(),
       });
       _isProcessing = true;
-      _showChatResponse = true;
     });
 
     _intentController.clear();
@@ -155,7 +148,6 @@ class _HomeScreenState extends State<HomeScreen>
         'timestamp': DateTime.now(),
       });
       _isProcessing = false;
-      _currentResponse = aiResponse;
     });
 
     if (_shouldProcessForMatches(userMessage)) {
@@ -277,6 +269,17 @@ class _HomeScreenState extends State<HomeScreen>
       _intentController.text = randomResult;
     });
 
+    // Auto-scroll to bottom when text updates
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_voiceScrollController.hasClients) {
+        _voiceScrollController.animateTo(
+          _voiceScrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+
     await Future.delayed(const Duration(milliseconds: 500));
     _processIntent();
   }
@@ -284,7 +287,6 @@ class _HomeScreenState extends State<HomeScreen>
   Future<void> _processWithIntent(String intent) async {
     setState(() {
       _isProcessing = true;
-      _errorMessage = null;
     });
 
     try {
@@ -308,7 +310,6 @@ class _HomeScreenState extends State<HomeScreen>
         }
 
         setState(() {
-          _currentIntent = result['intent'];
           _matches = matches;
           _isProcessing = false;
         });
@@ -327,13 +328,11 @@ class _HomeScreenState extends State<HomeScreen>
         _loadUserIntents();
       } else {
         setState(() {
-          _errorMessage = result['error'] ?? 'Failed to process request';
           _isProcessing = false;
         });
       }
     } catch (e) {
       setState(() {
-        _errorMessage = 'Error: $e';
         _isProcessing = false;
       });
     }
@@ -359,7 +358,7 @@ class _HomeScreenState extends State<HomeScreen>
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.transparent,
-        toolbarHeight: 100, // <-- FINAL height control
+        toolbarHeight: 60,
         centerTitle: false,
         title: ShaderMask(
           shaderCallback: (bounds) => LinearGradient(
@@ -447,21 +446,14 @@ class _HomeScreenState extends State<HomeScreen>
 
   Widget _buildVoiceRecordingOverlay(bool isDarkMode) {
     return Container(
-      height: MediaQuery.of(context).size.height * 0.5, // Half screen height
+      height: MediaQuery.of(context).size.height * 0.4,
       width: double.infinity,
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.95),
+        color: Colors.grey.shade800,
         borderRadius: const BorderRadius.only(
           topLeft: Radius.circular(20),
           topRight: Radius.circular(20),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.5),
-            blurRadius: 20,
-            spreadRadius: 5,
-          ),
-        ],
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -480,59 +472,77 @@ class _HomeScreenState extends State<HomeScreen>
                 height: 80,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: _isRecording ? Colors.red : Colors.blue,
+                  color: _isRecording ? Colors.red : Colors.transparent,
                   boxShadow: [
                     BoxShadow(
                       color: (_isRecording ? Colors.red : Colors.blue)
-                          .withValues(alpha: 0.5),
+                          .withOpacity(0.5),
                       blurRadius: 15,
                       spreadRadius: 5,
                     ),
                   ],
+                  image: !_isRecording
+                      ? const DecorationImage(
+                          image: AssetImage('assets/logo/Clogo.jpeg'),
+                          fit: BoxFit.cover,
+                        )
+                      : null,
                 ),
-                child: Icon(
-                  _isRecording ? Icons.mic : Icons.auto_awesome,
-                  color: Colors.white,
-                  size: 40,
-                ),
+                child: _isRecording
+                    ? const Center(
+                        child: Icon(Icons.mic, color: Colors.white, size: 40),
+                      )
+                    : null,
               ),
             ],
           ),
 
-          const SizedBox(height: 40),
+          const SizedBox(height: 10),
 
-          // Status text
-          Text(
-            _voiceText,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
+          // Scrollable text container
+          Expanded(
+            child: SingleChildScrollView(
+              controller: _voiceScrollController,
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
+                children: [
+                  // Status text
+                  Text(
+                    _voiceText,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  // Additional guidance
+                  if (_isRecording)
+                    Text(
+                      'Tap anywhere to stop recording',
+                      style: TextStyle(color: Colors.grey[400], fontSize: 16),
+                      textAlign: TextAlign.center,
+                    ),
+
+                  if (_isVoiceProcessing)
+                    const Column(
+                      children: [
+                        SizedBox(height: 20),
+                        CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Color.fromARGB(255, 219, 224, 228),
+                          ),
+                          strokeWidth: 3,
+                        ),
+                      ],
+                    ),
+                ],
+              ),
             ),
-            textAlign: TextAlign.center,
           ),
-
-          const SizedBox(height: 20),
-
-          // Additional guidance
-          if (_isRecording)
-            Text(
-              'Tap anywhere to stop recording',
-              style: TextStyle(color: Colors.grey[400], fontSize: 16),
-            ),
-
-          if (_isVoiceProcessing)
-            const Column(
-              children: [
-                SizedBox(height: 20),
-                CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
-                  strokeWidth: 3,
-                ),
-              ],
-            ),
-
-          const Spacer(),
 
           // Close button
           if (_isRecording)
@@ -543,24 +553,17 @@ class _HomeScreenState extends State<HomeScreen>
                 child: Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 32,
-                    vertical: 16,
+                    vertical: 8,
                   ),
                   decoration: BoxDecoration(
                     color: Colors.red,
                     borderRadius: BorderRadius.circular(25),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.red.withValues(alpha: 0.3),
-                        blurRadius: 10,
-                        spreadRadius: 2,
-                      ),
-                    ],
                   ),
                   child: const Text(
                     'Stop Recording',
                     style: TextStyle(
                       color: Colors.white,
-                      fontSize: 18,
+                      fontSize: 16,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -585,7 +588,10 @@ class _HomeScreenState extends State<HomeScreen>
             height: size + (value * 100),
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              border: Border.all(color: Colors.red.withValues(alpha: 0.5), width: 2),
+              border: Border.all(
+                color: Colors.red.withValues(alpha: 0.5),
+                width: 2,
+              ),
             ),
           ),
         );
@@ -629,8 +635,12 @@ class _HomeScreenState extends State<HomeScreen>
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             colors: [
-                              Theme.of(context).primaryColor.withValues(alpha: 0.2),
-                              Theme.of(context).primaryColor.withValues(alpha: 0.1),
+                              Theme.of(
+                                context,
+                              ).primaryColor.withValues(alpha: 0.2),
+                              Theme.of(
+                                context,
+                              ).primaryColor.withValues(alpha: 0.1),
                             ],
                           ),
                           borderRadius: BorderRadius.circular(20),
@@ -799,32 +809,7 @@ class _HomeScreenState extends State<HomeScreen>
   Widget _buildChatState(bool isDarkMode) {
     return Column(
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
-          child: TweenAnimationBuilder(
-            tween: Tween<double>(begin: 0, end: 1),
-            duration: const Duration(milliseconds: 600),
-            builder: (context, double value, child) {
-              return Opacity(
-                opacity: value,
-                child: Transform.translate(
-                  offset: Offset(0, 20 * (1 - value)),
-                  child: child,
-                ),
-              );
-            },
-            child: Text(
-              'Hello ${_currentUserName.split(' ')[0].toUpperCase()}',
-              style: const TextStyle(
-                fontSize: 22,
-                color: Colors.white,
-                fontWeight: FontWeight.w500,
-                letterSpacing: 1,
-              ),
-            ),
-          ),
-        ),
-
+        const SizedBox(height: 110),
         Expanded(
           child: ListView.builder(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),

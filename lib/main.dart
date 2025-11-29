@@ -8,11 +8,13 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:supper/screens/login/splash_screen.dart';
+import 'package:supper/screens/home/home_screen.dart';
 
 import 'firebase_options.dart';
+import 'screens/login/splash_screen.dart';
 import 'screens/login/login_screen.dart';
 import 'screens/main_navigation_screen.dart';
+
 import 'services/auth_service.dart';
 import 'services/profile_service.dart';
 import 'services/user_manager.dart';
@@ -26,33 +28,28 @@ import 'providers/theme_provider.dart';
 import 'utils/app_optimizer.dart';
 import 'utils/memory_manager.dart';
 
-// Top-level background handler for FCM
+// FCM background handler
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // Only print data; do NOT initialize Firebase here
-  debugPrint('Background message received: ${message.messageId}');
+  debugPrint('Background FCM message: ${message.messageId}');
 }
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Load environment variables
   await dotenv.load(fileName: ".env");
 
-  // Initialize Firebase only once
   if (Firebase.apps.isEmpty) {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
   }
 
-  // Lock orientation
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
 
-  // System UI overlay
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -60,7 +57,6 @@ void main() async {
     ),
   );
 
-  // Firestore offline persistence (mobile only)
   if (!kIsWeb) {
     FirebaseFirestore.instance.settings = const Settings(
       persistenceEnabled: true,
@@ -68,36 +64,30 @@ void main() async {
     );
   }
 
-  // FCM background handler
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
-  // Initialize utilities and services
   await AppOptimizer.initialize();
   MemoryManager().initialize();
   UserManager().initialize();
   await NotificationService().initialize();
   await ConnectivityService().initialize();
 
-  // Run user migration
+  // User migration
   try {
     final userMigration = UserMigrationService();
     await userMigration.checkAndRunMigration();
   } catch (e) {
-    debugPrint('User migration failed (non-fatal): $e');
+    debugPrint('User migration failed: $e');
   }
 
-  // Run conversation migration
+  // Conversation migration
   try {
     final conversationMigration = ConversationMigrationService();
-    final isCompleted = await conversationMigration.isMigrationCompleted();
-    if (!isCompleted) {
-      final result = await conversationMigration.runMigration();
-      debugPrint('Conversation migration result: $result');
-    } else {
-      debugPrint('Conversation migration already completed');
+    if (!await conversationMigration.isMigrationCompleted()) {
+      await conversationMigration.runMigration();
     }
   } catch (e) {
-    debugPrint('Conversation migration failed (non-fatal): $e');
+    debugPrint('Conversation migration failed: $e');
   }
 
   runApp(const ProviderScope(child: MyApp()));
@@ -108,15 +98,14 @@ class MyApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Watch theme to trigger rebuilds on theme change
     ref.watch(themeProvider);
     final themeNotifier = ref.read(themeProvider.notifier);
 
     return MaterialApp(
       title: 'Supper',
       theme: themeNotifier.themeData,
-      home: const SplashScreen(),
       debugShowCheckedModeBanner: false,
+      home: const SplashScreen(),
     );
   }
 }
@@ -134,8 +123,8 @@ class _AuthWrapperState extends State<AuthWrapper> {
   final LocationService _locationService = LocationService();
   final ConversationService _conversationService = ConversationService();
 
-  bool _hasInitializedServices = false;
-  String? _lastInitializedUserId;
+  bool _initialized = false;
+  String? _lastUserId;
 
   @override
   Widget build(BuildContext context) {
@@ -149,40 +138,38 @@ class _AuthWrapperState extends State<AuthWrapper> {
         }
 
         if (snapshot.hasData && snapshot.data != null) {
-          final currentUserId = snapshot.data!.uid;
+          String uid = snapshot.data!.uid;
 
-          // Initialize user-dependent services only once per session
-          if (!_hasInitializedServices ||
-              _lastInitializedUserId != currentUserId) {
-            _hasInitializedServices = true;
-            _lastInitializedUserId = currentUserId;
+          if (!_initialized || _lastUserId != uid) {
+            _initialized = true;
+            _lastUserId = uid;
 
             WidgetsBinding.instance.addPostFrameCallback((_) {
-              _initializeUserServices();
+              _initUserServices();
             });
           }
-
+          // return const HomeScreen();
           return const MainNavigationScreen();
         }
 
-        // Reset when user logs out
-        _hasInitializedServices = false;
-        _lastInitializedUserId = null;
+        _initialized = false;
+        _lastUserId = null;
 
         return const LoginScreen();
       },
     );
   }
 
-  Future<void> _initializeUserServices() async {
+  Future<void> _initUserServices() async {
     try {
       await _profileService.ensureProfileExists();
-      await Future.delayed(const Duration(milliseconds: 100));
+      await Future.delayed(const Duration(milliseconds: 120));
+
       _locationService.initializeLocation();
       _locationService.startPeriodicLocationUpdates();
       _conversationService.cleanupDuplicateConversations();
     } catch (e) {
-      debugPrint('Error initializing user services: $e');
+      debugPrint("User services init failed: $e");
     }
   }
 }

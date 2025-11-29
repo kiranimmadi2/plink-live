@@ -20,9 +20,10 @@ class _LoginScreenState extends State<LoginScreen>
   bool _obscurePassword = true;
   bool _isSignUpMode = false;
   bool _rememberMe = false;
-  final bool _acceptTerms = false; // ignore: unused_field
-  String _passwordStrength = ''; // ignore: unused_field, prefer_final_fields
-  final Color _passwordStrengthColor = Colors.grey; // ignore: unused_field
+  bool _acceptTerms = false;
+
+  String _passwordStrength = '';
+  final Color _passwordStrengthColor = Colors.grey;
 
   late AnimationController _animationController;
   late AnimationController _fadeController;
@@ -44,6 +45,7 @@ class _LoginScreenState extends State<LoginScreen>
       begin: 0.0,
       end: 1.0,
     ).animate(CurvedAnimation(parent: _fadeController, curve: Curves.easeIn));
+
     _slideAnimation =
         Tween<Offset>(begin: const Offset(0, 0.1), end: Offset.zero).animate(
           CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
@@ -72,8 +74,6 @@ class _LoginScreenState extends State<LoginScreen>
       });
       return;
     }
-
-    // ignore: unused_local_variable
     int strength = 0;
     if (password.length >= 8) strength++;
     if (password.contains(RegExp(r'[a-z]'))) strength++;
@@ -92,7 +92,6 @@ class _LoginScreenState extends State<LoginScreen>
 
   Future<void> _handleAuth() async {
     if (_formKey.currentState!.validate()) {
-      // Check terms acceptance for signup
       if (_isSignUpMode && !_acceptTerms) {
         _showErrorSnackBar(
           'Please accept the Terms of Service and Privacy Policy to continue',
@@ -230,7 +229,6 @@ class _LoginScreenState extends State<LoginScreen>
                 child: Container(
                   margin: const EdgeInsets.all(24),
                   padding: const EdgeInsets.all(32),
-
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
                       colors: [
@@ -255,7 +253,6 @@ class _LoginScreenState extends State<LoginScreen>
                       _buildHeader(),
                       const SizedBox(height: 32),
                       _buildForm(),
-
                       const SizedBox(height: 24),
                       _buildRememberMeAndForgot(),
                       const SizedBox(height: 24),
@@ -322,8 +319,6 @@ class _LoginScreenState extends State<LoginScreen>
                 Icons.email_outlined,
                 color: Color.fromARGB(255, 247, 245, 245),
               ),
-
-              // ---- Border grey for all states ----
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
                 borderSide: const BorderSide(color: Colors.grey, width: 1),
@@ -340,7 +335,6 @@ class _LoginScreenState extends State<LoginScreen>
                 borderRadius: BorderRadius.circular(16),
                 borderSide: const BorderSide(color: Colors.red, width: 1),
               ),
-
               filled: true,
               fillColor: Colors.grey,
               errorStyle: const TextStyle(height: 0.8),
@@ -390,8 +384,6 @@ class _LoginScreenState extends State<LoginScreen>
                   });
                 },
               ),
-
-              // ---- Border grey for all states ----
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
                 borderSide: const BorderSide(color: Colors.grey, width: 1),
@@ -408,7 +400,6 @@ class _LoginScreenState extends State<LoginScreen>
                 borderRadius: BorderRadius.circular(16),
                 borderSide: const BorderSide(color: Colors.red, width: 1),
               ),
-
               filled: true,
               fillColor: Colors.grey,
               errorStyle: const TextStyle(height: 0.8),
@@ -433,85 +424,38 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   Widget _buildRememberMeAndForgot() {
-    if (_isSignUpMode) return const SizedBox.shrink();
+    if (_isSignUpMode) {
+      return Row(
+        children: [
+          SizedBox(
+            height: 24,
+            width: 24,
+            child: Checkbox(
+              value: _acceptTerms,
+              onChanged: (value) {
+                setState(() {
+                  _acceptTerms = value ?? false;
+                });
+              },
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Text(
+              'I agree to the Terms of Service & Privacy Policy',
+              style: TextStyle(color: Colors.white, fontSize: 13),
+            ),
+          ),
+        ],
+      );
+    }
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        // // Remember me for login, Terms acceptance for signup
-        // _isSignUpMode
-        //     ? Row(
-        //         crossAxisAlignment: CrossAxisAlignment.start,
-        //         children: [
-        //           SizedBox(
-        //             height: 24,
-        //             width: 24,
-        //             child: Checkbox(
-        //               value: _acceptTerms,
-        //               onChanged: (value) {
-        //                 setState(() {
-        //                   _acceptTerms = value ?? false;
-        //                 });
-        //               },
-        //               shape: RoundedRectangleBorder(
-        //                 borderRadius: BorderRadius.circular(4),
-        //               ),
-        //             ),
-        //           ),
-        //           const SizedBox(width: 8),
-        // Expanded(
-        //   child: RichText(
-        //     text: TextSpan(
-        //       style: const TextStyle(
-        //         color: Color.fromARGB(255, 155, 39, 39),
-        //         fontSize: 13,
-        //       ),
-        //       children: [
-        //         // const TextSpan(text: 'I agree to the '),
-        //         // TextSpan(
-        //         //   text: 'Terms of Service',
-        //         //   style: const TextStyle(
-        //         //     color: Color.fromARGB(255, 241, 242, 243),
-        //         //     fontWeight: FontWeight.w600,
-        //         //     decoration: TextDecoration.underline,
-        //         //   ),
-        //         //   recognizer: TapGestureRecognizer()
-        //         //     ..onTap = () {
-        //         //       Navigator.push(
-        //         //         context,
-        //         //         MaterialPageRoute(
-        //         //           builder: (context) =>
-        //         //               const TermsOfServiceScreen(),
-        //         //         ),
-        //         //       );
-        //         //     },
-        //         // ),
-        //         // const TextSpan(text: ' and '),
-        //         // TextSpan(
-        //         //   text: 'Privacy Policy',
-        //         //   style: const TextStyle(
-        //         //     color: Color.fromARGB(255, 225, 228, 231),
-        //         //     fontWeight: FontWeight.w600,
-        //         //     decoration: TextDecoration.underline,
-        //         //   ),
-        //         //   recognizer: TapGestureRecognizer()
-        //         //     ..onTap = () {
-        //         //       Navigator.push(
-        //         //         context,
-        //         //         MaterialPageRoute(
-        //         //           builder: (context) =>
-        //         //               const PrivacyPolicyScreen(),
-        //         //         ),
-        //         //       );
-        //         //     },
-        //         // ),
-        //       ],
-        //     ),
-        //   ),
-        // ),
-        //     ],
-        //   )
-        // :
         Row(
           children: [
             SizedBox(

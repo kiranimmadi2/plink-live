@@ -1,5 +1,6 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:supper/main.dart';
 import 'package:supper/screens/home/home_screen.dart';
 import 'package:supper/screens/login/login_screen.dart';
 
@@ -82,7 +83,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   void _getStarted() {
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (context) => const LoginScreen()),
+      MaterialPageRoute(builder: (context) => const AuthWrapper()),
     );
   }
 

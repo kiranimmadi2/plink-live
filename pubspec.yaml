@@ -85,6 +85,8 @@ dependencies:
 
   lottie: ^3.3.2
   flutter_3d_choice_chip: ^0.1.4
+  fab_circular_menu: ^1.0.2
+
 
 
 dev_dependencies:
@@ -92,6 +94,11 @@ dev_dependencies:
     sdk: flutter
   integration_test:
     sdk: flutter
+  flutter_launcher_icons: ^0.13.1
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: 'assets/logo/Clogo.jpeg'
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
