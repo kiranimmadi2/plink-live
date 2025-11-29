@@ -118,9 +118,7 @@ class AuthService {
       GoogleSignInAccount? googleUser = await _googleSignIn.signInSilently();
 
       // If silent fails, show account picker
-      if (googleUser == null) {
-        googleUser = await _googleSignIn.signIn();
-      }
+      googleUser ??= await _googleSignIn.signIn();
 
       if (googleUser == null) {
         // User cancelled
