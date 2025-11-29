@@ -9,6 +9,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supper/screens/home/home_screen.dart';
+import 'package:supper/screens/login/onboarding_screen.dart';
 
 import 'firebase_options.dart';
 import 'screens/login/splash_screen.dart';
@@ -105,7 +106,7 @@ class MyApp extends ConsumerWidget {
       title: 'Supper',
       theme: themeNotifier.themeData,
       debugShowCheckedModeBanner: false,
-      home: const SplashScreen(),
+      home: const SplashScreen(), // <-- Use AuthWrapper here
     );
   }
 }
@@ -148,14 +149,14 @@ class _AuthWrapperState extends State<AuthWrapper> {
               _initUserServices();
             });
           }
-          // return const HomeScreen();
+
           return const MainNavigationScreen();
         }
 
+        // User not logged in
         _initialized = false;
         _lastUserId = null;
-
-        return const LoginScreen();
+        return const OnboardingScreen(); // <-- Show LoginScreen if not logged in
       },
     );
   }

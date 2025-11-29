@@ -18,42 +18,52 @@ class AuthService {
         email: email,
         password: password,
       );
-      
+
       // Update last seen and ensure profile exists
       if (result.user != null) {
         final user = result.user!;
-        
+
         // Check if profile exists
-        final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
-        
+        final doc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+
         if (!doc.exists) {
           // Create profile if it doesn't exist
-          await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-            'uid': user.uid,
-            'email': user.email ?? email,
-            'name': user.displayName ?? email.split('@')[0],
-            'profileImageUrl': user.photoURL,
-            'photoUrl': user.photoURL,
-            'createdAt': FieldValue.serverTimestamp(),
-            'lastSeen': FieldValue.serverTimestamp(),
-            'isOnline': true,
-            'discoveryModeEnabled': true, // Enable Live Connect discovery by default
-            'interests': [], // Initialize empty interests
-            'connections': [], // Initialize empty connections
-            'connectionCount': 0,
-            'blockedUsers': [], // Initialize empty blocked users
-            'connectionTypes': [], // Initialize empty connection types
-            'activities': [], // Initialize empty activities
-          });
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .set({
+                'uid': user.uid,
+                'email': user.email ?? email,
+                'name': user.displayName ?? email.split('@')[0],
+                'profileImageUrl': user.photoURL,
+                'photoUrl': user.photoURL,
+                'createdAt': FieldValue.serverTimestamp(),
+                'lastSeen': FieldValue.serverTimestamp(),
+                'isOnline': true,
+                'discoveryModeEnabled':
+                    true, // Enable Live Connect discovery by default
+                'interests': [], // Initialize empty interests
+                'connections': [], // Initialize empty connections
+                'connectionCount': 0,
+                'blockedUsers': [], // Initialize empty blocked users
+                'connectionTypes': [], // Initialize empty connection types
+                'activities': [], // Initialize empty activities
+              });
         } else {
           // Just update last seen
-          await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
-            'lastSeen': FieldValue.serverTimestamp(),
-            'isOnline': true,
-          });
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .update({
+                'lastSeen': FieldValue.serverTimestamp(),
+                'isOnline': true,
+              });
         }
       }
-      
+
       return result.user;
     } on FirebaseAuthException catch (e) {
       String message;
@@ -88,7 +98,7 @@ class AuthService {
         email: email,
         password: password,
       );
-      
+
       // Create initial Firestore profile for email signup
       if (result.user != null) {
         final user = result.user!;
@@ -101,7 +111,8 @@ class AuthService {
           'lastSeen': FieldValue.serverTimestamp(),
           'createdAt': FieldValue.serverTimestamp(),
           'isOnline': true,
-          'discoveryModeEnabled': true, // Enable Live Connect discovery by default
+          'discoveryModeEnabled':
+              true, // Enable Live Connect discovery by default
           'interests': [], // Initialize empty interests
           'connections': [], // Initialize empty connections
           'connectionCount': 0,
@@ -110,7 +121,7 @@ class AuthService {
           'activities': [], // Initialize empty activities
         }, SetOptions(merge: true));
       }
-      
+
       return result.user;
     } on FirebaseAuthException catch (e) {
       String message;
@@ -140,14 +151,14 @@ class AuthService {
     try {
       // Check if already signed in
       await _googleSignIn.signOut();
-      
+
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-      
+
       if (googleUser == null) {
         return null;
       }
 
-      final GoogleSignInAuthentication googleAuth = 
+      final GoogleSignInAuthentication googleAuth =
           await googleUser.authentication;
 
       final credential = GoogleAuthProvider.credential(
@@ -155,19 +166,23 @@ class AuthService {
         idToken: googleAuth.idToken,
       );
 
-      final UserCredential result = 
-          await _auth.signInWithCredential(credential);
-      
+      final UserCredential result = await _auth.signInWithCredential(
+        credential,
+      );
+
       // Save Google profile photo URL to Firestore
       if (result.user != null) {
         final user = result.user!;
-        
+
         // Fix Google photo URL to get higher quality version
         String? photoUrl = user.photoURL ?? googleUser.photoUrl;
         photoUrl = PhotoUrlHelper.getHighQualityGooglePhoto(photoUrl);
-        
+
         // Check if this is a new user or existing user
-        final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+        final doc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
         final isNewUser = !doc.exists;
 
         await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
@@ -181,7 +196,8 @@ class AuthService {
           'isOnline': true,
           // Only set these for new users to avoid overwriting existing values
           if (isNewUser) ...{
-            'discoveryModeEnabled': true, // Enable Live Connect discovery by default
+            'discoveryModeEnabled':
+                true, // Enable Live Connect discovery by default
             'interests': [], // Initialize empty interests
             'connections': [], // Initialize empty connections
             'connectionCount': 0,
@@ -190,7 +206,7 @@ class AuthService {
             'activities': [], // Initialize empty activities
           },
         }, SetOptions(merge: true));
-        
+
         // Also update the auth profile with fixed URL
         if (photoUrl != null && photoUrl != user.photoURL) {
           try {
@@ -200,7 +216,7 @@ class AuthService {
           }
         }
       }
-      
+
       return result.user;
     } on FirebaseAuthException catch (e) {
       String message;
@@ -231,16 +247,16 @@ class AuthService {
       // Update user's online status to false before signing out
       final user = _auth.currentUser;
       if (user != null) {
-        await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
-          'isOnline': false,
-          'lastSeen': FieldValue.serverTimestamp(),
-        });
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .update({
+              'isOnline': false,
+              'lastSeen': FieldValue.serverTimestamp(),
+            });
       }
-      
-      await Future.wait([
-        _auth.signOut(),
-        _googleSignIn.signOut(),
-      ]);
+
+      await Future.wait([_auth.signOut(), _googleSignIn.signOut()]);
     } catch (e) {
       throw Exception('Sign out failed: ${e.toString()}');
     }
@@ -344,9 +360,13 @@ class AuthService {
       if (!hasPasswordProvider()) {
         final provider = getPrimarySignInMethod();
         if (provider == 'google.com') {
-          throw Exception('You signed in with Google. Please use Google to manage your password.');
+          throw Exception(
+            'You signed in with Google. Please use Google to manage your password.',
+          );
         } else {
-          throw Exception('Password change is only available for email/password accounts.');
+          throw Exception(
+            'Password change is only available for email/password accounts.',
+          );
         }
       }
 
@@ -408,11 +428,7 @@ class AuthService {
           .collection('users')
           .doc(userId)
           .collection('securityEvents')
-          .add({
-        'type': 'password_change',
-        'timestamp': now,
-        'success': true,
-      });
+          .add({'type': 'password_change', 'timestamp': now, 'success': true});
     } catch (e) {
       // Don't fail the password change if logging fails
       debugPrint('Failed to record password change: $e');

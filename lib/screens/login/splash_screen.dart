@@ -1,4 +1,6 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:supper/main.dart';
+import 'package:supper/screens/login/login_screen.dart';
 import 'dart:async';
 
 import 'package:supper/screens/login/onboarding_screen.dart';
@@ -27,7 +29,7 @@ class _SplashScreenState extends State<SplashScreen>
     Future.delayed(const Duration(seconds: 2), () {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const OnboardingScreen()),
+        MaterialPageRoute(builder: (_) => const AuthWrapper()),
       );
     });
   }
