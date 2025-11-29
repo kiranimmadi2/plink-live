@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../services/auth_service.dart';
+import '../main_navigation_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -120,6 +121,11 @@ class _LoginScreenState extends State<LoginScreen>
           _showSuccessSnackBar(
             _isSignUpMode ? 'Account created successfully!' : 'Welcome back!',
           );
+          // Navigate to main screen after successful login
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const MainNavigationScreen()),
+          );
         }
       } catch (e) {
         if (mounted) {
@@ -147,6 +153,11 @@ class _LoginScreenState extends State<LoginScreen>
       if (user != null && mounted) {
         HapticFeedback.lightImpact();
         _showSuccessSnackBar('Welcome, ${user.displayName ?? 'User'}!');
+        // Navigate to main screen after successful Google sign-in
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const MainNavigationScreen()),
+        );
       }
     } catch (e) {
       if (mounted) {

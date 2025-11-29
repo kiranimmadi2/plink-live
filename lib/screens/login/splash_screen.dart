@@ -1,7 +1,8 @@
 ﻿import 'package:flutter/material.dart';
 import 'dart:async';
-
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:supper/screens/login/onboarding_screen.dart';
+import 'package:supper/screens/main_navigation_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -25,10 +26,21 @@ class _SplashScreenState extends State<SplashScreen>
     )..repeat(reverse: true);
 
     Timer(const Duration(seconds: 3), () {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const OnboardingScreen()),
-      );
+      // Check if user is already logged in
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        // User is logged in, go to main screen
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const MainNavigationScreen()),
+        );
+      } else {
+        // User not logged in, show onboarding
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const OnboardingScreen()),
+        );
+      }
     });
   }
 
