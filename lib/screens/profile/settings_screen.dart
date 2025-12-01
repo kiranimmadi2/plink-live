@@ -799,11 +799,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
               TextButton(
                 onPressed: () async {
+                  // Capture navigator before popping dialog
+                  final navigator = Navigator.of(context, rootNavigator: true);
                   Navigator.pop(context);
                   await authService.signOut();
-                  if (!context.mounted) return;
-                  // ignore: use_build_context_synchronously
-                  Navigator.of(context).pushAndRemoveUntil(
+                  navigator.pushAndRemoveUntil(
                     MaterialPageRoute(builder: (_) => const LoginScreen()),
                     (route) => false,
                   );
@@ -1021,11 +1021,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           TextButton(
             onPressed: () async {
+              // Capture navigator before popping dialog
+              final navigator = Navigator.of(context, rootNavigator: true);
               Navigator.pop(context);
               await authService.signOut();
-              if (!context.mounted) return;
-              // ignore: use_build_context_synchronously
-              Navigator.of(context).pushAndRemoveUntil(
+              navigator.pushAndRemoveUntil(
                 MaterialPageRoute(builder: (_) => const LoginScreen()),
                 (route) => false,
               );
