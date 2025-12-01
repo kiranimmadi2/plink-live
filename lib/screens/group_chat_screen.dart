@@ -462,13 +462,14 @@ class _GroupChatScreenState extends State<GroupChatScreen> with WidgetsBindingOb
                 leading: const Icon(Icons.admin_panel_settings, color: Colors.blue),
                 title: const Text('Make Admin'),
                 onTap: () async {
+                  final messenger = ScaffoldMessenger.of(context);
                   Navigator.pop(context);
                   final success = await _groupChatService.makeAdmin(
                     groupId: widget.groupId,
                     memberId: memberId,
                   );
                   if (success && mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    messenger.showSnackBar(
                       SnackBar(content: Text('$memberName is now an admin')),
                     );
                   }
@@ -479,13 +480,14 @@ class _GroupChatScreenState extends State<GroupChatScreen> with WidgetsBindingOb
                 leading: const Icon(Icons.remove_moderator, color: Colors.orange),
                 title: const Text('Remove Admin'),
                 onTap: () async {
+                  final messenger = ScaffoldMessenger.of(context);
                   Navigator.pop(context);
                   final success = await _groupChatService.removeAdmin(
                     groupId: widget.groupId,
                     memberId: memberId,
                   );
                   if (success && mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    messenger.showSnackBar(
                       SnackBar(content: Text('$memberName is no longer an admin')),
                     );
                   }
@@ -495,9 +497,11 @@ class _GroupChatScreenState extends State<GroupChatScreen> with WidgetsBindingOb
               leading: const Icon(Icons.remove_circle, color: Colors.red),
               title: const Text('Remove from Group', style: TextStyle(color: Colors.red)),
               onTap: () async {
+                final messenger = ScaffoldMessenger.of(context);
+                final parentContext = this.context;
                 Navigator.pop(context);
                 final confirmed = await showDialog<bool>(
-                  context: context,
+                  context: parentContext,
                   builder: (context) => AlertDialog(
                     title: const Text('Remove Member?'),
                     content: Text('Remove $memberName from this group?'),
@@ -519,11 +523,11 @@ class _GroupChatScreenState extends State<GroupChatScreen> with WidgetsBindingOb
                     memberId: memberId,
                   );
                   if (success && mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    messenger.showSnackBar(
                       SnackBar(content: Text('$memberName removed from group')),
                     );
                   } else if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    messenger.showSnackBar(
                       const SnackBar(
                         content: Text('Failed to remove member. Only the creator can remove admins.'),
                         backgroundColor: Colors.red,
@@ -589,21 +593,23 @@ class _GroupChatScreenState extends State<GroupChatScreen> with WidgetsBindingOb
                             if (selectedUsers.isNotEmpty)
                               ElevatedButton(
                                 onPressed: () async {
+                                  final messenger = ScaffoldMessenger.of(context);
+                                  final navigator = Navigator.of(context);
                                   final success =
                                       await _groupChatService.addMembers(
                                     groupId: widget.groupId,
                                     newMemberIds: selectedUsers.toList(),
                                   );
                                   if (success && mounted) {
-                                    Navigator.pop(context);
-                                    ScaffoldMessenger.of(context).showSnackBar(
+                                    navigator.pop();
+                                    messenger.showSnackBar(
                                       const SnackBar(
                                         content: Text('Members added successfully'),
                                         backgroundColor: Colors.green,
                                       ),
                                     );
                                   } else if (mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
+                                    messenger.showSnackBar(
                                       const SnackBar(
                                         content: Text('Failed to add members. Only admins can add members.'),
                                         backgroundColor: Colors.red,

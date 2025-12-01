@@ -1,5 +1,4 @@
-﻿import 'dart:async';
-import 'dart:math' as math;
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -115,7 +114,7 @@ class _HomeScreenState extends State<HomeScreen>
   Future<void> _loadUserIntents() async {
     final userId = _auth.currentUser?.uid;
     if (userId != null) {
-      final intents = await _intentService.getUserIntents(userId);
+      await _intentService.getUserIntents(userId);
       setState(() {});
     }
   }
@@ -476,7 +475,7 @@ class _HomeScreenState extends State<HomeScreen>
                   boxShadow: [
                     BoxShadow(
                       color: (_isRecording ? Colors.red : Colors.blue)
-                          .withOpacity(0.5),
+                          .withValues(alpha: 0.5),
                       blurRadius: 15,
                       spreadRadius: 5,
                     ),

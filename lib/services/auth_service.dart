@@ -3,6 +3,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import '../utils/photo_url_helper.dart';
+import 'location_service.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -236,7 +237,10 @@ class AuthService {
           'lastSeen': FieldValue.serverTimestamp(),
         });
       }
-      
+
+      // Reset location service to stop periodic updates
+      LocationService().reset();
+
       await Future.wait([
         _auth.signOut(),
         _googleSignIn.signOut(),

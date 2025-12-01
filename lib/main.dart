@@ -8,12 +8,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:supper/screens/home/home_screen.dart';
 import 'package:supper/screens/login/onboarding_screen.dart';
 
 import 'firebase_options.dart';
 import 'screens/login/splash_screen.dart';
-import 'screens/login/login_screen.dart';
 import 'screens/main_navigation_screen.dart';
 
 import 'services/auth_service.dart';
@@ -170,7 +168,7 @@ class AuthWrapper extends StatefulWidget {
   State<AuthWrapper> createState() => _AuthWrapperState();
 }
 
-class _AuthWrapperState extends State<AuthWrapper> {
+class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
   final AuthService _authService = AuthService();
   final ProfileService _profileService = ProfileService();
   final LocationService _locationService = LocationService();
@@ -179,6 +177,43 @@ class _AuthWrapperState extends State<AuthWrapper> {
   bool _hasInitializedServices = false;
   String? _lastInitializedUserId;
   bool _isInitializing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Register app lifecycle observer
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    // Unregister app lifecycle observer
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+
+    switch (state) {
+      case AppLifecycleState.resumed:
+        // App came to foreground - refresh location if stale
+        debugPrint('AuthWrapper: App resumed - checking location freshness');
+        if (_authService.currentUser != null) {
+          _locationService.onAppResume();
+        }
+        break;
+      case AppLifecycleState.paused:
+        // App went to background
+        debugPrint('AuthWrapper: App paused');
+        break;
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.detached:
+      case AppLifecycleState.hidden:
+        break;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -311,6 +346,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
       await Future.delayed(const Duration(milliseconds: 100));
       _locationService.initializeLocation();
       _locationService.startPeriodicLocationUpdates();
+      _locationService.startLocationStream(); // Efficient movement-based updates
       _conversationService.cleanupDuplicateConversations();
 
       // Run migrations now that user is authenticated

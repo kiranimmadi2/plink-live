@@ -1,10 +1,5 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:supper/main.dart';
-import 'package:supper/screens/login/login_screen.dart';
-import 'dart:async';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:supper/screens/login/onboarding_screen.dart';
-import 'package:supper/screens/main_navigation_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -28,6 +23,7 @@ class _SplashScreenState extends State<SplashScreen>
     )..repeat(reverse: true);
 
     Future.delayed(const Duration(seconds: 2), () {
+      if (!mounted) return;
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const AuthWrapper()),
