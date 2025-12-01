@@ -74,6 +74,19 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
   // Single stream for user status (avoid duplicate queries)
   Stream<DocumentSnapshot>? _userStatusStream;
 
+  // Chat theme - gradient colors for sent message bubbles
+  String _currentTheme = 'default';
+  static const Map<String, List<Color>> chatThemes = {
+    'default': [Color(0xFF007AFF), Color(0xFF5856D6)],  // iOS Blue-Purple
+    'sunset': [Color(0xFFFF6B6B), Color(0xFFFF8E53)],   // Red-Orange
+    'ocean': [Color(0xFF00B4DB), Color(0xFF0083B0)],    // Cyan-Blue
+    'forest': [Color(0xFF56AB2F), Color(0xFFA8E063)],   // Green gradient
+    'berry': [Color(0xFF8E2DE2), Color(0xFF4A00E0)],    // Purple
+    'midnight': [Color(0xFF232526), Color(0xFF414345)], // Dark gray
+    'rose': [Color(0xFFFF0844), Color(0xFFFFB199)],     // Pink-Peach
+    'golden': [Color(0xFFF7971E), Color(0xFFFFD200)],   // Orange-Gold
+  };
+
   @override
   void initState() {
     super.initState();
@@ -233,12 +246,60 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
       }
       _markMessagesAsRead();
 
+      // Load saved chat theme
+      await _loadChatTheme();
+
       // debugPrint('EnhancedChatScreen: Conversation initialized with ID: $conversationId');
     } catch (e) {
       debugPrint('Error initializing conversation: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error loading conversation: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _loadChatTheme() async {
+    if (_conversationId == null) return;
+
+    try {
+      final doc = await _firestore
+          .collection('conversations')
+          .doc(_conversationId!)
+          .get();
+
+      if (doc.exists && mounted) {
+        final data = doc.data();
+        final theme = data?['chatTheme'] as String?;
+        if (theme != null && chatThemes.containsKey(theme)) {
+          setState(() {
+            _currentTheme = theme;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading chat theme: $e');
+    }
+  }
+
+  Future<void> _saveChatTheme(String theme) async {
+    if (_conversationId == null || !mounted) return;
+
+    try {
+      await _firestore
+          .collection('conversations')
+          .doc(_conversationId!)
+          .update({'chatTheme': theme});
+
+      setState(() {
+        _currentTheme = theme;
+      });
+    } catch (e) {
+      debugPrint('Error saving chat theme: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to save theme')),
         );
       }
     }
@@ -529,14 +590,14 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
       return _buildEmptyChatState(isDarkMode);
     }
 
-    // Use StreamBuilder for real-time updates from Firebase
+    // Use StreamBuilder for real-time updates from Firebase with pagination
     return StreamBuilder<QuerySnapshot>(
       stream: _firestore
           .collection('conversations')
           .doc(_conversationId!)
           .collection('messages')
           .orderBy('timestamp', descending: true)
-          .limit(100)
+          .limit(_messagesPerPage)
           .snapshots(),
       builder: (context, snapshot) {
         // Skip loading indicator - show content immediately for faster UX
@@ -582,10 +643,46 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
           );
         }).toList();
 
-        // Store all messages for searching
-        _allMessages = messages;
+        // Update _allMessages after build using post-frame callback to avoid state mutation in build
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _allMessages.length != messages.length) {
+            _allMessages = List.from(messages);
+          }
+        });
 
-        return _buildMessageListView(isDarkMode, messages);
+        // Combine stream messages with paginated older messages
+        final allDisplayMessages = <MessageModel>[...messages];
+
+        // Add older loaded messages (avoiding duplicates)
+        for (final doc in _loadedMessages) {
+          final data = doc.data() as Map<String, dynamic>;
+          final messageId = doc.id;
+          if (!allDisplayMessages.any((m) => m.id == messageId)) {
+            allDisplayMessages.add(MessageModel(
+              id: messageId,
+              senderId: data['senderId'] as String? ?? '',
+              receiverId: data['receiverId'] as String? ?? '',
+              chatId: _conversationId!,
+              text: data['text'] as String?,
+              mediaUrl: data['mediaUrl'] as String? ?? data['imageUrl'] as String?,
+              timestamp: data['timestamp'] != null
+                  ? (data['timestamp'] as Timestamp).toDate()
+                  : DateTime.now(),
+              status: _parseMessageStatusFromInt(data['status']),
+              type: _parseMessageType(data['type']),
+              replyToMessageId: data['replyToMessageId'] as String?,
+              isEdited: data['isEdited'] ?? false,
+              reactions: data['reactions'] != null
+                  ? List<String>.from(data['reactions'])
+                  : null,
+            ));
+          }
+        }
+
+        // Sort by timestamp descending
+        allDisplayMessages.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+
+        return _buildMessageListView(isDarkMode, allDisplayMessages);
       },
     );
   }
@@ -865,11 +962,8 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
     // Format timestamp - show actual time
     String formattedTime = _formatMessageTime(message.timestamp);
 
-    // Premium gradient for sent messages - Instagram/iMessage style
-    final sentGradientColors = [
-      const Color(0xFF007AFF), // iOS blue
-      const Color(0xFF5856D6), // iOS purple
-    ];
+    // Get theme gradient colors for sent messages
+    final sentGradientColors = chatThemes[_currentTheme] ?? chatThemes['default']!;
 
     // Received message background - subtle glass effect
     final receivedBgColor = isDarkMode
@@ -973,8 +1067,8 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
                         boxShadow: [
                           BoxShadow(
                             color: isMe
-                                ? const Color(0xFF007AFF).withValues(alpha: 0.25)
-                                : Colors.black.withValues(alpha: 
+                                ? sentGradientColors[0].withValues(alpha: 0.25)
+                                : Colors.black.withValues(alpha:
                                     isDarkMode ? 0.2 : 0.06,
                                   ),
                             blurRadius: isMe ? 12 : 6,
@@ -1591,32 +1685,35 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
                       ? GestureDetector(
                           key: const ValueKey('send'),
                           onTap: _sendMessage,
-                          child: Container(
-                            height: 36,
-                            width: 36,
-                            margin: const EdgeInsets.only(bottom: 2),
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [Color(0xFF007AFF), Color(0xFF5856D6)],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: const Color(
-                                    0xFF007AFF,
-                                  ).withValues(alpha: 0.4),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
+                          child: Builder(
+                            builder: (context) {
+                              final themeColors = chatThemes[_currentTheme] ?? chatThemes['default']!;
+                              return Container(
+                                height: 36,
+                                width: 36,
+                                margin: const EdgeInsets.only(bottom: 2),
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: themeColors,
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: themeColors[0].withValues(alpha: 0.4),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
                                 ),
-                              ],
-                            ),
-                            child: const Icon(
-                              Icons.arrow_upward_rounded,
-                              color: Colors.white,
-                              size: 20,
-                            ),
+                                child: const Icon(
+                                  Icons.arrow_upward_rounded,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
+                              );
+                            },
                           ),
                         )
                       : GestureDetector(
@@ -1640,39 +1737,45 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
             ),
           ),
         ),
-        // Emoji Picker - Premium styling
+        // Emoji Picker - Premium styling with dynamic height
         if (_showEmojiPicker)
-          Container(
-            height: 280,
-            decoration: BoxDecoration(
-              color: isDarkMode
-                  ? const Color(0xFF000000)
-                  : const Color(0xFFF6F6F6),
-              border: Border(
-                top: BorderSide(
+          Builder(
+            builder: (context) {
+              // Calculate dynamic height based on screen size (max 35% of screen height)
+              final screenHeight = MediaQuery.of(context).size.height;
+              final emojiPickerHeight = (screenHeight * 0.35).clamp(200.0, 350.0);
+
+              return Container(
+                height: emojiPickerHeight,
+                decoration: BoxDecoration(
                   color: isDarkMode
-                      ? const Color(0xFF1C1C1E)
-                      : const Color(0xFFE5E5EA),
-                  width: 0.5,
+                      ? const Color(0xFF000000)
+                      : const Color(0xFFF6F6F6),
+                  border: Border(
+                    top: BorderSide(
+                      color: isDarkMode
+                          ? const Color(0xFF1C1C1E)
+                          : const Color(0xFFE5E5EA),
+                      width: 0.5,
+                    ),
+                  ),
                 ),
-              ),
-            ),
-            child: EmojiPicker(
-              onEmojiSelected: (category, emoji) {
-                _messageController.text += emoji.emoji;
-                _messageController.selection = TextSelection.fromPosition(
-                  TextPosition(offset: _messageController.text.length),
-                );
-                setState(() {});
-              },
-              onBackspacePressed: () {
-                _messageController.text = _messageController.text.characters
-                    .skipLast(1)
-                    .toString();
-                setState(() {});
-              },
-              config: Config(
-                height: 280,
+                child: EmojiPicker(
+                  onEmojiSelected: (category, emoji) {
+                    _messageController.text += emoji.emoji;
+                    _messageController.selection = TextSelection.fromPosition(
+                      TextPosition(offset: _messageController.text.length),
+                    );
+                    setState(() {});
+                  },
+                  onBackspacePressed: () {
+                    _messageController.text = _messageController.text.characters
+                        .skipLast(1)
+                        .toString();
+                    setState(() {});
+                  },
+                  config: Config(
+                    height: emojiPickerHeight,
                 checkPlatformCompatibility: true,
                 emojiViewConfig: EmojiViewConfig(
                   columns: 8,
@@ -1722,7 +1825,9 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
                 ),
               ),
             ),
-          ),
+          );
+        },
+      ),
       ],
     );
   }
@@ -2042,7 +2147,7 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
   }
 
   void _addReaction(MessageModel message, String reaction) async {
-    if (_conversationId == null) return;
+    if (_conversationId == null || !mounted) return;
 
     try {
       final messageRef = _firestore
@@ -2056,6 +2161,11 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
       });
     } catch (e) {
       debugPrint('Error adding reaction: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to add reaction')),
+        );
+      }
     }
   }
 
@@ -2370,7 +2480,7 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
   }
 
   void _uploadAndSendImage(File imageFile) async {
-    if (_conversationId == null) return;
+    if (_conversationId == null || !mounted) return;
 
     try {
       final ref = _storage.ref().child(
@@ -2378,7 +2488,11 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
       );
       final uploadTask = ref.putFile(imageFile);
       final snapshot = await uploadTask;
+
+      if (!mounted) return;
       final downloadUrl = await snapshot.ref.getDownloadURL();
+
+      if (!mounted) return;
 
       await _firestore
           .collection('conversations')
@@ -2521,7 +2635,7 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
                         ListTile(
                           leading: const Icon(Icons.color_lens),
                           title: const Text('Change Theme'),
-                          onTap: () {},
+                          onTap: _showThemeSelector,
                         ),
                         ListTile(
                           leading: const Icon(Icons.photo),
@@ -2755,5 +2869,125 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
     }
 
     return RichText(text: TextSpan(children: spans));
+  }
+
+  void _showThemeSelector() {
+    Navigator.pop(context); // Close the chat info sheet first
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
+        return Container(
+          decoration: BoxDecoration(
+            color: isDarkMode ? const Color(0xFF1A1A1A) : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                margin: const EdgeInsets.only(top: 8),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: isDarkMode ? Colors.grey[700] : Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text(
+                  'Chat Theme',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: isDarkMode ? Colors.white : Colors.black,
+                  ),
+                ),
+              ),
+              SizedBox(
+                height: 120,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: chatThemes.length,
+                  itemBuilder: (context, index) {
+                    final themeName = chatThemes.keys.elementAt(index);
+                    final themeColors = chatThemes[themeName]!;
+                    final isSelected = themeName == _currentTheme;
+
+                    return GestureDetector(
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        _saveChatTheme(themeName);
+                        Navigator.pop(context);
+                      },
+                      child: Container(
+                        width: 80,
+                        margin: const EdgeInsets.only(right: 12),
+                        child: Column(
+                          children: [
+                            Container(
+                              width: 60,
+                              height: 60,
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: themeColors,
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                                shape: BoxShape.circle,
+                                border: isSelected
+                                    ? Border.all(color: Colors.white, width: 3)
+                                    : null,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: themeColors[0].withValues(alpha: 0.4),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: isSelected
+                                  ? const Icon(
+                                      Icons.check,
+                                      color: Colors.white,
+                                      size: 28,
+                                    )
+                                  : null,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              _capitalizeThemeName(themeName),
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: isSelected
+                                    ? FontWeight.w600
+                                    : FontWeight.normal,
+                                color: isDarkMode ? Colors.white : Colors.black,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 24),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  String _capitalizeThemeName(String name) {
+    if (name.isEmpty) return name;
+    return name[0].toUpperCase() + name.substring(1);
   }
 }

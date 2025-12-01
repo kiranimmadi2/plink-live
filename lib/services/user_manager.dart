@@ -195,18 +195,25 @@ class UserManager {
   // Sign out and clear cache
   Future<void> signOut() async {
     try {
-      // Update online status
+      // Update online status (with timeout to prevent hanging)
       final user = currentUser;
       if (user != null) {
-        await _firestore.collection('users').doc(user.uid).update({
-          'isOnline': false,
-          'lastSeen': FieldValue.serverTimestamp(),
-        });
+        try {
+          await _firestore.collection('users').doc(user.uid).update({
+            'isOnline': false,
+            'lastSeen': FieldValue.serverTimestamp(),
+          }).timeout(const Duration(seconds: 5));
+        } catch (e) {
+          debugPrint('⚠️ Failed to update online status: $e');
+        }
       }
 
-      // Clear cache
+      // Clear all caches
       _cachedProfile = null;
       _profileController.add(null);
+      _photoCache.clearAllCache();
+
+      debugPrint('✓ UserManager: Session cleared');
     } catch (e) {
       debugPrint('Error during sign out: $e');
     }

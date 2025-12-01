@@ -711,4 +711,12 @@ class LocationService {
   Future<bool> isLocationServiceEnabled() async {
     return await Geolocator.isLocationServiceEnabled();
   }
+
+  /// Reset service state (call on logout)
+  void reset() {
+    _isInitialized = false;
+    _lastLocationUpdate = null;
+    _isUpdatingLocation = false;
+    _log('LocationService: State reset');
+  }
 }

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../services/auth_service.dart';
-import '../main_navigation_screen.dart'; // Make sure path is correct
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -21,10 +20,9 @@ class _LoginScreenState extends State<LoginScreen>
   bool _obscurePassword = true;
   bool _isSignUpMode = false;
   bool _rememberMe = false;
-  bool _acceptTerms = false;
-
-  String _passwordStrength = '';
-  final Color _passwordStrengthColor = Colors.grey;
+  final bool _acceptTerms = false; // ignore: unused_field
+  String _passwordStrength = ''; // ignore: unused_field, prefer_final_fields
+  final Color _passwordStrengthColor = Colors.grey; // ignore: unused_field
 
   late AnimationController _animationController;
   late AnimationController _fadeController;
@@ -46,7 +44,6 @@ class _LoginScreenState extends State<LoginScreen>
       begin: 0.0,
       end: 1.0,
     ).animate(CurvedAnimation(parent: _fadeController, curve: Curves.easeIn));
-
     _slideAnimation =
         Tween<Offset>(begin: const Offset(0, 0.1), end: Offset.zero).animate(
           CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
@@ -75,6 +72,8 @@ class _LoginScreenState extends State<LoginScreen>
       });
       return;
     }
+
+    // ignore: unused_local_variable
     int strength = 0;
     if (password.length >= 8) strength++;
     if (password.contains(RegExp(r'[a-z]'))) strength++;
@@ -93,6 +92,7 @@ class _LoginScreenState extends State<LoginScreen>
 
   Future<void> _handleAuth() async {
     if (_formKey.currentState!.validate()) {
+      // Check terms acceptance for signup
       if (_isSignUpMode && !_acceptTerms) {
         _showErrorSnackBar(
           'Please accept the Terms of Service and Privacy Policy to continue',
@@ -119,12 +119,6 @@ class _LoginScreenState extends State<LoginScreen>
           HapticFeedback.lightImpact();
           _showSuccessSnackBar(
             _isSignUpMode ? 'Account created successfully!' : 'Welcome back!',
-          );
-
-          // FIX: Navigate to MainNavigationScreen after login
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
-            (route) => false,
           );
         }
       } catch (e) {
@@ -153,12 +147,6 @@ class _LoginScreenState extends State<LoginScreen>
       if (user != null && mounted) {
         HapticFeedback.lightImpact();
         _showSuccessSnackBar('Welcome, ${user.displayName ?? 'User'}!');
-
-        // FIX: Navigate to MainNavigationScreen after Google login
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
-          (route) => false,
-        );
       }
     } catch (e) {
       if (mounted) {
@@ -242,6 +230,7 @@ class _LoginScreenState extends State<LoginScreen>
                 child: Container(
                   margin: const EdgeInsets.all(24),
                   padding: const EdgeInsets.all(32),
+
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
                       colors: [
@@ -254,7 +243,7 @@ class _LoginScreenState extends State<LoginScreen>
                     borderRadius: BorderRadius.circular(24),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
+                        color: Colors.black.withValues(alpha: 0.1),
                         blurRadius: 20,
                         offset: const Offset(0, 10),
                       ),
@@ -266,6 +255,7 @@ class _LoginScreenState extends State<LoginScreen>
                       _buildHeader(),
                       const SizedBox(height: 32),
                       _buildForm(),
+
                       const SizedBox(height: 24),
                       _buildRememberMeAndForgot(),
                       const SizedBox(height: 24),
@@ -323,12 +313,17 @@ class _LoginScreenState extends State<LoginScreen>
           TextFormField(
             controller: _emailController,
             keyboardType: TextInputType.emailAddress,
-            cursorColor: Colors.white,
+            cursorColor: const Color.fromARGB(255, 247, 245, 245),
             textInputAction: TextInputAction.next,
             decoration: InputDecoration(
               labelText: 'Email',
               hintText: 'Enter your email',
-              prefixIcon: const Icon(Icons.email_outlined, color: Colors.white),
+              prefixIcon: const Icon(
+                Icons.email_outlined,
+                color: Color.fromARGB(255, 247, 245, 245),
+              ),
+
+              // ---- Border grey for all states ----
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
                 borderSide: const BorderSide(color: Colors.grey, width: 1),
@@ -345,6 +340,7 @@ class _LoginScreenState extends State<LoginScreen>
                 borderRadius: BorderRadius.circular(16),
                 borderSide: const BorderSide(color: Colors.red, width: 1),
               ),
+
               filled: true,
               fillColor: Colors.grey,
               errorStyle: const TextStyle(height: 0.8),
@@ -354,8 +350,9 @@ class _LoginScreenState extends State<LoginScreen>
               ),
             ),
             validator: (value) {
-              if (value == null || value.isEmpty)
+              if (value == null || value.isEmpty) {
                 return 'Please enter your email';
+              }
               if (!RegExp(
                 r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
               ).hasMatch(value)) {
@@ -364,23 +361,28 @@ class _LoginScreenState extends State<LoginScreen>
               return null;
             },
           ),
+
           const SizedBox(height: 16),
+
           TextFormField(
             controller: _passwordController,
             obscureText: _obscurePassword,
-            cursorColor: Colors.white,
+            cursorColor: const Color.fromARGB(255, 247, 245, 245),
             textInputAction: TextInputAction.done,
             onFieldSubmitted: (_) => _handleAuth(),
             decoration: InputDecoration(
               labelText: 'Password',
               hintText: 'Enter your password',
-              prefixIcon: const Icon(Icons.lock_outline, color: Colors.white),
+              prefixIcon: const Icon(
+                Icons.lock_outline,
+                color: Color.fromARGB(255, 253, 252, 252),
+              ),
               suffixIcon: IconButton(
                 icon: Icon(
                   _obscurePassword
                       ? Icons.visibility_off_outlined
                       : Icons.visibility_outlined,
-                  color: Colors.white,
+                  color: const Color.fromARGB(255, 250, 246, 246),
                 ),
                 onPressed: () {
                   setState(() {
@@ -388,6 +390,8 @@ class _LoginScreenState extends State<LoginScreen>
                   });
                 },
               ),
+
+              // ---- Border grey for all states ----
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
                 borderSide: const BorderSide(color: Colors.grey, width: 1),
@@ -404,6 +408,7 @@ class _LoginScreenState extends State<LoginScreen>
                 borderRadius: BorderRadius.circular(16),
                 borderSide: const BorderSide(color: Colors.red, width: 1),
               ),
+
               filled: true,
               fillColor: Colors.grey,
               errorStyle: const TextStyle(height: 0.8),
@@ -413,10 +418,12 @@ class _LoginScreenState extends State<LoginScreen>
               ),
             ),
             validator: (value) {
-              if (value == null || value.isEmpty)
+              if (value == null || value.isEmpty) {
                 return 'Please enter your password';
-              if (_isSignUpMode && value.length < 6)
+              }
+              if (_isSignUpMode && value.length < 6) {
                 return 'Password must be at least 6 characters';
+              }
               return null;
             },
           ),
@@ -426,38 +433,85 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   Widget _buildRememberMeAndForgot() {
-    if (_isSignUpMode) {
-      return Row(
-        children: [
-          SizedBox(
-            height: 24,
-            width: 24,
-            child: Checkbox(
-              value: _acceptTerms,
-              onChanged: (value) {
-                setState(() {
-                  _acceptTerms = value ?? false;
-                });
-              },
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(4),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          const Expanded(
-            child: Text(
-              'I agree to the Terms of Service & Privacy Policy',
-              style: TextStyle(color: Colors.white, fontSize: 13),
-            ),
-          ),
-        ],
-      );
-    }
+    if (_isSignUpMode) return const SizedBox.shrink();
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
+        // // Remember me for login, Terms acceptance for signup
+        // _isSignUpMode
+        //     ? Row(
+        //         crossAxisAlignment: CrossAxisAlignment.start,
+        //         children: [
+        //           SizedBox(
+        //             height: 24,
+        //             width: 24,
+        //             child: Checkbox(
+        //               value: _acceptTerms,
+        //               onChanged: (value) {
+        //                 setState(() {
+        //                   _acceptTerms = value ?? false;
+        //                 });
+        //               },
+        //               shape: RoundedRectangleBorder(
+        //                 borderRadius: BorderRadius.circular(4),
+        //               ),
+        //             ),
+        //           ),
+        //           const SizedBox(width: 8),
+        // Expanded(
+        //   child: RichText(
+        //     text: TextSpan(
+        //       style: const TextStyle(
+        //         color: Color.fromARGB(255, 155, 39, 39),
+        //         fontSize: 13,
+        //       ),
+        //       children: [
+        //         // const TextSpan(text: 'I agree to the '),
+        //         // TextSpan(
+        //         //   text: 'Terms of Service',
+        //         //   style: const TextStyle(
+        //         //     color: Color.fromARGB(255, 241, 242, 243),
+        //         //     fontWeight: FontWeight.w600,
+        //         //     decoration: TextDecoration.underline,
+        //         //   ),
+        //         //   recognizer: TapGestureRecognizer()
+        //         //     ..onTap = () {
+        //         //       Navigator.push(
+        //         //         context,
+        //         //         MaterialPageRoute(
+        //         //           builder: (context) =>
+        //         //               const TermsOfServiceScreen(),
+        //         //         ),
+        //         //       );
+        //         //     },
+        //         // ),
+        //         // const TextSpan(text: ' and '),
+        //         // TextSpan(
+        //         //   text: 'Privacy Policy',
+        //         //   style: const TextStyle(
+        //         //     color: Color.fromARGB(255, 225, 228, 231),
+        //         //     fontWeight: FontWeight.w600,
+        //         //     decoration: TextDecoration.underline,
+        //         //   ),
+        //         //   recognizer: TapGestureRecognizer()
+        //         //     ..onTap = () {
+        //         //       Navigator.push(
+        //         //         context,
+        //         //         MaterialPageRoute(
+        //         //           builder: (context) =>
+        //         //               const PrivacyPolicyScreen(),
+        //         //         ),
+        //         //       );
+        //         //     },
+        //         // ),
+        //       ],
+        //     ),
+        //   ),
+        // ),
+        //     ],
+        //   )
+        // :
         Row(
           children: [
             SizedBox(
@@ -478,7 +532,10 @@ class _LoginScreenState extends State<LoginScreen>
             const SizedBox(width: 8),
             const Text(
               'Remember me',
-              style: TextStyle(color: Colors.white, fontSize: 14),
+              style: TextStyle(
+                color: Color.fromARGB(255, 240, 237, 237),
+                fontSize: 14,
+              ),
             ),
           ],
         ),
@@ -489,7 +546,7 @@ class _LoginScreenState extends State<LoginScreen>
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w600,
-              color: Colors.white,
+              color: Color.fromARGB(255, 240, 237, 237),
             ),
           ),
         ),
@@ -544,7 +601,10 @@ class _LoginScreenState extends State<LoginScreen>
           text: _isSignUpMode
               ? 'Already have an account? '
               : "Don't have an account? ",
-          style: const TextStyle(color: Colors.white, fontSize: 14),
+          style: const TextStyle(
+            color: Color.fromARGB(255, 238, 237, 237),
+            fontSize: 14,
+          ),
           children: [
             TextSpan(
               text: _isSignUpMode ? 'Log In' : 'Sign Up',
@@ -563,9 +623,15 @@ class _LoginScreenState extends State<LoginScreen>
     return Row(
       children: [
         Expanded(child: Divider(color: Colors.grey[300], thickness: 1)),
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16),
-          child: Text('OR', style: TextStyle(color: Colors.grey)),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Text(
+            'OR',
+            style: TextStyle(
+              color: Colors.grey[500],
+              fontWeight: FontWeight.w500,
+            ),
+          ),
         ),
         Expanded(child: Divider(color: Colors.grey[300], thickness: 1)),
       ],
@@ -587,7 +653,7 @@ class _LoginScreenState extends State<LoginScreen>
                 return const Icon(
                   Icons.g_mobiledata,
                   size: 38,
-                  color: Colors.white,
+                  color: Color.fromARGB(255, 230, 226, 226),
                 );
               },
             ),
@@ -603,7 +669,7 @@ class _LoginScreenState extends State<LoginScreen>
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
-              side: const BorderSide(color: Colors.grey),
+              side: BorderSide(color: Colors.grey[300]!),
               backgroundColor: const Color.fromARGB(255, 141, 112, 112),
             ),
           ),
