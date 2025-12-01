@@ -55,8 +55,8 @@ android {
             signingConfig = signingConfigs.getByName("debug")
             
             // Enable code shrinking, obfuscation, and optimization
-            isMinifyEnabled = true
-            isShrinkResources = true
+            isMinifyEnabled = false
+            isShrinkResources = false
             
             // Use proguard for code optimization
             proguardFiles(
