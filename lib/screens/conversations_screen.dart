@@ -7,7 +7,6 @@ import 'package:timeago/timeago.dart' as timeago;
 
 import '../models/conversation_model.dart';
 import '../models/user_profile.dart';
-import '../services/conversation_service.dart';
 import 'enhanced_chat_screen.dart';
 import 'create_group_screen.dart';
 import 'group_chat_screen.dart';
@@ -24,12 +23,10 @@ class _ConversationsScreenState extends State<ConversationsScreen>
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final TextEditingController _searchController = TextEditingController();
-  final ConversationService _conversationService = ConversationService();
 
   late TabController _tabController;
   bool _isSearching = false;
   String _searchQuery = '';
-  bool _isCleaningUp = false;
 
   @override
   void initState() {
@@ -37,46 +34,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
     _tabController = TabController(
       length: 1,
       vsync: this,
-    ); // Changed to 1 tab only
-    _runCleanup();
-  }
-
-  /// Run cleanup for orphaned conversations
-  /// Deferred to run AFTER first frame to prevent frame drops
-  Future<void> _runCleanup() async {
-    // Defer cleanup to after UI is rendered to prevent frame skipping
-    await Future.delayed(const Duration(milliseconds: 500));
-
-    if (!mounted) return;
-
-    try {
-      setState(() {
-        _isCleaningUp = true;
-      });
-
-      final deletedCount = await _conversationService
-          .deleteOrphanedConversations();
-
-      if (deletedCount > 0 && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Cleaned up $deletedCount invalid conversation${deletedCount > 1 ? 's' : ''}',
-            ),
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 2),
-          ),
-        );
-      }
-    } catch (e) {
-      debugPrint('Error during cleanup: $e');
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isCleaningUp = false;
-        });
-      }
-    }
+    );
   }
 
   @override
@@ -246,25 +204,6 @@ class _ConversationsScreenState extends State<ConversationsScreen>
     final currentUserId = _auth.currentUser?.uid;
     if (currentUserId == null) {
       return const Center(child: Text('Please login to see conversations'));
-    }
-
-    // Show loading indicator while cleaning up orphaned conversations
-    if (_isCleaningUp) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const CircularProgressIndicator(),
-            const SizedBox(height: 16),
-            Text(
-              'Checking conversations...',
-              style: TextStyle(
-                color: isDarkMode ? Colors.grey[600] : Colors.grey,
-              ),
-            ),
-          ],
-        ),
-      );
     }
 
     return StreamBuilder<QuerySnapshot>(

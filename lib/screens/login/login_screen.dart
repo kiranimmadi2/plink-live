@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../services/auth_service.dart';
 import '../main_navigation_screen.dart';
+import 'profile_setup_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -121,11 +123,17 @@ class _LoginScreenState extends State<LoginScreen>
           _showSuccessSnackBar(
             _isSignUpMode ? 'Account created successfully!' : 'Welcome back!',
           );
-          // Navigate to main screen after successful login
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
-            (route) => false,
-          );
+
+          // For new signups, go to profile setup
+          if (_isSignUpMode) {
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (_) => const ProfileSetupScreen()),
+              (route) => false,
+            );
+          } else {
+            // For existing users, check if profile setup is complete
+            await _navigateBasedOnProfileStatus(user.uid);
+          }
         }
       } catch (e) {
         if (mounted) {
@@ -142,6 +150,45 @@ class _LoginScreenState extends State<LoginScreen>
     }
   }
 
+  Future<void> _navigateBasedOnProfileStatus(String userId) async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .get();
+
+      if (!mounted) return;
+
+      final data = doc.data();
+      final profileSetupComplete = data?['profileSetupComplete'] ?? false;
+      final connectionTypes = data?['connectionTypes'] as List?;
+      final activities = data?['activities'] as List?;
+
+      // If profile setup not complete and no data, show setup
+      if (!profileSetupComplete &&
+          (connectionTypes == null || connectionTypes.isEmpty) &&
+          (activities == null || activities.isEmpty)) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const ProfileSetupScreen()),
+          (route) => false,
+        );
+      } else {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
+          (route) => false,
+        );
+      }
+    } catch (e) {
+      // On error, just go to main screen
+      if (mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
+          (route) => false,
+        );
+      }
+    }
+  }
+
   Future<void> _signInWithGoogle() async {
     setState(() {
       _isLoading = true;
@@ -153,11 +200,8 @@ class _LoginScreenState extends State<LoginScreen>
       if (user != null && mounted) {
         HapticFeedback.lightImpact();
         _showSuccessSnackBar('Welcome, ${user.displayName ?? 'User'}!');
-        // Navigate to main screen after successful Google sign-in
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
-          (route) => false,
-        );
+        // Check if profile setup is complete
+        await _navigateBasedOnProfileStatus(user.uid);
       }
     } catch (e) {
       if (mounted) {

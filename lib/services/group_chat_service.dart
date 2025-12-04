@@ -569,6 +569,7 @@ class GroupChatService {
     String? imageUrl,
     String? fileUrl,
     String? fileName,
+    String? replyToMessageId,
   }) async {
     final currentUserId = _auth.currentUser?.uid;
     if (currentUserId == null) return null;
@@ -598,6 +599,7 @@ class GroupChatService {
         'timestamp': FieldValue.serverTimestamp(),
         'isSystemMessage': false,
         'readBy': [currentUserId], // Sender has read their own message
+        if (replyToMessageId != null) 'replyToMessageId': replyToMessageId,
       });
 
       final updates = <String, dynamic>{

@@ -45,6 +45,7 @@ class AuthService {
             'blockedUsers': [], // Initialize empty blocked users
             'connectionTypes': [], // Initialize empty connection types
             'activities': [], // Initialize empty activities
+            'birthDate': null, // Initialize birthDate as null
           });
         } else {
           // Just update last seen
@@ -109,6 +110,7 @@ class AuthService {
           'blockedUsers': [], // Initialize empty blocked users
           'connectionTypes': [], // Initialize empty connection types
           'activities': [], // Initialize empty activities
+          'birthDate': null, // Initialize birthDate as null
         }, SetOptions(merge: true));
       }
       
@@ -189,6 +191,7 @@ class AuthService {
             'blockedUsers': [], // Initialize empty blocked users
             'connectionTypes': [], // Initialize empty connection types
             'activities': [], // Initialize empty activities
+            'birthDate': null, // Initialize birthDate as null
           },
         }, SetOptions(merge: true));
         
