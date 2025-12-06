@@ -1,10 +1,9 @@
-﻿import 'package:flutter/material.dart';
+import 'dart:ui' show ImageFilter;
+import 'package:flutter/material.dart';
+import 'package:video_player/video_player.dart';
 import 'package:supper/main.dart';
-import 'package:supper/screens/login/login_screen.dart';
 import 'dart:async';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:supper/screens/login/onboarding_screen.dart';
-import 'package:supper/screens/main_navigation_screen.dart';
+import 'package:supper/services/video_preload_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -16,6 +15,7 @@ class SplashScreen extends StatefulWidget {
 class _SplashScreenState extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
+  final VideoPreloadService _videoService = VideoPreloadService();
 
   @override
   void initState() {
@@ -27,16 +27,45 @@ class _SplashScreenState extends State<SplashScreen>
       duration: const Duration(seconds: 3),
     )..repeat(reverse: true);
 
-    Future.delayed(const Duration(seconds: 2), () {
+    // Setup video background - same pattern as onboarding
+    if (_videoService.isReady) {
+      _videoService.resume();
+    } else {
+      _videoService.addOnReadyCallback(_onVideoReady);
+    }
+
+    // Start video preload and wait for it before navigating
+    _initializeAndNavigate();
+  }
+
+  void _onVideoReady() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  Future<void> _initializeAndNavigate() async {
+    // Start video preload immediately
+    final videoFuture = _videoService.preload();
+
+    // Wait for minimum splash time (3 seconds) AND video to be ready
+    await Future.wait([
+      videoFuture,
+      Future.delayed(const Duration(seconds: 3)),
+    ]);
+
+    // Navigate only after video is ready
+    if (mounted) {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const AuthWrapper()),
       );
-    });
+    }
   }
 
   @override
   void dispose() {
+    _videoService.removeOnReadyCallback(_onVideoReady);
     _animationController.dispose();
     super.dispose();
   }
@@ -46,78 +75,116 @@ class _SplashScreenState extends State<SplashScreen>
     final screenSize = MediaQuery.of(context).size;
 
     return Scaffold(
+      backgroundColor: const Color(0xFF0f0f23),
       body: Stack(
         children: [
-          // Background gradient
-          Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  Color.fromARGB(255, 99, 99, 100),
-                  Color.fromARGB(255, 42, 31, 44),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+          // Gradient Background - always visible immediately
+          Positioned.fill(
+            child: Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Color(0xFF1a1a2e),
+                    Color(0xFF16213e),
+                    Color(0xFF0f0f23),
+                  ],
+                ),
               ),
             ),
           ),
 
-          // Background circular elements
+          // Video Background - layered on top when ready
+          if (_videoService.isReady && _videoService.controller != null)
+            Positioned.fill(
+              child: FittedBox(
+                fit: BoxFit.cover,
+                child: SizedBox(
+                  width: _videoService.controller!.value.size.width,
+                  height: _videoService.controller!.value.size.height,
+                  child: VideoPlayer(_videoService.controller!),
+                ),
+              ),
+            ),
+
+          // Dark overlay
+          Positioned.fill(
+            child: Container(
+              color: Colors.black.withValues(alpha: 0.4),
+            ),
+          ),
+
+          // Background circular elements with glassmorphism
           CustomPaint(
             size: screenSize,
             painter: _BackgroundPatternPainter(color: Colors.white),
           ),
 
-          Center(
-            child: AnimatedBuilder(
-              animation: _animationController,
-              builder: (context, child) {
-                final value = _animationController.value;
-                final scale = 1.0 + (value * 0.1);
-                final rotationY = value * 0.5;
+          // Centered Logo with glassmorphism - truly centered
+          Positioned.fill(
+            child: Center(
+              child: AnimatedBuilder(
+                animation: _animationController,
+                builder: (context, child) {
+                  final value = _animationController.value;
+                  final scale = 1.0 + (value * 0.1);
+                  final rotationY = value * 0.5;
 
-                return Transform(
-                  alignment: Alignment.center,
-                  transform: Matrix4.identity()
-                    ..scale(scale) // ignore: deprecated_member_use
-                    ..rotateY(rotationY),
-                  child: child,
-                );
-              },
-              child: Container(
-                width: 280,
-                height: 280,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withValues(alpha: 0.1),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.3),
-                    width: 3,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.white.withValues(alpha: 0.5),
-                      blurRadius: 30,
-                      spreadRadius: 5,
-                      offset: const Offset(0, 10),
-                    ),
-                  ],
-                ),
+                  return Transform(
+                    alignment: Alignment.center,
+                    transform: Matrix4.identity()
+                      ..scale(scale)
+                      ..rotateY(rotationY),
+                    child: child,
+                  );
+                },
                 child: ClipOval(
-                  child: Image.asset(
-                    'assets/logo/Clogo.jpeg',
-                    fit: BoxFit.cover,
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                    child: Container(
+                      width: screenSize.height * 0.28,
+                      height: screenSize.height * 0.28,
+                      constraints: const BoxConstraints(
+                        maxWidth: 280,
+                        maxHeight: 280,
+                        minWidth: 180,
+                        minHeight: 180,
+                      ),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white.withValues(alpha: 0.1),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.3),
+                          width: 3,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.white.withValues(alpha: 0.3),
+                            blurRadius: 40,
+                            spreadRadius: 5,
+                            offset: const Offset(0, 10),
+                          ),
+                        ],
+                      ),
+                      child: ClipOval(
+                        child: Image.asset(
+                          'assets/logo/Clogo.jpeg',
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),
             ),
           ),
 
-          // Splash text
+          // Splash text with glassmorphism container
           Positioned(
-            bottom: 200,
-            left: 0,
-            right: 0,
+            bottom: screenSize.height * 0.18,
+            left: 24,
+            right: 24,
             child: FadeTransition(
               opacity: Tween<double>(begin: 0, end: 1).animate(
                 CurvedAnimation(
@@ -125,14 +192,90 @@ class _SplashScreenState extends State<SplashScreen>
                   curve: Curves.easeIn,
                 ),
               ),
-              child: const Text(
-                'Welcome to Supper',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.2,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 16,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.2),
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Welcome to Supper',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: screenSize.height < 700 ? 22 : 26,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.2,
+                            shadows: [
+                              Shadow(
+                                color: Colors.black.withValues(alpha: 0.5),
+                                blurRadius: 8,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Your campus marketplace',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.8),
+                            fontSize: 13,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          // Loading indicator
+          Positioned(
+            bottom: screenSize.height * 0.08,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.2),
+                      ),
+                    ),
+                    child: SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          Colors.white.withValues(alpha: 0.8),
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -151,13 +294,22 @@ class _BackgroundPatternPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = color.withValues(alpha: 0.05)
+      ..color = color.withValues(alpha: 0.03)
       ..style = PaintingStyle.fill;
 
-    // Big circles
+    // Big circles with reduced opacity for video background
     canvas.drawCircle(Offset(size.width * 0.3, size.height * 0.4), 150, paint);
     canvas.drawCircle(Offset(size.width * 0.7, size.height * 0.6), 200, paint);
     canvas.drawCircle(Offset(size.width * 0.5, size.height * 0.8), 120, paint);
+
+    // Add border circles
+    final borderPaint = Paint()
+      ..color = color.withValues(alpha: 0.05)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+
+    canvas.drawCircle(Offset(size.width * 0.2, size.height * 0.2), 80, borderPaint);
+    canvas.drawCircle(Offset(size.width * 0.8, size.height * 0.3), 60, borderPaint);
   }
 
   @override

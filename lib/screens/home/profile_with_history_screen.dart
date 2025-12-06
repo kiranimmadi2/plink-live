@@ -12,8 +12,8 @@ import '../../services/activity_migration_service.dart';
 import '../../widgets/user_avatar.dart';
 import '../../providers/theme_provider.dart';
 import '../login/login_screen.dart';
-import 'profile_view_screen.dart';
-import 'settings_screen.dart';
+import '../profile/profile_view_screen.dart';
+import '../profile/settings_screen.dart';
 import '../enhanced_chat_screen.dart';
 import '../../models/user_profile.dart';
 
@@ -350,7 +350,8 @@ class _ProfileWithHistoryScreenState
       if (userId == null) return;
 
       final userCity = _userProfile?['city'];
-      final userLocation = _userProfile?['location']; // ignore: unused_local_variable
+      final userLocation =
+          _userProfile?['location']; // ignore: unused_local_variable
 
       // Build query based on filters
       Query<Map<String, dynamic>> usersQuery = _firestore.collection('users');
@@ -741,7 +742,7 @@ class _ProfileWithHistoryScreenState
       if (mounted) {
         Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(builder: (_) => const LoginScreen()),
+          MaterialPageRoute(builder: (_) => const LoginScreen(accountType: '')),
           (route) => false,
         );
       }
@@ -1107,7 +1108,10 @@ class _ProfileWithHistoryScreenState
                                                   _loadUserData();
 
                                                   if (mounted) {
-                                                    ScaffoldMessenger.of(context).showSnackBar( // ignore: use_build_context_synchronously
+                                                    ScaffoldMessenger.of(
+                                                      context,
+                                                    ).showSnackBar(
+                                                      // ignore: use_build_context_synchronously
                                                       const SnackBar(
                                                         content: Text(
                                                           'Location updated successfully',
@@ -1119,7 +1123,10 @@ class _ProfileWithHistoryScreenState
                                                   }
                                                 } else {
                                                   if (mounted) {
-                                                    ScaffoldMessenger.of(context).showSnackBar( // ignore: use_build_context_synchronously
+                                                    ScaffoldMessenger.of(
+                                                      context,
+                                                    ).showSnackBar(
+                                                      // ignore: use_build_context_synchronously
                                                       const SnackBar(
                                                         content: Text(
                                                           'Could not update location',
@@ -1135,7 +1142,10 @@ class _ProfileWithHistoryScreenState
                                                   'Error during manual location update: $e',
                                                 );
                                                 if (mounted) {
-                                                  ScaffoldMessenger.of(context).showSnackBar( // ignore: use_build_context_synchronously
+                                                  ScaffoldMessenger.of(
+                                                    context,
+                                                  ).showSnackBar(
+                                                    // ignore: use_build_context_synchronously
                                                     const SnackBar(
                                                       content: Text(
                                                         'Location update failed',
@@ -1829,7 +1839,8 @@ class _ProfileWithHistoryScreenState
           await _loadUserData();
 
           if (!mounted) return;
-          showDialog( // ignore: use_build_context_synchronously
+          showDialog(
+            // ignore: use_build_context_synchronously
             context: context,
             builder: (context) => AlertDialog(
               title: const Text('Migration Complete'),
@@ -2230,7 +2241,8 @@ class _ProfileWithHistoryScreenState
         final person = _nearbyPeople[index];
         final userData = person['userData'] as Map<String, dynamic>;
         final commonInterests = person['commonInterests'] as List<String>;
-        final matchScore = person['matchScore'] as double; // ignore: unused_local_variable
+        final matchScore =
+            person['matchScore'] as double; // ignore: unused_local_variable
 
         return Container(
           margin: const EdgeInsets.only(bottom: 12),

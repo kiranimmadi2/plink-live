@@ -5,12 +5,12 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
-import '../models/conversation_model.dart';
-import '../models/user_profile.dart';
-import '../services/conversation_service.dart';
-import 'enhanced_chat_screen.dart';
-import 'create_group_screen.dart';
-import 'group_chat_screen.dart';
+import '../../models/conversation_model.dart';
+import '../../models/user_profile.dart';
+import '../../services/conversation_service.dart';
+import '../enhanced_chat_screen.dart';
+import '../create_group_screen.dart';
+import '../group_chat_screen.dart';
 
 class ConversationsScreen extends StatefulWidget {
   const ConversationsScreen({super.key});
@@ -187,7 +187,10 @@ class _ConversationsScreenState extends State<ConversationsScreen>
 
   void _openGroupChat(String groupId) async {
     try {
-      final groupDoc = await _firestore.collection('conversations').doc(groupId).get();
+      final groupDoc = await _firestore
+          .collection('conversations')
+          .doc(groupId)
+          .get();
       if (groupDoc.exists) {
         final data = groupDoc.data()!;
         if (data['isGroup'] == true) {
@@ -616,19 +619,21 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                       : Theme.of(context).primaryColor.withValues(alpha: 0.1),
                   child: displayPhoto == null || conversation.isGroup
                       ? (conversation.isGroup
-                          ? Icon(
-                              Icons.group,
-                              color: Theme.of(context).primaryColor,
-                              size: 28,
-                            )
-                          : Text(
-                              displayName.isNotEmpty ? displayName[0].toUpperCase() : '?',
-                              style: TextStyle(
+                            ? Icon(
+                                Icons.group,
                                 color: Theme.of(context).primaryColor,
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ))
+                                size: 28,
+                              )
+                            : Text(
+                                displayName.isNotEmpty
+                                    ? displayName[0].toUpperCase()
+                                    : '?',
+                                style: TextStyle(
+                                  color: Theme.of(context).primaryColor,
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ))
                       : null,
                 ),
                 Positioned(
@@ -966,11 +971,13 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                         .where('isGroup', isEqualTo: false)
                         .snapshots(),
                     builder: (context, convSnapshot) {
-                      if (convSnapshot.connectionState == ConnectionState.waiting) {
+                      if (convSnapshot.connectionState ==
+                          ConnectionState.waiting) {
                         return const Center(child: CircularProgressIndicator());
                       }
 
-                      if (!convSnapshot.hasData || convSnapshot.data!.docs.isEmpty) {
+                      if (!convSnapshot.hasData ||
+                          convSnapshot.data!.docs.isEmpty) {
                         return Center(
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -978,7 +985,9 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                               Icon(
                                 Icons.people_outline,
                                 size: 64,
-                                color: isDarkMode ? Colors.grey[700] : Colors.grey[400],
+                                color: isDarkMode
+                                    ? Colors.grey[700]
+                                    : Colors.grey[400],
                               ),
                               const SizedBox(height: 16),
                               Text(
@@ -986,18 +995,24 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                                 style: TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.w600,
-                                  color: isDarkMode ? Colors.white : Colors.black,
+                                  color: isDarkMode
+                                      ? Colors.white
+                                      : Colors.black,
                                 ),
                               ),
                               const SizedBox(height: 8),
                               Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 40),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 40,
+                                ),
                                 child: Text(
                                   'Start chatting with people from Discover or Live Connect to add them here',
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
                                     fontSize: 14,
-                                    color: isDarkMode ? Colors.grey[600] : Colors.grey,
+                                    color: isDarkMode
+                                        ? Colors.grey[600]
+                                        : Colors.grey,
                                   ),
                                 ),
                               ),
@@ -1010,7 +1025,9 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                       final Set<String> otherUserIds = {};
                       for (var doc in convSnapshot.data!.docs) {
                         final data = doc.data() as Map<String, dynamic>;
-                        final participants = List<String>.from(data['participants'] ?? []);
+                        final participants = List<String>.from(
+                          data['participants'] ?? [],
+                        );
                         for (var participant in participants) {
                           if (participant != currentUserId) {
                             otherUserIds.add(participant);
@@ -1026,7 +1043,9 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                               Icon(
                                 Icons.people_outline,
                                 size: 64,
-                                color: isDarkMode ? Colors.grey[700] : Colors.grey[400],
+                                color: isDarkMode
+                                    ? Colors.grey[700]
+                                    : Colors.grey[400],
                               ),
                               const SizedBox(height: 16),
                               Text(
@@ -1034,7 +1053,9 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                                 style: TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.w600,
-                                  color: isDarkMode ? Colors.white : Colors.black,
+                                  color: isDarkMode
+                                      ? Colors.white
+                                      : Colors.black,
                                 ),
                               ),
                             ],
@@ -1045,17 +1066,23 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                       // Fetch user details for these IDs
                       return FutureBuilder<List<DocumentSnapshot>>(
                         future: Future.wait(
-                          otherUserIds.map((id) =>
-                            _firestore.collection('users').doc(id).get()
+                          otherUserIds.map(
+                            (id) =>
+                                _firestore.collection('users').doc(id).get(),
                           ),
                         ),
                         builder: (context, usersSnapshot) {
-                          if (usersSnapshot.connectionState == ConnectionState.waiting) {
-                            return const Center(child: CircularProgressIndicator());
+                          if (usersSnapshot.connectionState ==
+                              ConnectionState.waiting) {
+                            return const Center(
+                              child: CircularProgressIndicator(),
+                            );
                           }
 
                           if (!usersSnapshot.hasData) {
-                            return const Center(child: Text('Error loading contacts'));
+                            return const Center(
+                              child: Text('Error loading contacts'),
+                            );
                           }
 
                           // Filter out non-existent users
@@ -1068,7 +1095,9 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                               child: Text(
                                 'No contacts available',
                                 style: TextStyle(
-                                  color: isDarkMode ? Colors.grey[600] : Colors.grey,
+                                  color: isDarkMode
+                                      ? Colors.grey[600]
+                                      : Colors.grey,
                                 ),
                               ),
                             );
@@ -1079,11 +1108,13 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                             itemCount: validUsers.length,
                             itemBuilder: (context, index) {
                               final userDoc = validUsers[index];
-                              final userData = userDoc.data() as Map<String, dynamic>;
+                              final userData =
+                                  userDoc.data() as Map<String, dynamic>;
                               final userId = userDoc.id;
                               final name = userData['name'] ?? 'Unknown';
                               final photoUrl = userData['photoUrl'];
-                              final showOnlineStatus = userData['showOnlineStatus'] ?? true;
+                              final showOnlineStatus =
+                                  userData['showOnlineStatus'] ?? true;
                               var isOnline = false;
 
                               // Only show online if user allows it
@@ -1093,9 +1124,11 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                                 // Check if lastSeen is recent
                                 if (isOnline) {
                                   final lastSeen = userData['lastSeen'];
-                                  if (lastSeen != null && lastSeen is Timestamp) {
+                                  if (lastSeen != null &&
+                                      lastSeen is Timestamp) {
                                     final lastSeenTime = lastSeen.toDate();
-                                    final difference = DateTime.now().difference(lastSeenTime);
+                                    final difference = DateTime.now()
+                                        .difference(lastSeenTime);
                                     if (difference.inMinutes > 5) {
                                       isOnline = false;
                                     }
@@ -1112,14 +1145,18 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                                       backgroundImage: photoUrl != null
                                           ? CachedNetworkImageProvider(photoUrl)
                                           : null,
-                                      backgroundColor: Theme.of(context)
-                                          .primaryColor
-                                          .withValues(alpha: 0.1),
+                                      backgroundColor: Theme.of(
+                                        context,
+                                      ).primaryColor.withValues(alpha: 0.1),
                                       child: photoUrl == null
                                           ? Text(
-                                              name.isNotEmpty ? name[0].toUpperCase() : '?',
+                                              name.isNotEmpty
+                                                  ? name[0].toUpperCase()
+                                                  : '?',
                                               style: TextStyle(
-                                                color: Theme.of(context).primaryColor,
+                                                color: Theme.of(
+                                                  context,
+                                                ).primaryColor,
                                                 fontWeight: FontWeight.bold,
                                               ),
                                             )
@@ -1136,7 +1173,9 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                                             color: Colors.green,
                                             shape: BoxShape.circle,
                                             border: Border.all(
-                                              color: isDarkMode ? Colors.black : Colors.white,
+                                              color: isDarkMode
+                                                  ? Colors.black
+                                                  : Colors.white,
                                               width: 2,
                                             ),
                                           ),
@@ -1147,7 +1186,9 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                                 title: Text(
                                   name,
                                   style: TextStyle(
-                                    color: isDarkMode ? Colors.white : Colors.black,
+                                    color: isDarkMode
+                                        ? Colors.white
+                                        : Colors.black,
                                     fontWeight: FontWeight.w500,
                                   ),
                                 ),
@@ -1155,18 +1196,25 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                                   isOnline
                                       ? 'Active now'
                                       : (!showOnlineStatus
-                                          ? 'Status hidden'
-                                          : _getLastSeenText(userData['lastSeen'])),
+                                            ? 'Status hidden'
+                                            : _getLastSeenText(
+                                                userData['lastSeen'],
+                                              )),
                                   style: TextStyle(
                                     color: isOnline
                                         ? Colors.green
-                                        : (isDarkMode ? Colors.grey[600] : Colors.grey),
+                                        : (isDarkMode
+                                              ? Colors.grey[600]
+                                              : Colors.grey),
                                   ),
                                 ),
                                 onTap: () async {
                                   Navigator.pop(context);
 
-                                  final userProfile = UserProfile.fromMap(userData, userId);
+                                  final userProfile = UserProfile.fromMap(
+                                    userData,
+                                    userId,
+                                  );
 
                                   Navigator.push(
                                     context,

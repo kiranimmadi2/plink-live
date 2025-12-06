@@ -14,7 +14,7 @@ import 'package:supper/screens/login/onboarding_screen.dart';
 import 'firebase_options.dart';
 import 'screens/login/splash_screen.dart';
 import 'screens/login/login_screen.dart';
-import 'screens/main_navigation_screen.dart';
+import 'screens/home/main_navigation_screen.dart';
 
 import 'services/auth_service.dart';
 import 'services/profile_service.dart';
@@ -25,6 +25,7 @@ import 'services/location_service.dart';
 import 'services/connectivity_service.dart';
 import 'services/user_migration_service.dart';
 import 'services/conversation_migration_service.dart';
+import 'services/video_preload_service.dart';
 import 'providers/theme_provider.dart';
 import 'utils/app_optimizer.dart';
 import 'utils/memory_manager.dart';
@@ -38,16 +39,22 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 /// Validate that Firebase configuration is loaded from .env
 void _validateFirebaseConfig() {
   final projectId = dotenv.env['FIREBASE_WEB_PROJECT_ID'];
-  final apiKey = dotenv.env['FIREBASE_ANDROID_API_KEY'] ?? dotenv.env['FIREBASE_WEB_API_KEY'];
+  final apiKey =
+      dotenv.env['FIREBASE_ANDROID_API_KEY'] ??
+      dotenv.env['FIREBASE_WEB_API_KEY'];
 
   if (projectId == null || projectId.isEmpty) {
     debugPrint('⚠️ WARNING: Firebase project ID is missing!');
-    debugPrint('   Please ensure .env file exists with FIREBASE_WEB_PROJECT_ID');
+    debugPrint(
+      '   Please ensure .env file exists with FIREBASE_WEB_PROJECT_ID',
+    );
   }
 
   if (apiKey == null || apiKey.isEmpty) {
     debugPrint('⚠️ WARNING: Firebase API key is missing!');
-    debugPrint('   Please ensure .env file exists with FIREBASE_ANDROID_API_KEY or FIREBASE_WEB_API_KEY');
+    debugPrint(
+      '   Please ensure .env file exists with FIREBASE_ANDROID_API_KEY or FIREBASE_WEB_API_KEY',
+    );
   }
 
   if ((projectId?.isNotEmpty ?? false) && (apiKey?.isNotEmpty ?? false)) {
@@ -65,7 +72,9 @@ void main() async {
     if (exception.toString().contains('ImageDecoder') ||
         exception.toString().contains('Failed to decode image') ||
         exception.toString().contains('codec')) {
-      debugPrint('⚠️ Image decode error (suppressed): ${details.exceptionAsString()}');
+      debugPrint(
+        ' Image decode error (suppressed): ${details.exceptionAsString()}',
+      );
       return; // Don't propagate
     }
     // For other errors, use default handler
@@ -104,6 +113,10 @@ void main() async {
     );
   }
 
+  // Start video preload immediately - before app renders
+  // This ensures video is ready when splash screen opens
+  unawaited(VideoPreloadService().preload());
+
   // Run app immediately - defer ALL heavy initializations
   runApp(const ProviderScope(child: MyApp()));
 
@@ -132,15 +145,19 @@ Future<void> _initializeServicesInBackground() async {
   await Future.delayed(const Duration(milliseconds: 50));
 
   // Initialize notification service (can run in parallel, but don't block)
-  unawaited(NotificationService().initialize().catchError((e) {
-    debugPrint('NotificationService init error (non-fatal): $e');
-  }));
+  unawaited(
+    NotificationService().initialize().catchError((e) {
+      debugPrint('NotificationService init error (non-fatal): $e');
+    }),
+  );
 
   // Initialize connectivity service after a small delay
   await Future.delayed(const Duration(milliseconds: 100));
-  unawaited(ConnectivityService().initialize().catchError((e) {
-    debugPrint('ConnectivityService init error (non-fatal): $e');
-  }));
+  unawaited(
+    ConnectivityService().initialize().catchError((e) {
+      debugPrint('ConnectivityService init error (non-fatal): $e');
+    }),
+  );
 
   // NOTE: Migrations are now run in AuthWrapper._initializeUserServices()
   // after the user is authenticated to avoid permission errors
@@ -156,9 +173,17 @@ class MyApp extends ConsumerWidget {
 
     return MaterialApp(
       title: 'Supper',
-      theme: themeNotifier.themeData,
+      theme: themeNotifier.themeData.copyWith(
+        scaffoldBackgroundColor: const Color(0xFF0f0f23),
+      ),
       debugShowCheckedModeBanner: false,
       home: const SplashScreen(), // <-- Use AuthWrapper here
+      builder: (context, child) {
+        return Container(
+          color: const Color(0xFF0f0f23),
+          child: child,
+        );
+      },
     );
   }
 }
@@ -200,8 +225,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
           String uid = snapshot.data!.uid;
 
           // Initialize user-dependent services only once per session
-          if (!_hasInitializedServices ||
-              _lastInitializedUserId != uid) {
+          if (!_hasInitializedServices || _lastInitializedUserId != uid) {
             if (!_isInitializing) {
               _isInitializing = true;
               _hasInitializedServices = true;
@@ -230,14 +254,16 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
   Widget _buildLoadingScreen() {
     return Scaffold(
+      backgroundColor: const Color(0xFF0f0f23),
       body: Container(
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
             colors: [
-              Colors.blue.shade400,
-              Colors.purple.shade400,
+              Color(0xFF1a1a2e),
+              Color(0xFF16213e),
+              Color(0xFF0f0f23),
             ],
           ),
         ),
@@ -260,6 +286,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
   Widget _buildErrorScreen(String error) {
     return Scaffold(
+      backgroundColor: const Color(0xFF0f0f23),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -270,13 +297,13 @@ class _AuthWrapperState extends State<AuthWrapper> {
               const SizedBox(height: 16),
               const Text(
                 'Something went wrong',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
               ),
               const SizedBox(height: 8),
               Text(
                 error,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.grey),
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
               ),
               const SizedBox(height: 24),
               ElevatedButton(
@@ -301,11 +328,11 @@ class _AuthWrapperState extends State<AuthWrapper> {
         await _profileService.ensureProfileExists().timeout(
           const Duration(seconds: 10),
           onTimeout: () {
-            debugPrint('⚠️ Profile service timed out');
+            debugPrint(' Profile service timed out');
           },
         );
       } catch (e) {
-        debugPrint('⚠️ Profile service error (non-fatal): $e');
+        debugPrint(' Profile service error (non-fatal): $e');
       }
 
       await Future.delayed(const Duration(milliseconds: 100));

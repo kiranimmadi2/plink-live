@@ -1,9 +1,10 @@
 // Web-specific entry point that avoids importing Agora
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:supper/screens/login/choose_account_type_screen.dart';
 import 'firebase_options.dart';
 import 'screens/login/login_screen.dart';
-import 'screens/main_navigation_screen.dart';
+import 'screens/home/main_navigation_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 void main() async {
@@ -38,7 +39,7 @@ class MyApp extends StatelessWidget {
           if (snapshot.hasData) {
             return const MainNavigationScreen();
           }
-          return const LoginScreen();
+          return const ChooseAccountTypeScreen();
         },
       ),
     );
