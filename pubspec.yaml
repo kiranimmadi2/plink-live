@@ -80,6 +80,13 @@ dependencies:
   # Contacts and sharing
   flutter_contacts: ^1.1.9+2
   share_plus: ^10.1.4
+  file_picker: ^8.1.4
+  open_filex: ^4.5.0
+  video_player: ^2.9.2
+  chewie: ^1.8.5
+  flutter_image_compress: ^2.3.0
+  video_compress: ^3.1.2
+  dio: ^5.7.0
 
   # Local SQLite storage for messages
   sqflite: ^2.3.0
