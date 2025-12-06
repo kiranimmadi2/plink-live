@@ -2,16 +2,17 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../services/group_chat_service.dart';
+import '../providers/app_providers.dart';
 
-class GroupChatScreen extends StatefulWidget {
+class GroupChatScreen extends ConsumerStatefulWidget {
   final String groupId;
   final String groupName;
 
@@ -22,17 +23,19 @@ class GroupChatScreen extends StatefulWidget {
   });
 
   @override
-  State<GroupChatScreen> createState() => _GroupChatScreenState();
+  ConsumerState<GroupChatScreen> createState() => _GroupChatScreenState();
 }
 
-class _GroupChatScreenState extends State<GroupChatScreen> with WidgetsBindingObserver {
+class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsBindingObserver {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
   final GroupChatService _groupChatService = GroupChatService();
   final ImagePicker _imagePicker = ImagePicker();
+
+  // Helper getter for current user ID from provider
+  String? get _currentUserId => ref.read(currentUserIdProvider);
 
   // Message pagination
   static const int _messagesPerPage = 50;
@@ -194,7 +197,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> with WidgetsBindingOb
     final text = _messageController.text.trim();
     if (text.isEmpty || _isSending) return;
 
-    final currentUserId = _auth.currentUser?.uid;
+    final currentUserId = _currentUserId;
     if (currentUserId == null) return;
 
     // Clear input immediately
@@ -428,7 +431,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> with WidgetsBindingOb
 
   // Send image message
   Future<void> _sendImageMessage(File imageFile) async {
-    final currentUserId = _auth.currentUser?.uid;
+    final currentUserId = _currentUserId;
     if (currentUserId == null) {
       debugPrint('Error: No authenticated user');
       return;
@@ -870,7 +873,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> with WidgetsBindingOb
                     }
 
                     final members = snapshot.data!;
-                    final currentUserId = _auth.currentUser?.uid;
+                    final currentUserId = _currentUserId;
 
                     return ListView.builder(
                       controller: scrollController,
@@ -990,7 +993,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> with WidgetsBindingOb
     final memberId = member['id'] as String;
     final memberName = member['name'] ?? 'Unknown';
     final isAdmin = member['isAdmin'] ?? false;
-    final isCreator = _auth.currentUser?.uid == _createdBy;
+    final isCreator = _currentUserId == _createdBy;
 
     showModalBottomSheet(
       context: context,
@@ -1316,7 +1319,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> with WidgetsBindingOb
   String _getTypingText() {
     if (_typingUsers.isEmpty) return '';
 
-    final currentUserId = _auth.currentUser?.uid;
+    final currentUserId = _currentUserId;
     final typingNames = _typingUsers
         .where((id) => id != currentUserId)
         .map((id) => _memberNames[id]?.split(' ').first ?? 'Someone')
@@ -1331,7 +1334,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> with WidgetsBindingOb
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final currentUserId = _auth.currentUser?.uid;
+    final currentUserId = _currentUserId;
 
     return Scaffold(
       backgroundColor: isDarkMode ? const Color(0xFF000000) : Colors.white,

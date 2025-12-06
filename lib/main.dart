@@ -23,6 +23,8 @@ import 'services/location_service.dart';
 import 'services/connectivity_service.dart';
 import 'services/user_migration_service.dart';
 import 'services/conversation_migration_service.dart';
+import 'services/analytics_service.dart';
+import 'services/error_tracking_service.dart';
 import 'providers/theme_provider.dart';
 import 'utils/app_optimizer.dart';
 import 'utils/memory_manager.dart';
@@ -56,68 +58,78 @@ void _validateFirebaseConfig() {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Set up global error handling for image decode errors
-  FlutterError.onError = (FlutterErrorDetails details) {
-    final exception = details.exception;
-    // Suppress image decode errors - they're non-fatal
-    if (exception.toString().contains('ImageDecoder') ||
-        exception.toString().contains('Failed to decode image') ||
-        exception.toString().contains('codec')) {
-      debugPrint('⚠️ Image decode error (suppressed): ${details.exceptionAsString()}');
-      return; // Don't propagate
-    }
-    // For other errors, use default handler
-    FlutterError.presentError(details);
-  };
-
-  // Load environment variables
+  // Load environment variables first
   await dotenv.load(fileName: ".env");
 
-  // Validate Firebase configuration
-  _validateFirebaseConfig();
+  // Initialize Sentry for error tracking (wraps the entire app)
+  await ErrorTrackingService.initialize(() async {
+    // Set up global error handling for image decode errors
+    FlutterError.onError = (FlutterErrorDetails details) {
+      final exception = details.exception;
+      // Suppress image decode errors - they're non-fatal
+      if (exception.toString().contains('ImageDecoder') ||
+          exception.toString().contains('Failed to decode image') ||
+          exception.toString().contains('codec')) {
+        debugPrint('⚠️ Image decode error (suppressed): ${details.exceptionAsString()}');
+        return; // Don't propagate
+      }
+      // Report to Sentry and show error
+      ErrorTrackingService().captureException(exception, stackTrace: details.stack);
+      FlutterError.presentError(details);
+    };
 
-  // Initialize Firebase only once
-  if (Firebase.apps.isEmpty) {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
+    // Validate Firebase configuration
+    _validateFirebaseConfig();
+
+    // Initialize Firebase only once
+    if (Firebase.apps.isEmpty) {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+    }
+
+    await SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
+
+    SystemChrome.setSystemUIOverlayStyle(
+      const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        systemNavigationBarColor: Colors.transparent,
+      ),
     );
-  }
 
-  await SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-  ]);
+    if (!kIsWeb) {
+      // Fixed: Changed from UNLIMITED to 50MB to prevent memory issues
+      FirebaseFirestore.instance.settings = const Settings(
+        persistenceEnabled: true,
+        cacheSizeBytes: 50 * 1024 * 1024, // 50MB cache limit
+      );
+    }
 
-  SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      systemNavigationBarColor: Colors.transparent,
-    ),
-  );
+    // Run app immediately - defer ALL heavy initializations
+    runApp(const ProviderScope(child: MyApp()));
 
-  if (!kIsWeb) {
-    FirebaseFirestore.instance.settings = const Settings(
-      persistenceEnabled: true,
-      cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
-    );
-  }
-
-  // Run app immediately - defer ALL heavy initializations
-  runApp(const ProviderScope(child: MyApp()));
-
-  // Defer all non-critical initialization to AFTER first frame
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    _initializeServicesInBackground();
+    // Defer all non-critical initialization to AFTER first frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeServicesInBackground();
+    });
   });
 }
 
 /// Initialize non-critical services after app has started rendering
 Future<void> _initializeServicesInBackground() async {
-  // Longer delay to let UI fully render and become responsive
-  await Future.delayed(const Duration(milliseconds: 500));
+  // Shorter delay - reduced from 500ms to 200ms for faster startup
+  await Future.delayed(const Duration(milliseconds: 200));
 
   // FCM background handler - set up after app is responsive
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+
+  // Initialize Firebase Analytics
+  unawaited(AnalyticsService().initialize().catchError((e) {
+    debugPrint('AnalyticsService init error (non-fatal): $e');
+  }));
 
   // Initialize utilities in sequence with small delays to prevent jank
   await AppOptimizer.initialize();
@@ -132,6 +144,7 @@ Future<void> _initializeServicesInBackground() async {
   // Initialize notification service (can run in parallel, but don't block)
   unawaited(NotificationService().initialize().catchError((e) {
     debugPrint('NotificationService init error (non-fatal): $e');
+    ErrorTrackingService().captureException(e, message: 'NotificationService init failed');
   }));
 
   // Initialize connectivity service after a small delay
@@ -139,6 +152,9 @@ Future<void> _initializeServicesInBackground() async {
   unawaited(ConnectivityService().initialize().catchError((e) {
     debugPrint('ConnectivityService init error (non-fatal): $e');
   }));
+
+  // Log app open event
+  unawaited(AnalyticsService().logAppOpen());
 
   // NOTE: Migrations are now run in AuthWrapper._initializeUserServices()
   // after the user is authenticated to avoid permission errors

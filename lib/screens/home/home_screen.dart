@@ -2,8 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import '../../services/universal_intent_service.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/user_profile.dart';
 import '../enhanced_chat_screen.dart';
 import '../../widgets/user_avatar.dart';
@@ -11,51 +10,38 @@ import '../../services/realtime_matching_service.dart';
 import '../profile/profile_with_history_screen.dart';
 import '../../services/photo_cache_service.dart';
 import '../../widgets/floating_particles.dart';
+import '../../providers/discovery_providers.dart';
 import 'package:lottie/lottie.dart';
 
 @immutable
-class HomeScreen extends StatefulWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen>
+class _HomeScreenState extends ConsumerState<HomeScreen>
     with SingleTickerProviderStateMixin {
-  final UniversalIntentService _intentService = UniversalIntentService();
   final RealtimeMatchingService _realtimeService = RealtimeMatchingService();
-
-  final FirebaseAuth _auth = FirebaseAuth.instance;
   final PhotoCacheService _photoCache = PhotoCacheService();
+
+  // Helper getter for current user photo URL
+  String? get _currentUserPhotoURL => FirebaseAuth.instance.currentUser?.photoURL;
 
   final TextEditingController _intentController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   final ScrollController _voiceScrollController = ScrollController();
 
   bool _isSearchFocused = false;
-  bool _isProcessing = false;
-
-  List<String> _suggestions = [];
-  List<Map<String, dynamic>> _matches = [];
-  String _currentUserName = '';
 
   late AnimationController _controller;
   bool _visible = true;
   late Timer _timer;
 
-  final List<Map<String, dynamic>> _conversation = [];
-
-  // Voice recording state
-  bool _isRecording = false;
-  bool _isVoiceProcessing = false;
-  String _voiceText = '';
-
   @override
   void initState() {
     super.initState();
-    _loadUserIntents();
-    _loadUserProfile();
     _realtimeService.initialize();
 
     _controller = AnimationController(vsync: this);
@@ -75,13 +61,6 @@ class _HomeScreenState extends State<HomeScreen>
     _intentController.addListener(() {
       setState(() {});
     });
-
-    _conversation.add({
-      'text':
-          'Hi! I\'m your Supper assistant. What would you like to find today?',
-      'isUser': false,
-      'timestamp': DateTime.now(),
-    });
   }
 
   @override
@@ -95,142 +74,39 @@ class _HomeScreenState extends State<HomeScreen>
     super.dispose();
   }
 
-  Future<void> _loadUserProfile() async {
-    final userId = _auth.currentUser?.uid;
-    if (userId != null) {
-      final userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(userId)
-          .get();
-
-      if (userDoc.exists && mounted) {
-        setState(() {
-          _currentUserName = userDoc.data()?['name'] ?? 'User';
-        });
-      }
-    }
-  }
-
-  Future<void> _loadUserIntents() async {
-    final userId = _auth.currentUser?.uid;
-    if (userId != null) {
-      await _intentService.getUserIntents(userId);
-      setState(() {});
-    }
-  }
-
   void _processIntent() async {
     if (_intentController.text.isEmpty) return;
 
     final userMessage = _intentController.text.trim();
     if (userMessage.isEmpty) return;
 
-    setState(() {
-      _conversation.add({
-        'text': userMessage,
-        'isUser': true,
-        'timestamp': DateTime.now(),
-      });
-      _isProcessing = true;
-    });
+    // Add user message to conversation
+    ref.read(conversationProvider.notifier).addUserMessage(userMessage);
+    ref.read(homeProcessingProvider.notifier).setProcessing(true);
 
     _intentController.clear();
 
     await Future.delayed(const Duration(milliseconds: 1000));
 
-    final aiResponse = _generateAIResponse(userMessage);
+    // Get user name from provider
+    final userName = ref.read(currentUserNameProvider).maybeWhen(
+      data: (name) => name,
+      orElse: () => 'User',
+    );
 
-    setState(() {
-      _conversation.add({
-        'text': aiResponse,
-        'isUser': false,
-        'timestamp': DateTime.now(),
-      });
-      _isProcessing = false;
-    });
+    final aiResponse = generateAIResponse(userMessage, userName);
+    ref.read(conversationProvider.notifier).addAIMessage(aiResponse);
+    ref.read(homeProcessingProvider.notifier).setProcessing(false);
 
-    if (_shouldProcessForMatches(userMessage)) {
+    if (shouldProcessForMatches(userMessage)) {
       await _processWithIntent(userMessage);
     }
   }
 
-  String _generateAIResponse(String userMessage) {
-    final message = userMessage.toLowerCase();
-
-    if (message.contains('hello') ||
-        message.contains('hi') ||
-        message.contains('hey')) {
-      return 'Hello ${_currentUserName.split(' ')[0]}!  How can I help you find what you need today?';
-    } else if (message.contains('bike') || message.contains('cycle')) {
-      return ' Looking for a bike? I can help you find people selling or renting bicycles in your area. What\'s your budget?';
-    } else if (message.contains('book') || message.contains('study')) {
-      return 'Need books? Tell me which subject or specific books you\'re looking for, and I\'ll find students who have them.';
-    } else if (message.contains('room') ||
-        message.contains('hostel') ||
-        message.contains('rent')) {
-      return ' Looking for accommodation? I can connect you with people offering rooms or looking for roommates nearby.';
-    } else if (message.contains('job') ||
-        message.contains('work') ||
-        message.contains('hire')) {
-      return ' Job hunting? Let me know what kind of work you\'re looking for or if you\'re hiring, and I\'ll find relevant matches.';
-    } else if (message.contains('sell') || message.contains('buy')) {
-      return 'Looking to buy or sell something? Describe what you need, and I\'ll find the perfect match for you!';
-    } else if (message.contains('thank') || message.contains('thanks')) {
-      return 'You\'re welcome! Let me know if you need help with anything else.';
-    } else if (message.contains('help')) {
-      return 'I can help you find:\n• Items to buy/sell\n• Roommates\n• Study materials\n• Part-time jobs\n• Services\nJust tell me what you need!';
-    } else {
-      return 'I understand you\'re looking for: "$userMessage". Let me find the best matches for you in our community!';
-    }
-  }
-
-  bool _shouldProcessForMatches(String message) {
-    final lowerMessage = message.toLowerCase();
-    return lowerMessage.contains('bike') ||
-        lowerMessage.contains('book') ||
-        lowerMessage.contains('room') ||
-        lowerMessage.contains('job') ||
-        lowerMessage.contains('sell') ||
-        lowerMessage.contains('buy') ||
-        lowerMessage.contains('rent') ||
-        lowerMessage.contains('hire') ||
-        lowerMessage.contains('find') ||
-        lowerMessage.contains('look');
-  }
-
-  void _loadSuggestions(String value) {
-    setState(() {
-      _suggestions =
-          [
-                "Looking for a bike under \$200",
-                "Need study books for engineering",
-                "Room for rent near campus",
-                "Part-time job opportunities",
-                "Selling my old laptop",
-              ]
-              .where(
-                (suggestion) =>
-                    suggestion.toLowerCase().contains(value.toLowerCase()),
-              )
-              .toList();
-
-      if (_suggestions.length < 3) {
-        _suggestions.addAll([
-          "Find roommates",
-          "Buy/Sell items",
-          "Study materials",
-        ]);
-      }
-      _suggestions = _suggestions.take(3).toList();
-    });
-  }
-
   void _startVoiceRecording() async {
     HapticFeedback.mediumImpact();
-    setState(() {
-      _isRecording = true;
-      _voiceText = 'Listening... Speak now';
-    });
+    ref.read(homeProcessingProvider.notifier).setRecording(true);
+    ref.read(homeProcessingProvider.notifier).setVoiceText('Listening... Speak now');
 
     await Future.delayed(const Duration(seconds: 3));
 
@@ -240,11 +116,9 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   void _stopVoiceRecording() async {
-    setState(() {
-      _isRecording = false;
-      _isVoiceProcessing = true;
-      _voiceText = 'Processing your voice...';
-    });
+    ref.read(homeProcessingProvider.notifier).setRecording(false);
+    ref.read(homeProcessingProvider.notifier).setVoiceProcessing(true);
+    ref.read(homeProcessingProvider.notifier).setVoiceText('Processing your voice...');
 
     await Future.delayed(const Duration(seconds: 2));
 
@@ -262,11 +136,9 @@ class _HomeScreenState extends State<HomeScreen>
         mockVoiceResults[DateTime.now().millisecondsSinceEpoch %
             mockVoiceResults.length];
 
-    setState(() {
-      _isVoiceProcessing = false;
-      _voiceText = randomResult;
-      _intentController.text = randomResult;
-    });
+    ref.read(homeProcessingProvider.notifier).setVoiceProcessing(false);
+    ref.read(homeProcessingProvider.notifier).setVoiceText(randomResult);
+    _intentController.text = randomResult;
 
     // Auto-scroll to bottom when text updates
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -284,56 +156,23 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Future<void> _processWithIntent(String intent) async {
-    setState(() {
-      _isProcessing = true;
-    });
+    ref.read(homeProcessingProvider.notifier).setProcessing(true);
 
     try {
-      final result = await _intentService.processIntentAndMatch(intent);
+      await ref.read(matchesProvider.notifier).processIntent(intent);
 
       if (!mounted) return;
 
-      if (result['success'] == true) {
-        final matches = List<Map<String, dynamic>>.from(
-          result['matches'] ?? [],
+      final matchesState = ref.read(matchesProvider);
+      ref.read(homeProcessingProvider.notifier).setProcessing(false);
+
+      if (matchesState.hasMatches) {
+        ref.read(conversationProvider.notifier).addAIMessage(
+          'Found ${matchesState.matchCount} potential matches for you! Tap below to view them.',
         );
-
-        for (final match in matches) {
-          final userProfile = match['userProfile'] ?? {};
-          final userId = match['userId'];
-          final photoUrl = userProfile['photoUrl'];
-
-          if (userId != null && photoUrl != null) {
-            _photoCache.cachePhotoUrl(userId, photoUrl);
-          }
-        }
-
-        setState(() {
-          _matches = matches;
-          _isProcessing = false;
-        });
-
-        if (_matches.isNotEmpty) {
-          setState(() {
-            _conversation.add({
-              'text':
-                  'Found ${_matches.length} potential matches for you! Tap below to view them.',
-              'isUser': false,
-              'timestamp': DateTime.now(),
-            });
-          });
-        }
-
-        _loadUserIntents();
-      } else {
-        setState(() {
-          _isProcessing = false;
-        });
       }
     } catch (e) {
-      setState(() {
-        _isProcessing = false;
-      });
+      ref.read(homeProcessingProvider.notifier).setProcessing(false);
     }
   }
 
@@ -350,6 +189,15 @@ class _HomeScreenState extends State<HomeScreen>
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
+    // Watch providers for reactive updates
+    final processingState = ref.watch(homeProcessingProvider);
+    final matchesState = ref.watch(matchesProvider);
+    final userNameAsync = ref.watch(currentUserNameProvider);
+    final currentUserName = userNameAsync.maybeWhen(
+      data: (name) => name,
+      orElse: () => 'User',
+    );
 
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -386,7 +234,7 @@ class _HomeScreenState extends State<HomeScreen>
                   MaterialPageRoute(
                     builder: (context) => const ProfileWithHistoryScreen(),
                   ),
-                ).then((_) => _loadUserProfile());
+                );
               },
               child: Container(
                 decoration: BoxDecoration(
@@ -403,9 +251,9 @@ class _HomeScreenState extends State<HomeScreen>
                 ),
                 padding: const EdgeInsets.all(2),
                 child: UserAvatar(
-                  profileImageUrl: _auth.currentUser?.photoURL,
+                  profileImageUrl: _currentUserPhotoURL,
                   radius: 20,
-                  fallbackText: _currentUserName,
+                  fallbackText: currentUserName,
                 ),
               ),
             ),
@@ -422,19 +270,19 @@ class _HomeScreenState extends State<HomeScreen>
           Column(
             children: [
               Expanded(
-                child: _isProcessing
+                child: processingState.isProcessing
                     ? _buildChatState(isDarkMode)
-                    : _matches.isNotEmpty
+                    : matchesState.hasMatches
                     ? _buildMatchesList(isDarkMode)
                     : _buildChatState(isDarkMode),
               ),
 
               // Voice recording overlay - HALF SCREEN MODAL
-              if (_isRecording || _isVoiceProcessing)
+              if (processingState.isRecording || processingState.isVoiceProcessing)
                 _buildVoiceRecordingOverlay(isDarkMode),
 
               // Bottom input section
-              if (!_isRecording && !_isVoiceProcessing)
+              if (!processingState.isRecording && !processingState.isVoiceProcessing)
                 _buildInputSection(isDarkMode),
             ],
           ),
@@ -444,6 +292,11 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Widget _buildVoiceRecordingOverlay(bool isDarkMode) {
+    final processingState = ref.watch(homeProcessingProvider);
+    final isRecording = processingState.isRecording;
+    final isVoiceProcessing = processingState.isVoiceProcessing;
+    final voiceText = processingState.voiceText;
+
     return Container(
       height: MediaQuery.of(context).size.height * 0.4,
       width: double.infinity,
@@ -461,7 +314,7 @@ class _HomeScreenState extends State<HomeScreen>
           Stack(
             alignment: Alignment.center,
             children: [
-              if (_isRecording) ...[
+              if (isRecording) ...[
                 _buildVoiceWave(120, 0.3, 0),
                 _buildVoiceWave(100, 0.5, 500),
                 _buildVoiceWave(80, 0.7, 1000),
@@ -471,23 +324,23 @@ class _HomeScreenState extends State<HomeScreen>
                 height: 80,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: _isRecording ? Colors.red : Colors.transparent,
+                  color: isRecording ? Colors.red : Colors.transparent,
                   boxShadow: [
                     BoxShadow(
-                      color: (_isRecording ? Colors.red : Colors.blue)
+                      color: (isRecording ? Colors.red : Colors.blue)
                           .withValues(alpha: 0.5),
                       blurRadius: 15,
                       spreadRadius: 5,
                     ),
                   ],
-                  image: !_isRecording
+                  image: !isRecording
                       ? const DecorationImage(
                           image: AssetImage('assets/logo/Clogo.jpeg'),
                           fit: BoxFit.cover,
                         )
                       : null,
                 ),
-                child: _isRecording
+                child: isRecording
                     ? const Center(
                         child: Icon(Icons.mic, color: Colors.white, size: 40),
                       )
@@ -507,7 +360,7 @@ class _HomeScreenState extends State<HomeScreen>
                 children: [
                   // Status text
                   Text(
-                    _voiceText,
+                    voiceText,
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 20,
@@ -519,14 +372,14 @@ class _HomeScreenState extends State<HomeScreen>
                   const SizedBox(height: 8),
 
                   // Additional guidance
-                  if (_isRecording)
+                  if (isRecording)
                     Text(
                       'Tap anywhere to stop recording',
                       style: TextStyle(color: Colors.grey[400], fontSize: 16),
                       textAlign: TextAlign.center,
                     ),
 
-                  if (_isVoiceProcessing)
+                  if (isVoiceProcessing)
                     const Column(
                       children: [
                         SizedBox(height: 20),
@@ -544,7 +397,7 @@ class _HomeScreenState extends State<HomeScreen>
           ),
 
           // Close button
-          if (_isRecording)
+          if (isRecording)
             Padding(
               padding: const EdgeInsets.only(bottom: 30),
               child: GestureDetector(
@@ -599,6 +452,12 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Widget _buildInputSection(bool isDarkMode) {
+    final processingState = ref.watch(homeProcessingProvider);
+    final isRecording = processingState.isRecording;
+    final isProcessing = processingState.isProcessing;
+    final query = _intentController.text;
+    final suggestions = ref.watch(filteredSuggestionsProvider(query));
+
     return Container(
       padding: EdgeInsets.only(
         left: 20,
@@ -610,20 +469,20 @@ class _HomeScreenState extends State<HomeScreen>
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (_suggestions.isNotEmpty)
+          if (suggestions.isNotEmpty)
             Container(
               margin: const EdgeInsets.only(bottom: 8),
               height: 36,
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
-                itemCount: _suggestions.length,
+                itemCount: suggestions.length,
                 itemBuilder: (context, index) {
                   return Padding(
                     padding: const EdgeInsets.only(right: 8),
                     child: InkWell(
                       onTap: () {
                         HapticFeedback.lightImpact();
-                        _intentController.text = _suggestions[index];
+                        _intentController.text = suggestions[index];
                         _processIntent();
                       },
                       child: Container(
@@ -650,7 +509,7 @@ class _HomeScreenState extends State<HomeScreen>
                           ),
                         ),
                         child: Text(
-                          _suggestions[index],
+                          suggestions[index],
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w500,
@@ -733,11 +592,8 @@ class _HomeScreenState extends State<HomeScreen>
                         fillColor: Colors.transparent,
                       ),
                       onChanged: (value) {
-                        if (value.length >= 2) {
-                          _loadSuggestions(value);
-                        } else {
-                          setState(() => _suggestions = []);
-                        }
+                        // Trigger rebuild to update suggestions via provider
+                        setState(() {});
                       },
                       onSubmitted: (_) => _processIntent(),
                     ),
@@ -748,7 +604,7 @@ class _HomeScreenState extends State<HomeScreen>
 
                 // Mic button
                 GestureDetector(
-                  onTap: _isRecording
+                  onTap: isRecording
                       ? _stopVoiceRecording
                       : _startVoiceRecording,
                   child: Container(
@@ -757,7 +613,7 @@ class _HomeScreenState extends State<HomeScreen>
                     margin: const EdgeInsets.only(left: 6, bottom: 7.5),
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: _isRecording ? Colors.red : Colors.grey[800],
+                      color: isRecording ? Colors.red : Colors.grey[800],
                       boxShadow: [
                         BoxShadow(
                           color: Colors.white.withValues(alpha: 0.1),
@@ -767,7 +623,7 @@ class _HomeScreenState extends State<HomeScreen>
                       ],
                     ),
                     child: Icon(
-                      _isRecording ? Icons.stop : Icons.mic,
+                      isRecording ? Icons.stop : Icons.mic,
                       color: Colors.white,
                       size: 22,
                     ),
@@ -777,7 +633,7 @@ class _HomeScreenState extends State<HomeScreen>
 
                 // Send button
                 GestureDetector(
-                  onTap: _isProcessing ? null : _processIntent,
+                  onTap: isProcessing ? null : _processIntent,
                   child: Container(
                     width: 50,
                     height: 50,
@@ -786,7 +642,7 @@ class _HomeScreenState extends State<HomeScreen>
                       shape: BoxShape.circle,
                       color: Colors.grey[800],
                     ),
-                    child: _isProcessing
+                    child: isProcessing
                         ? const Padding(
                             padding: EdgeInsets.all(12),
                             child: CircularProgressIndicator(
@@ -806,6 +662,9 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Widget _buildChatState(bool isDarkMode) {
+    final conversationState = ref.watch(conversationProvider);
+    final messages = conversationState.messages;
+
     return Column(
       children: [
         const SizedBox(height: 110),
@@ -813,15 +672,15 @@ class _HomeScreenState extends State<HomeScreen>
           child: ListView.builder(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             reverse: false,
-            itemCount: _conversation.length,
+            itemCount: messages.length,
             itemBuilder: (context, index) {
-              final message = _conversation[index];
+              final message = messages[index];
               return _buildMessageBubble(message, isDarkMode);
             },
           ),
         ),
 
-        if (_conversation.length <= 1)
+        if (messages.length <= 1)
           AnimatedOpacity(
             opacity: _visible ? 1.0 : 0.5,
             duration: const Duration(milliseconds: 300),
@@ -838,9 +697,9 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  Widget _buildMessageBubble(Map<String, dynamic> message, bool isDarkMode) {
-    final isUser = message['isUser'] as bool;
-    final text = message['text'] as String;
+  Widget _buildMessageBubble(ConversationMessage message, bool isDarkMode) {
+    final isUser = message.isUser;
+    final text = message.text;
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8),
@@ -906,15 +765,15 @@ class _HomeScreenState extends State<HomeScreen>
               margin: const EdgeInsets.only(left: 8, top: 4),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                image: _auth.currentUser?.photoURL != null
+                image: _currentUserPhotoURL != null
                     ? DecorationImage(
-                        image: NetworkImage(_auth.currentUser!.photoURL!),
+                        image: NetworkImage(_currentUserPhotoURL!),
                         fit: BoxFit.cover,
                       )
                     : null,
-                color: _auth.currentUser?.photoURL == null ? Colors.grey : null,
+                color: _currentUserPhotoURL == null ? Colors.grey : null,
               ),
-              child: _auth.currentUser?.photoURL == null
+              child: _currentUserPhotoURL == null
                   ? const Icon(Icons.person, color: Colors.white, size: 16)
                   : null,
             ),
@@ -924,6 +783,9 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Widget _buildMatchesList(bool isDarkMode) {
+    final matchesState = ref.watch(matchesProvider);
+    final matches = matchesState.matches;
+
     return Column(
       children: [
         Container(
@@ -939,7 +801,7 @@ class _HomeScreenState extends State<HomeScreen>
               Icon(Icons.people, color: Colors.green[600]),
               const SizedBox(width: 8),
               Text(
-                '${_matches.length} Matches Found',
+                '${matches.length} Matches Found',
                 style: TextStyle(
                   color: Colors.green[600],
                   fontWeight: FontWeight.w600,
@@ -949,9 +811,7 @@ class _HomeScreenState extends State<HomeScreen>
               const Spacer(),
               GestureDetector(
                 onTap: () {
-                  setState(() {
-                    _matches.clear();
-                  });
+                  ref.read(matchesProvider.notifier).clearMatches();
                 },
                 child: Container(
                   padding: const EdgeInsets.symmetric(
@@ -979,9 +839,9 @@ class _HomeScreenState extends State<HomeScreen>
         Expanded(
           child: ListView.builder(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            itemCount: _matches.length,
+            itemCount: matches.length,
             itemBuilder: (context, index) {
-              return _buildMatchCard(_matches[index], isDarkMode);
+              return _buildMatchCard(matches[index], isDarkMode);
             },
           ),
         ),

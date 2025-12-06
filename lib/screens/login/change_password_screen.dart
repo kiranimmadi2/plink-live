@@ -13,7 +13,6 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   final _currentPasswordController = TextEditingController();
   final _newPasswordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   bool _isLoading = false;
   bool _obscureCurrentPassword = true;
@@ -36,7 +35,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     });
 
     try {
-      final user = _auth.currentUser;
+      final user = FirebaseAuth.instance.currentUser;
       if (user == null || user.email == null) {
         throw Exception('User not authenticated');
       }
@@ -100,7 +99,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   @override
   Widget build(BuildContext context) {
     // Check if user signed in with email/password
-    final user = _auth.currentUser;
+    final user = FirebaseAuth.instance.currentUser;
     final isEmailProvider =
         user?.providerData.any(
           (provider) => provider.providerId == 'password',

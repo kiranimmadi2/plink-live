@@ -1,7 +1,7 @@
-﻿import 'dart:math' as math;
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 // screens
 import 'home/home_screen.dart';
@@ -13,14 +13,17 @@ import 'profile/profile_with_history_screen.dart';
 import '../services/location_service.dart';
 import '../services/notification_service.dart';
 
-class MainNavigationScreen extends StatefulWidget {
+// providers
+import '../providers/app_providers.dart';
+
+class MainNavigationScreen extends ConsumerStatefulWidget {
   const MainNavigationScreen({super.key});
 
   @override
-  State<MainNavigationScreen> createState() => _MainNavigationScreenState();
+  ConsumerState<MainNavigationScreen> createState() => _MainNavigationScreenState();
 }
 
-class _MainNavigationScreenState extends State<MainNavigationScreen>
+class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen>
     with WidgetsBindingObserver {
   int _currentIndex = 0;
   bool _fabMenuOpen = false;
@@ -30,9 +33,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
   bool _isDragging = false;
   bool _initialPosSet = false;
 
-  final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final LocationService _location = LocationService();
+
+  // Helper getter for current user ID from provider
+  String? get _currentUserId => ref.read(currentUserIdProvider);
 
   @override
   void initState() {
@@ -63,7 +68,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (_auth.currentUser == null) return;
+    if (_currentUserId == null) return;
 
     if (state == AppLifecycleState.resumed) {
       _updateStatus(true);
@@ -73,7 +78,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
   }
 
   void _updateStatus(bool online) {
-    final uid = _auth.currentUser?.uid;
+    final uid = _currentUserId;
     if (uid == null) return;
 
     _firestore.collection("users").doc(uid).update({
@@ -83,17 +88,17 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
   }
 
   void _listenUnread() {
-    final user = _auth.currentUser;
-    if (user == null) return;
+    final userId = _currentUserId;
+    if (userId == null) return;
 
     _firestore
         .collection("conversations")
-        .where("participants", arrayContains: user.uid)
+        .where("participants", arrayContains: userId)
         .snapshots()
         .listen((snap) {
           int total = 0;
           for (var doc in snap.docs) {
-            total += ((doc["unreadCount"]?[user.uid] ?? 0) as num).toInt();
+            total += ((doc["unreadCount"]?[userId] ?? 0) as num).toInt();
           }
           setState(() => _unreadMessageCount = total);
           NotificationService().updateBadgeCount(total);

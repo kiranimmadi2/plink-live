@@ -3,9 +3,9 @@ import 'dart:ui';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/app_providers.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -29,8 +29,10 @@ class LiveConnectTabScreen extends ConsumerStatefulWidget {
 }
 
 class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  // Helper getter for current user ID from provider
+  String? get _currentUserId => ref.read(currentUserIdProvider);
   final ConnectionService _connectionService = ConnectionService();
   final LocationService _locationService = LocationService();
 
@@ -161,7 +163,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
 
   /// Load user's connections with real-time listener
   void _loadMyConnections() {
-    final currentUserId = _auth.currentUser?.uid;
+    final currentUserId = _currentUserId;
     if (currentUserId == null) return;
 
     // Cancel existing subscription if any
@@ -283,7 +285,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
     if (!mounted) return;
 
     try {
-      final userId = _auth.currentUser?.uid;
+      final userId = _currentUserId;
       if (userId == null) return;
 
       // Load user profile
@@ -351,7 +353,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
     });
 
     try {
-      final userId = _auth.currentUser?.uid;
+      final userId = _currentUserId;
       if (userId == null) return;
 
       final userCity = _userProfile?['city'];
@@ -670,7 +672,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
     if (_userProfile == null) return;
 
     // Create ExtendedUserProfile from current user's data
-    final userId = _auth.currentUser?.uid;
+    final userId = _currentUserId;
     if (userId == null) return;
 
     final myProfile = ExtendedUserProfile.fromMap(_userProfile!, userId);
@@ -694,7 +696,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
   void _showEditProfile() {
     if (_userProfile == null) return;
 
-    final userId = _auth.currentUser?.uid;
+    final userId = _currentUserId;
     if (userId == null) return;
 
     // ignore: unused_local_variable
@@ -755,7 +757,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
   }
 
   Future<void> _updateInterests() async {
-    final userId = _auth.currentUser?.uid;
+    final userId = _currentUserId;
     if (userId == null) return;
 
     try {
@@ -1672,7 +1674,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
 
   // ignore: unused_element
   Future<void> _toggleFavorite(String userId, String userName) async {
-    final currentUserId = _auth.currentUser?.uid;
+    final currentUserId = _currentUserId;
     if (currentUserId == null) return;
 
     try {

@@ -1,32 +1,34 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:timeago/timeago.dart' as timeago;
+import 'package:flutter_contacts/flutter_contacts.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../models/conversation_model.dart';
 import '../models/user_profile.dart';
+import '../providers/conversation_providers.dart';
+import '../providers/app_providers.dart';
 import 'enhanced_chat_screen.dart';
 import 'create_group_screen.dart';
 import 'group_chat_screen.dart';
 
-class ConversationsScreen extends StatefulWidget {
+class ConversationsScreen extends ConsumerStatefulWidget {
   const ConversationsScreen({super.key});
 
   @override
-  State<ConversationsScreen> createState() => _ConversationsScreenState();
+  ConsumerState<ConversationsScreen> createState() => _ConversationsScreenState();
 }
 
-class _ConversationsScreenState extends State<ConversationsScreen>
+class _ConversationsScreenState extends ConsumerState<ConversationsScreen>
     with TickerProviderStateMixin {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
   final TextEditingController _searchController = TextEditingController();
 
   late TabController _tabController;
-  bool _isSearching = false;
-  String _searchQuery = '';
 
   @override
   void initState() {
@@ -44,55 +46,33 @@ class _ConversationsScreenState extends State<ConversationsScreen>
     super.dispose();
   }
 
-  String _getLastSeenText(dynamic lastSeen) {
-    if (lastSeen == null) return 'Offline';
-
-    if (lastSeen is Timestamp) {
-      final lastSeenTime = lastSeen.toDate();
-      final difference = DateTime.now().difference(lastSeenTime);
-
-      if (difference.inMinutes < 1) {
-        return 'Just now';
-      } else if (difference.inMinutes < 60) {
-        return '${difference.inMinutes}m ago';
-      } else if (difference.inHours < 24) {
-        return '${difference.inHours}h ago';
-      } else if (difference.inDays < 7) {
-        return '${difference.inDays}d ago';
-      } else {
-        return 'Offline';
-      }
-    }
-
-    return 'Offline';
-  }
-
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final screenState = ref.watch(conversationsScreenProvider);
 
     return Scaffold(
       backgroundColor: isDarkMode ? const Color(0xFF000000) : Colors.white,
       appBar: _buildAppBar(isDarkMode),
       body: Column(
         children: [
-          if (_isSearching) _buildSearchBar(isDarkMode),
+          if (screenState.isSearching) _buildSearchBar(isDarkMode),
           Expanded(
-            child: _buildChatsList(
-              isDarkMode,
-            ), // Direct chat list without TabBar
+            child: _buildChatsList(isDarkMode),
           ),
         ],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _showNewChatDialog,
         backgroundColor: Theme.of(context).primaryColor,
-        child: const Icon(Icons.edit, color: Colors.white),
+        child: const Icon(Icons.add, color: Colors.white),
       ),
     );
   }
 
   PreferredSizeWidget _buildAppBar(bool isDarkMode) {
+    final screenState = ref.watch(conversationsScreenProvider);
+
     return AppBar(
       backgroundColor: isDarkMode ? const Color(0xFF000000) : Colors.white,
       elevation: 0,
@@ -115,17 +95,14 @@ class _ConversationsScreenState extends State<ConversationsScreen>
         ),
         IconButton(
           icon: Icon(
-            _isSearching ? Icons.close : Icons.search,
+            screenState.isSearching ? Icons.close : Icons.search,
             color: isDarkMode ? Colors.white : Colors.black,
           ),
           onPressed: () {
-            setState(() {
-              _isSearching = !_isSearching;
-              if (!_isSearching) {
-                _searchController.clear();
-                _searchQuery = '';
-              }
-            });
+            ref.read(conversationsScreenProvider.notifier).toggleSearch();
+            if (!screenState.isSearching) {
+              _searchController.clear();
+            }
           },
         ),
       ],
@@ -192,103 +169,40 @@ class _ConversationsScreenState extends State<ConversationsScreen>
           contentPadding: const EdgeInsets.symmetric(vertical: 8),
         ),
         onChanged: (value) {
-          setState(() {
-            _searchQuery = value.toLowerCase();
-          });
+          ref.read(conversationsScreenProvider.notifier).setSearchQuery(value);
         },
       ),
     );
   }
 
   Widget _buildChatsList(bool isDarkMode) {
-    final currentUserId = _auth.currentUser?.uid;
+    final currentUserId = ref.watch(currentUserIdProvider);
     if (currentUserId == null) {
       return const Center(child: Text('Please login to see conversations'));
     }
 
-    return StreamBuilder<QuerySnapshot>(
-      stream: _firestore
-          .collection('conversations')
-          .where('participants', arrayContains: currentUserId)
-          .snapshots(),
-      builder: (context, snapshot) {
-        // Debug logging disabled for production performance
-        // Uncomment for debugging: debugPrint('ConversationsScreen: rebuild, state=${snapshot.connectionState}');
+    final filteredConversations = ref.watch(filteredConversationsProvider);
 
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
+    return filteredConversations.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, stack) {
+        debugPrint('ConversationsScreen: Error: $error');
 
-        if (snapshot.hasError) {
-          // Log the error for debugging
-          debugPrint('ConversationsScreen: Error: ${snapshot.error}');
-
-          // Handle permission errors gracefully
-          final error = snapshot.error.toString();
-          if (error.contains('permission-denied') ||
-              error.contains('PERMISSION_DENIED')) {
-            // Show error with option to retry instead of just empty state
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(
-                    Icons.error_outline,
-                    size: 80,
-                    color: Colors.orange,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Permission Error',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: isDarkMode ? Colors.white : Colors.black,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 40),
-                    child: Text(
-                      'Unable to load conversations. Please try logging out and logging back in.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: isDarkMode ? Colors.grey[600] : Colors.grey,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      setState(() {}); // Trigger rebuild to retry
-                    },
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('Retry'),
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 12,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }
-
-          // For other errors, show a more detailed error message
+        final errorStr = error.toString();
+        if (errorStr.contains('permission-denied') ||
+            errorStr.contains('PERMISSION_DENIED')) {
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.error_outline, size: 80, color: Colors.red),
+                const Icon(
+                  Icons.error_outline,
+                  size: 80,
+                  color: Colors.orange,
+                ),
                 const SizedBox(height: 16),
                 Text(
-                  'Error Loading Conversations',
+                  'Permission Error',
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -299,97 +213,106 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 40),
                   child: Text(
-                    error.length > 100
-                        ? '${error.substring(0, 100)}...'
-                        : error,
+                    'Unable to load conversations. Please try logging out and logging back in.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 14,
                       color: isDarkMode ? Colors.grey[600] : Colors.grey,
                     ),
                   ),
                 ),
                 const SizedBox(height: 24),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    ElevatedButton.icon(
-                      onPressed: () {
-                        setState(() {}); // Trigger rebuild to retry
-                      },
-                      icon: const Icon(Icons.refresh),
-                      label: const Text('Retry'),
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 12,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                      ),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    ref.invalidate(conversationsStreamProvider);
+                  },
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Retry'),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 12,
                     ),
-                    const SizedBox(width: 12),
-                    OutlinedButton.icon(
-                      onPressed: _showNewChatDialog,
-                      icon: const Icon(Icons.message),
-                      label: const Text('New Chat'),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 12,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                      ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
                     ),
-                  ],
+                  ),
                 ),
               ],
             ),
           );
         }
 
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return _buildEmptyState(isDarkMode);
-        }
-
-        // Parse and sort conversations manually
-        final List<ConversationModel> conversations = [];
-
-        for (var doc in snapshot.data!.docs) {
-          try {
-            final conv = ConversationModel.fromFirestore(doc);
-
-            // Note: Orphaned conversations (where user doesn't exist) are handled:
-            // 1. On app start via _runCleanup()
-            // 2. When user taps the conversation (it will be deleted gracefully)
-            // This keeps the UI responsive without async validation in the builder
-
-            // Show all conversations, even those without messages
-            if (_searchQuery.isEmpty) {
-              conversations.add(conv);
-            } else {
-              final displayName = conv.getDisplayName(currentUserId);
-              if (displayName.toLowerCase().contains(_searchQuery)) {
-                conversations.add(conv);
-              }
-            }
-          } catch (e) {
-            debugPrint(
-              'ConversationsScreen: Error parsing conversation ${doc.id}: $e',
-            );
-          }
-        }
-
-        // Sort by lastMessageTime
-        conversations.sort((a, b) {
-          if (a.lastMessageTime == null) return 1;
-          if (b.lastMessageTime == null) return -1;
-          return b.lastMessageTime!.compareTo(a.lastMessageTime!);
-        });
-
+        return Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, size: 80, color: Colors.red),
+              const SizedBox(height: 16),
+              Text(
+                'Error Loading Conversations',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: isDarkMode ? Colors.white : Colors.black,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 40),
+                child: Text(
+                  errorStr.length > 100
+                      ? '${errorStr.substring(0, 100)}...'
+                      : errorStr,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDarkMode ? Colors.grey[600] : Colors.grey,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      ref.invalidate(conversationsStreamProvider);
+                    },
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Retry'),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 12,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  OutlinedButton.icon(
+                    onPressed: _showNewChatDialog,
+                    icon: const Icon(Icons.message),
+                    label: const Text('New Chat'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 12,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+      data: (conversations) {
         if (conversations.isEmpty) {
           return _buildEmptyState(isDarkMode);
         }
@@ -409,7 +332,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
     ConversationModel conversation,
     bool isDarkMode,
   ) {
-    final currentUserId = _auth.currentUser!.uid;
+    final currentUserId = ref.watch(currentUserIdProvider) ?? '';
     final otherUserId = conversation.getOtherParticipantId(currentUserId);
 
     // Skip rendering if otherUserId is empty (invalid conversation)
@@ -853,282 +776,405 @@ class _ConversationsScreenState extends State<ConversationsScreen>
 
   void _showNewChatDialog() {
     HapticFeedback.lightImpact();
-    final currentUserId = _auth.currentUser?.uid;
+    final currentUserId = ref.read(currentUserIdProvider);
     if (currentUserId == null) return;
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.7,
-        minChildSize: 0.5,
-        maxChildSize: 0.95,
-        builder: (context, scrollController) {
-          final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+      builder: (context) => _NewMessageSheet(
+        currentUserId: currentUserId,
+        firestore: _firestore,
+      ),
+    );
+  }
 
-          return Container(
-            decoration: BoxDecoration(
-              color: isDarkMode ? const Color(0xFF1A1A1A) : Colors.white,
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(20),
-              ),
+}
+
+// Separate StatefulWidget for the New Message sheet to handle contacts loading
+class _NewMessageSheet extends StatefulWidget {
+  final String currentUserId;
+  final FirebaseFirestore firestore;
+
+  const _NewMessageSheet({
+    required this.currentUserId,
+    required this.firestore,
+  });
+
+  @override
+  State<_NewMessageSheet> createState() => _NewMessageSheetState();
+}
+
+class _NewMessageSheetState extends State<_NewMessageSheet> {
+  List<Contact> _phoneContacts = [];
+  bool _loadingContacts = false;
+  bool _contactsPermissionDenied = false;
+  Set<String> _registeredPhoneNumbers = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPhoneContacts();
+    _loadRegisteredPhoneNumbers();
+  }
+
+  Future<void> _loadRegisteredPhoneNumbers() async {
+    try {
+      final usersSnapshot = await widget.firestore.collection('users').get();
+      final phoneNumbers = <String>{};
+      for (var doc in usersSnapshot.docs) {
+        final phone = doc.data()['phone'] as String?;
+        if (phone != null && phone.isNotEmpty) {
+          // Normalize phone number (remove spaces, dashes, etc.)
+          phoneNumbers.add(_normalizePhoneNumber(phone));
+        }
+      }
+      if (mounted) {
+        setState(() {
+          _registeredPhoneNumbers = phoneNumbers;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading registered phone numbers: $e');
+    }
+  }
+
+  String _normalizePhoneNumber(String phone) {
+    return phone.replaceAll(RegExp(r'[\s\-\(\)]'), '');
+  }
+
+  Future<void> _loadPhoneContacts() async {
+    setState(() {
+      _loadingContacts = true;
+    });
+
+    try {
+      // Request permission
+      final permission = await Permission.contacts.request();
+
+      if (permission.isGranted) {
+        final contacts = await FlutterContacts.getContacts(
+          withProperties: true,
+          withPhoto: true,
+        );
+        if (mounted) {
+          setState(() {
+            _phoneContacts = contacts;
+            _loadingContacts = false;
+          });
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            _contactsPermissionDenied = true;
+            _loadingContacts = false;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading contacts: $e');
+      if (mounted) {
+        setState(() {
+          _loadingContacts = false;
+        });
+      }
+    }
+  }
+
+  bool _isContactRegistered(Contact contact) {
+    for (var phone in contact.phones) {
+      final normalized = _normalizePhoneNumber(phone.number);
+      if (_registeredPhoneNumbers.contains(normalized)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  void _inviteContact(Contact contact) {
+    final inviteMessage =
+        'Hey ${contact.displayName}! Join me on Supper - the AI-powered matching app. '
+        'Connect with people for dating, friendship, business, and more! '
+        'Download now: https://supper.app/download';
+
+    Share.share(inviteMessage, subject: 'Join me on Supper!');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.7,
+      minChildSize: 0.5,
+      maxChildSize: 0.95,
+      builder: (context, scrollController) {
+        return Container(
+          decoration: BoxDecoration(
+            color: isDarkMode ? const Color(0xFF1A1A1A) : Colors.white,
+            borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(20),
             ),
-            child: Column(
-              children: [
-                Container(
-                  margin: const EdgeInsets.only(top: 8),
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: isDarkMode ? Colors.grey[700] : Colors.grey[300],
-                    borderRadius: BorderRadius.circular(2),
+          ),
+          child: Column(
+            children: [
+              Container(
+                margin: const EdgeInsets.only(top: 8),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: isDarkMode ? Colors.grey[700] : Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text(
+                  'New Message',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: isDarkMode ? Colors.white : Colors.black,
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Text(
-                    'New Message',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: isDarkMode ? Colors.white : Colors.black,
+              ),
+              Expanded(
+                child: _buildContent(isDarkMode, scrollController),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildContent(bool isDarkMode, ScrollController scrollController) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: widget.firestore
+          .collection('conversations')
+          .where('participants', arrayContains: widget.currentUserId)
+          .where('isGroup', isEqualTo: false)
+          .snapshots(),
+      builder: (context, convSnapshot) {
+        if (convSnapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        // Extract other user IDs from conversations
+        final Set<String> otherUserIds = {};
+        if (convSnapshot.hasData) {
+          for (var doc in convSnapshot.data!.docs) {
+            final data = doc.data() as Map<String, dynamic>;
+            final participants = List<String>.from(data['participants'] ?? []);
+            for (var participant in participants) {
+              if (participant != widget.currentUserId) {
+                otherUserIds.add(participant);
+              }
+            }
+          }
+        }
+
+        // Fetch user details for registered users
+        return FutureBuilder<List<DocumentSnapshot>>(
+          future: otherUserIds.isNotEmpty
+              ? Future.wait(
+                  otherUserIds.map((id) =>
+                      widget.firestore.collection('users').doc(id).get()),
+                )
+              : Future.value([]),
+          builder: (context, usersSnapshot) {
+            final validUsers = usersSnapshot.hasData
+                ? usersSnapshot.data!.where((doc) => doc.exists).toList()
+                : <DocumentSnapshot>[];
+
+            return ListView(
+              controller: scrollController,
+              children: [
+                // Section: Registered Users (App Contacts)
+                if (validUsers.isNotEmpty) ...[
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                    child: Text(
+                      'ON SUPPER',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: isDarkMode ? Colors.grey[500] : Colors.grey[600],
+                        letterSpacing: 1,
+                      ),
                     ),
                   ),
-                ),
-                Expanded(
-                  // Show only users from existing conversations
-                  child: StreamBuilder<QuerySnapshot>(
-                    stream: _firestore
-                        .collection('conversations')
-                        .where('participants', arrayContains: currentUserId)
-                        .where('isGroup', isEqualTo: false)
-                        .snapshots(),
-                    builder: (context, convSnapshot) {
-                      if (convSnapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
-                      }
+                  ...validUsers.map((userDoc) {
+                    final userData = userDoc.data() as Map<String, dynamic>;
+                    final userId = userDoc.id;
+                    final name = userData['name'] ?? 'Unknown';
+                    final photoUrl = userData['photoUrl'];
 
-                      if (!convSnapshot.hasData || convSnapshot.data!.docs.isEmpty) {
-                        return Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.people_outline,
-                                size: 64,
-                                color: isDarkMode ? Colors.grey[700] : Colors.grey[400],
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                'No contacts yet',
+                    return ListTile(
+                      leading: CircleAvatar(
+                        backgroundImage: photoUrl != null
+                            ? CachedNetworkImageProvider(photoUrl)
+                            : null,
+                        backgroundColor:
+                            Theme.of(context).primaryColor.withValues(alpha: 0.1),
+                        child: photoUrl == null
+                            ? Text(
+                                name.isNotEmpty ? name[0].toUpperCase() : '?',
                                 style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w600,
-                                  color: isDarkMode ? Colors.white : Colors.black,
+                                  color: Theme.of(context).primaryColor,
+                                  fontWeight: FontWeight.bold,
                                 ),
-                              ),
-                              const SizedBox(height: 8),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 40),
-                                child: Text(
-                                  'Start chatting with people from Discover or Live Connect to add them here',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: isDarkMode ? Colors.grey[600] : Colors.grey,
-                                  ),
-                                ),
-                              ),
-                            ],
+                              )
+                            : null,
+                      ),
+                      title: Text(
+                        name,
+                        style: TextStyle(
+                          color: isDarkMode ? Colors.white : Colors.black,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      onTap: () async {
+                        Navigator.pop(context);
+                        final userProfile = UserProfile.fromMap(userData, userId);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) =>
+                                EnhancedChatScreen(otherUser: userProfile),
                           ),
                         );
-                      }
+                      },
+                    );
+                  }),
+                ],
 
-                      // Extract other user IDs from conversations
-                      final Set<String> otherUserIds = {};
-                      for (var doc in convSnapshot.data!.docs) {
-                        final data = doc.data() as Map<String, dynamic>;
-                        final participants = List<String>.from(data['participants'] ?? []);
-                        for (var participant in participants) {
-                          if (participant != currentUserId) {
-                            otherUserIds.add(participant);
-                          }
-                        }
-                      }
-
-                      if (otherUserIds.isEmpty) {
-                        return Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.people_outline,
-                                size: 64,
-                                color: isDarkMode ? Colors.grey[700] : Colors.grey[400],
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                'No contacts yet',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w600,
-                                  color: isDarkMode ? Colors.white : Colors.black,
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }
-
-                      // Fetch user details for these IDs
-                      return FutureBuilder<List<DocumentSnapshot>>(
-                        future: Future.wait(
-                          otherUserIds.map((id) =>
-                            _firestore.collection('users').doc(id).get()
+                // Section: Phone Contacts
+                if (_loadingContacts)
+                  const Padding(
+                    padding: EdgeInsets.all(32),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else if (_contactsPermissionDenied)
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      children: [
+                        Icon(
+                          Icons.contacts_outlined,
+                          size: 48,
+                          color: isDarkMode ? Colors.grey[600] : Colors.grey[400],
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'Enable contacts to invite friends',
+                          style: TextStyle(
+                            color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
                           ),
                         ),
-                        builder: (context, usersSnapshot) {
-                          if (usersSnapshot.connectionState == ConnectionState.waiting) {
-                            return const Center(child: CircularProgressIndicator());
-                          }
-
-                          if (!usersSnapshot.hasData) {
-                            return const Center(child: Text('Error loading contacts'));
-                          }
-
-                          // Filter out non-existent users
-                          final validUsers = usersSnapshot.data!
-                              .where((doc) => doc.exists)
-                              .toList();
-
-                          if (validUsers.isEmpty) {
-                            return Center(
-                              child: Text(
-                                'No contacts available',
-                                style: TextStyle(
-                                  color: isDarkMode ? Colors.grey[600] : Colors.grey,
-                                ),
-                              ),
-                            );
-                          }
-
-                          return ListView.builder(
-                            controller: scrollController,
-                            itemCount: validUsers.length,
-                            itemBuilder: (context, index) {
-                              final userDoc = validUsers[index];
-                              final userData = userDoc.data() as Map<String, dynamic>;
-                              final userId = userDoc.id;
-                              final name = userData['name'] ?? 'Unknown';
-                              final photoUrl = userData['photoUrl'];
-                              final showOnlineStatus = userData['showOnlineStatus'] ?? true;
-                              var isOnline = false;
-
-                              // Only show online if user allows it
-                              if (showOnlineStatus) {
-                                isOnline = userData['isOnline'] ?? false;
-
-                                // Check if lastSeen is recent
-                                if (isOnline) {
-                                  final lastSeen = userData['lastSeen'];
-                                  if (lastSeen != null && lastSeen is Timestamp) {
-                                    final lastSeenTime = lastSeen.toDate();
-                                    final difference = DateTime.now().difference(lastSeenTime);
-                                    if (difference.inMinutes > 5) {
-                                      isOnline = false;
-                                    }
-                                  } else {
-                                    isOnline = false;
-                                  }
-                                }
-                              }
-
-                              return ListTile(
-                                leading: Stack(
-                                  children: [
-                                    CircleAvatar(
-                                      backgroundImage: photoUrl != null
-                                          ? CachedNetworkImageProvider(photoUrl)
-                                          : null,
-                                      backgroundColor: Theme.of(context)
-                                          .primaryColor
-                                          .withValues(alpha: 0.1),
-                                      child: photoUrl == null
-                                          ? Text(
-                                              name.isNotEmpty ? name[0].toUpperCase() : '?',
-                                              style: TextStyle(
-                                                color: Theme.of(context).primaryColor,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            )
-                                          : null,
-                                    ),
-                                    if (isOnline)
-                                      Positioned(
-                                        right: 0,
-                                        bottom: 0,
-                                        child: Container(
-                                          width: 12,
-                                          height: 12,
-                                          decoration: BoxDecoration(
-                                            color: Colors.green,
-                                            shape: BoxShape.circle,
-                                            border: Border.all(
-                                              color: isDarkMode ? Colors.black : Colors.white,
-                                              width: 2,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                                title: Text(
-                                  name,
-                                  style: TextStyle(
-                                    color: isDarkMode ? Colors.white : Colors.black,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                subtitle: Text(
-                                  isOnline
-                                      ? 'Active now'
-                                      : (!showOnlineStatus
-                                          ? 'Status hidden'
-                                          : _getLastSeenText(userData['lastSeen'])),
-                                  style: TextStyle(
-                                    color: isOnline
-                                        ? Colors.green
-                                        : (isDarkMode ? Colors.grey[600] : Colors.grey),
-                                  ),
-                                ),
-                                onTap: () async {
-                                  Navigator.pop(context);
-
-                                  final userProfile = UserProfile.fromMap(userData, userId);
-
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => EnhancedChatScreen(
-                                        otherUser: userProfile,
-                                      ),
-                                    ),
-                                  );
-                                },
-                              );
-                            },
-                          );
-                        },
-                      );
-                    },
+                        const SizedBox(height: 8),
+                        TextButton(
+                          onPressed: () => openAppSettings(),
+                          child: const Text('Open Settings'),
+                        ),
+                      ],
+                    ),
+                  )
+                else if (_phoneContacts.isNotEmpty) ...[
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                    child: Text(
+                      'INVITE TO SUPPER',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: isDarkMode ? Colors.grey[500] : Colors.grey[600],
+                        letterSpacing: 1,
+                      ),
+                    ),
                   ),
-                ),
+                  ..._phoneContacts
+                      .where((contact) => !_isContactRegistered(contact))
+                      .take(50) // Limit to first 50 contacts
+                      .map((contact) {
+                    return ListTile(
+                      leading: CircleAvatar(
+                        backgroundImage: contact.photo != null
+                            ? MemoryImage(contact.photo!)
+                            : null,
+                        backgroundColor: Colors.grey.withValues(alpha: 0.2),
+                        child: contact.photo == null
+                            ? Text(
+                                contact.displayName.isNotEmpty
+                                    ? contact.displayName[0].toUpperCase()
+                                    : '?',
+                                style: TextStyle(
+                                  color: isDarkMode ? Colors.white : Colors.black,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              )
+                            : null,
+                      ),
+                      title: Text(
+                        contact.displayName,
+                        style: TextStyle(
+                          color: isDarkMode ? Colors.white : Colors.black,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      trailing: TextButton.icon(
+                        onPressed: () => _inviteContact(contact),
+                        icon: const Icon(Icons.send, size: 18),
+                        label: const Text('Invite'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: Theme.of(context).primaryColor,
+                        ),
+                      ),
+                    );
+                  }),
+                ],
+
+                // Empty state
+                if (validUsers.isEmpty &&
+                    _phoneContacts.isEmpty &&
+                    !_loadingContacts)
+                  Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.people_outline,
+                          size: 64,
+                          color: isDarkMode ? Colors.grey[700] : Colors.grey[400],
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'No contacts yet',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: isDarkMode ? Colors.white : Colors.black,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Start chatting with people from Discover or invite your friends',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: isDarkMode ? Colors.grey[600] : Colors.grey,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
               ],
-            ),
-          );
-        },
-      ),
+            );
+          },
+        );
+      },
     );
   }
 }

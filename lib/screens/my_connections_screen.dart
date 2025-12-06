@@ -1,22 +1,25 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/connection_service.dart';
 import '../widgets/user_avatar.dart';
 import '../models/user_profile.dart';
+import '../providers/app_providers.dart';
 import 'enhanced_chat_screen.dart';
 
-class MyConnectionsScreen extends StatefulWidget {
+class MyConnectionsScreen extends ConsumerStatefulWidget {
   const MyConnectionsScreen({super.key});
 
   @override
-  State<MyConnectionsScreen> createState() => _MyConnectionsScreenState();
+  ConsumerState<MyConnectionsScreen> createState() => _MyConnectionsScreenState();
 }
 
-class _MyConnectionsScreenState extends State<MyConnectionsScreen> {
+class _MyConnectionsScreenState extends ConsumerState<MyConnectionsScreen> {
   final ConnectionService _connectionService = ConnectionService();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  // Helper getter for current user ID from provider
+  String? get _currentUserId => ref.read(currentUserIdProvider);
 
   @override
   Widget build(BuildContext context) {
@@ -595,7 +598,7 @@ class _MyConnectionsScreenState extends State<MyConnectionsScreen> {
     if (confirmed != true) return;
 
     try {
-      final currentUserId = _auth.currentUser?.uid;
+      final currentUserId = _currentUserId;
       if (currentUserId == null) return;
 
       // Remove connection from both users

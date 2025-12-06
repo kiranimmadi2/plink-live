@@ -42,7 +42,11 @@ dependencies:
   cloud_firestore: ^5.4.4
   firebase_storage: ^12.3.4
   firebase_crashlytics: ^4.2.1
-  
+  firebase_analytics: ^11.3.3
+
+  # Error tracking
+  sentry_flutter: ^8.10.1
+
   # Gemini AI
   google_generative_ai: ^0.4.7
   
@@ -72,6 +76,10 @@ dependencies:
   connectivity_plus: ^6.0.5
   path_provider: ^2.1.4
   package_info_plus: ^8.0.3
+
+  # Contacts and sharing
+  flutter_contacts: ^1.1.9+2
+  share_plus: ^10.1.4
 
   # Local SQLite storage for messages
   sqflite: ^2.3.0

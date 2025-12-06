@@ -1,18 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../providers/app_providers.dart';
 import '../main_navigation_screen.dart';
 
-class ProfileSetupScreen extends StatefulWidget {
+class ProfileSetupScreen extends ConsumerStatefulWidget {
   const ProfileSetupScreen({super.key});
 
   @override
-  State<ProfileSetupScreen> createState() => _ProfileSetupScreenState();
+  ConsumerState<ProfileSetupScreen> createState() => _ProfileSetupScreenState();
 }
 
-class _ProfileSetupScreenState extends State<ProfileSetupScreen>
+class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen>
     with SingleTickerProviderStateMixin {
+
+  // Helper getter for current user ID from provider
+  String? get _currentUserId => ref.read(currentUserIdProvider);
   final PageController _pageController = PageController();
   late AnimationController _animationController;
   int _currentStep = 0;
@@ -134,9 +138,9 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen>
     });
 
     try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+      final userId = _currentUserId;
+      if (userId != null) {
+        await FirebaseFirestore.instance.collection('users').doc(userId).update({
           'birthDate': _selectedBirthDate?.toIso8601String(),
           'connectionTypes': _selectedConnectionTypes,
           'activities': _selectedActivities,
@@ -276,8 +280,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen>
 
   Widget _buildBirthDatePage() {
     final now = DateTime.now();
-    final minAge = 18;
-    final maxAge = 100;
+    const minAge = 18;
+    const maxAge = 100;
     final maxDate = DateTime(now.year - minAge, now.month, now.day);
     final minDate = DateTime(now.year - maxAge, now.month, now.day);
 
@@ -329,7 +333,9 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen>
                         surface: Color(0xFF2D2D44),
                         onSurface: Colors.white,
                       ),
-                      dialogBackgroundColor: const Color(0xFF1A1A2E),
+                      dialogTheme: const DialogThemeData(
+                        backgroundColor: Color(0xFF1A1A2E),
+                      ),
                     ),
                     child: child!,
                   );

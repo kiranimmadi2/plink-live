@@ -1,4 +1,4 @@
-﻿import 'dart:ui';
+import 'dart:ui';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
@@ -7,6 +7,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../providers/theme_provider.dart';
+import '../../providers/app_providers.dart';
 import '../../services/auth_service.dart';
 import 'profile_edit_screen.dart';
 import '../performance_debug_screen.dart';
@@ -25,8 +26,10 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  // Helper getter for current user ID from provider
+  String? get _currentUserId => ref.read(currentUserIdProvider);
   bool _showOnlineStatus = true;
   bool _discoveryModeEnabled = true;
   bool _isLoading = false;
@@ -44,9 +47,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<void> _loadUserPreferences() async {
-    final user = _auth.currentUser;
-    if (user != null) {
-      final doc = await _firestore.collection('users').doc(user.uid).get();
+    final userId = _currentUserId;
+    if (userId != null) {
+      final doc = await _firestore.collection('users').doc(userId).get();
       if (doc.exists && mounted) {
         final data = doc.data() ?? {};
         setState(() {
@@ -63,10 +66,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<void> _updatePreference(String key, dynamic value) async {
-    final user = _auth.currentUser;
-    if (user != null) {
+    final userId = _currentUserId;
+    if (userId != null) {
       try {
-        await _firestore.collection('users').doc(user.uid).update({key: value});
+        await _firestore.collection('users').doc(userId).update({key: value});
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -85,10 +88,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       _isLoading = true;
     });
 
-    final user = _auth.currentUser;
-    if (user != null) {
+    final userId = _currentUserId;
+    if (userId != null) {
       try {
-        await _firestore.collection('users').doc(user.uid).update({
+        await _firestore.collection('users').doc(userId).update({
           'showOnlineStatus': value,
           'isOnline': value ? true : false,
         });
@@ -828,7 +831,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           body: StreamBuilder<QuerySnapshot>(
             stream: _firestore
                 .collection('users')
-                .doc(_auth.currentUser?.uid)
+                .doc(_currentUserId)
                 .collection('blocked')
                 .snapshots(),
             builder: (context, snapshot) {
@@ -867,7 +870,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       onPressed: () async {
                         await _firestore
                             .collection('users')
-                            .doc(_auth.currentUser?.uid)
+                            .doc(_currentUserId)
                             .collection('blocked')
                             .doc(blockedUser.id)
                             .delete();
@@ -969,7 +972,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 style: TextStyle(color: Colors.orange),
               ),
               subtitle: Text(
-                _auth.currentUser?.email ?? '',
+                FirebaseAuth.instance.currentUser?.email ?? '',
                 style: const TextStyle(fontSize: 12),
               ),
               trailing: const Icon(Icons.chevron_right, color: Colors.orange),
@@ -1076,13 +1079,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               if (confirmController.text == 'DELETE') {
                 try {
                   // Delete user data from Firestore
-                  final userId = _auth.currentUser?.uid;
+                  final userId = _currentUserId;
                   if (userId != null) {
                     await _firestore.collection('users').doc(userId).delete();
                   }
 
                   // Delete authentication account
-                  await _auth.currentUser?.delete();
+                  await FirebaseAuth.instance.currentUser?.delete();
 
                   if (context.mounted) {
                     Navigator.of(context).pushAndRemoveUntil(
@@ -1345,8 +1348,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               if (feedbackController.text.isNotEmpty) {
                 try {
                   await _firestore.collection('feedback').add({
-                    'userId': _auth.currentUser?.uid,
-                    'userEmail': _auth.currentUser?.email,
+                    'userId': _currentUserId,
+                    'userEmail': FirebaseAuth.instance.currentUser?.email,
                     'feedback': feedbackController.text,
                     'timestamp': FieldValue.serverTimestamp(),
                     'type': 'feedback',
@@ -1432,8 +1435,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   if (problemController.text.isNotEmpty) {
                     try {
                       await _firestore.collection('feedback').add({
-                        'userId': _auth.currentUser?.uid,
-                        'userEmail': _auth.currentUser?.email,
+                        'userId': _currentUserId,
+                        'userEmail': FirebaseAuth.instance.currentUser?.email,
                         'problem': problemController.text,
                         'category': selectedCategory,
                         'timestamp': FieldValue.serverTimestamp(),
