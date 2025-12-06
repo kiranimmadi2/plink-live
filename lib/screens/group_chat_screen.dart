@@ -26,7 +26,8 @@ class GroupChatScreen extends ConsumerStatefulWidget {
   ConsumerState<GroupChatScreen> createState() => _GroupChatScreenState();
 }
 
-class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsBindingObserver {
+class _GroupChatScreenState extends ConsumerState<GroupChatScreen>
+    with WidgetsBindingObserver {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -99,7 +100,8 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
 
   void _scrollListener() {
     if (!_scrollController.hasClients) return;
-    final shouldShow = _scrollController.position.pixels <
+    final shouldShow =
+        _scrollController.position.pixels <
         _scrollController.position.maxScrollExtent - 500;
     if (shouldShow != _showScrollButton) {
       setState(() => _showScrollButton = shouldShow);
@@ -126,10 +128,9 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
 
   Future<void> _saveChatTheme(String theme) async {
     try {
-      await _firestore
-          .collection('conversations')
-          .doc(widget.groupId)
-          .update({'chatTheme': theme});
+      await _firestore.collection('conversations').doc(widget.groupId).update({
+        'chatTheme': theme,
+      });
       setState(() => _currentTheme = theme);
     } catch (e) {
       debugPrint('Error saving chat theme: $e');
@@ -151,14 +152,17 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     // Clear typing status when app goes to background
-    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
       _groupChatService.clearTypingStatus(widget.groupId);
     }
   }
 
   void _onScroll() {
     // Load more messages when scrolling to top
-    if (_scrollController.position.pixels <= 100 && !_isLoadingMore && _hasMoreMessages) {
+    if (_scrollController.position.pixels <= 100 &&
+        !_isLoadingMore &&
+        _hasMoreMessages) {
       _loadMoreMessages();
     }
   }
@@ -237,7 +241,9 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
       if (messageId != null && mounted) {
         // Remove optimistic message (real one will come from stream)
         setState(() {
-          _optimisticMessages.removeWhere((m) => m['id'] == optimisticMessage['id']);
+          _optimisticMessages.removeWhere(
+            (m) => m['id'] == optimisticMessage['id'],
+          );
         });
       }
     } catch (e) {
@@ -245,7 +251,9 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
       // Remove failed optimistic message
       if (mounted) {
         setState(() {
-          _optimisticMessages.removeWhere((m) => m['id'] == optimisticMessage['id']);
+          _optimisticMessages.removeWhere(
+            (m) => m['id'] == optimisticMessage['id'],
+          );
         });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -396,9 +404,9 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
     } catch (e) {
       debugPrint('Error picking image: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to pick image: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to pick image: $e')));
       }
     }
   }
@@ -422,9 +430,9 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
     } catch (e) {
       debugPrint('Error taking photo: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to take photo: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to take photo: $e')));
       }
     }
   }
@@ -442,9 +450,10 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
 
     try {
       // Upload image to Firebase Storage
-      final fileName = '${DateTime.now().millisecondsSinceEpoch}_$currentUserId.jpg';
-      final ref = _storage.ref().child('chat_images/$fileName');
-      debugPrint('Uploading to: chat_images/$fileName');
+      final fileName =
+          '${DateTime.now().millisecondsSinceEpoch}_$currentUserId.jpg';
+      final ref = _storage.ref().child('chat_media/$currentUserId/$fileName');
+      debugPrint('Uploading to: chat_media/$currentUserId/$fileName');
 
       final uploadTask = ref.putFile(imageFile);
       final snapshot = await uploadTask;
@@ -461,14 +470,15 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
           .doc(widget.groupId)
           .collection('messages')
           .add({
-        'senderId': currentUserId,
-        'text': '',
-        'imageUrl': imageUrl,
-        'timestamp': FieldValue.serverTimestamp(),
-        'isSystemMessage': false,
-        'readBy': [currentUserId],
-        if (_replyToMessage != null) 'replyToMessageId': _replyToMessage!['id'],
-      });
+            'senderId': currentUserId,
+            'text': '',
+            'imageUrl': imageUrl,
+            'timestamp': FieldValue.serverTimestamp(),
+            'isSystemMessage': false,
+            'readBy': [currentUserId],
+            if (_replyToMessage != null)
+              'replyToMessageId': _replyToMessage!['id'],
+          });
 
       // Update conversation
       await _firestore.collection('conversations').doc(widget.groupId).update({
@@ -567,7 +577,7 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
                                 color: entry.value[0].withValues(alpha: 0.5),
                                 blurRadius: 8,
                                 spreadRadius: 2,
-                              )
+                              ),
                             ]
                           : null,
                     ),
@@ -614,10 +624,15 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
               ),
               // Reply option
               ListTile(
-                leading: Icon(Icons.reply, color: Theme.of(context).primaryColor),
+                leading: Icon(
+                  Icons.reply,
+                  color: Theme.of(context).primaryColor,
+                ),
                 title: Text(
                   'Reply',
-                  style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.white : Colors.black,
+                  ),
                 ),
                 onTap: () {
                   Navigator.pop(context);
@@ -625,12 +640,18 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
                 },
               ),
               // Copy option (only for text messages)
-              if (message['text'] != null && (message['text'] as String).isNotEmpty)
+              if (message['text'] != null &&
+                  (message['text'] as String).isNotEmpty)
                 ListTile(
-                  leading: Icon(Icons.copy, color: isDarkMode ? Colors.grey[400] : Colors.grey[700]),
+                  leading: Icon(
+                    Icons.copy,
+                    color: isDarkMode ? Colors.grey[400] : Colors.grey[700],
+                  ),
                   title: Text(
                     'Copy',
-                    style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                    style: TextStyle(
+                      color: isDarkMode ? Colors.white : Colors.black,
+                    ),
                   ),
                   onTap: () {
                     Navigator.pop(context);
@@ -644,14 +665,19 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
               if (isMe)
                 ListTile(
                   leading: const Icon(Icons.delete, color: Colors.red),
-                  title: const Text('Delete', style: TextStyle(color: Colors.red)),
+                  title: const Text(
+                    'Delete',
+                    style: TextStyle(color: Colors.red),
+                  ),
                   onTap: () async {
                     Navigator.pop(context);
                     final confirmed = await showDialog<bool>(
                       context: context,
                       builder: (context) => AlertDialog(
                         title: const Text('Delete Message?'),
-                        content: const Text('This message will be deleted for everyone.'),
+                        content: const Text(
+                          'This message will be deleted for everyone.',
+                        ),
                         actions: [
                           TextButton(
                             onPressed: () => Navigator.pop(context, false),
@@ -659,7 +685,10 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
                           ),
                           TextButton(
                             onPressed: () => Navigator.pop(context, true),
-                            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                            child: const Text(
+                              'Delete',
+                              style: TextStyle(color: Colors.red),
+                            ),
                           ),
                         ],
                       ),
@@ -688,7 +717,10 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
       debugPrint('Error deleting message: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to delete message'), backgroundColor: Colors.red),
+          const SnackBar(
+            content: Text('Failed to delete message'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
@@ -721,10 +753,15 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
                 ),
               ),
               ListTile(
-                leading: Icon(Icons.palette, color: Theme.of(context).primaryColor),
+                leading: Icon(
+                  Icons.palette,
+                  color: Theme.of(context).primaryColor,
+                ),
                 title: Text(
                   'Chat Theme',
-                  style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.white : Colors.black,
+                  ),
                 ),
                 onTap: () {
                   Navigator.pop(context);
@@ -732,10 +769,15 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
                 },
               ),
               ListTile(
-                leading: Icon(Icons.search, color: isDarkMode ? Colors.grey[400] : Colors.grey[700]),
+                leading: Icon(
+                  Icons.search,
+                  color: isDarkMode ? Colors.grey[400] : Colors.grey[700],
+                ),
                 title: Text(
                   'Search Messages',
-                  style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.white : Colors.black,
+                  ),
                 ),
                 onTap: () {
                   Navigator.pop(context);
@@ -743,10 +785,15 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
                 },
               ),
               ListTile(
-                leading: Icon(Icons.info_outline, color: isDarkMode ? Colors.grey[400] : Colors.grey[700]),
+                leading: Icon(
+                  Icons.info_outline,
+                  color: isDarkMode ? Colors.grey[400] : Colors.grey[700],
+                ),
                 title: Text(
                   'Group Info',
-                  style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.white : Colors.black,
+                  ),
                 ),
                 onTap: () {
                   Navigator.pop(context);
@@ -799,8 +846,9 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
                   children: [
                     CircleAvatar(
                       radius: 30,
-                      backgroundColor:
-                          Theme.of(context).primaryColor.withValues(alpha: 0.15),
+                      backgroundColor: Theme.of(
+                        context,
+                      ).primaryColor.withValues(alpha: 0.15),
                       backgroundImage: _groupPhoto != null
                           ? CachedNetworkImageProvider(_groupPhoto!)
                           : null,
@@ -828,7 +876,9 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
                           Text(
                             '${_memberNames.length} members',
                             style: TextStyle(
-                              color: isDarkMode ? Colors.grey[600] : Colors.grey,
+                              color: isDarkMode
+                                  ? Colors.grey[600]
+                                  : Colors.grey,
                             ),
                           ),
                         ],
@@ -839,7 +889,10 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
               ),
               const Divider(),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 child: Row(
                   children: [
                     Text(
@@ -891,9 +944,7 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
                                 ? CachedNetworkImageProvider(member['photoUrl'])
                                 : null,
                             child: member['photoUrl'] == null
-                                ? Text(
-                                    (member['name'] ?? 'U')[0].toUpperCase(),
-                                  )
+                                ? Text((member['name'] ?? 'U')[0].toUpperCase())
                                 : null,
                           ),
                           title: Row(
@@ -902,7 +953,9 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
                                 child: Text(
                                   '${member['name'] ?? 'Unknown'}${isCurrentUser ? ' (You)' : ''}',
                                   style: TextStyle(
-                                    color: isDarkMode ? Colors.white : Colors.black,
+                                    color: isDarkMode
+                                        ? Colors.white
+                                        : Colors.black,
                                   ),
                                 ),
                               ),
@@ -937,9 +990,9 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
                                     vertical: 4,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: Theme.of(context)
-                                        .primaryColor
-                                        .withValues(alpha: 0.1),
+                                    color: Theme.of(
+                                      context,
+                                    ).primaryColor.withValues(alpha: 0.1),
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: Text(
@@ -1028,7 +1081,10 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
             const Divider(height: 1),
             if (isCreator && !isAdmin)
               ListTile(
-                leading: const Icon(Icons.admin_panel_settings, color: Colors.blue),
+                leading: const Icon(
+                  Icons.admin_panel_settings,
+                  color: Colors.blue,
+                ),
                 title: const Text('Make Admin'),
                 onTap: () async {
                   final messenger = ScaffoldMessenger.of(context);
@@ -1046,7 +1102,10 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
               ),
             if (isCreator && isAdmin)
               ListTile(
-                leading: const Icon(Icons.remove_moderator, color: Colors.orange),
+                leading: const Icon(
+                  Icons.remove_moderator,
+                  color: Colors.orange,
+                ),
                 title: const Text('Remove Admin'),
                 onTap: () async {
                   final messenger = ScaffoldMessenger.of(context);
@@ -1057,14 +1116,19 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
                   );
                   if (success && mounted) {
                     messenger.showSnackBar(
-                      SnackBar(content: Text('$memberName is no longer an admin')),
+                      SnackBar(
+                        content: Text('$memberName is no longer an admin'),
+                      ),
                     );
                   }
                 },
               ),
             ListTile(
               leading: const Icon(Icons.remove_circle, color: Colors.red),
-              title: const Text('Remove from Group', style: TextStyle(color: Colors.red)),
+              title: const Text(
+                'Remove from Group',
+                style: TextStyle(color: Colors.red),
+              ),
               onTap: () async {
                 final messenger = ScaffoldMessenger.of(context);
                 final parentContext = this.context;
@@ -1081,7 +1145,10 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
                       ),
                       TextButton(
                         onPressed: () => Navigator.pop(context, true),
-                        child: const Text('Remove', style: TextStyle(color: Colors.red)),
+                        child: const Text(
+                          'Remove',
+                          style: TextStyle(color: Colors.red),
+                        ),
                       ),
                     ],
                   ),
@@ -1098,7 +1165,9 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
                   } else if (mounted) {
                     messenger.showSnackBar(
                       const SnackBar(
-                        content: Text('Failed to remove member. Only the creator can remove admins.'),
+                        content: Text(
+                          'Failed to remove member. Only the creator can remove admins.',
+                        ),
                         backgroundColor: Colors.red,
                       ),
                     );
@@ -1132,8 +1201,9 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
                 return Container(
                   decoration: BoxDecoration(
                     color: isDarkMode ? const Color(0xFF1A1A1A) : Colors.white,
-                    borderRadius:
-                        const BorderRadius.vertical(top: Radius.circular(20)),
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(20),
+                    ),
                   ),
                   child: Column(
                     children: [
@@ -1142,7 +1212,9 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
                         width: 40,
                         height: 4,
                         decoration: BoxDecoration(
-                          color: isDarkMode ? Colors.grey[700] : Colors.grey[300],
+                          color: isDarkMode
+                              ? Colors.grey[700]
+                              : Colors.grey[300],
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
@@ -1162,25 +1234,31 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
                             if (selectedUsers.isNotEmpty)
                               ElevatedButton(
                                 onPressed: () async {
-                                  final messenger = ScaffoldMessenger.of(context);
-                                  final navigator = Navigator.of(context);
-                                  final success =
-                                      await _groupChatService.addMembers(
-                                    groupId: widget.groupId,
-                                    newMemberIds: selectedUsers.toList(),
+                                  final messenger = ScaffoldMessenger.of(
+                                    context,
                                   );
+                                  final navigator = Navigator.of(context);
+                                  final success = await _groupChatService
+                                      .addMembers(
+                                        groupId: widget.groupId,
+                                        newMemberIds: selectedUsers.toList(),
+                                      );
                                   if (success && mounted) {
                                     navigator.pop();
                                     messenger.showSnackBar(
                                       const SnackBar(
-                                        content: Text('Members added successfully'),
+                                        content: Text(
+                                          'Members added successfully',
+                                        ),
                                         backgroundColor: Colors.green,
                                       ),
                                     );
                                   } else if (mounted) {
                                     messenger.showSnackBar(
                                       const SnackBar(
-                                        content: Text('Failed to add members. Only admins can add members.'),
+                                        content: Text(
+                                          'Failed to add members. Only admins can add members.',
+                                        ),
                                         backgroundColor: Colors.red,
                                       ),
                                     );
@@ -1197,13 +1275,15 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
                           builder: (context, snapshot) {
                             if (!snapshot.hasData) {
                               return const Center(
-                                  child: CircularProgressIndicator());
+                                child: CircularProgressIndicator(),
+                              );
                             }
 
                             final currentMembers = _memberNames.keys.toSet();
                             final users = snapshot.data!.docs
                                 .where(
-                                    (doc) => !currentMembers.contains(doc.id))
+                                  (doc) => !currentMembers.contains(doc.id),
+                                )
                                 .toList();
 
                             if (users.isEmpty) {
@@ -1228,8 +1308,9 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
                                 final userId = users[index].id;
                                 final name = userData['name'] ?? 'Unknown';
                                 final photoUrl = userData['photoUrl'];
-                                final isSelected =
-                                    selectedUsers.contains(userId);
+                                final isSelected = selectedUsers.contains(
+                                  userId,
+                                );
 
                                 return ListTile(
                                   leading: CircleAvatar(
@@ -1327,7 +1408,8 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
 
     if (typingNames.isEmpty) return '';
     if (typingNames.length == 1) return '${typingNames[0]} is typing...';
-    if (typingNames.length == 2) return '${typingNames.join(' and ')} are typing...';
+    if (typingNames.length == 2)
+      return '${typingNames.join(' and ')} are typing...';
     return '${typingNames.length} people are typing...';
   }
 
@@ -1356,7 +1438,8 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
                       .limitToLast(_messagesPerPage)
                       .snapshots(),
                   builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
+                    if (snapshot.connectionState == ConnectionState.waiting &&
+                        !snapshot.hasData) {
                       return const Center(child: CircularProgressIndicator());
                     }
 
@@ -1369,10 +1452,12 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
 
                     // Combine real messages with optimistic messages
                     var allMessages = [
-                      ...messages.map((doc) => {
-                        'id': doc.id,
-                        ...doc.data() as Map<String, dynamic>,
-                      }),
+                      ...messages.map(
+                        (doc) => {
+                          'id': doc.id,
+                          ...doc.data() as Map<String, dynamic>,
+                        },
+                      ),
                       ..._optimisticMessages,
                     ];
 
@@ -1380,7 +1465,9 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
                     if (_searchQuery.isNotEmpty) {
                       allMessages = allMessages.where((msg) {
                         final text = msg['text'] as String? ?? '';
-                        return text.toLowerCase().contains(_searchQuery.toLowerCase());
+                        return text.toLowerCase().contains(
+                          _searchQuery.toLowerCase(),
+                        );
                       }).toList();
                     }
 
@@ -1407,30 +1494,45 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
                               child: CircularProgressIndicator(strokeWidth: 2),
                             ),
                           ),
-                        if (_hasMoreMessages && messages.length >= _messagesPerPage && !_isSearching)
+                        if (_hasMoreMessages &&
+                            messages.length >= _messagesPerPage &&
+                            !_isSearching)
                           TextButton(
                             onPressed: _loadMoreMessages,
                             child: Text(
                               'Load earlier messages',
-                              style: TextStyle(color: Theme.of(context).primaryColor),
+                              style: TextStyle(
+                                color: Theme.of(context).primaryColor,
+                              ),
                             ),
                           ),
                         Expanded(
                           child: ListView.builder(
                             controller: _scrollController,
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
                             itemCount: allMessages.length,
                             itemBuilder: (context, index) {
                               final messageData = allMessages[index];
-                              final senderId = messageData['senderId'] as String;
+                              final senderId =
+                                  messageData['senderId'] as String;
                               final text = messageData['text'] as String? ?? '';
-                              final imageUrl = messageData['imageUrl'] as String?;
-                              final timestamp = messageData['timestamp'] as Timestamp?;
-                              final isSystemMessage = messageData['isSystemMessage'] ?? false;
-                              final isOptimistic = messageData['isOptimistic'] ?? false;
+                              final imageUrl =
+                                  messageData['imageUrl'] as String?;
+                              final timestamp =
+                                  messageData['timestamp'] as Timestamp?;
+                              final isSystemMessage =
+                                  messageData['isSystemMessage'] ?? false;
+                              final isOptimistic =
+                                  messageData['isOptimistic'] ?? false;
                               final isMe = senderId == currentUserId;
-                              final readBy = List<String>.from(messageData['readBy'] ?? []);
-                              final replyToId = messageData['replyToMessageId'] as String?;
+                              final readBy = List<String>.from(
+                                messageData['readBy'] ?? [],
+                              );
+                              final replyToId =
+                                  messageData['replyToMessageId'] as String?;
 
                               if (isSystemMessage) {
                                 return _buildSystemMessage(text, isDarkMode);
@@ -1486,19 +1588,28 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
       title: _isSearching
           ? null
           : StreamBuilder<DocumentSnapshot>(
-              stream: _firestore.collection('conversations').doc(widget.groupId).snapshots(),
+              stream: _firestore
+                  .collection('conversations')
+                  .doc(widget.groupId)
+                  .snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.hasData && snapshot.data!.exists) {
                   final data = snapshot.data!.data() as Map<String, dynamic>;
                   _currentGroupName = data['groupName'] ?? widget.groupName;
                   _groupPhoto = data['groupPhoto'];
-                  _memberNames = Map<String, String>.from(data['participantNames'] ?? {});
-                  _memberPhotos = Map<String, String?>.from(data['participantPhotos'] ?? {});
+                  _memberNames = Map<String, String>.from(
+                    data['participantNames'] ?? {},
+                  );
+                  _memberPhotos = Map<String, String?>.from(
+                    data['participantPhotos'] ?? {},
+                  );
                   _admins = List<String>.from(data['admins'] ?? []);
                   _createdBy = data['createdBy'];
                   _isAdmin = _admins.contains(currentUserId);
 
-                  final isTypingMap = Map<String, bool>.from(data['isTyping'] ?? {});
+                  final isTypingMap = Map<String, bool>.from(
+                    data['isTyping'] ?? {},
+                  );
                   _typingUsers = isTypingMap.entries
                       .where((e) => e.value == true && e.key != currentUserId)
                       .map((e) => e.key)
@@ -1513,12 +1624,18 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
                     children: [
                       CircleAvatar(
                         radius: 18,
-                        backgroundColor: Theme.of(context).primaryColor.withValues(alpha: 0.15),
+                        backgroundColor: Theme.of(
+                          context,
+                        ).primaryColor.withValues(alpha: 0.15),
                         backgroundImage: _groupPhoto != null
                             ? CachedNetworkImageProvider(_groupPhoto!)
                             : null,
                         child: _groupPhoto == null
-                            ? Icon(Icons.group, color: Theme.of(context).primaryColor, size: 20)
+                            ? Icon(
+                                Icons.group,
+                                color: Theme.of(context).primaryColor,
+                                size: 20,
+                              )
                             : null,
                       ),
                       const SizedBox(width: 12),
@@ -1535,13 +1652,19 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
                               ),
                             ),
                             Text(
-                              typingText.isNotEmpty ? typingText : '${_memberNames.length} members',
+                              typingText.isNotEmpty
+                                  ? typingText
+                                  : '${_memberNames.length} members',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: typingText.isNotEmpty
                                     ? Theme.of(context).primaryColor
-                                    : (isDarkMode ? Colors.grey[600] : Colors.grey),
-                                fontStyle: typingText.isNotEmpty ? FontStyle.italic : FontStyle.normal,
+                                    : (isDarkMode
+                                          ? Colors.grey[600]
+                                          : Colors.grey),
+                                fontStyle: typingText.isNotEmpty
+                                    ? FontStyle.italic
+                                    : FontStyle.normal,
                               ),
                             ),
                           ],
@@ -1582,15 +1705,23 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
         style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
         decoration: InputDecoration(
           hintText: 'Search messages...',
-          hintStyle: TextStyle(color: isDarkMode ? Colors.grey[600] : Colors.grey),
-          prefixIcon: Icon(Icons.search, color: isDarkMode ? Colors.grey[600] : Colors.grey),
+          hintStyle: TextStyle(
+            color: isDarkMode ? Colors.grey[600] : Colors.grey,
+          ),
+          prefixIcon: Icon(
+            Icons.search,
+            color: isDarkMode ? Colors.grey[600] : Colors.grey,
+          ),
           filled: true,
           fillColor: isDarkMode ? Colors.grey[900] : Colors.white,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide.none,
           ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 12,
+          ),
         ),
         onChanged: (value) {
           setState(() => _searchQuery = value);
@@ -1619,8 +1750,12 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
           ),
           const SizedBox(height: 8),
           Text(
-            _searchQuery.isNotEmpty ? 'Try a different search' : 'Start the conversation!',
-            style: TextStyle(color: isDarkMode ? Colors.grey[700] : Colors.grey[400]),
+            _searchQuery.isNotEmpty
+                ? 'Try a different search'
+                : 'Start the conversation!',
+            style: TextStyle(
+              color: isDarkMode ? Colors.grey[700] : Colors.grey[400],
+            ),
           ),
         ],
       ),
@@ -1635,7 +1770,9 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
       decoration: BoxDecoration(
         color: isDarkMode ? Colors.grey[900] : Colors.grey[100],
         border: Border(
-          top: BorderSide(color: isDarkMode ? Colors.grey[800]! : Colors.grey[300]!),
+          top: BorderSide(
+            color: isDarkMode ? Colors.grey[800]! : Colors.grey[300]!,
+          ),
         ),
       ),
       child: Row(
@@ -1674,7 +1811,10 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
             ),
           ),
           IconButton(
-            icon: Icon(Icons.close, color: isDarkMode ? Colors.grey[600] : Colors.grey),
+            icon: Icon(
+              Icons.close,
+              color: isDarkMode ? Colors.grey[600] : Colors.grey,
+            ),
             onPressed: () => setState(() => _replyToMessage = null),
           ),
         ],
@@ -1691,13 +1831,17 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
         left: 8,
         right: 8,
         top: 8,
-        bottom: _showEmojiPicker ? 8 : MediaQuery.of(context).padding.bottom + 8,
+        bottom: _showEmojiPicker
+            ? 8
+            : MediaQuery.of(context).padding.bottom + 8,
       ),
       decoration: BoxDecoration(
         color: isDarkMode ? const Color(0xFF000000) : const Color(0xFFF6F6F6),
         border: Border(
           top: BorderSide(
-            color: isDarkMode ? const Color(0xFF1C1C1E) : const Color(0xFFE5E5EA),
+            color: isDarkMode
+                ? const Color(0xFF1C1C1E)
+                : const Color(0xFFE5E5EA),
             width: 0.5,
           ),
         ),
@@ -1713,10 +1857,16 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
               width: 36,
               margin: const EdgeInsets.only(bottom: 2, right: 4),
               decoration: BoxDecoration(
-                color: isDarkMode ? const Color(0xFF1C1C1E) : const Color(0xFFE5E5EA),
+                color: isDarkMode
+                    ? const Color(0xFF1C1C1E)
+                    : const Color(0xFFE5E5EA),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.add_rounded, color: Color(0xFF007AFF), size: 22),
+              child: const Icon(
+                Icons.add_rounded,
+                color: Color(0xFF007AFF),
+                size: 22,
+              ),
             ),
           ),
           // Camera button
@@ -1741,7 +1891,9 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
                 color: isDarkMode ? const Color(0xFF1C1C1E) : Colors.white,
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
-                  color: isDarkMode ? const Color(0xFF38383A) : const Color(0xFFE5E5EA),
+                  color: isDarkMode
+                      ? const Color(0xFF38383A)
+                      : const Color(0xFFE5E5EA),
                   width: 1,
                 ),
               ),
@@ -1756,18 +1908,29 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
                       minLines: 1,
                       textCapitalization: TextCapitalization.sentences,
                       style: TextStyle(
-                        color: isDarkMode ? Colors.white : const Color(0xFF1C1C1E),
+                        color: isDarkMode
+                            ? Colors.white
+                            : const Color(0xFF1C1C1E),
                         fontSize: 17,
                       ),
                       decoration: const InputDecoration(
                         hintText: 'Message',
-                        hintStyle: TextStyle(color: Color(0xFF8E8E93), fontSize: 17),
+                        hintStyle: TextStyle(
+                          color: Color(0xFF8E8E93),
+                          fontSize: 17,
+                        ),
                         border: InputBorder.none,
-                        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 10,
+                        ),
                       ),
                       onChanged: (text) {
                         setState(() {});
-                        _groupChatService.setTyping(widget.groupId, text.isNotEmpty);
+                        _groupChatService.setTyping(
+                          widget.groupId,
+                          text.isNotEmpty,
+                        );
                       },
                       onTap: () {
                         if (_showEmojiPicker) {
@@ -1797,8 +1960,12 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
                           borderRadius: BorderRadius.circular(16),
                         ),
                         child: Icon(
-                          _showEmojiPicker ? Icons.keyboard_rounded : Icons.emoji_emotions_outlined,
-                          color: _showEmojiPicker ? const Color(0xFF007AFF) : const Color(0xFF8E8E93),
+                          _showEmojiPicker
+                              ? Icons.keyboard_rounded
+                              : Icons.emoji_emotions_outlined,
+                          color: _showEmojiPicker
+                              ? const Color(0xFF007AFF)
+                              : const Color(0xFF8E8E93),
                           size: 26,
                         ),
                       ),
@@ -1824,7 +1991,9 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
                         end: Alignment.bottomRight,
                       )
                     : null,
-                color: hasText ? null : (isDarkMode ? Colors.grey[800] : Colors.grey[300]),
+                color: hasText
+                    ? null
+                    : (isDarkMode ? Colors.grey[800] : Colors.grey[300]),
                 shape: BoxShape.circle,
                 boxShadow: hasText
                     ? [
@@ -1840,7 +2009,10 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
                   ? const SizedBox(
                       width: 20,
                       height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
                     )
                   : Icon(
                       Icons.arrow_upward_rounded,
@@ -1864,7 +2036,9 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
         color: isDarkMode ? const Color(0xFF000000) : const Color(0xFFF6F6F6),
         border: Border(
           top: BorderSide(
-            color: isDarkMode ? const Color(0xFF1C1C1E) : const Color(0xFFE5E5EA),
+            color: isDarkMode
+                ? const Color(0xFF1C1C1E)
+                : const Color(0xFFE5E5EA),
             width: 0.5,
           ),
         ),
@@ -1878,7 +2052,9 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
           setState(() {});
         },
         onBackspacePressed: () {
-          _messageController.text = _messageController.text.characters.skipLast(1).toString();
+          _messageController.text = _messageController.text.characters
+              .skipLast(1)
+              .toString();
           setState(() {});
         },
         config: Config(
@@ -1887,23 +2063,31 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
           emojiViewConfig: EmojiViewConfig(
             columns: 8,
             emojiSizeMax: 32,
-            backgroundColor: isDarkMode ? const Color(0xFF000000) : const Color(0xFFF6F6F6),
+            backgroundColor: isDarkMode
+                ? const Color(0xFF000000)
+                : const Color(0xFFF6F6F6),
             recentsLimit: 28,
           ),
           categoryViewConfig: CategoryViewConfig(
             initCategory: Category.RECENT,
-            backgroundColor: isDarkMode ? const Color(0xFF000000) : const Color(0xFFF6F6F6),
+            backgroundColor: isDarkMode
+                ? const Color(0xFF000000)
+                : const Color(0xFFF6F6F6),
             indicatorColor: const Color(0xFF007AFF),
             iconColor: const Color(0xFF8E8E93),
             iconColorSelected: const Color(0xFF007AFF),
           ),
           bottomActionBarConfig: BottomActionBarConfig(
-            backgroundColor: isDarkMode ? const Color(0xFF000000) : const Color(0xFFF6F6F6),
+            backgroundColor: isDarkMode
+                ? const Color(0xFF000000)
+                : const Color(0xFFF6F6F6),
             buttonColor: const Color(0xFF007AFF),
             buttonIconColor: Colors.white,
           ),
           searchViewConfig: SearchViewConfig(
-            backgroundColor: isDarkMode ? const Color(0xFF1C1C1E) : Colors.white,
+            backgroundColor: isDarkMode
+                ? const Color(0xFF1C1C1E)
+                : Colors.white,
             buttonIconColor: const Color(0xFF007AFF),
           ),
         ),
@@ -1990,7 +2174,9 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 4),
           child: Row(
-            mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+            mainAxisAlignment: isMe
+                ? MainAxisAlignment.end
+                : MainAxisAlignment.start,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               if (!isMe) ...[
@@ -1999,10 +2185,14 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
                   backgroundImage: senderPhoto != null
                       ? CachedNetworkImageProvider(senderPhoto)
                       : null,
-                  backgroundColor: Theme.of(context).primaryColor.withValues(alpha: 0.1),
+                  backgroundColor: Theme.of(
+                    context,
+                  ).primaryColor.withValues(alpha: 0.1),
                   child: senderPhoto == null
                       ? Text(
-                          senderName.isNotEmpty ? senderName[0].toUpperCase() : '?',
+                          senderName.isNotEmpty
+                              ? senderName[0].toUpperCase()
+                              : '?',
                           style: TextStyle(
                             fontSize: 12,
                             color: Theme.of(context).primaryColor,
@@ -2014,7 +2204,9 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
               ],
               Flexible(
                 child: Column(
-                  crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                  crossAxisAlignment: isMe
+                      ? CrossAxisAlignment.end
+                      : CrossAxisAlignment.start,
                   children: [
                     if (!isMe)
                       Padding(
@@ -2040,7 +2232,11 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
                                 end: Alignment.bottomRight,
                               )
                             : null,
-                        color: isMe ? null : (isDarkMode ? const Color(0xFF1C1C1E) : const Color(0xFFE9E9EB)),
+                        color: isMe
+                            ? null
+                            : (isDarkMode
+                                  ? const Color(0xFF1C1C1E)
+                                  : const Color(0xFFE9E9EB)),
                         borderRadius: BorderRadius.only(
                           topLeft: const Radius.circular(18),
                           topRight: const Radius.circular(18),
@@ -2059,15 +2255,20 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           // Reply preview
-                          if (replyToId != null) _buildReplyBubble(replyToId, isMe, isDarkMode),
+                          if (replyToId != null)
+                            _buildReplyBubble(replyToId, isMe, isDarkMode),
                           // Image
                           if (imageUrl != null)
                             ClipRRect(
                               borderRadius: BorderRadius.only(
                                 topLeft: const Radius.circular(18),
                                 topRight: const Radius.circular(18),
-                                bottomLeft: text.isEmpty ? Radius.circular(isMe ? 18 : 4) : Radius.zero,
-                                bottomRight: text.isEmpty ? Radius.circular(isMe ? 4 : 18) : Radius.zero,
+                                bottomLeft: text.isEmpty
+                                    ? Radius.circular(isMe ? 18 : 4)
+                                    : Radius.zero,
+                                bottomRight: text.isEmpty
+                                    ? Radius.circular(isMe ? 4 : 18)
+                                    : Radius.zero,
                               ),
                               child: CachedNetworkImage(
                                 imageUrl: imageUrl,
@@ -2076,11 +2277,20 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
                                 placeholder: (context, url) => Container(
                                   width: 200,
                                   height: 150,
-                                  color: isDarkMode ? Colors.grey[800] : Colors.grey[300],
-                                  child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                                  color: isDarkMode
+                                      ? Colors.grey[800]
+                                      : Colors.grey[300],
+                                  child: const Center(
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  ),
                                 ),
                                 errorWidget: (context, url, error) =>
-                                    const Icon(Icons.error_outline, color: Colors.red),
+                                    const Icon(
+                                      Icons.error_outline,
+                                      color: Colors.red,
+                                    ),
                               ),
                             ),
                           // Text
@@ -2095,7 +2305,11 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
                               child: Text(
                                 text,
                                 style: TextStyle(
-                                  color: isMe ? Colors.white : (isDarkMode ? Colors.white : const Color(0xFF1C1C1E)),
+                                  color: isMe
+                                      ? Colors.white
+                                      : (isDarkMode
+                                            ? Colors.white
+                                            : const Color(0xFF1C1C1E)),
                                   fontSize: 16,
                                   height: 1.35,
                                 ),
@@ -2103,35 +2317,52 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
                             ),
                           // Timestamp and read status
                           Padding(
-                            padding: const EdgeInsets.only(left: 14, right: 14, bottom: 8, top: 2),
+                            padding: const EdgeInsets.only(
+                              left: 14,
+                              right: 14,
+                              bottom: 8,
+                              top: 2,
+                            ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 if (timestamp != null)
                                   Text(
-                                    DateFormat('h:mm a').format(timestamp.toDate()),
+                                    DateFormat(
+                                      'h:mm a',
+                                    ).format(timestamp.toDate()),
                                     style: TextStyle(
                                       fontSize: 11,
                                       color: isMe
                                           ? Colors.white.withValues(alpha: 0.65)
-                                          : (isDarkMode ? Colors.grey[500] : Colors.grey[600]),
+                                          : (isDarkMode
+                                                ? Colors.grey[500]
+                                                : Colors.grey[600]),
                                     ),
                                   ),
                                 if (isMe && !isOptimistic) ...[
                                   const SizedBox(width: 4),
                                   if (readCount >= totalMembers)
-                                    const Icon(Icons.done_all, size: 14, color: Color(0xFF34C759))
+                                    const Icon(
+                                      Icons.done_all,
+                                      size: 14,
+                                      color: Color(0xFF34C759),
+                                    )
                                   else if (readCount > 1)
                                     Icon(
                                       Icons.done_all,
                                       size: 14,
-                                      color: Colors.white.withValues(alpha: 0.65),
+                                      color: Colors.white.withValues(
+                                        alpha: 0.65,
+                                      ),
                                     )
                                   else
                                     Icon(
                                       Icons.done,
                                       size: 14,
-                                      color: Colors.white.withValues(alpha: 0.65),
+                                      color: Colors.white.withValues(
+                                        alpha: 0.65,
+                                      ),
                                     ),
                                 ],
                                 if (isOptimistic) ...[
@@ -2141,7 +2372,11 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
                                     height: 10,
                                     child: CircularProgressIndicator(
                                       strokeWidth: 1.5,
-                                      color: isMe ? Colors.white70 : (isDarkMode ? Colors.grey[600] : Colors.grey),
+                                      color: isMe
+                                          ? Colors.white70
+                                          : (isDarkMode
+                                                ? Colors.grey[600]
+                                                : Colors.grey),
                                     ),
                                   ),
                                 ],
@@ -2170,18 +2405,21 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
           .doc(messageId)
           .get(),
       builder: (context, snapshot) {
-        if (!snapshot.hasData || !snapshot.data!.exists) return const SizedBox.shrink();
+        if (!snapshot.hasData || !snapshot.data!.exists)
+          return const SizedBox.shrink();
 
         final replyData = snapshot.data!.data() as Map<String, dynamic>?;
         if (replyData == null) return const SizedBox.shrink();
 
-        final replySenderName = _memberNames[replyData['senderId']] ?? 'Unknown';
+        final replySenderName =
+            _memberNames[replyData['senderId']] ?? 'Unknown';
 
         return Container(
           margin: const EdgeInsets.only(left: 10, right: 10, top: 8, bottom: 4),
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: (isMe ? Colors.white : Theme.of(context).primaryColor).withValues(alpha: 0.15),
+            color: (isMe ? Colors.white : Theme.of(context).primaryColor)
+                .withValues(alpha: 0.15),
             borderRadius: BorderRadius.circular(8),
             border: Border(
               left: BorderSide(
@@ -2205,7 +2443,9 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen> with WidgetsB
                 replyData['text'] ?? '📷 Photo',
                 style: TextStyle(
                   fontSize: 12,
-                  color: isMe ? Colors.white.withValues(alpha: 0.8) : (isDarkMode ? Colors.grey[400] : Colors.grey[700]),
+                  color: isMe
+                      ? Colors.white.withValues(alpha: 0.8)
+                      : (isDarkMode ? Colors.grey[400] : Colors.grey[700]),
                 ),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
