@@ -254,8 +254,8 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
         setState(() {
           _conversationId = conversationId;
         });
+        _markMessagesAsRead();
       }
-      _markMessagesAsRead();
 
       // Load saved chat theme
       await _loadChatTheme();
@@ -331,7 +331,7 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
+    if (state == AppLifecycleState.resumed && mounted) {
       _markMessagesAsRead();
     }
   }
@@ -2255,15 +2255,24 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
   }
 
   void _markMessagesAsRead() async {
+    // Guard against calling after widget is disposed (prevents "ref" access error)
+    if (!mounted) return;
     if (_conversationId == null) return;
+
+    // Cache the current user ID before any async operations
+    final currentUserId = _currentUserId;
+    if (currentUserId == null) return;
 
     try {
       // Use HybridChatService - updates both local DB and Firebase
       await _hybridChatService.markMessagesAsRead(_conversationId!);
 
+      // Check mounted again after async operation
+      if (!mounted) return;
+
       // Update conversation unread count
       await _firestore.collection('conversations').doc(_conversationId!).update(
-        {'unreadCount.${_currentUserId!}': 0},
+        {'unreadCount.$currentUserId': 0},
       );
     } catch (e) {
       // Only log non-critical errors, don't show to user
