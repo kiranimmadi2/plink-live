@@ -97,10 +97,6 @@ dev_dependencies:
   integration_test:
     sdk: flutter
   flutter_launcher_icons: ^0.13.1
-flutter_launcher_icons:
-  android: true
-  ios: true
-  image_path: 'assets/logo/Clogo.jpeg'
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
@@ -113,6 +109,11 @@ flutter_launcher_icons:
   # Testing mocks
   mockito: ^5.4.4
   fake_cloud_firestore: ^3.1.0
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: 'assets/logo/Clogo.jpeg'
 
 
 # For information on the generic Dart part of this file, see the
