@@ -57,6 +57,13 @@ service firebase.storage {
       allow delete: if isAuthenticated();
     }
     
+    // Chat Media (New Path) - Organized by User
+    match /chat_media/{userId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId);
+      allow delete: if isOwner(userId);
+    }
+
     // Voice notes for calls and chats
     match /voice_notes/{conversationId}/{messageId}/{fileName} {
       allow read: if isAuthenticated();

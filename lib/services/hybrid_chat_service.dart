@@ -1,7 +1,14 @@
+import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'package:video_compress/video_compress.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:dio/dio.dart';
 import '../database/message_database.dart';
+import '../models/message_model.dart';
 
 /// Hybrid Chat Service - Combines local SQLite storage with Firebase sync
 ///
@@ -28,6 +35,127 @@ class HybridChatService {
   }
 
   // ═══════════════════════════════════════════════════════════════
+  // MEDIA HANDLING (Upload, Download, Compression)
+  // ═══════════════════════════════════════════════════════════════
+
+  /// Upload media file with compression
+  Future<Map<String, dynamic>> uploadMedia(File file, MessageType type) async {
+    final currentUserId = _auth.currentUser?.uid;
+    if (currentUserId == null) throw Exception('No user');
+
+    File fileToUpload = file;
+    String? fileName = file.path.split('/').last;
+    int fileSize = await file.length();
+
+    // 1. COMPRESSION
+    if (type == MessageType.image) {
+      final compressed = await _compressImage(file);
+      if (compressed != null) {
+        fileToUpload = compressed;
+        fileSize = await fileToUpload.length();
+        _log(
+          'HybridChat: Image compressed from ${await file.length()} to $fileSize',
+        );
+      }
+    } else if (type == MessageType.video) {
+      final compressed = await _compressVideo(file);
+      if (compressed != null) {
+        fileToUpload = compressed;
+        fileSize = await fileToUpload.length();
+        _log(
+          'HybridChat: Video compressed from ${await file.length()} to $fileSize',
+        );
+      }
+    }
+
+    // 2. UPLOAD
+    final ext = fileName.split('.').last;
+    final storageRef = FirebaseStorage.instance
+        .ref()
+        .child('chat_media')
+        .child(currentUserId)
+        .child('${DateTime.now().millisecondsSinceEpoch}.$ext');
+
+    final uploadTask = storageRef.putFile(
+      fileToUpload,
+      SettableMetadata(contentType: _getContentType(type, ext)),
+    );
+
+    final snapshot = await uploadTask;
+    final downloadUrl = await snapshot.ref.getDownloadURL();
+
+    return {
+      'url': downloadUrl,
+      'fileName': fileName,
+      'fileSize': fileSize,
+      'localPath': fileToUpload.path,
+    };
+  }
+
+  /// Download media file to local storage
+  Future<String?> downloadMedia(String url, String? fileName) async {
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      final name = fileName ?? url.split('/').last.split('?').first;
+      final savePath = '${dir.path}/media/$name';
+
+      // Check if already exists
+      if (await File(savePath).exists()) {
+        return savePath;
+      }
+
+      // Create directory if needed
+      await Directory('${dir.path}/media').create(recursive: true);
+
+      // Download
+      await Dio().download(url, savePath);
+      _log('HybridChat: Media downloaded to $savePath');
+      return savePath;
+    } catch (e) {
+      _log('HybridChat: Error downloading media: $e');
+      return null;
+    }
+  }
+
+  Future<File?> _compressImage(File file) async {
+    final dir = await getTemporaryDirectory();
+    final targetPath =
+        '${dir.path}/${DateTime.now().millisecondsSinceEpoch}.jpg';
+
+    final result = await FlutterImageCompress.compressAndGetFile(
+      file.absolute.path,
+      targetPath,
+      quality: 70,
+      minWidth: 1024,
+      minHeight: 1024,
+    );
+
+    return result != null ? File(result.path) : null;
+  }
+
+  Future<File?> _compressVideo(File file) async {
+    final info = await VideoCompress.compressVideo(
+      file.path,
+      quality: VideoQuality.MediumQuality,
+      deleteOrigin: false,
+    );
+    return info?.file;
+  }
+
+  String _getContentType(MessageType type, String ext) {
+    switch (type) {
+      case MessageType.image:
+        return 'image/$ext';
+      case MessageType.video:
+        return 'video/$ext';
+      case MessageType.audio:
+        return 'audio/$ext';
+      default:
+        return 'application/octet-stream';
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════
   // SEND MESSAGE (Hybrid Approach)
   // ═══════════════════════════════════════════════════════════════
 
@@ -40,7 +168,9 @@ class HybridChatService {
   Future<String> sendMessage({
     required String conversationId,
     required String receiverId,
-    required String text,
+    String? text,
+    File? file,
+    MessageType type = MessageType.text,
     String? imageUrl,
     String? voiceUrl,
     String? replyToMessageId,
@@ -55,6 +185,11 @@ class HybridChatService {
     final messageId = _firestore.collection('temp').doc().id;
     final timestamp = DateTime.now().millisecondsSinceEpoch;
 
+    String? mediaUrl = imageUrl ?? voiceUrl;
+    String? localPath = file?.path;
+    String? fileName = file?.path.split('/').last;
+    int? fileSize = file != null ? await file.length() : null;
+
     // STEP 1: Save to LOCAL database FIRST (instant!)
     await _localDb.saveMessage({
       'messageId': messageId,
@@ -62,8 +197,11 @@ class HybridChatService {
       'senderId': currentUserId,
       'receiverId': receiverId,
       'text': text,
-      'imageUrl': imageUrl,
-      'voiceUrl': voiceUrl,
+      'type': type.index,
+      'mediaUrl': mediaUrl,
+      'localPath': localPath,
+      'fileName': fileName,
+      'fileSize': fileSize,
       'status': 'sending', // Shows clock icon
       'isSentByMe': 1,
       'timestamp': timestamp,
@@ -79,28 +217,45 @@ class HybridChatService {
 
     // User sees message immediately! ✓ (grey checkmark)
 
-    // STEP 2: Upload to Firebase for delivery
+    // STEP 2: Upload Media (if any) & Upload to Firebase
     try {
+      if (file != null) {
+        final uploadResult = await uploadMedia(file, type);
+        mediaUrl = uploadResult['url'];
+        fileName = uploadResult['fileName'];
+        fileSize = uploadResult['fileSize'];
+
+        // Update local DB with media URL
+        await _localDb.updateMessageMedia(
+          messageId,
+          mediaUrl!,
+          fileName,
+          fileSize,
+        );
+      }
+
       await _firestore
           .collection('conversations')
           .doc(conversationId)
           .collection('messages')
           .doc(messageId)
           .set({
-        'messageId': messageId,
-        'senderId': currentUserId,
-        'text': text,
-        'imageUrl': imageUrl,
-        'voiceUrl': voiceUrl,
-        'timestamp': FieldValue.serverTimestamp(),
-        'status': 'sent',
-        'isRead': false,
-        'replyToMessageId': replyToMessageId,
-        'replyToText': replyToText,
-        'replyToSenderId': replyToSenderId,
-        'isDeleted': false,
-        'isEdited': false,
-      });
+            'messageId': messageId,
+            'senderId': currentUserId,
+            'text': text,
+            'type': type.index,
+            'mediaUrl': mediaUrl,
+            'fileName': fileName,
+            'fileSize': fileSize,
+            'timestamp': FieldValue.serverTimestamp(),
+            'status': 'sent',
+            'isRead': false,
+            'replyToMessageId': replyToMessageId,
+            'replyToText': replyToText,
+            'replyToSenderId': replyToSenderId,
+            'isDeleted': false,
+            'isEdited': false,
+          });
 
       _log('HybridChat: Message uploaded to Firebase: $messageId');
 
@@ -111,8 +266,13 @@ class HybridChatService {
       // User sees ✓ (single grey checkmark)
 
       // STEP 4: Update conversation metadata
+      String lastMsg =
+          text ?? (type == MessageType.image ? '📷 Image' : '📎 File');
+      if (type == MessageType.video) lastMsg = '🎥 Video';
+      if (type == MessageType.audio) lastMsg = '🎵 Audio';
+
       await _firestore.collection('conversations').doc(conversationId).update({
-        'lastMessage': text,
+        'lastMessage': lastMsg,
         'lastMessageTime': FieldValue.serverTimestamp(),
         'lastMessageSenderId': currentUserId,
       });
@@ -169,7 +329,9 @@ class HybridChatService {
 
     try {
       // Get last message timestamp from local DB
-      final lastTimestamp = await _localDb.getLastMessageTimestamp(conversationId);
+      final lastTimestamp = await _localDb.getLastMessageTimestamp(
+        conversationId,
+      );
       final lastSync = lastTimestamp != null
           ? DateTime.fromMillisecondsSinceEpoch(lastTimestamp)
           : DateTime.now().subtract(const Duration(days: 30));
@@ -186,7 +348,9 @@ class HybridChatService {
           .limit(100) // Only last 100 new messages
           .get();
 
-      _log('HybridChat: Found ${snapshot.docs.length} new messages from Firebase');
+      _log(
+        'HybridChat: Found ${snapshot.docs.length} new messages from Firebase',
+      );
 
       if (snapshot.docs.isEmpty) {
         _log('HybridChat: No new messages to sync');
@@ -202,8 +366,10 @@ class HybridChatService {
           'senderId': data['senderId'] ?? '',
           'receiverId': currentUserId, // Current user is receiver
           'text': data['text'],
-          'imageUrl': data['imageUrl'],
-          'voiceUrl': data['voiceUrl'],
+          'type': data['type'] ?? 0,
+          'mediaUrl': data['mediaUrl'],
+          'fileName': data['fileName'],
+          'fileSize': data['fileSize'],
           'status': data['status'] ?? 'delivered',
           'isSentByMe': data['senderId'] == currentUserId ? 1 : 0,
           'timestamp': data['timestamp'] != null
@@ -316,10 +482,10 @@ class HybridChatService {
           .collection('messages')
           .doc(messageId)
           .update({
-        'text': newText,
-        'isEdited': true,
-        'editedAt': FieldValue.serverTimestamp(),
-      });
+            'text': newText,
+            'isEdited': true,
+            'editedAt': FieldValue.serverTimestamp(),
+          });
     }
 
     _log('HybridChat: Message edited successfully');
@@ -346,11 +512,11 @@ class HybridChatService {
             .collection('messages')
             .doc(messageId)
             .update({
-          'isDeleted': true,
-          'text': null,
-          'imageUrl': null,
-          'voiceUrl': null,
-        });
+              'isDeleted': true,
+              'text': null,
+              'imageUrl': null,
+              'voiceUrl': null,
+            });
       }
     } else {
       // Delete locally only
@@ -381,9 +547,7 @@ class HybridChatService {
           .doc(conversationId)
           .collection('messages')
           .doc(messageId)
-          .update({
-        'reactions': reactions,
-      });
+          .update({'reactions': reactions});
     }
 
     _log('HybridChat: Reaction added successfully');
