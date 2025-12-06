@@ -20,7 +20,8 @@ class ConversationsScreen extends ConsumerStatefulWidget {
   const ConversationsScreen({super.key});
 
   @override
-  ConsumerState<ConversationsScreen> createState() => _ConversationsScreenState();
+  ConsumerState<ConversationsScreen> createState() =>
+      _ConversationsScreenState();
 }
 
 class _ConversationsScreenState extends ConsumerState<ConversationsScreen>
@@ -33,10 +34,7 @@ class _ConversationsScreenState extends ConsumerState<ConversationsScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(
-      length: 1,
-      vsync: this,
-    );
+    _tabController = TabController(length: 1, vsync: this);
   }
 
   @override
@@ -52,14 +50,12 @@ class _ConversationsScreenState extends ConsumerState<ConversationsScreen>
     final screenState = ref.watch(conversationsScreenProvider);
 
     return Scaffold(
-      backgroundColor: isDarkMode ? const Color(0xFF000000) : Colors.white,
+      backgroundColor: const Color(0xFF111111),
       appBar: _buildAppBar(isDarkMode),
       body: Column(
         children: [
           if (screenState.isSearching) _buildSearchBar(isDarkMode),
-          Expanded(
-            child: _buildChatsList(isDarkMode),
-          ),
+          Expanded(child: _buildChatsList(isDarkMode)),
         ],
       ),
       floatingActionButton: FloatingActionButton(
@@ -74,29 +70,26 @@ class _ConversationsScreenState extends ConsumerState<ConversationsScreen>
     final screenState = ref.watch(conversationsScreenProvider);
 
     return AppBar(
-      backgroundColor: isDarkMode ? const Color(0xFF000000) : Colors.white,
+      backgroundColor: const Color(0xFF111111),
       elevation: 0,
       title: Text(
         'Messages',
         style: TextStyle(
           fontSize: 24,
           fontWeight: FontWeight.bold,
-          color: isDarkMode ? Colors.white : Colors.black,
+          color: Colors.white,
         ),
       ),
       actions: [
         IconButton(
-          icon: Icon(
-            Icons.group_add,
-            color: isDarkMode ? Colors.white : Colors.black,
-          ),
+          icon: const Icon(Icons.group_add, color: Colors.white),
           tooltip: 'Create Group',
           onPressed: _createGroup,
         ),
         IconButton(
           icon: Icon(
             screenState.isSearching ? Icons.close : Icons.search,
-            color: isDarkMode ? Colors.white : Colors.black,
+            color: Colors.white,
           ),
           onPressed: () {
             ref.read(conversationsScreenProvider.notifier).toggleSearch();
@@ -122,7 +115,10 @@ class _ConversationsScreenState extends ConsumerState<ConversationsScreen>
 
   void _openGroupChat(String groupId) async {
     try {
-      final groupDoc = await _firestore.collection('conversations').doc(groupId).get();
+      final groupDoc = await _firestore
+          .collection('conversations')
+          .doc(groupId)
+          .get();
       if (groupDoc.exists) {
         final data = groupDoc.data()!;
         if (data['isGroup'] == true) {
@@ -195,11 +191,7 @@ class _ConversationsScreenState extends ConsumerState<ConversationsScreen>
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(
-                  Icons.error_outline,
-                  size: 80,
-                  color: Colors.orange,
-                ),
+                const Icon(Icons.error_outline, size: 80, color: Colors.orange),
                 const SizedBox(height: 16),
                 Text(
                   'Permission Error',
@@ -393,258 +385,275 @@ class _ConversationsScreenState extends ConsumerState<ConversationsScreen>
     required bool isTyping,
     required bool isDarkMode,
   }) {
-    return InkWell(
-      onTap: () async {
-        HapticFeedback.lightImpact();
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFF252525),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: () async {
+            HapticFeedback.lightImpact();
 
-        // Handle group conversations
-        if (conversation.isGroup) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => GroupChatScreen(
-                groupId: conversation.id,
-                groupName: conversation.groupName ?? 'Group',
-              ),
-            ),
-          );
-          return;
-        }
-
-        // Handle direct messages
-        try {
-          final otherUserDoc = await _firestore
-              .collection('users')
-              .doc(otherUserId)
-              .get();
-
-          if (otherUserDoc.exists) {
-            final otherUser = UserProfile.fromMap(
-              otherUserDoc.data()!,
-              otherUserId,
-            );
-
-            if (!mounted) return;
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => EnhancedChatScreen(otherUser: otherUser),
-              ),
-            );
-          } else {
-            // User no longer exists - delete this orphaned conversation
-            await _firestore
-                .collection('conversations')
-                .doc(conversation.id)
-                .delete();
-
-            // Show a friendly message
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('This conversation is no longer available'),
-                  backgroundColor: Colors.orange,
-                  duration: Duration(seconds: 2),
+            // Handle group conversations
+            if (conversation.isGroup) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => GroupChatScreen(
+                    groupId: conversation.id,
+                    groupName: conversation.groupName ?? 'Group',
+                  ),
                 ),
               );
+              return;
             }
-          }
-        } catch (e) {
-          debugPrint('Error loading user data: $e');
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Unable to load conversation'),
-                backgroundColor: Colors.orange,
-                duration: Duration(seconds: 2),
-              ),
-            );
-          }
-        }
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Row(
-          children: [
-            Stack(
+
+            // Handle direct messages
+            try {
+              final otherUserDoc = await _firestore
+                  .collection('users')
+                  .doc(otherUserId)
+                  .get();
+
+              if (otherUserDoc.exists) {
+                final otherUser = UserProfile.fromMap(
+                  otherUserDoc.data()!,
+                  otherUserId,
+                );
+
+                if (!mounted) return;
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) =>
+                        EnhancedChatScreen(otherUser: otherUser),
+                  ),
+                );
+              } else {
+                // User no longer exists - delete this orphaned conversation
+                await _firestore
+                    .collection('conversations')
+                    .doc(conversation.id)
+                    .delete();
+
+                // Show a friendly message
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('This conversation is no longer available'),
+                      backgroundColor: Colors.orange,
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                }
+              }
+            } catch (e) {
+              debugPrint('Error loading user data: $e');
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Unable to load conversation'),
+                    backgroundColor: Colors.orange,
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              }
+            }
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
               children: [
-                CircleAvatar(
-                  radius: 28,
-                  backgroundImage: displayPhoto != null && !conversation.isGroup
-                      ? CachedNetworkImageProvider(displayPhoto)
-                      : null,
-                  backgroundColor: conversation.isGroup
-                      ? Theme.of(context).primaryColor.withValues(alpha: 0.15)
-                      : Theme.of(context).primaryColor.withValues(alpha: 0.1),
-                  child: displayPhoto == null || conversation.isGroup
-                      ? (conversation.isGroup
-                          ? Icon(
-                              Icons.group,
-                              color: Theme.of(context).primaryColor,
-                              size: 28,
-                            )
-                          : Text(
-                              displayName.isNotEmpty ? displayName[0].toUpperCase() : '?',
-                              style: TextStyle(
-                                color: Theme.of(context).primaryColor,
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ))
-                      : null,
-                ),
-                Positioned(
-                  right: 0,
-                  bottom: 0,
-                  child: otherUserId.isNotEmpty && !conversation.isGroup
-                      ? StreamBuilder<DocumentSnapshot>(
-                          stream: _firestore
-                              .collection('users')
-                              .doc(otherUserId)
-                              .snapshots(),
-                          builder: (context, snapshot) {
-                            bool isOnline = false;
-                            if (snapshot.hasData && snapshot.data!.exists) {
-                              final userData =
-                                  snapshot.data!.data() as Map<String, dynamic>;
-                              final showOnlineStatus =
-                                  userData['showOnlineStatus'] ?? true;
+                Stack(
+                  children: [
+                    CircleAvatar(
+                      radius: 28,
+                      backgroundImage:
+                          displayPhoto != null && !conversation.isGroup
+                          ? CachedNetworkImageProvider(displayPhoto)
+                          : null,
+                      backgroundColor: conversation.isGroup
+                          ? Theme.of(
+                              context,
+                            ).primaryColor.withValues(alpha: 0.15)
+                          : Theme.of(
+                              context,
+                            ).primaryColor.withValues(alpha: 0.1),
+                      child: displayPhoto == null || conversation.isGroup
+                          ? (conversation.isGroup
+                                ? Icon(
+                                    Icons.group,
+                                    color: Theme.of(context).primaryColor,
+                                    size: 28,
+                                  )
+                                : Text(
+                                    displayName.isNotEmpty
+                                        ? displayName[0].toUpperCase()
+                                        : '?',
+                                    style: TextStyle(
+                                      color: Theme.of(context).primaryColor,
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ))
+                          : null,
+                    ),
+                    Positioned(
+                      right: 0,
+                      bottom: 0,
+                      child: otherUserId.isNotEmpty && !conversation.isGroup
+                          ? StreamBuilder<DocumentSnapshot>(
+                              stream: _firestore
+                                  .collection('users')
+                                  .doc(otherUserId)
+                                  .snapshots(),
+                              builder: (context, snapshot) {
+                                bool isOnline = false;
+                                if (snapshot.hasData && snapshot.data!.exists) {
+                                  final userData =
+                                      snapshot.data!.data()
+                                          as Map<String, dynamic>;
+                                  final showOnlineStatus =
+                                      userData['showOnlineStatus'] ?? true;
 
-                              // Only show online if user allows it and they're actually online
-                              if (showOnlineStatus) {
-                                isOnline = userData['isOnline'] ?? false;
+                                  // Only show online if user allows it and they're actually online
+                                  if (showOnlineStatus) {
+                                    isOnline = userData['isOnline'] ?? false;
 
-                                // Also check if lastSeen is recent
-                                if (isOnline) {
-                                  final lastSeen = userData['lastSeen'];
-                                  if (lastSeen != null &&
-                                      lastSeen is Timestamp) {
-                                    final lastSeenTime = lastSeen.toDate();
-                                    final difference = DateTime.now()
-                                        .difference(lastSeenTime);
-                                    // Consider offline if last seen more than 5 minutes ago
-                                    if (difference.inMinutes > 5) {
-                                      isOnline = false;
+                                    // Also check if lastSeen is recent
+                                    if (isOnline) {
+                                      final lastSeen = userData['lastSeen'];
+                                      if (lastSeen != null &&
+                                          lastSeen is Timestamp) {
+                                        final lastSeenTime = lastSeen.toDate();
+                                        final difference = DateTime.now()
+                                            .difference(lastSeenTime);
+                                        // Consider offline if last seen more than 5 minutes ago
+                                        if (difference.inMinutes > 5) {
+                                          isOnline = false;
+                                        }
+                                      } else {
+                                        // No lastSeen timestamp, consider offline
+                                        isOnline = false;
+                                      }
                                     }
-                                  } else {
-                                    // No lastSeen timestamp, consider offline
-                                    isOnline = false;
                                   }
                                 }
-                              }
-                            }
 
-                            if (!isOnline) return const SizedBox.shrink();
+                                if (!isOnline) return const SizedBox.shrink();
 
-                            return Container(
-                              width: 14,
-                              height: 14,
+                                return Container(
+                                  width: 14,
+                                  height: 14,
+                                  decoration: BoxDecoration(
+                                    color: Colors.green,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: Colors.black,
+                                      width: 2,
+                                    ),
+                                  ),
+                                );
+                              },
+                            )
+                          : const SizedBox.shrink(),
+                    ),
+                  ],
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              displayName,
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: unreadCount > 0
+                                    ? FontWeight.bold
+                                    : FontWeight.w500,
+                                color: Colors.white,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (conversation.lastMessageTime != null)
+                            Text(
+                              timeago.format(conversation.lastMessageTime!),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: unreadCount > 0
+                                    ? Theme.of(context).primaryColor
+                                    : Colors.grey[400],
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              isTyping
+                                  ? 'Typing...'
+                                  : conversation.lastMessage ??
+                                        'Start a conversation',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: isTyping
+                                    ? Theme.of(context).primaryColor
+                                    : (unreadCount > 0
+                                          ? Colors.white
+                                          : Colors.white70),
+                                fontWeight: unreadCount > 0
+                                    ? FontWeight.w500
+                                    : FontWeight.normal,
+                                fontStyle: isTyping
+                                    ? FontStyle.italic
+                                    : FontStyle.normal,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (unreadCount > 0)
+                            Container(
+                              margin: const EdgeInsets.only(left: 8),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
                               decoration: BoxDecoration(
-                                color: Colors.green,
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: isDarkMode
-                                      ? Colors.black
-                                      : Colors.white,
-                                  width: 2,
+                                color: Theme.of(context).primaryColor,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                unreadCount > 99
+                                    ? '99+'
+                                    : unreadCount.toString(),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
-                            );
-                          },
-                        )
-                      : const SizedBox.shrink(),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          displayName,
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: unreadCount > 0
-                                ? FontWeight.bold
-                                : FontWeight.w500,
-                            color: isDarkMode ? Colors.white : Colors.black,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      if (conversation.lastMessageTime != null)
-                        Text(
-                          timeago.format(conversation.lastMessageTime!),
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: unreadCount > 0
-                                ? Theme.of(context).primaryColor
-                                : (isDarkMode ? Colors.grey[600] : Colors.grey),
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          isTyping
-                              ? 'Typing...'
-                              : conversation.lastMessage ??
-                                    'Start a conversation',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: isTyping
-                                ? Theme.of(context).primaryColor
-                                : (unreadCount > 0
-                                      ? (isDarkMode
-                                            ? Colors.white
-                                            : Colors.black87)
-                                      : (isDarkMode
-                                            ? Colors.grey[600]
-                                            : Colors.grey)),
-                            fontWeight: unreadCount > 0
-                                ? FontWeight.w500
-                                : FontWeight.normal,
-                            fontStyle: isTyping
-                                ? FontStyle.italic
-                                : FontStyle.normal,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      if (unreadCount > 0)
-                        Container(
-                          margin: const EdgeInsets.only(left: 8),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).primaryColor,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            unreadCount > 99 ? '99+' : unreadCount.toString(),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -783,13 +792,10 @@ class _ConversationsScreenState extends ConsumerState<ConversationsScreen>
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => _NewMessageSheet(
-        currentUserId: currentUserId,
-        firestore: _firestore,
-      ),
+      builder: (context) =>
+          _NewMessageSheet(currentUserId: currentUserId, firestore: _firestore),
     );
   }
-
 }
 
 // Separate StatefulWidget for the New Message sheet to handle contacts loading
@@ -913,9 +919,7 @@ class _NewMessageSheetState extends State<_NewMessageSheet> {
         return Container(
           decoration: BoxDecoration(
             color: isDarkMode ? const Color(0xFF1A1A1A) : Colors.white,
-            borderRadius: const BorderRadius.vertical(
-              top: Radius.circular(20),
-            ),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           ),
           child: Column(
             children: [
@@ -939,9 +943,7 @@ class _NewMessageSheetState extends State<_NewMessageSheet> {
                   ),
                 ),
               ),
-              Expanded(
-                child: _buildContent(isDarkMode, scrollController),
-              ),
+              Expanded(child: _buildContent(isDarkMode, scrollController)),
             ],
           ),
         );
@@ -979,8 +981,9 @@ class _NewMessageSheetState extends State<_NewMessageSheet> {
         return FutureBuilder<List<DocumentSnapshot>>(
           future: otherUserIds.isNotEmpty
               ? Future.wait(
-                  otherUserIds.map((id) =>
-                      widget.firestore.collection('users').doc(id).get()),
+                  otherUserIds.map(
+                    (id) => widget.firestore.collection('users').doc(id).get(),
+                  ),
                 )
               : Future.value([]),
           builder: (context, usersSnapshot) {
@@ -1016,8 +1019,9 @@ class _NewMessageSheetState extends State<_NewMessageSheet> {
                         backgroundImage: photoUrl != null
                             ? CachedNetworkImageProvider(photoUrl)
                             : null,
-                        backgroundColor:
-                            Theme.of(context).primaryColor.withValues(alpha: 0.1),
+                        backgroundColor: Theme.of(
+                          context,
+                        ).primaryColor.withValues(alpha: 0.1),
                         child: photoUrl == null
                             ? Text(
                                 name.isNotEmpty ? name[0].toUpperCase() : '?',
@@ -1037,7 +1041,10 @@ class _NewMessageSheetState extends State<_NewMessageSheet> {
                       ),
                       onTap: () async {
                         Navigator.pop(context);
-                        final userProfile = UserProfile.fromMap(userData, userId);
+                        final userProfile = UserProfile.fromMap(
+                          userData,
+                          userId,
+                        );
                         Navigator.push(
                           context,
                           MaterialPageRoute(
@@ -1064,13 +1071,17 @@ class _NewMessageSheetState extends State<_NewMessageSheet> {
                         Icon(
                           Icons.contacts_outlined,
                           size: 48,
-                          color: isDarkMode ? Colors.grey[600] : Colors.grey[400],
+                          color: isDarkMode
+                              ? Colors.grey[600]
+                              : Colors.grey[400],
                         ),
                         const SizedBox(height: 12),
                         Text(
                           'Enable contacts to invite friends',
                           style: TextStyle(
-                            color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                            color: isDarkMode
+                                ? Colors.grey[400]
+                                : Colors.grey[600],
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -1098,41 +1109,43 @@ class _NewMessageSheetState extends State<_NewMessageSheet> {
                       .where((contact) => !_isContactRegistered(contact))
                       .take(50) // Limit to first 50 contacts
                       .map((contact) {
-                    return ListTile(
-                      leading: CircleAvatar(
-                        backgroundImage: contact.photo != null
-                            ? MemoryImage(contact.photo!)
-                            : null,
-                        backgroundColor: Colors.grey.withValues(alpha: 0.2),
-                        child: contact.photo == null
-                            ? Text(
-                                contact.displayName.isNotEmpty
-                                    ? contact.displayName[0].toUpperCase()
-                                    : '?',
-                                style: TextStyle(
-                                  color: isDarkMode ? Colors.white : Colors.black,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              )
-                            : null,
-                      ),
-                      title: Text(
-                        contact.displayName,
-                        style: TextStyle(
-                          color: isDarkMode ? Colors.white : Colors.black,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      trailing: TextButton.icon(
-                        onPressed: () => _inviteContact(contact),
-                        icon: const Icon(Icons.send, size: 18),
-                        label: const Text('Invite'),
-                        style: TextButton.styleFrom(
-                          foregroundColor: Theme.of(context).primaryColor,
-                        ),
-                      ),
-                    );
-                  }),
+                        return ListTile(
+                          leading: CircleAvatar(
+                            backgroundImage: contact.photo != null
+                                ? MemoryImage(contact.photo!)
+                                : null,
+                            backgroundColor: Colors.grey.withValues(alpha: 0.2),
+                            child: contact.photo == null
+                                ? Text(
+                                    contact.displayName.isNotEmpty
+                                        ? contact.displayName[0].toUpperCase()
+                                        : '?',
+                                    style: TextStyle(
+                                      color: isDarkMode
+                                          ? Colors.white
+                                          : Colors.black,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  )
+                                : null,
+                          ),
+                          title: Text(
+                            contact.displayName,
+                            style: TextStyle(
+                              color: isDarkMode ? Colors.white : Colors.black,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          trailing: TextButton.icon(
+                            onPressed: () => _inviteContact(contact),
+                            icon: const Icon(Icons.send, size: 18),
+                            label: const Text('Invite'),
+                            style: TextButton.styleFrom(
+                              foregroundColor: Theme.of(context).primaryColor,
+                            ),
+                          ),
+                        );
+                      }),
                 ],
 
                 // Empty state
@@ -1147,7 +1160,9 @@ class _NewMessageSheetState extends State<_NewMessageSheet> {
                         Icon(
                           Icons.people_outline,
                           size: 64,
-                          color: isDarkMode ? Colors.grey[700] : Colors.grey[400],
+                          color: isDarkMode
+                              ? Colors.grey[700]
+                              : Colors.grey[400],
                         ),
                         const SizedBox(height: 16),
                         Text(

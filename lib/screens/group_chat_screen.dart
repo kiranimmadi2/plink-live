@@ -1408,8 +1408,9 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen>
 
     if (typingNames.isEmpty) return '';
     if (typingNames.length == 1) return '${typingNames[0]} is typing...';
-    if (typingNames.length == 2)
+    if (typingNames.length == 2) {
       return '${typingNames.join(' and ')} are typing...';
+    }
     return '${typingNames.length} people are typing...';
   }
 
@@ -2405,8 +2406,9 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen>
           .doc(messageId)
           .get(),
       builder: (context, snapshot) {
-        if (!snapshot.hasData || !snapshot.data!.exists)
+        if (!snapshot.hasData || !snapshot.data!.exists) {
           return const SizedBox.shrink();
+        }
 
         final replyData = snapshot.data!.data() as Map<String, dynamic>?;
         if (replyData == null) return const SizedBox.shrink();
