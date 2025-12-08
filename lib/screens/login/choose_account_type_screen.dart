@@ -55,7 +55,7 @@ class _ChooseAccountTypeScreenState extends State<ChooseAccountTypeScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => LoginScreen(accountType: accountTypes[index]),
+        builder: (_) => const LoginScreen(),
       ),
     );
   }

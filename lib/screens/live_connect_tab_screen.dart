@@ -1,22 +1,24 @@
-﻿import 'dart:ui';
+﻿import 'dart:async';
+import 'dart:ui';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/app_providers.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supper/providers/theme_provider.dart';
-import '../../widgets/user_avatar.dart';
-import '../enhanced_chat_screen.dart';
-import '../../models/user_profile.dart';
-import '../../models/extended_user_profile.dart';
-import '../../widgets/profile_detail_bottom_sheet.dart';
-import '../../widgets/edit_profile_bottom_sheet.dart';
-import '../../services/connection_service.dart';
-import '../../services/location_service.dart';
-import '../my_connections_screen.dart';
+import '../widgets/user_avatar.dart';
+import 'enhanced_chat_screen.dart';
+import '../models/user_profile.dart';
+import '../models/extended_user_profile.dart';
+import '../widgets/profile_detail_bottom_sheet.dart';
+import '../widgets/edit_profile_bottom_sheet.dart';
+import '../services/connection_service.dart';
+import '../services/location_service.dart';
+import 'my_connections_screen.dart';
 
 class LiveConnectTabScreen extends ConsumerStatefulWidget {
   const LiveConnectTabScreen({super.key});
@@ -27,15 +29,15 @@ class LiveConnectTabScreen extends ConsumerStatefulWidget {
 }
 
 class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  // Helper getter for current user ID from provider
+  String? get _currentUserId => ref.read(currentUserIdProvider);
   final ConnectionService _connectionService = ConnectionService();
   final LocationService _locationService = LocationService();
 
   Map<String, dynamic>? _userProfile;
   List<String> _selectedInterests = [];
-  final List<String> _selectedConnectionTypes = [];
-  final List<String> _selectedActivities = [];
   List<Map<String, dynamic>> _nearbyPeople = [];
   List<Map<String, dynamic>> _filteredPeople = []; // For search results
   bool _isLoadingPeople = false;
@@ -49,12 +51,12 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
   final bool _filterByExactLocation = false;
   bool _filterByInterests = false;
   bool _filterByGender = false;
-  bool _filterByConnectionTypes = false;
-  bool _filterByActivities = false;
+  bool _filterByAge = false;
   double _distanceFilter = 50.0; // Distance in km
   String _locationFilter =
       'Worldwide'; // 'Near me', 'City', 'Country', 'Worldwide'
   final List<String> _selectedGenders = [];
+  RangeValues _ageRange = const RangeValues(18, 50); // Default age range
 
   // Pagination variables
   bool _isLoadingMore = false;
@@ -67,102 +69,12 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
   final Map<String, String?> _requestStatusCache =
       {}; // userId -> 'sent'|'received'|null
   List<String> _myConnections = []; // List of connected user IDs
-  bool _connectionsLoaded = false;
+
+  // Real-time connection listener
+  StreamSubscription<DocumentSnapshot>? _connectionsSubscription;
 
   // Available genders
   final List<String> _availableGenders = ['Male', 'Female', 'Other'];
-
-  // Available connection types (grouped)
-  final Map<String, List<String>> _connectionTypeGroups = {
-    'Social': [
-      'Dating',
-      'Friendship',
-      'Casual Hangout',
-      'Travel Buddy',
-      'Nightlife Partner',
-    ],
-    'Professional': [
-      'Networking',
-      'Mentorship',
-      'Business Partner',
-      'Career Advice',
-      'Collaboration',
-    ],
-    'Activities': [
-      'Workout Partner',
-      'Sports Partner',
-      'Hobby Partner',
-      'Event Companion',
-      'Study Group',
-    ],
-    'Learning': [
-      'Language Exchange',
-      'Skill Sharing',
-      'Book Club',
-      'Learning Partner',
-      'Creative Workshop',
-    ],
-    'Creative': [
-      'Music Jam',
-      'Art Collaboration',
-      'Photography',
-      'Content Creation',
-      'Performance',
-    ],
-    'Other': [
-      'Roommate',
-      'Pet Playdate',
-      'Community Service',
-      'Gaming',
-      'Online Friends',
-    ],
-  };
-
-  // Available activities (grouped)
-  final Map<String, List<String>> _activityGroups = {
-    'Sports': [
-      'Tennis',
-      'Badminton',
-      'Basketball',
-      'Football',
-      'Volleyball',
-      'Golf',
-      'Table Tennis',
-      'Squash',
-    ],
-    'Fitness': [
-      'Running',
-      'Gym',
-      'Yoga',
-      'Pilates',
-      'CrossFit',
-      'Cycling',
-      'Swimming',
-      'Dance',
-    ],
-    'Outdoor': [
-      'Hiking',
-      'Rock Climbing',
-      'Camping',
-      'Kayaking',
-      'Surfing',
-      'Mountain Biking',
-      'Trail Running',
-    ],
-    'Creative': [
-      'Photography',
-      'Painting',
-      'Music',
-      'Writing',
-      'Cooking',
-      'Crafts',
-      'Gaming',
-    ],
-  };
-
-  // Expanded state for each group
-  final Map<String, bool> _expandedConnectionGroups = {};
-  final Map<String, bool> _expandedActivityGroups = {};
 
   // Common interests for users to choose from
   final List<String> _availableInterests = [
@@ -192,36 +104,106 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
   @override
   void initState() {
     super.initState();
-    // Initialize expanded state for all groups (all collapsed by default)
-    for (var groupName in _connectionTypeGroups.keys) {
-      _expandedConnectionGroups[groupName] = false;
-    }
-    for (var groupName in _activityGroups.keys) {
-      _expandedActivityGroups[groupName] = false;
-    }
+    _loadSavedFilters(); // Load persisted filter state
     _loadMyConnections(); // Load connections for caching
     _loadUserProfile();
   }
 
-  /// Load user's connections list once for caching
-  Future<void> _loadMyConnections() async {
-    if (_connectionsLoaded) return; // Already loaded
-
+  /// Load saved filter state from SharedPreferences
+  Future<void> _loadSavedFilters() async {
     try {
-      _myConnections = await _connectionService.getUserConnections();
-      _connectionsLoaded = true;
+      final prefs = await SharedPreferences.getInstance();
 
-      // Initialize connection status cache
-      for (var userId in _myConnections) {
-        _connectionStatusCache[userId] = true;
-      }
+      setState(() {
+        _locationFilter = prefs.getString('lc_locationFilter') ?? 'Worldwide';
+        _distanceFilter = prefs.getDouble('lc_distanceFilter') ?? 50.0;
+        _filterByInterests = prefs.getBool('lc_filterByInterests') ?? false;
+        _filterByGender = prefs.getBool('lc_filterByGender') ?? false;
+        _filterByAge = prefs.getBool('lc_filterByAge') ?? false;
 
-      debugPrint(
-        'LiveConnect: Loaded ${_myConnections.length} connections for caching',
-      );
+        // Load selected items
+        final savedGenders = prefs.getStringList('lc_selectedGenders');
+        if (savedGenders != null) {
+          _selectedGenders.clear();
+          _selectedGenders.addAll(savedGenders);
+        }
+
+        // Load age range
+        final minAge = prefs.getDouble('lc_minAge') ?? 18;
+        final maxAge = prefs.getDouble('lc_maxAge') ?? 50;
+        _ageRange = RangeValues(minAge, maxAge);
+      });
+
+      debugPrint('LiveConnect: Loaded saved filters');
     } catch (e) {
-      debugPrint('LiveConnect: Error loading connections: $e');
+      debugPrint('LiveConnect: Error loading saved filters: $e');
     }
+  }
+
+  /// Save filter state to SharedPreferences
+  Future<void> _saveFilters() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      await prefs.setString('lc_locationFilter', _locationFilter);
+      await prefs.setDouble('lc_distanceFilter', _distanceFilter);
+      await prefs.setBool('lc_filterByInterests', _filterByInterests);
+      await prefs.setBool('lc_filterByGender', _filterByGender);
+      await prefs.setBool('lc_filterByAge', _filterByAge);
+
+      await prefs.setStringList('lc_selectedGenders', _selectedGenders);
+      await prefs.setDouble('lc_minAge', _ageRange.start);
+      await prefs.setDouble('lc_maxAge', _ageRange.end);
+
+      debugPrint('LiveConnect: Filters saved');
+    } catch (e) {
+      debugPrint('LiveConnect: Error saving filters: $e');
+    }
+  }
+
+  /// Load user's connections with real-time listener
+  void _loadMyConnections() {
+    final currentUserId = _currentUserId;
+    if (currentUserId == null) return;
+
+    // Cancel existing subscription if any
+    _connectionsSubscription?.cancel();
+
+    // Set up real-time listener for connections
+    _connectionsSubscription = _firestore
+        .collection('users')
+        .doc(currentUserId)
+        .snapshots()
+        .listen((snapshot) {
+      if (!mounted) return;
+
+      if (snapshot.exists) {
+        final data = snapshot.data() as Map<String, dynamic>;
+        final connections = List<String>.from(data['connections'] ?? []);
+
+        setState(() {
+          _myConnections = connections;
+
+          // Update connection status cache
+          _connectionStatusCache.clear();
+          for (var userId in connections) {
+            _connectionStatusCache[userId] = true;
+          }
+        });
+
+        debugPrint(
+          'LiveConnect: Real-time update - ${connections.length} connections',
+        );
+      }
+    }, onError: (e) {
+      debugPrint('LiveConnect: Error in connections listener: $e');
+    });
+  }
+
+  @override
+  void dispose() {
+    _connectionsSubscription?.cancel();
+    super.dispose();
   }
 
   /// Get cached connection status (much faster than Firestore query)
@@ -303,7 +285,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
     if (!mounted) return;
 
     try {
-      final userId = _auth.currentUser?.uid;
+      final userId = _currentUserId;
       if (userId == null) return;
 
       // Load user profile
@@ -371,7 +353,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
     });
 
     try {
-      final userId = _auth.currentUser?.uid;
+      final userId = _currentUserId;
       if (userId == null) return;
 
       final userCity = _userProfile?['city'];
@@ -406,19 +388,18 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
       // Build query based on filters - USE INDEXES FOR BETTER PERFORMANCE
       Query<Map<String, dynamic>> usersQuery = _firestore.collection('users');
 
-      // ALWAYS filter by discoveryModeEnabled to respect user privacy
-      usersQuery = usersQuery.where('discoveryModeEnabled', isEqualTo: true);
+      // NOTE: discoveryModeEnabled is checked in-memory below to include users
+      // who haven't explicitly set this field (default to visible).
+      // Only users who explicitly set discoveryModeEnabled: false are hidden.
 
       // Apply city filter if 'City' location filter is selected
-      // This uses the composite index: discoveryModeEnabled + city
       if (_locationFilter == 'City' &&
           userCity != null &&
           userCity.isNotEmpty) {
         usersQuery = usersQuery.where('city', isEqualTo: userCity);
       }
 
-      // Apply gender filter at database level when enabled
-      // This uses the composite index: discoveryModeEnabled + city + gender OR discoveryModeEnabled + gender
+      // Apply gender filter at database level when enabled (single gender only)
       if (_filterByGender && _selectedGenders.length == 1) {
         // Only apply single-gender filter at DB level (arrayContainsAny doesn't work for equality)
         usersQuery = usersQuery.where(
@@ -447,11 +428,8 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
       if (_filterByGender && _selectedGenders.length > 1) {
         hasInMemoryFilters = true; // Multi-gender
       }
-      if (_filterByConnectionTypes && _selectedConnectionTypes.isNotEmpty) {
-        hasInMemoryFilters = true;
-      }
-      if (_filterByActivities && _selectedActivities.isNotEmpty) {
-        hasInMemoryFilters = true;
+      if (_filterByAge) {
+        hasInMemoryFilters = true; // Age filtering
       }
 
       // Over-fetch by 3x when in-memory filters are active to ensure we get enough results
@@ -469,7 +447,10 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
 
           final userData = doc.data();
 
-          // Note: discoveryModeEnabled is now filtered at database level for better performance
+          // Check discoveryModeEnabled - skip only if explicitly set to false
+          // Users without this field are included by default (opt-out approach)
+          final discoveryEnabled = userData['discoveryModeEnabled'];
+          if (discoveryEnabled == false) continue; // Only skip if explicitly false
 
           final userInterests = List<String>.from(userData['interests'] ?? []);
           final otherUserCity = userData['city'];
@@ -539,32 +520,22 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
           }
           // Note: Single gender filter is applied at database level for better performance
 
-          // Connection Types filtering
-          if (_filterByConnectionTypes && _selectedConnectionTypes.isNotEmpty) {
-            final userConnectionTypes = List<String>.from(
-              userData['connectionTypes'] ?? [],
-            );
-
-            // Check if user has any of the selected connection types
-            final hasMatchingType = _selectedConnectionTypes.any(
-              (type) => userConnectionTypes.contains(type),
-            );
-
-            if (!hasMatchingType) continue;
-          }
-
-          // Activities filtering
-          if (_filterByActivities && _selectedActivities.isNotEmpty) {
-            final userActivities = List<String>.from(
-              userData['activities'] ?? [],
-            );
-
-            // Check if user has any of the selected activities
-            final hasMatchingActivity = _selectedActivities.any(
-              (activity) => userActivities.contains(activity),
-            );
-
-            if (!hasMatchingActivity) continue;
+          // Age filtering
+          if (_filterByAge) {
+            final birthDateStr = userData['birthDate'] as String?;
+            if (birthDateStr != null) {
+              try {
+                final birthDate = DateTime.parse(birthDateStr);
+                final age = _calculateAge(birthDate);
+                if (age < _ageRange.start || age > _ageRange.end) {
+                  continue; // Skip user if age is outside the range
+                }
+              } catch (e) {
+                // If birthDate can't be parsed, skip this filter for this user
+                debugPrint('Error parsing birthDate for user ${doc.id}: $e');
+              }
+            }
+            // If user has no birthDate, they're still included (don't filter them out)
           }
 
           // Add user with match data
@@ -606,9 +577,15 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
           if (usersSnapshot.docs.isNotEmpty) {
             _lastDocument = usersSnapshot.docs.last;
           }
-          // Has more if we fetched the full fetch size
-          // (not _pageSize, but the actual size we requested)
-          _hasMoreUsers = usersSnapshot.docs.length >= fetchSize;
+
+          // Has more if we fetched the full fetch size from Firestore
+          // This indicates there might be more documents to load
+          final moreDocsAvailable = usersSnapshot.docs.length >= fetchSize;
+
+          // Also consider: if we got documents but after filtering have fewer
+          // than _pageSize results, there might still be more matching users
+          _hasMoreUsers = moreDocsAvailable ||
+              (usersSnapshot.docs.isNotEmpty && people.length < _pageSize && hasInMemoryFilters);
 
           // Limit final results to _pageSize even if we fetched more
           if (people.length > _pageSize) {
@@ -695,7 +672,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
     if (_userProfile == null) return;
 
     // Create ExtendedUserProfile from current user's data
-    final userId = _auth.currentUser?.uid;
+    final userId = _currentUserId;
     if (userId == null) return;
 
     final myProfile = ExtendedUserProfile.fromMap(_userProfile!, userId);
@@ -719,7 +696,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
   void _showEditProfile() {
     if (_userProfile == null) return;
 
-    final userId = _auth.currentUser?.uid;
+    final userId = _currentUserId;
     if (userId == null) return;
 
     // ignore: unused_local_variable
@@ -768,8 +745,19 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
     return degrees * pi / 180;
   }
 
+  // Helper method to calculate age from birth date
+  int _calculateAge(DateTime birthDate) {
+    final now = DateTime.now();
+    int age = now.year - birthDate.year;
+    if (now.month < birthDate.month ||
+        (now.month == birthDate.month && now.day < birthDate.day)) {
+      age--;
+    }
+    return age;
+  }
+
   Future<void> _updateInterests() async {
-    final userId = _auth.currentUser?.uid;
+    final userId = _currentUserId;
     if (userId == null) return;
 
     try {
@@ -1216,8 +1204,9 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                       ),
                                       decoration: BoxDecoration(
                                         color: isSelected
-                                            ? Theme.of(context).primaryColor
-                                                  .withValues(alpha: 0.2)
+                                            ? Theme.of(
+                                                context,
+                                              ).primaryColor.withValues(alpha: 0.2)
                                             : Colors.grey[800],
                                         borderRadius: BorderRadius.circular(16),
                                         border: Border.all(
@@ -1438,17 +1427,17 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
 
                           const SizedBox(height: 32),
 
-                          // Connection Types Filter Section
+                          // Age Range Filter Section
                           Row(
                             children: [
                               const Icon(
-                                Icons.connect_without_contact,
-                                color: Color(0xFF9C27B0), // Purple
+                                Icons.cake,
+                                color: Color(0xFFFF6B6B), // Red/pink
                                 size: 20,
                               ),
                               const SizedBox(width: 8),
                               Text(
-                                'Connection Types',
+                                'Age Range',
                                 style: TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
@@ -1459,10 +1448,10 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                               ),
                               const Spacer(),
                               Switch(
-                                value: _filterByConnectionTypes,
+                                value: _filterByAge,
                                 onChanged: (value) {
                                   setDialogState(() {
-                                    _filterByConnectionTypes = value;
+                                    _filterByAge = value;
                                   });
                                 },
                                 activeThumbColor: const Color(0xFF00D67D),
@@ -1471,195 +1460,55 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                           ),
                           const SizedBox(height: 12),
 
-                          if (_filterByConnectionTypes) ...[
+                          if (_filterByAge) ...[
                             Text(
-                              'Select connection types you\'re interested in:',
+                              'Show people aged ${_ageRange.start.round()} - ${_ageRange.end.round()}',
                               style: TextStyle(
-                                fontSize: 13,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w500,
                                 color: isDarkMode
-                                    ? Colors.white70
-                                    : Colors.black54,
+                                    ? Colors.white
+                                    : Colors.black87,
                               ),
                             ),
                             const SizedBox(height: 16),
-
-                            // Grouped connection types
-                            ..._connectionTypeGroups.entries.map((groupEntry) {
-                              final groupName = groupEntry.key;
-                              final types = groupEntry.value;
-                              final isExpanded =
-                                  _expandedConnectionGroups[groupName] ?? false;
-
-                              return Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  // Group header
-                                  GestureDetector(
-                                    onTap: () {
-                                      setDialogState(() {
-                                        _expandedConnectionGroups[groupName] =
-                                            !isExpanded;
-                                      });
-                                    },
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 16,
-                                        vertical: 12,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: const Color(
-                                          0xFF9C27B0,
-                                        ).withValues(alpha: 0.15),
-                                        borderRadius: BorderRadius.circular(12),
-                                        border: Border.all(
-                                          color: const Color(
-                                            0xFF9C27B0,
-                                          ).withValues(alpha: 0.3),
-                                        ),
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          Icon(
-                                            isExpanded
-                                                ? Icons.expand_less
-                                                : Icons.expand_more,
-                                            color: const Color(0xFF9C27B0),
-                                            size: 20,
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            groupName,
-                                            style: const TextStyle(
-                                              fontSize: 15,
-                                              fontWeight: FontWeight.w600,
-                                              color: Color(0xFF9C27B0),
-                                            ),
-                                          ),
-                                          const Spacer(),
-                                          Text(
-                                            '${types.where((t) => _selectedConnectionTypes.contains(t)).length}/${types.length}',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              color: Colors.grey[500],
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
+                            RangeSlider(
+                              values: _ageRange,
+                              min: 18,
+                              max: 80,
+                              divisions: 62,
+                              labels: RangeLabels(
+                                '${_ageRange.start.round()}',
+                                '${_ageRange.end.round()}',
+                              ),
+                              activeColor: const Color(0xFFFF6B6B),
+                              inactiveColor: Colors.grey[700],
+                              onChanged: (RangeValues values) {
+                                setDialogState(() {
+                                  _ageRange = values;
+                                });
+                              },
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  '18',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey[500],
                                   ),
-
-                                  // Group content (chips)
-                                  if (isExpanded) ...[
-                                    const SizedBox(height: 12),
-                                    Padding(
-                                      padding: const EdgeInsets.only(left: 8),
-                                      child: Wrap(
-                                        spacing: 8,
-                                        runSpacing: 8,
-                                        children: types.map((type) {
-                                          final isSelected =
-                                              _selectedConnectionTypes.contains(
-                                                type,
-                                              );
-                                          final userConnectionTypes =
-                                              List<String>.from(
-                                                _userProfile?['connectionTypes'] ??
-                                                    [],
-                                              );
-                                          final isUserOwn = userConnectionTypes
-                                              .contains(type);
-
-                                          return GestureDetector(
-                                            onTap: () {
-                                              setDialogState(() {
-                                                if (isSelected) {
-                                                  _selectedConnectionTypes
-                                                      .remove(type);
-                                                } else {
-                                                  _selectedConnectionTypes.add(
-                                                    type,
-                                                  );
-                                                }
-                                              });
-                                            },
-                                            child: Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 14,
-                                                    vertical: 8,
-                                                  ),
-                                              decoration: BoxDecoration(
-                                                color: isSelected
-                                                    ? const Color(
-                                                        0xFF00D67D,
-                                                      ).withValues(alpha: 0.2)
-                                                    : isUserOwn
-                                                    ? const Color(
-                                                        0xFF9C27B0,
-                                                      ).withValues(alpha: 0.1)
-                                                    : Colors.grey[800],
-                                                borderRadius:
-                                                    BorderRadius.circular(16),
-                                                border: Border.all(
-                                                  color: isSelected
-                                                      ? const Color(0xFF00D67D)
-                                                      : isUserOwn
-                                                      ? const Color(
-                                                          0xFF9C27B0,
-                                                        ).withValues(alpha: 0.5)
-                                                      : Colors.grey[600]!,
-                                                  width: isSelected ? 2 : 1,
-                                                ),
-                                              ),
-                                              child: Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  if (isSelected)
-                                                    const Icon(
-                                                      Icons.check_circle,
-                                                      size: 16,
-                                                      color: Color(0xFF00D67D),
-                                                    ),
-                                                  if (isSelected)
-                                                    const SizedBox(width: 6),
-                                                  if (isUserOwn && !isSelected)
-                                                    const Icon(
-                                                      Icons.person,
-                                                      size: 14,
-                                                      color: Color(0xFF9C27B0),
-                                                    ),
-                                                  if (isUserOwn && !isSelected)
-                                                    const SizedBox(width: 4),
-                                                  Text(
-                                                    type,
-                                                    style: TextStyle(
-                                                      fontSize: 13,
-                                                      fontWeight: isSelected
-                                                          ? FontWeight.w600
-                                                          : FontWeight.normal,
-                                                      color: isSelected
-                                                          ? const Color(
-                                                              0xFF00D67D,
-                                                            )
-                                                          : isUserOwn
-                                                          ? const Color(
-                                                              0xFF9C27B0,
-                                                            )
-                                                          : Colors.grey[400],
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                          );
-                                        }).toList(),
-                                      ),
-                                    ),
-                                  ],
-                                  const SizedBox(height: 12),
-                                ],
-                              );
-                            }),
+                                ),
+                                Text(
+                                  '80+',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey[500],
+                                  ),
+                                ),
+                              ],
+                            ),
                           ] else ...[
                             Container(
                               padding: const EdgeInsets.all(16),
@@ -1677,261 +1526,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                   const SizedBox(width: 12),
                                   Expanded(
                                     child: Text(
-                                      'Enable to filter by connection types',
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        color: isDarkMode
-                                            ? Colors.white70
-                                            : Colors.black54,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-
-                          const SizedBox(height: 32),
-
-                          // Activities Filter Section
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.directions_run,
-                                color: Color(0xFF9C27B0), // Purple
-                                size: 20,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Activities',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: isDarkMode
-                                      ? Colors.white
-                                      : Colors.black,
-                                ),
-                              ),
-                              const Spacer(),
-                              Switch(
-                                value: _filterByActivities,
-                                onChanged: (value) {
-                                  setDialogState(() {
-                                    _filterByActivities = value;
-                                  });
-                                },
-                                activeThumbColor: const Color(0xFF00D67D),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-
-                          if (_filterByActivities) ...[
-                            Text(
-                              'Select activities you\'re interested in:',
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: isDarkMode
-                                    ? Colors.white70
-                                    : Colors.black54,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-
-                            // Grouped activities
-                            ..._activityGroups.entries.map((groupEntry) {
-                              final groupName = groupEntry.key;
-                              final activities = groupEntry.value;
-                              final isExpanded =
-                                  _expandedActivityGroups[groupName] ?? false;
-
-                              return Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  // Group header
-                                  GestureDetector(
-                                    onTap: () {
-                                      setDialogState(() {
-                                        _expandedActivityGroups[groupName] =
-                                            !isExpanded;
-                                      });
-                                    },
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 16,
-                                        vertical: 12,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: const Color(
-                                          0xFF9C27B0,
-                                        ).withValues(alpha: 0.15),
-                                        borderRadius: BorderRadius.circular(12),
-                                        border: Border.all(
-                                          color: const Color(
-                                            0xFF9C27B0,
-                                          ).withValues(alpha: 0.3),
-                                        ),
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          Icon(
-                                            isExpanded
-                                                ? Icons.expand_less
-                                                : Icons.expand_more,
-                                            color: const Color(0xFF9C27B0),
-                                            size: 20,
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            groupName,
-                                            style: const TextStyle(
-                                              fontSize: 15,
-                                              fontWeight: FontWeight.w600,
-                                              color: Color(0xFF9C27B0),
-                                            ),
-                                          ),
-                                          const Spacer(),
-                                          Text(
-                                            '${activities.where((a) => _selectedActivities.contains(a)).length}/${activities.length}',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              color: Colors.grey[500],
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-
-                                  // Group content (chips)
-                                  if (isExpanded) ...[
-                                    const SizedBox(height: 12),
-                                    Padding(
-                                      padding: const EdgeInsets.only(left: 8),
-                                      child: Wrap(
-                                        spacing: 8,
-                                        runSpacing: 8,
-                                        children: activities.map((activity) {
-                                          final isSelected = _selectedActivities
-                                              .contains(activity);
-                                          final userActivities =
-                                              List<String>.from(
-                                                _userProfile?['activities'] ??
-                                                    [],
-                                              );
-                                          final isUserOwn = userActivities
-                                              .contains(activity);
-
-                                          return GestureDetector(
-                                            onTap: () {
-                                              setDialogState(() {
-                                                if (isSelected) {
-                                                  _selectedActivities.remove(
-                                                    activity,
-                                                  );
-                                                } else {
-                                                  _selectedActivities.add(
-                                                    activity,
-                                                  );
-                                                }
-                                              });
-                                            },
-                                            child: Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 14,
-                                                    vertical: 8,
-                                                  ),
-                                              decoration: BoxDecoration(
-                                                color: isSelected
-                                                    ? const Color(
-                                                        0xFF00D67D,
-                                                      ).withValues(alpha: 0.2)
-                                                    : isUserOwn
-                                                    ? const Color(
-                                                        0xFF9C27B0,
-                                                      ).withValues(alpha: 0.1)
-                                                    : Colors.grey[800],
-                                                borderRadius:
-                                                    BorderRadius.circular(16),
-                                                border: Border.all(
-                                                  color: isSelected
-                                                      ? const Color(0xFF00D67D)
-                                                      : isUserOwn
-                                                      ? const Color(
-                                                          0xFF9C27B0,
-                                                        ).withValues(alpha: 0.5)
-                                                      : Colors.grey[600]!,
-                                                  width: isSelected ? 2 : 1,
-                                                ),
-                                              ),
-                                              child: Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  if (isSelected)
-                                                    const Icon(
-                                                      Icons.check_circle,
-                                                      size: 16,
-                                                      color: Color(0xFF00D67D),
-                                                    ),
-                                                  if (isSelected)
-                                                    const SizedBox(width: 6),
-                                                  if (isUserOwn && !isSelected)
-                                                    const Icon(
-                                                      Icons.person,
-                                                      size: 14,
-                                                      color: Color(0xFF9C27B0),
-                                                    ),
-                                                  if (isUserOwn && !isSelected)
-                                                    const SizedBox(width: 4),
-                                                  Text(
-                                                    activity,
-                                                    style: TextStyle(
-                                                      fontSize: 13,
-                                                      fontWeight: isSelected
-                                                          ? FontWeight.w600
-                                                          : FontWeight.normal,
-                                                      color: isSelected
-                                                          ? const Color(
-                                                              0xFF00D67D,
-                                                            )
-                                                          : isUserOwn
-                                                          ? const Color(
-                                                              0xFF9C27B0,
-                                                            )
-                                                          : Colors.grey[400],
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                          );
-                                        }).toList(),
-                                      ),
-                                    ),
-                                  ],
-                                  const SizedBox(height: 12),
-                                ],
-                              );
-                            }),
-                          ] else ...[
-                            Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: Colors.grey[800],
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.info_outline,
-                                    size: 20,
-                                    color: Colors.grey[400],
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Text(
-                                      'Enable to filter by activities',
+                                      'Enable to filter by age range',
                                       style: TextStyle(
                                         fontSize: 13,
                                         color: isDarkMode
@@ -1996,6 +1591,8 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                 // State is already updated from setDialogState
                               });
                               Navigator.pop(context);
+                              // Save filters to SharedPreferences
+                              _saveFilters();
                               // Reload nearby people with new filters
                               _loadNearbyPeople();
                             },
@@ -2077,7 +1674,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
 
   // ignore: unused_element
   Future<void> _toggleFavorite(String userId, String userName) async {
-    final currentUserId = _auth.currentUser?.uid;
+    final currentUserId = _currentUserId;
     if (currentUserId == null) return;
 
     try {
@@ -2130,13 +1727,19 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
   }
 
   void _showProfileDetail(ExtendedUserProfile user) async {
-    // Check connection status before showing sheet
-    final connectionStatus = await _connectionService
-        .getConnectionRequestStatus(user.uid);
-    final isConnected = await _connectionService.areUsersConnected(
-      _auth.currentUser!.uid,
-      user.uid,
-    );
+    // Use cached connection status for instant display (cache is real-time)
+    final isConnected = _isConnectedCached(user.uid);
+    var connectionStatus = _requestStatusCache[user.uid];
+
+    // If not in cache, fetch it (one-time) and update cache
+    if (!isConnected && connectionStatus == null && !_requestStatusCache.containsKey(user.uid)) {
+      connectionStatus = await _connectionService.getConnectionRequestStatus(user.uid);
+      if (mounted) {
+        setState(() {
+          _requestStatusCache[user.uid] = connectionStatus;
+        });
+      }
+    }
 
     if (!mounted) return;
 
@@ -3221,8 +2824,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
           final person = _filteredPeople[index];
           final userData = person['userData'] as Map<String, dynamic>;
           final commonInterests = person['commonInterests'] as List<String>;
-          final matchScore =
-              person['matchScore'] as double; // ignore: unused_local_variable
+          final matchScore = person['matchScore'] as double; // ignore: unused_local_variable
           final userId = person['userId'] as String;
           final distance = person['distance'] as double?;
 
@@ -3307,9 +2909,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                 ),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: gradientColors[0].withValues(
-                                      alpha: 0.3,
-                                    ),
+                                    color: gradientColors[0].withValues(alpha: 0.3),
                                     blurRadius: 12,
                                     offset: const Offset(0, 4),
                                   ),
@@ -3335,9 +2935,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                 shape: BoxShape.circle,
                                 boxShadow: [
                                   BoxShadow(
-                                    color: gradientColors[0].withValues(
-                                      alpha: 0.3,
-                                    ),
+                                    color: gradientColors[0].withValues(alpha: 0.3),
                                     blurRadius: 12,
                                     offset: const Offset(0, 4),
                                   ),
@@ -3529,12 +3127,6 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                         ],
                       ],
                     ),
-                  ),
-                  // Arrow icon
-                  Icon(
-                    Icons.arrow_forward_ios,
-                    size: 18,
-                    color: isDarkMode ? Colors.grey[600] : Colors.grey[400],
                   ),
                 ],
               ),

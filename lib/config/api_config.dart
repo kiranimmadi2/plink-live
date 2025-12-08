@@ -38,6 +38,14 @@ class ApiConfig {
   static const Duration matchCacheDuration = Duration(minutes: 30);
   static const int maxCacheSize = 1000;
 
+  /// Network timeout configuration
+  static const Duration connectionTimeout = Duration(seconds: 30);
+  static const Duration receiveTimeout = Duration(seconds: 30);
+  static const Duration sendTimeout = Duration(seconds: 30);
+  static const Duration apiCallTimeout = Duration(seconds: 45);
+  static const int maxRetries = 3;
+  static const Duration retryDelay = Duration(seconds: 2);
+
   /// Firestore collection names
   static const String postsCollection = 'posts';
   static const String usersCollection = 'users';

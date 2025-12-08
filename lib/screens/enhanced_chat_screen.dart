@@ -1,23 +1,23 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:io';
-import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/user_profile.dart';
 import '../models/message_model.dart';
 import '../services/notification_service.dart';
 import '../services/conversation_service.dart';
 import '../services/hybrid_chat_service.dart';
+import '../providers/app_providers.dart';
 import 'profile/profile_view_screen.dart';
 
-class EnhancedChatScreen extends StatefulWidget {
+class EnhancedChatScreen extends ConsumerStatefulWidget {
   final UserProfile otherUser;
   final String? initialMessage;
   final String? chatId; // Optional chatId from Live Connect
@@ -30,20 +30,22 @@ class EnhancedChatScreen extends StatefulWidget {
   });
 
   @override
-  State<EnhancedChatScreen> createState() => _EnhancedChatScreenState();
+  ConsumerState<EnhancedChatScreen> createState() => _EnhancedChatScreenState();
 }
 
-class _EnhancedChatScreenState extends State<EnhancedChatScreen>
+class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
     with WidgetsBindingObserver, TickerProviderStateMixin {
   final TextEditingController _messageController = TextEditingController();
   final FocusNode _messageFocusNode = FocusNode();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
   final ScrollController _scrollController = ScrollController();
   final ImagePicker _imagePicker = ImagePicker();
   final ConversationService _conversationService = ConversationService();
   final HybridChatService _hybridChatService = HybridChatService();
+
+  // Helper getter for current user ID from provider
+  String? get _currentUserId => ref.read(currentUserIdProvider);
 
   String? _conversationId;
   bool _isTyping = false;
@@ -144,8 +146,8 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
                 if (snapshot.docs.isNotEmpty && mounted) {
                   final latestMessage = snapshot.docs.first.data();
                   // Check if it's an incoming message in memory
-                  if (latestMessage['receiverId'] == _auth.currentUser!.uid &&
-                      latestMessage['senderId'] != _auth.currentUser!.uid) {
+                  if (latestMessage['receiverId'] == _currentUserId! &&
+                      latestMessage['senderId'] != _currentUserId!) {
                     HapticFeedback.mediumImpact();
                   }
                 }
@@ -332,177 +334,27 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: Colors.transparent,
-      extendBodyBehindAppBar: true,
-      appBar: _buildGlassAppBar(isDarkMode),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Colors.grey.shade900,
-              Colors.grey.shade800,
-              Colors.grey.shade900,
-            ],
-          ),
-        ),
-        child: SafeArea(
-          child: Stack(
+      backgroundColor: isDarkMode ? const Color(0xFF000000) : Colors.white,
+      appBar: _buildAppBar(isDarkMode),
+      body: Stack(
+        children: [
+          Column(
             children: [
-              Column(
-                children: [
-                  if (_isSearching) _buildSearchResultsBar(isDarkMode),
-                  Expanded(
-                    child: Stack(
-                      children: [
-                        _buildMessagesList(isDarkMode),
-                        if (_showScrollButton) _buildScrollToBottomButton(),
-                      ],
-                    ),
-                  ),
-                  if (_replyToMessage != null) _buildReplyPreview(isDarkMode),
-                  _buildTypingIndicator(isDarkMode),
-                  _buildMessageInput(isDarkMode),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  PreferredSizeWidget _buildGlassAppBar(bool isDarkMode) {
-    return PreferredSize(
-      preferredSize: const Size.fromHeight(kToolbarHeight),
-      child: ClipRRect(
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: AppBar(
-            backgroundColor: Colors.grey.shade800.withValues(alpha: 0.5),
-            elevation: 0,
-            scrolledUnderElevation: 0,
-            leading: IconButton(
-              icon: const Icon(
-                Icons.arrow_back_ios_rounded,
-                color: Colors.white,
-                size: 22,
-              ),
-              onPressed: () => Navigator.pop(context),
-            ),
-            title: _isSearching
-                ? _buildSearchField(isDarkMode)
-                : InkWell(
-                    onTap: _showUserProfile,
-                    child: Row(
-                      children: [
-                        Stack(
-                          children: [
-                            CircleAvatar(
-                              radius: 18,
-                              backgroundImage:
-                                  widget.otherUser.profileImageUrl != null
-                                  ? CachedNetworkImageProvider(
-                                      widget.otherUser.profileImageUrl!,
-                                    )
-                                  : null,
-                              child: widget.otherUser.profileImageUrl == null
-                                  ? Text(widget.otherUser.name[0].toUpperCase())
-                                  : null,
-                            ),
-                            StreamBuilder<DocumentSnapshot>(
-                              stream: _userStatusStream,
-                              builder: (context, snapshot) {
-                                bool isOnline = false;
-                                if (snapshot.hasData && snapshot.data!.exists) {
-                                  final userData =
-                                      snapshot.data!.data() as Map<String, dynamic>;
-                                  final showOnlineStatus =
-                                      userData['showOnlineStatus'] ?? true;
-                                  if (showOnlineStatus) {
-                                    isOnline = userData['isOnline'] ?? false;
-                                  }
-                                }
-                                return Positioned(
-                                  right: 0,
-                                  bottom: 0,
-                                  child: Container(
-                                    width: 12,
-                                    height: 12,
-                                    decoration: BoxDecoration(
-                                      color: isOnline ? Colors.green : Colors.grey,
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: Colors.grey.shade800,
-                                        width: 2,
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          ],
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                widget.otherUser.name,
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.white,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              StreamBuilder<DocumentSnapshot>(
-                                stream: _userStatusStream,
-                                builder: (context, snapshot) {
-                                  String statusText = 'Offline';
-                                  if (snapshot.hasData && snapshot.data!.exists) {
-                                    final userData =
-                                        snapshot.data!.data() as Map<String, dynamic>;
-                                    final isOnline = userData['isOnline'] ?? false;
-                                    if (isOnline) {
-                                      statusText = 'Online';
-                                    } else if (userData['lastSeen'] != null) {
-                                      final lastSeen = (userData['lastSeen'] as Timestamp).toDate();
-                                      statusText = 'Last seen ${timeago.format(lastSeen)}';
-                                    }
-                                  }
-                                  return Text(
-                                    statusText,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey.shade400,
-                                    ),
-                                  );
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-            actions: [
-              IconButton(
-                icon: Icon(
-                  _isSearching ? Icons.close : Icons.search,
-                  color: Colors.white,
+              if (_isSearching) _buildSearchResultsBar(isDarkMode),
+              Expanded(
+                child: Stack(
+                  children: [
+                    _buildMessagesList(isDarkMode),
+                    if (_showScrollButton) _buildScrollToBottomButton(),
+                  ],
                 ),
-                onPressed: _toggleSearch,
               ),
-              IconButton(
-                icon: const Icon(Icons.more_vert, color: Colors.white),
-                onPressed: _showChatInfo,
-              ),
+              if (_replyToMessage != null) _buildReplyPreview(isDarkMode),
+              _buildTypingIndicator(isDarkMode),
+              _buildMessageInput(isDarkMode),
             ],
           ),
-        ),
+        ],
       ),
     );
   }
@@ -976,7 +828,7 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
               itemCount: displayMessages.length,
               itemBuilder: (context, index) {
                 final message = displayMessages[index];
-                final isMe = message.senderId == _auth.currentUser!.uid;
+                final isMe = message.senderId == _currentUserId!;
                 final showAvatar =
                     !isMe &&
                     (index == displayMessages.length - 1 ||
@@ -1513,7 +1365,7 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Replying to ${_replyToMessage!.senderId == _auth.currentUser!.uid ? 'yourself' : widget.otherUser.name}',
+                  'Replying to ${_replyToMessage!.senderId == _currentUserId! ? 'yourself' : widget.otherUser.name}',
                   style: TextStyle(
                     fontSize: 12,
                     color: Theme.of(context).primaryColor,
@@ -2115,10 +1967,8 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
       setState(() {});
 
       // Send push notification to the other user
-      final currentUserName =
-          _auth.currentUser!.displayName ??
-          _auth.currentUser!.email?.split('@')[0] ??
-          'Someone';
+      final currentUserProfile = ref.read(currentUserProfileProvider).valueOrNull;
+      final currentUserName = currentUserProfile?.name ?? 'Someone';
 
       NotificationService().sendMessageNotification(
         recipientToken: widget.otherUser.fcmToken ?? '',
@@ -2143,7 +1993,7 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
     if (isTyping != _isTyping) {
       _isTyping = isTyping;
       _firestore.collection('conversations').doc(_conversationId!).update({
-        'isTyping.${_auth.currentUser!.uid}': isTyping,
+        'isTyping.${_currentUserId!}': isTyping,
       });
     }
 
@@ -2163,7 +2013,7 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
 
       // Update conversation unread count
       await _firestore.collection('conversations').doc(_conversationId!).update(
-        {'unreadCount.${_auth.currentUser!.uid}': 0},
+        {'unreadCount.${_currentUserId!}': 0},
       );
     } catch (e) {
       // Only log non-critical errors, don't show to user
@@ -2650,7 +2500,7 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
           .doc(_conversationId!)
           .collection('messages')
           .add({
-            'senderId': _auth.currentUser!.uid,
+            'senderId': _currentUserId!,
             'receiverId': widget.otherUser.uid,
             'chatId': _conversationId,
             'text': '',
@@ -2667,7 +2517,7 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen>
           .update({
             'lastMessage': '📷 Photo',
             'lastMessageTime': FieldValue.serverTimestamp(),
-            'lastMessageSenderId': _auth.currentUser!.uid,
+            'lastMessageSenderId': _currentUserId!,
             'unreadCount.${widget.otherUser.uid}': FieldValue.increment(1),
           });
     } catch (e) {

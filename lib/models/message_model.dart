@@ -1,23 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-enum MessageType {
-  text,
-  image,
-  video,
-  audio,
-  file,
-  location,
-  sticker,
-  gif,
-}
+enum MessageType { text, image, video, audio, file, location, sticker, gif }
 
-enum MessageStatus {
-  sending,
-  sent,
-  delivered,
-  read,
-  failed,
-}
+enum MessageStatus { sending, sent, delivered, read, failed }
 
 class MessageModel {
   final String id;
@@ -30,6 +15,9 @@ class MessageModel {
   final DateTime timestamp;
   final bool isDeleted;
   final String? mediaUrl;
+  final String? localPath;
+  final String? fileName;
+  final int? fileSize;
   final String? thumbnailUrl;
   final Map<String, dynamic>? metadata;
   final String? replyToMessageId;
@@ -54,6 +42,9 @@ class MessageModel {
     this.reactions,
     this.isEdited = false,
     this.editedAt,
+    this.localPath,
+    this.fileName,
+    this.fileSize,
   });
 
   factory MessageModel.fromFirestore(DocumentSnapshot doc) {
@@ -74,13 +65,16 @@ class MessageModel {
       thumbnailUrl: data['thumbnailUrl'],
       metadata: data['metadata'],
       replyToMessageId: data['replyToMessageId'],
-      reactions: data['reactions'] != null 
-          ? List<String>.from(data['reactions']) 
+      reactions: data['reactions'] != null
+          ? List<String>.from(data['reactions'])
           : null,
       isEdited: data['isEdited'] ?? false,
-      editedAt: data['editedAt'] != null 
-          ? (data['editedAt'] as Timestamp).toDate() 
+      editedAt: data['editedAt'] != null
+          ? (data['editedAt'] as Timestamp).toDate()
           : null,
+      localPath: data['localPath'],
+      fileName: data['fileName'],
+      fileSize: data['fileSize'],
     );
   }
 
@@ -101,6 +95,9 @@ class MessageModel {
       'reactions': reactions,
       'isEdited': isEdited,
       'editedAt': editedAt != null ? Timestamp.fromDate(editedAt!) : null,
+      'localPath': localPath,
+      'fileName': fileName,
+      'fileSize': fileSize,
     };
   }
 
@@ -121,6 +118,9 @@ class MessageModel {
     List<String>? reactions,
     bool? isEdited,
     DateTime? editedAt,
+    String? localPath,
+    String? fileName,
+    int? fileSize,
   }) {
     return MessageModel(
       id: id ?? this.id,
@@ -139,6 +139,9 @@ class MessageModel {
       reactions: reactions ?? this.reactions,
       isEdited: isEdited ?? this.isEdited,
       editedAt: editedAt ?? this.editedAt,
+      localPath: localPath ?? this.localPath,
+      fileName: fileName ?? this.fileName,
+      fileSize: fileSize ?? this.fileSize,
     );
   }
 }

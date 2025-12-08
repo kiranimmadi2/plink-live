@@ -34,7 +34,7 @@ dependencies:
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
-  
+
   # Firebase dependencies
   firebase_core: ^3.8.0
   firebase_auth: ^5.3.3
@@ -42,18 +42,22 @@ dependencies:
   cloud_firestore: ^5.4.4
   firebase_storage: ^12.3.4
   firebase_crashlytics: ^4.2.1
-  
+  firebase_analytics: ^11.3.3
+
+  # Error tracking
+  sentry_flutter: ^8.10.1
+
   # Gemini AI
   google_generative_ai: ^0.4.7
-  
+
   # Chat and messaging
   firebase_messaging: ^15.1.4
-  
+
   permission_handler: ^11.3.1
   flutter_local_notifications: ^18.0.1
   badges: ^3.1.2
   timeago: ^3.7.0
-  
+
   # State management - Riverpod
   flutter_riverpod: ^2.6.1
 
@@ -73,6 +77,17 @@ dependencies:
   path_provider: ^2.1.4
   package_info_plus: ^8.0.3
 
+  # Contacts and sharing
+  flutter_contacts: ^1.1.9+2
+  share_plus: ^10.1.4
+  file_picker: ^8.1.4
+  open_filex: ^4.5.0
+  video_player: ^2.9.2
+  chewie: ^1.8.5
+  flutter_image_compress: ^2.3.0
+  video_compress: ^3.1.2
+  dio: ^5.7.0
+
   # Local SQLite storage for messages
   sqflite: ^2.3.0
   path: ^1.9.0
@@ -85,11 +100,7 @@ dependencies:
 
   lottie: ^3.3.2
   flutter_3d_choice_chip: ^0.1.4
-  video_player: ^2.8.6
   speech_to_text: ^7.3.0
- 
-
-
 
 dev_dependencies:
   flutter_test:
@@ -97,16 +108,8 @@ dev_dependencies:
   integration_test:
     sdk: flutter
   flutter_launcher_icons: ^0.13.1
-
-  # The "flutter_lints" package below contains a set of recommended lints to
-  # encourage good coding practices. The lint set provided by the package is
-  # activated in the `analysis_options.yaml` file located at the root of your
-  # package. See that file for information about deactivating specific lint
-  # rules and activating additional ones.
-  flutter_lints: 3.0.2
+  flutter_lints: ^3.0.2
   flutter_patch_package: ^0.0.11
-
-  # Testing mocks
   mockito: ^5.4.4
   fake_cloud_firestore: ^3.1.0
 
@@ -114,7 +117,6 @@ flutter_launcher_icons:
   android: true
   ios: true
   image_path: 'assets/logo/Clogo.jpeg'
-
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

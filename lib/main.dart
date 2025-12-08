@@ -8,13 +8,11 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:supper/screens/home/home_screen.dart';
 import 'package:supper/screens/login/onboarding_screen.dart';
 
 import 'firebase_options.dart';
 import 'screens/login/splash_screen.dart';
-import 'screens/login/login_screen.dart';
-import 'screens/home/main_navigation_screen.dart';
+import 'screens/main_navigation_screen.dart';
 
 import 'services/auth_service.dart';
 import 'services/profile_service.dart';
@@ -25,7 +23,8 @@ import 'services/location_service.dart';
 import 'services/connectivity_service.dart';
 import 'services/user_migration_service.dart';
 import 'services/conversation_migration_service.dart';
-import 'services/video_preload_service.dart';
+import 'services/analytics_service.dart';
+import 'services/error_tracking_service.dart';
 import 'providers/theme_provider.dart';
 import 'utils/app_optimizer.dart';
 import 'utils/memory_manager.dart';
@@ -73,7 +72,7 @@ void main() async {
         exception.toString().contains('Failed to decode image') ||
         exception.toString().contains('codec')) {
       debugPrint(
-        ' Image decode error (suppressed): ${details.exceptionAsString()}',
+        '⚠️ Image decode error (suppressed): ${details.exceptionAsString()}',
       );
       return; // Don't propagate
     }
@@ -84,55 +83,60 @@ void main() async {
   // Load environment variables
   await dotenv.load(fileName: ".env");
 
-  // Validate Firebase configuration
-  _validateFirebaseConfig();
+  // Initialize Sentry for error tracking (wraps the entire app)
+  await ErrorTrackingService.initialize(() async {
+    // Validate Firebase configuration
+    _validateFirebaseConfig();
 
-  // Initialize Firebase only once
-  if (Firebase.apps.isEmpty) {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
+    // Initialize Firebase only once
+    if (Firebase.apps.isEmpty) {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+    }
+
+    await SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
+
+    SystemChrome.setSystemUIOverlayStyle(
+      const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        systemNavigationBarColor: Colors.transparent,
+      ),
     );
-  }
 
-  await SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-  ]);
+    if (!kIsWeb) {
+      // Fixed: Changed from UNLIMITED to 50MB to prevent memory issues
+      FirebaseFirestore.instance.settings = const Settings(
+        persistenceEnabled: true,
+        cacheSizeBytes: 50 * 1024 * 1024, // 50MB cache limit
+      );
+    }
 
-  SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      systemNavigationBarColor: Colors.transparent,
-    ),
-  );
+    // Run app immediately - defer ALL heavy initializations
+    runApp(const ProviderScope(child: MyApp()));
 
-  if (!kIsWeb) {
-    FirebaseFirestore.instance.settings = const Settings(
-      persistenceEnabled: true,
-      cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
-    );
-  }
-
-  // Start video preload immediately - before app renders
-  // This ensures video is ready when splash screen opens
-  unawaited(VideoPreloadService().preload());
-
-  // Run app immediately - defer ALL heavy initializations
-  runApp(const ProviderScope(child: MyApp()));
-
-  // Defer all non-critical initialization to AFTER first frame
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    _initializeServicesInBackground();
+    // Defer all non-critical initialization to AFTER first frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeServicesInBackground();
+    });
   });
 }
 
 /// Initialize non-critical services after app has started rendering
 Future<void> _initializeServicesInBackground() async {
-  // Longer delay to let UI fully render and become responsive
-  await Future.delayed(const Duration(milliseconds: 500));
+  // Shorter delay - reduced from 500ms to 200ms for faster startup
+  await Future.delayed(const Duration(milliseconds: 200));
 
   // FCM background handler - set up after app is responsive
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+
+  // Initialize Firebase Analytics
+  unawaited(AnalyticsService().initialize().catchError((e) {
+    debugPrint('AnalyticsService init error (non-fatal): $e');
+  }));
 
   // Initialize utilities in sequence with small delays to prevent jank
   await AppOptimizer.initialize();
@@ -145,11 +149,10 @@ Future<void> _initializeServicesInBackground() async {
   await Future.delayed(const Duration(milliseconds: 50));
 
   // Initialize notification service (can run in parallel, but don't block)
-  unawaited(
-    NotificationService().initialize().catchError((e) {
-      debugPrint('NotificationService init error (non-fatal): $e');
-    }),
-  );
+  unawaited(NotificationService().initialize().catchError((e) {
+    debugPrint('NotificationService init error (non-fatal): $e');
+    ErrorTrackingService().captureException(e, message: 'NotificationService init failed');
+  }));
 
   // Initialize connectivity service after a small delay
   await Future.delayed(const Duration(milliseconds: 100));
@@ -158,6 +161,9 @@ Future<void> _initializeServicesInBackground() async {
       debugPrint('ConnectivityService init error (non-fatal): $e');
     }),
   );
+
+  // Log app open event
+  unawaited(AnalyticsService().logAppOpen());
 
   // NOTE: Migrations are now run in AuthWrapper._initializeUserServices()
   // after the user is authenticated to avoid permission errors
@@ -177,7 +183,7 @@ class MyApp extends ConsumerWidget {
         scaffoldBackgroundColor: const Color(0xFF0f0f23),
       ),
       debugShowCheckedModeBanner: false,
-      home: const SplashScreen(), // <-- Use AuthWrapper here
+      home: const SplashScreen(),
       builder: (context, child) {
         return Container(
           color: const Color(0xFF0f0f23),
@@ -195,7 +201,7 @@ class AuthWrapper extends StatefulWidget {
   State<AuthWrapper> createState() => _AuthWrapperState();
 }
 
-class _AuthWrapperState extends State<AuthWrapper> {
+class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
   final AuthService _authService = AuthService();
   final ProfileService _profileService = ProfileService();
   final LocationService _locationService = LocationService();
@@ -206,16 +212,47 @@ class _AuthWrapperState extends State<AuthWrapper> {
   bool _isInitializing = false;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+
+    switch (state) {
+      case AppLifecycleState.resumed:
+        debugPrint('AuthWrapper: App resumed - checking location freshness');
+        if (_authService.currentUser != null) {
+          _locationService.onAppResume();
+        }
+        break;
+      case AppLifecycleState.paused:
+        debugPrint('AuthWrapper: App paused');
+        break;
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.detached:
+      case AppLifecycleState.hidden:
+        break;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return StreamBuilder<User?>(
       stream: _authService.authStateChanges,
       builder: (context, snapshot) {
-        // Show loading only on initial connection
         if (snapshot.connectionState == ConnectionState.waiting) {
           return _buildLoadingScreen();
         }
 
-        // Handle errors in auth stream
         if (snapshot.hasError) {
           debugPrint('AuthWrapper: Auth stream error: ${snapshot.error}');
           return _buildErrorScreen(snapshot.error.toString());
@@ -224,7 +261,6 @@ class _AuthWrapperState extends State<AuthWrapper> {
         if (snapshot.hasData && snapshot.data != null) {
           String uid = snapshot.data!.uid;
 
-          // Initialize user-dependent services only once per session
           if (!_hasInitializedServices || _lastInitializedUserId != uid) {
             if (!_isInitializing) {
               _isInitializing = true;
@@ -242,7 +278,6 @@ class _AuthWrapperState extends State<AuthWrapper> {
           return const MainNavigationScreen();
         }
 
-        // Reset when user logs out
         _hasInitializedServices = false;
         _lastInitializedUserId = null;
         _isInitializing = false;
@@ -323,24 +358,23 @@ class _AuthWrapperState extends State<AuthWrapper> {
     try {
       debugPrint('AuthWrapper: Initializing user services...');
 
-      // Ensure profile exists with timeout
       try {
         await _profileService.ensureProfileExists().timeout(
           const Duration(seconds: 10),
           onTimeout: () {
-            debugPrint(' Profile service timed out');
+            debugPrint('⚠️ Profile service timed out');
           },
         );
       } catch (e) {
-        debugPrint(' Profile service error (non-fatal): $e');
+        debugPrint('⚠️ Profile service error (non-fatal): $e');
       }
 
       await Future.delayed(const Duration(milliseconds: 100));
       _locationService.initializeLocation();
       _locationService.startPeriodicLocationUpdates();
+      _locationService.startLocationStream();
       _conversationService.cleanupDuplicateConversations();
 
-      // Run migrations now that user is authenticated
       _runMigrationsInBackground();
 
       debugPrint('✓ AuthWrapper: User services initialized');
@@ -349,10 +383,8 @@ class _AuthWrapperState extends State<AuthWrapper> {
     }
   }
 
-  /// Run database migrations in background after user is authenticated
   void _runMigrationsInBackground() {
     Future.delayed(const Duration(milliseconds: 300), () async {
-      // Run user migration
       try {
         final userMigration = UserMigrationService();
         await userMigration.checkAndRunMigration();
@@ -360,7 +392,6 @@ class _AuthWrapperState extends State<AuthWrapper> {
         debugPrint('User migration failed (non-fatal): $e');
       }
 
-      // Run conversation migration
       try {
         final conversationMigration = ConversationMigrationService();
         final isCompleted = await conversationMigration.isMigrationCompleted();

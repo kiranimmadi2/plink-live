@@ -26,8 +26,9 @@ class MessageDatabase {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 2, // Incremented version
       onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
     );
   }
 
@@ -42,6 +43,11 @@ class MessageDatabase {
         text TEXT,
         imageUrl TEXT,
         voiceUrl TEXT,
+        mediaUrl TEXT,
+        localPath TEXT,
+        fileName TEXT,
+        fileSize INTEGER,
+        type INTEGER DEFAULT 0,
         status TEXT NOT NULL,
         isRead INTEGER DEFAULT 0,
         isSentByMe INTEGER NOT NULL,
@@ -62,9 +68,20 @@ class MessageDatabase {
     await db.execute(
       'CREATE INDEX idx_conversation ON messages(conversationId, timestamp DESC)',
     );
-    await db.execute(
-      'CREATE INDEX idx_message_id ON messages(messageId)',
-    );
+    await db.execute('CREATE INDEX idx_message_id ON messages(messageId)');
+  }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      // Add new columns for file sharing
+      await db.execute('ALTER TABLE messages ADD COLUMN mediaUrl TEXT');
+      await db.execute('ALTER TABLE messages ADD COLUMN localPath TEXT');
+      await db.execute('ALTER TABLE messages ADD COLUMN fileName TEXT');
+      await db.execute('ALTER TABLE messages ADD COLUMN fileSize INTEGER');
+      await db.execute(
+        'ALTER TABLE messages ADD COLUMN type INTEGER DEFAULT 0',
+      );
+    }
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -115,7 +132,10 @@ class MessageDatabase {
   }
 
   /// Count unread messages in a conversation
-  Future<int> countUnreadMessages(String conversationId, String myUserId) async {
+  Future<int> countUnreadMessages(
+    String conversationId,
+    String myUserId,
+  ) async {
     final db = await database;
     final results = await db.rawQuery(
       'SELECT COUNT(*) as count FROM messages WHERE conversationId = ? AND isRead = 0 AND senderId != ?',
@@ -134,7 +154,7 @@ class MessageDatabase {
     return await db.insert(
       'messages',
       message,
-      conflictAlgorithm: ConflictAlgorithm.replace,  // Update if exists
+      conflictAlgorithm: ConflictAlgorithm.replace, // Update if exists
     );
   }
 
@@ -160,9 +180,7 @@ class MessageDatabase {
     int? readAt,
   }) async {
     final db = await database;
-    final updates = <String, dynamic>{
-      'status': status,
-    };
+    final updates = <String, dynamic>{'status': status};
     if (deliveredAt != null) updates['deliveredAt'] = deliveredAt;
     if (readAt != null) updates['readAt'] = readAt;
 
@@ -174,15 +192,28 @@ class MessageDatabase {
     );
   }
 
+  /// Update message media details (after upload)
+  Future<int> updateMessageMedia(
+    String messageId,
+    String mediaUrl,
+    String? fileName,
+    int? fileSize,
+  ) async {
+    final db = await database;
+    return await db.update(
+      'messages',
+      {'mediaUrl': mediaUrl, 'fileName': fileName, 'fileSize': fileSize},
+      where: 'messageId = ?',
+      whereArgs: [messageId],
+    );
+  }
+
   /// Mark messages as read
   Future<int> markMessagesAsRead(String conversationId, String myUserId) async {
     final db = await database;
     return await db.update(
       'messages',
-      {
-        'isRead': 1,
-        'readAt': DateTime.now().millisecondsSinceEpoch,
-      },
+      {'isRead': 1, 'readAt': DateTime.now().millisecondsSinceEpoch},
       where: 'conversationId = ? AND senderId != ? AND isRead = 0',
       whereArgs: [conversationId, myUserId],
     );
@@ -218,12 +249,7 @@ class MessageDatabase {
     final db = await database;
     return await db.update(
       'messages',
-      {
-        'isDeleted': 1,
-        'text': null,
-        'imageUrl': null,
-        'voiceUrl': null,
-      },
+      {'isDeleted': 1, 'text': null, 'imageUrl': null, 'voiceUrl': null},
       where: 'messageId = ?',
       whereArgs: [messageId],
     );

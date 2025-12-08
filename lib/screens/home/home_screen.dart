@@ -10,7 +10,7 @@ import '../../models/user_profile.dart';
 import '../enhanced_chat_screen.dart';
 import '../../widgets/user_avatar.dart';
 import '../../services/realtime_matching_service.dart';
-import 'profile_with_history_screen.dart';
+import '../profile/profile_with_history_screen.dart';
 import '../../services/photo_cache_service.dart';
 import '../../widgets/floating_particles.dart';
 import 'product_detail_screen.dart';

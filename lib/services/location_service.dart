@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -21,8 +22,20 @@ class LocationService {
   bool _isInitialized = false; // Prevent multiple initialization calls
   bool _isFetchingBackground = false; // Prevent duplicate background fetches
 
+  // Timer for periodic updates (cancellable)
+  Timer? _periodicTimer;
+
+  // Stream subscription for location updates
+  StreamSubscription<Position>? _positionStreamSubscription;
+
+  // Last known position for distance filtering
+  Position? _lastKnownPosition;
+
   // Location freshness: Consider location stale after 24 hours
   static const Duration locationFreshnessThreshold = Duration(hours: 24);
+
+  // Minimum distance (meters) user must move before updating location
+  static const double minimumDistanceForUpdate = 100.0; // 100 meters
 
   // Enable/disable verbose logging (set to false for production)
   static const bool _enableVerboseLogging = false;
@@ -291,10 +304,20 @@ class LocationService {
     }
   }
 
+  // Calculate distance between two positions in meters
+  double _calculateDistance(Position pos1, Position pos2) {
+    return Geolocator.distanceBetween(
+      pos1.latitude,
+      pos1.longitude,
+      pos2.latitude,
+      pos2.longitude,
+    );
+  }
+
   // Update user's location in Firestore with detailed address - SILENT MODE SUPPORTED
-  Future<bool> updateUserLocation({Position? position, bool silent = true}) async {
+  Future<bool> updateUserLocation({Position? position, bool silent = true, bool forceUpdate = false}) async {
     try {
-      _log('LocationService: updateUserLocation called (silent=$silent)');
+      _log('LocationService: updateUserLocation called (silent=$silent, forceUpdate=$forceUpdate)');
 
       // DEBOUNCE: If already updating, skip this call
       if (_isUpdatingLocation) {
@@ -302,8 +325,8 @@ class LocationService {
         return false;
       }
 
-      // RATE LIMIT: Don't update more than once per minute
-      if (_lastLocationUpdate != null) {
+      // RATE LIMIT: Don't update more than once per minute (unless forced)
+      if (!forceUpdate && _lastLocationUpdate != null) {
         final timeSinceLastUpdate = DateTime.now().difference(_lastLocationUpdate!);
         if (timeSinceLastUpdate.inSeconds < 60) {
           _log('LocationService: Updated ${timeSinceLastUpdate.inSeconds}s ago, skipping (rate limit: 60s)');
@@ -321,6 +344,18 @@ class LocationService {
       }
 
       Position? currentPosition = position ?? await getCurrentLocation(silent: silent);
+
+      // DISTANCE CHECK: Skip update if user hasn't moved significantly (unless forced)
+      if (!forceUpdate && currentPosition != null && _lastKnownPosition != null) {
+        final distance = _calculateDistance(_lastKnownPosition!, currentPosition);
+        if (distance < minimumDistanceForUpdate) {
+          _log('LocationService: User moved only ${distance.toStringAsFixed(1)}m (< ${minimumDistanceForUpdate}m), skipping update');
+          _isUpdatingLocation = false;
+          _lastLocationUpdate = DateTime.now(); // Still update timestamp to prevent rapid checks
+          return true; // Return true since location is still valid
+        }
+        _log('LocationService: User moved ${distance.toStringAsFixed(1)}m, updating location');
+      }
 
       if (currentPosition != null) {
         // Get detailed address from coordinates SILENTLY
@@ -352,6 +387,7 @@ class LocationService {
           );
 
           _log('LocationService: Location updated silently with area: ${addressData['area']}, city: ${addressData['city']}');
+          _lastKnownPosition = currentPosition; // Save for distance filtering
           _lastLocationUpdate = DateTime.now();
           _isUpdatingLocation = false;
           return true;
@@ -468,7 +504,7 @@ class LocationService {
   // Start periodic background location updates (SILENT)
   Future<void> startPeriodicLocationUpdates() async {
     try {
-      // CRITICAL: Only start once to prevent multiple infinite loops
+      // CRITICAL: Only start once to prevent multiple timers
       if (_periodicUpdatesStarted) {
         _log('LocationService: Periodic updates already running, skipping...');
         return;
@@ -477,28 +513,90 @@ class LocationService {
       _periodicUpdatesStarted = true;
       _log('LocationService: Starting periodic background location updates (every 10 minutes)...');
 
-      // Update location every 10 minutes in background SILENTLY
-      Future.delayed(Duration.zero, () async {
-        while (true) {
-          try {
-            // Wait 10 minutes between updates (reduced API calls)
-            await Future.delayed(const Duration(minutes: 10));
+      // Cancel any existing timer first
+      _periodicTimer?.cancel();
 
-            // Check if user is still authenticated
-            if (_auth.currentUser != null) {
-              _log('LocationService: Running periodic silent location update...');
-              await updateUserLocation(silent: true);
-            } else {
-              _log('LocationService: User not authenticated, skipping periodic update');
-            }
-          } catch (e) {
-            _log('LocationService: Error in periodic update: $e');
-            // Continue loop even if one update fails
+      // Use Timer.periodic instead of while(true) - can be cancelled on logout
+      _periodicTimer = Timer.periodic(const Duration(minutes: 10), (timer) async {
+        try {
+          // Check if user is still authenticated
+          if (_auth.currentUser != null) {
+            _log('LocationService: Running periodic silent location update...');
+            await updateUserLocation(silent: true);
+          } else {
+            _log('LocationService: User not authenticated, stopping periodic updates');
+            stopPeriodicLocationUpdates();
           }
+        } catch (e) {
+          _log('LocationService: Error in periodic update: $e');
+          // Continue timer even if one update fails
+        }
+      });
+
+      // Do first update immediately (don't wait 10 minutes)
+      _log('LocationService: Running initial location update...');
+      Future.delayed(const Duration(seconds: 2), () async {
+        if (_auth.currentUser != null) {
+          await updateUserLocation(silent: true);
         }
       });
     } catch (e) {
       _log('LocationService: Error starting periodic updates: $e');
+    }
+  }
+
+  // Stop periodic location updates (call on logout)
+  void stopPeriodicLocationUpdates() {
+    _periodicTimer?.cancel();
+    _periodicTimer = null;
+    _positionStreamSubscription?.cancel();
+    _positionStreamSubscription = null;
+    _periodicUpdatesStarted = false;
+    _log('LocationService: Periodic updates stopped');
+  }
+
+  /// Start listening to location stream for efficient background updates
+  /// This is more battery-efficient than Timer.periodic as it only triggers
+  /// when the device actually moves
+  Future<void> startLocationStream() async {
+    try {
+      // Check permission first
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission != LocationPermission.whileInUse &&
+          permission != LocationPermission.always) {
+        _log('LocationService: No permission for location stream');
+        return;
+      }
+
+      // Cancel existing subscription
+      _positionStreamSubscription?.cancel();
+
+      _log('LocationService: Starting location stream (distance filter: ${minimumDistanceForUpdate}m)...');
+
+      // Use location stream with distance filter - only triggers when user moves
+      final LocationSettings locationSettings = LocationSettings(
+        accuracy: LocationAccuracy.medium, // Battery efficient
+        distanceFilter: minimumDistanceForUpdate.toInt(), // Only update when moved 100+ meters
+      );
+
+      _positionStreamSubscription = Geolocator.getPositionStream(
+        locationSettings: locationSettings,
+      ).listen(
+        (Position position) async {
+          _log('LocationService: Stream received new position lat=${position.latitude}, lng=${position.longitude}');
+
+          // Check if user is still authenticated
+          if (_auth.currentUser != null) {
+            // Update location (forceUpdate since stream already filtered by distance)
+            await updateUserLocation(position: position, silent: true, forceUpdate: true);
+          }
+        },
+        onError: (error) {
+          _log('LocationService: Stream error: $error');
+        },
+      );
+    } catch (e) {
+      _log('LocationService: Error starting location stream: $e');
     }
   }
 
@@ -714,9 +812,12 @@ class LocationService {
 
   /// Reset service state (call on logout)
   void reset() {
+    stopPeriodicLocationUpdates();
     _isInitialized = false;
     _lastLocationUpdate = null;
+    _lastKnownPosition = null;
     _isUpdatingLocation = false;
+    _isFetchingBackground = false;
     _log('LocationService: State reset');
   }
 }

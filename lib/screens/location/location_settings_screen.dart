@@ -1,21 +1,24 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../services/location_service.dart';
+import '../../providers/app_providers.dart';
 
-class LocationSettingsScreen extends StatefulWidget {
+class LocationSettingsScreen extends ConsumerStatefulWidget {
   const LocationSettingsScreen({super.key});
 
   @override
-  State<LocationSettingsScreen> createState() => _LocationSettingsScreenState();
+  ConsumerState<LocationSettingsScreen> createState() => _LocationSettingsScreenState();
 }
 
-class _LocationSettingsScreenState extends State<LocationSettingsScreen> {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+class _LocationSettingsScreenState extends ConsumerState<LocationSettingsScreen> {
   // ignore: unused_field
   final LocationService _locationService = LocationService();
+
+  // Helper getter for current user ID from provider
+  String? get _currentUserId => ref.read(currentUserIdProvider);
 
   bool _isLoading = false;
   bool _locationEnabled = false;
@@ -31,7 +34,7 @@ class _LocationSettingsScreenState extends State<LocationSettingsScreen> {
 
   Future<void> _loadCurrentLocation() async {
     try {
-      final userId = _auth.currentUser?.uid;
+      final userId = _currentUserId;
       if (userId == null) return;
 
       final userDoc = await FirebaseFirestore.instance
@@ -95,7 +98,7 @@ class _LocationSettingsScreenState extends State<LocationSettingsScreen> {
       }
 
       // Update Firestore
-      final userId = _auth.currentUser?.uid;
+      final userId = _currentUserId;
       if (userId != null) {
         await FirebaseFirestore.instance
             .collection('users')
@@ -140,7 +143,7 @@ class _LocationSettingsScreenState extends State<LocationSettingsScreen> {
 
   Future<void> _clearLocation() async {
     try {
-      final userId = _auth.currentUser?.uid;
+      final userId = _currentUserId;
       if (userId == null) return;
 
       await FirebaseFirestore.instance.collection('users').doc(userId).update({

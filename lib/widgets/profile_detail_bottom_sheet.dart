@@ -437,9 +437,73 @@ class _ProfileDetailBottomSheetState extends State<ProfileDetailBottomSheet>
   }
 
   Widget _buildActionButtons(BuildContext context, bool isDarkMode) {
-    // Don't show any buttons for own profile
+    // Show Edit button for own profile
     if (widget.isOwnProfile) {
-      return const SizedBox.shrink();
+      return Container(
+        padding: EdgeInsets.fromLTRB(
+          20,
+          16,
+          20,
+          MediaQuery.of(context).padding.bottom + 16,
+        ),
+        decoration: BoxDecoration(
+          color: isDarkMode ? const Color(0xFF1C1C1E) : Colors.white,
+          border: Border(
+            top: BorderSide(
+              color: isDarkMode
+                  ? const Color(0xFF38383A).withValues(alpha: 0.5)
+                  : const Color(0xFFE5E5EA),
+              width: 0.5,
+            ),
+          ),
+        ),
+        child: GestureDetector(
+          onTap: widget.onEdit,
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+                colors: [
+                  Color(0xFF7C3AED), // Violet
+                  Color(0xFF8B5CF6), // Purple
+                  Color(0xFFA855F7), // Light purple
+                ],
+              ),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF8B5CF6).withValues(alpha: 0.4),
+                  blurRadius: 15,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.edit_outlined,
+                  size: 20,
+                  color: Colors.white,
+                ),
+                SizedBox(width: 8),
+                Text(
+                  'Edit Profile',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
     }
 
     final isConnected = widget.connectionStatus == 'connected';

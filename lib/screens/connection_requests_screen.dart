@@ -1,16 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/connection_service.dart';
 import '../widgets/user_avatar.dart';
 
-class ConnectionRequestsScreen extends StatefulWidget {
+class ConnectionRequestsScreen extends ConsumerStatefulWidget {
   const ConnectionRequestsScreen({super.key});
 
   @override
-  State<ConnectionRequestsScreen> createState() =>
+  ConsumerState<ConnectionRequestsScreen> createState() =>
       _ConnectionRequestsScreenState();
 }
 
-class _ConnectionRequestsScreenState extends State<ConnectionRequestsScreen> {
+class _ConnectionRequestsScreenState extends ConsumerState<ConnectionRequestsScreen> {
   final ConnectionService _connectionService = ConnectionService();
 
   @override

@@ -305,7 +305,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           alignment: Alignment.center,
           transform: Matrix4.identity()
             ..setEntry(3, 2, 0.001)
-            ..scale(scale)
+            ..scaleByDouble(scale, scale, scale, 1)
             ..rotateY(rotation),
           child: Opacity(opacity: opacity, child: child),
         );
