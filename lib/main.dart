@@ -12,12 +12,7 @@ import 'package:supper/screens/login/onboarding_screen.dart';
 
 import 'firebase_options.dart';
 import 'screens/login/splash_screen.dart';
-<<<<<<< HEAD
 import 'screens/main_navigation_screen.dart';
-=======
-import 'screens/login/login_screen.dart';
-import 'screens/home/main_navigation_screen.dart';
->>>>>>> 0b200533559aaaa698b1f78c4e132361824f41ef
 
 import 'services/auth_service.dart';
 import 'services/profile_service.dart';
@@ -28,12 +23,8 @@ import 'services/location_service.dart';
 import 'services/connectivity_service.dart';
 import 'services/user_migration_service.dart';
 import 'services/conversation_migration_service.dart';
-<<<<<<< HEAD
 import 'services/analytics_service.dart';
 import 'services/error_tracking_service.dart';
-=======
-import 'services/video_preload_service.dart';
->>>>>>> 0b200533559aaaa698b1f78c4e132361824f41ef
 import 'providers/theme_provider.dart';
 import 'utils/app_optimizer.dart';
 import 'utils/memory_manager.dart';
@@ -73,9 +64,6 @@ void _validateFirebaseConfig() {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-<<<<<<< HEAD
-  // Load environment variables first
-=======
   // Set up global error handling for image decode errors
   FlutterError.onError = (FlutterErrorDetails details) {
     final exception = details.exception;
@@ -84,7 +72,7 @@ void main() async {
         exception.toString().contains('Failed to decode image') ||
         exception.toString().contains('codec')) {
       debugPrint(
-        ' Image decode error (suppressed): ${details.exceptionAsString()}',
+        '⚠️ Image decode error (suppressed): ${details.exceptionAsString()}',
       );
       return; // Don't propagate
     }
@@ -93,26 +81,10 @@ void main() async {
   };
 
   // Load environment variables
->>>>>>> 0b200533559aaaa698b1f78c4e132361824f41ef
   await dotenv.load(fileName: ".env");
 
   // Initialize Sentry for error tracking (wraps the entire app)
   await ErrorTrackingService.initialize(() async {
-    // Set up global error handling for image decode errors
-    FlutterError.onError = (FlutterErrorDetails details) {
-      final exception = details.exception;
-      // Suppress image decode errors - they're non-fatal
-      if (exception.toString().contains('ImageDecoder') ||
-          exception.toString().contains('Failed to decode image') ||
-          exception.toString().contains('codec')) {
-        debugPrint('⚠️ Image decode error (suppressed): ${details.exceptionAsString()}');
-        return; // Don't propagate
-      }
-      // Report to Sentry and show error
-      ErrorTrackingService().captureException(exception, stackTrace: details.stack);
-      FlutterError.presentError(details);
-    };
-
     // Validate Firebase configuration
     _validateFirebaseConfig();
 
@@ -146,30 +118,10 @@ void main() async {
     // Run app immediately - defer ALL heavy initializations
     runApp(const ProviderScope(child: MyApp()));
 
-<<<<<<< HEAD
     // Defer all non-critical initialization to AFTER first frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeServicesInBackground();
     });
-=======
-  if (!kIsWeb) {
-    FirebaseFirestore.instance.settings = const Settings(
-      persistenceEnabled: true,
-      cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
-    );
-  }
-
-  // Start video preload immediately - before app renders
-  // This ensures video is ready when splash screen opens
-  unawaited(VideoPreloadService().preload());
-
-  // Run app immediately - defer ALL heavy initializations
-  runApp(const ProviderScope(child: MyApp()));
-
-  // Defer all non-critical initialization to AFTER first frame
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    _initializeServicesInBackground();
->>>>>>> 0b200533559aaaa698b1f78c4e132361824f41ef
   });
 }
 
@@ -197,18 +149,10 @@ Future<void> _initializeServicesInBackground() async {
   await Future.delayed(const Duration(milliseconds: 50));
 
   // Initialize notification service (can run in parallel, but don't block)
-<<<<<<< HEAD
   unawaited(NotificationService().initialize().catchError((e) {
     debugPrint('NotificationService init error (non-fatal): $e');
     ErrorTrackingService().captureException(e, message: 'NotificationService init failed');
   }));
-=======
-  unawaited(
-    NotificationService().initialize().catchError((e) {
-      debugPrint('NotificationService init error (non-fatal): $e');
-    }),
-  );
->>>>>>> 0b200533559aaaa698b1f78c4e132361824f41ef
 
   // Initialize connectivity service after a small delay
   await Future.delayed(const Duration(milliseconds: 100));
@@ -239,7 +183,7 @@ class MyApp extends ConsumerWidget {
         scaffoldBackgroundColor: const Color(0xFF0f0f23),
       ),
       debugShowCheckedModeBanner: false,
-      home: const SplashScreen(), // <-- Use AuthWrapper here
+      home: const SplashScreen(),
       builder: (context, child) {
         return Container(
           color: const Color(0xFF0f0f23),
@@ -270,13 +214,11 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
-    // Register app lifecycle observer
     WidgetsBinding.instance.addObserver(this);
   }
 
   @override
   void dispose() {
-    // Unregister app lifecycle observer
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -287,14 +229,12 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
 
     switch (state) {
       case AppLifecycleState.resumed:
-        // App came to foreground - refresh location if stale
         debugPrint('AuthWrapper: App resumed - checking location freshness');
         if (_authService.currentUser != null) {
           _locationService.onAppResume();
         }
         break;
       case AppLifecycleState.paused:
-        // App went to background
         debugPrint('AuthWrapper: App paused');
         break;
       case AppLifecycleState.inactive:
@@ -309,12 +249,10 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
     return StreamBuilder<User?>(
       stream: _authService.authStateChanges,
       builder: (context, snapshot) {
-        // Show loading only on initial connection
         if (snapshot.connectionState == ConnectionState.waiting) {
           return _buildLoadingScreen();
         }
 
-        // Handle errors in auth stream
         if (snapshot.hasError) {
           debugPrint('AuthWrapper: Auth stream error: ${snapshot.error}');
           return _buildErrorScreen(snapshot.error.toString());
@@ -323,7 +261,6 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
         if (snapshot.hasData && snapshot.data != null) {
           String uid = snapshot.data!.uid;
 
-          // Initialize user-dependent services only once per session
           if (!_hasInitializedServices || _lastInitializedUserId != uid) {
             if (!_isInitializing) {
               _isInitializing = true;
@@ -341,7 +278,6 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
           return const MainNavigationScreen();
         }
 
-        // Reset when user logs out
         _hasInitializedServices = false;
         _lastInitializedUserId = null;
         _isInitializing = false;
@@ -422,25 +358,23 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
     try {
       debugPrint('AuthWrapper: Initializing user services...');
 
-      // Ensure profile exists with timeout
       try {
         await _profileService.ensureProfileExists().timeout(
           const Duration(seconds: 10),
           onTimeout: () {
-            debugPrint(' Profile service timed out');
+            debugPrint('⚠️ Profile service timed out');
           },
         );
       } catch (e) {
-        debugPrint(' Profile service error (non-fatal): $e');
+        debugPrint('⚠️ Profile service error (non-fatal): $e');
       }
 
       await Future.delayed(const Duration(milliseconds: 100));
       _locationService.initializeLocation();
       _locationService.startPeriodicLocationUpdates();
-      _locationService.startLocationStream(); // Efficient movement-based updates
+      _locationService.startLocationStream();
       _conversationService.cleanupDuplicateConversations();
 
-      // Run migrations now that user is authenticated
       _runMigrationsInBackground();
 
       debugPrint('✓ AuthWrapper: User services initialized');
@@ -449,10 +383,8 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
     }
   }
 
-  /// Run database migrations in background after user is authenticated
   void _runMigrationsInBackground() {
     Future.delayed(const Duration(milliseconds: 300), () async {
-      // Run user migration
       try {
         final userMigration = UserMigrationService();
         await userMigration.checkAndRunMigration();
@@ -460,7 +392,6 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
         debugPrint('User migration failed (non-fatal): $e');
       }
 
-      // Run conversation migration
       try {
         final conversationMigration = ConversationMigrationService();
         final isCompleted = await conversationMigration.isMigrationCompleted();

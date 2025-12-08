@@ -808,7 +808,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   await authService.signOut();
                   navigator.pushAndRemoveUntil(
                     MaterialPageRoute(
-                      builder: (_) => const LoginScreen(accountType: ''),
+                      builder: (_) => const LoginScreen(),
                     ),
                     (route) => false,
                   );
@@ -1032,7 +1032,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               await authService.signOut();
               navigator.pushAndRemoveUntil(
                 MaterialPageRoute(
-                  builder: (_) => const LoginScreen(accountType: ''),
+                  builder: (_) => const LoginScreen(),
                 ),
                 (route) => false,
               );
@@ -1094,7 +1094,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   if (context.mounted) {
                     Navigator.of(context).pushAndRemoveUntil(
                       MaterialPageRoute(
-                        builder: (_) => const LoginScreen(accountType: ''),
+                        builder: (_) => const LoginScreen(),
                       ),
                       (route) => false,
                     );
