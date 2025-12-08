@@ -820,7 +820,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             // Calculate box size based on available width
             // 6 boxes + 5 gaps (8px each) = total width
             final availableWidth = constraints.maxWidth;
-            const totalGapWidth = 5 * 8.0; // 5 gaps of 8px each
+            final totalGapWidth = 5 * 8.0; // 5 gaps of 8px each
             final boxWidth = ((availableWidth - totalGapWidth) / 6).clamp(36.0, 48.0);
             final boxHeight = boxWidth * 1.1; // Slightly taller than wide
 
