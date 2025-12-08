@@ -34,7 +34,7 @@ dependencies:
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
-  
+
   # Firebase dependencies
   firebase_core: ^3.8.0
   firebase_auth: ^5.3.3
@@ -49,15 +49,15 @@ dependencies:
 
   # Gemini AI
   google_generative_ai: ^0.4.7
-  
+
   # Chat and messaging
   firebase_messaging: ^15.1.4
-  
+
   permission_handler: ^11.3.1
   flutter_local_notifications: ^18.0.1
   badges: ^3.1.2
   timeago: ^3.7.0
-  
+
   # State management - Riverpod
   flutter_riverpod: ^2.6.1
 
@@ -100,9 +100,7 @@ dependencies:
 
   lottie: ^3.3.2
   flutter_3d_choice_chip: ^0.1.4
-  fab_circular_menu: ^1.0.2
-
-
+  speech_to_text: ^7.3.0
 
 dev_dependencies:
   flutter_test:
@@ -119,7 +117,6 @@ flutter_launcher_icons:
   android: true
   ios: true
   image_path: 'assets/logo/Clogo.jpeg'
-
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

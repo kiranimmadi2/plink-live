@@ -10,15 +10,15 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supper/providers/theme_provider.dart';
-import '../widgets/user_avatar.dart';
-import 'enhanced_chat_screen.dart';
-import '../models/user_profile.dart';
-import '../models/extended_user_profile.dart';
-import '../widgets/profile_detail_bottom_sheet.dart';
-import '../widgets/edit_profile_bottom_sheet.dart';
-import '../services/connection_service.dart';
-import '../services/location_service.dart';
-import 'my_connections_screen.dart';
+import '../../widgets/user_avatar.dart';
+import '../enhanced_chat_screen.dart';
+import '../../models/user_profile.dart';
+import '../../models/extended_user_profile.dart';
+import '../../widgets/profile_detail_bottom_sheet.dart';
+import '../../widgets/edit_profile_bottom_sheet.dart';
+import '../../services/connection_service.dart';
+import '../../services/location_service.dart';
+import '../my_connections_screen.dart';
 
 class LiveConnectTabScreen extends ConsumerStatefulWidget {
   const LiveConnectTabScreen({super.key});
@@ -1204,9 +1204,8 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                       ),
                                       decoration: BoxDecoration(
                                         color: isSelected
-                                            ? Theme.of(
-                                                context,
-                                              ).primaryColor.withValues(alpha: 0.2)
+                                            ? Theme.of(context).primaryColor
+                                                  .withValues(alpha: 0.2)
                                             : Colors.grey[800],
                                         borderRadius: BorderRadius.circular(16),
                                         border: Border.all(
@@ -2824,7 +2823,8 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
           final person = _filteredPeople[index];
           final userData = person['userData'] as Map<String, dynamic>;
           final commonInterests = person['commonInterests'] as List<String>;
-          final matchScore = person['matchScore'] as double; // ignore: unused_local_variable
+          final matchScore =
+              person['matchScore'] as double; // ignore: unused_local_variable
           final userId = person['userId'] as String;
           final distance = person['distance'] as double?;
 
@@ -2909,7 +2909,9 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                 ),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: gradientColors[0].withValues(alpha: 0.3),
+                                    color: gradientColors[0].withValues(
+                                      alpha: 0.3,
+                                    ),
                                     blurRadius: 12,
                                     offset: const Offset(0, 4),
                                   ),
@@ -2935,7 +2937,9 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                 shape: BoxShape.circle,
                                 boxShadow: [
                                   BoxShadow(
-                                    color: gradientColors[0].withValues(alpha: 0.3),
+                                    color: gradientColors[0].withValues(
+                                      alpha: 0.3,
+                                    ),
                                     blurRadius: 12,
                                     offset: const Offset(0, 4),
                                   ),

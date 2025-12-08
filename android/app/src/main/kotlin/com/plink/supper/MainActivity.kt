@@ -1,8 +1,14 @@
 package com.plink.supper
 
 import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterActivityLaunchConfigs.BackgroundMode.transparent
+import android.os.Bundle
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 
 class MainActivity: FlutterActivity() {
-    // Removed audio configuration to avoid conflicts with WebRTC
-    // WebRTC will handle all audio routing and mode settings
+    override fun onCreate(savedInstanceState: Bundle?) {
+        // Keep the splash screen visible until Flutter is ready
+        installSplashScreen()
+        super.onCreate(savedInstanceState)
+    }
 }

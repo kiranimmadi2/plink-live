@@ -8,6 +8,7 @@ import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+<<<<<<< HEAD:lib/screens/conversations_screen.dart
 import '../models/conversation_model.dart';
 import '../models/user_profile.dart';
 import '../providers/conversation_providers.dart';
@@ -15,6 +16,14 @@ import '../providers/app_providers.dart';
 import 'enhanced_chat_screen.dart';
 import 'create_group_screen.dart';
 import 'group_chat_screen.dart';
+=======
+import '../../models/conversation_model.dart';
+import '../../models/user_profile.dart';
+import '../../services/conversation_service.dart';
+import '../enhanced_chat_screen.dart';
+import '../create_group_screen.dart';
+import '../group_chat_screen.dart';
+>>>>>>> 0b200533559aaaa698b1f78c4e132361824f41ef:lib/screens/home/conversations_screen.dart
 
 class ConversationsScreen extends ConsumerStatefulWidget {
   const ConversationsScreen({super.key});
@@ -469,6 +478,7 @@ class _ConversationsScreenState extends ConsumerState<ConversationsScreen>
             padding: const EdgeInsets.all(16),
             child: Row(
               children: [
+<<<<<<< HEAD:lib/screens/conversations_screen.dart
                 Stack(
                   children: [
                     CircleAvatar(
@@ -520,6 +530,51 @@ class _ConversationsScreenState extends ConsumerState<ConversationsScreen>
                                           as Map<String, dynamic>;
                                   final showOnlineStatus =
                                       userData['showOnlineStatus'] ?? true;
+=======
+                CircleAvatar(
+                  radius: 28,
+                  backgroundImage: displayPhoto != null && !conversation.isGroup
+                      ? CachedNetworkImageProvider(displayPhoto)
+                      : null,
+                  backgroundColor: conversation.isGroup
+                      ? Theme.of(context).primaryColor.withValues(alpha: 0.15)
+                      : Theme.of(context).primaryColor.withValues(alpha: 0.1),
+                  child: displayPhoto == null || conversation.isGroup
+                      ? (conversation.isGroup
+                            ? Icon(
+                                Icons.group,
+                                color: Theme.of(context).primaryColor,
+                                size: 28,
+                              )
+                            : Text(
+                                displayName.isNotEmpty
+                                    ? displayName[0].toUpperCase()
+                                    : '?',
+                                style: TextStyle(
+                                  color: Theme.of(context).primaryColor,
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ))
+                      : null,
+                ),
+                Positioned(
+                  right: 0,
+                  bottom: 0,
+                  child: otherUserId.isNotEmpty && !conversation.isGroup
+                      ? StreamBuilder<DocumentSnapshot>(
+                          stream: _firestore
+                              .collection('users')
+                              .doc(otherUserId)
+                              .snapshots(),
+                          builder: (context, snapshot) {
+                            bool isOnline = false;
+                            if (snapshot.hasData && snapshot.data!.exists) {
+                              final userData =
+                                  snapshot.data!.data() as Map<String, dynamic>;
+                              final showOnlineStatus =
+                                  userData['showOnlineStatus'] ?? true;
+>>>>>>> 0b200533559aaaa698b1f78c4e132361824f41ef:lib/screens/home/conversations_screen.dart
 
                                   // Only show online if user allows it and they're actually online
                                   if (showOnlineStatus) {
@@ -792,6 +847,7 @@ class _ConversationsScreenState extends ConsumerState<ConversationsScreen>
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+<<<<<<< HEAD:lib/screens/conversations_screen.dart
       builder: (context) =>
           _NewMessageSheet(currentUserId: currentUserId, firestore: _firestore),
     );
@@ -1190,6 +1246,320 @@ class _NewMessageSheetState extends State<_NewMessageSheet> {
           },
         );
       },
+=======
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (context, scrollController) {
+          final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
+          return Container(
+            decoration: BoxDecoration(
+              color: isDarkMode ? const Color(0xFF1A1A1A) : Colors.white,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(20),
+              ),
+            ),
+            child: Column(
+              children: [
+                Container(
+                  margin: const EdgeInsets.only(top: 8),
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: isDarkMode ? Colors.grey[700] : Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text(
+                    'New Message',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: isDarkMode ? Colors.white : Colors.black,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  // Show only users from existing conversations
+                  child: StreamBuilder<QuerySnapshot>(
+                    stream: _firestore
+                        .collection('conversations')
+                        .where('participants', arrayContains: currentUserId)
+                        .where('isGroup', isEqualTo: false)
+                        .snapshots(),
+                    builder: (context, convSnapshot) {
+                      if (convSnapshot.connectionState ==
+                          ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+
+                      if (!convSnapshot.hasData ||
+                          convSnapshot.data!.docs.isEmpty) {
+                        return Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.people_outline,
+                                size: 64,
+                                color: isDarkMode
+                                    ? Colors.grey[700]
+                                    : Colors.grey[400],
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'No contacts yet',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w600,
+                                  color: isDarkMode
+                                      ? Colors.white
+                                      : Colors.black,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 40,
+                                ),
+                                child: Text(
+                                  'Start chatting with people from Discover or Live Connect to add them here',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: isDarkMode
+                                        ? Colors.grey[600]
+                                        : Colors.grey,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+
+                      // Extract other user IDs from conversations
+                      final Set<String> otherUserIds = {};
+                      for (var doc in convSnapshot.data!.docs) {
+                        final data = doc.data() as Map<String, dynamic>;
+                        final participants = List<String>.from(
+                          data['participants'] ?? [],
+                        );
+                        for (var participant in participants) {
+                          if (participant != currentUserId) {
+                            otherUserIds.add(participant);
+                          }
+                        }
+                      }
+
+                      if (otherUserIds.isEmpty) {
+                        return Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.people_outline,
+                                size: 64,
+                                color: isDarkMode
+                                    ? Colors.grey[700]
+                                    : Colors.grey[400],
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'No contacts yet',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w600,
+                                  color: isDarkMode
+                                      ? Colors.white
+                                      : Colors.black,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+
+                      // Fetch user details for these IDs
+                      return FutureBuilder<List<DocumentSnapshot>>(
+                        future: Future.wait(
+                          otherUserIds.map(
+                            (id) =>
+                                _firestore.collection('users').doc(id).get(),
+                          ),
+                        ),
+                        builder: (context, usersSnapshot) {
+                          if (usersSnapshot.connectionState ==
+                              ConnectionState.waiting) {
+                            return const Center(
+                              child: CircularProgressIndicator(),
+                            );
+                          }
+
+                          if (!usersSnapshot.hasData) {
+                            return const Center(
+                              child: Text('Error loading contacts'),
+                            );
+                          }
+
+                          // Filter out non-existent users
+                          final validUsers = usersSnapshot.data!
+                              .where((doc) => doc.exists)
+                              .toList();
+
+                          if (validUsers.isEmpty) {
+                            return Center(
+                              child: Text(
+                                'No contacts available',
+                                style: TextStyle(
+                                  color: isDarkMode
+                                      ? Colors.grey[600]
+                                      : Colors.grey,
+                                ),
+                              ),
+                            );
+                          }
+
+                          return ListView.builder(
+                            controller: scrollController,
+                            itemCount: validUsers.length,
+                            itemBuilder: (context, index) {
+                              final userDoc = validUsers[index];
+                              final userData =
+                                  userDoc.data() as Map<String, dynamic>;
+                              final userId = userDoc.id;
+                              final name = userData['name'] ?? 'Unknown';
+                              final photoUrl = userData['photoUrl'];
+                              final showOnlineStatus =
+                                  userData['showOnlineStatus'] ?? true;
+                              var isOnline = false;
+
+                              // Only show online if user allows it
+                              if (showOnlineStatus) {
+                                isOnline = userData['isOnline'] ?? false;
+
+                                // Check if lastSeen is recent
+                                if (isOnline) {
+                                  final lastSeen = userData['lastSeen'];
+                                  if (lastSeen != null &&
+                                      lastSeen is Timestamp) {
+                                    final lastSeenTime = lastSeen.toDate();
+                                    final difference = DateTime.now()
+                                        .difference(lastSeenTime);
+                                    if (difference.inMinutes > 5) {
+                                      isOnline = false;
+                                    }
+                                  } else {
+                                    isOnline = false;
+                                  }
+                                }
+                              }
+
+                              return ListTile(
+                                leading: Stack(
+                                  children: [
+                                    CircleAvatar(
+                                      backgroundImage: photoUrl != null
+                                          ? CachedNetworkImageProvider(photoUrl)
+                                          : null,
+                                      backgroundColor: Theme.of(
+                                        context,
+                                      ).primaryColor.withValues(alpha: 0.1),
+                                      child: photoUrl == null
+                                          ? Text(
+                                              name.isNotEmpty
+                                                  ? name[0].toUpperCase()
+                                                  : '?',
+                                              style: TextStyle(
+                                                color: Theme.of(
+                                                  context,
+                                                ).primaryColor,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            )
+                                          : null,
+                                    ),
+                                    if (isOnline)
+                                      Positioned(
+                                        right: 0,
+                                        bottom: 0,
+                                        child: Container(
+                                          width: 12,
+                                          height: 12,
+                                          decoration: BoxDecoration(
+                                            color: Colors.green,
+                                            shape: BoxShape.circle,
+                                            border: Border.all(
+                                              color: isDarkMode
+                                                  ? Colors.black
+                                                  : Colors.white,
+                                              width: 2,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                                title: Text(
+                                  name,
+                                  style: TextStyle(
+                                    color: isDarkMode
+                                        ? Colors.white
+                                        : Colors.black,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  isOnline
+                                      ? 'Active now'
+                                      : (!showOnlineStatus
+                                            ? 'Status hidden'
+                                            : _getLastSeenText(
+                                                userData['lastSeen'],
+                                              )),
+                                  style: TextStyle(
+                                    color: isOnline
+                                        ? Colors.green
+                                        : (isDarkMode
+                                              ? Colors.grey[600]
+                                              : Colors.grey),
+                                  ),
+                                ),
+                                onTap: () async {
+                                  Navigator.pop(context);
+
+                                  final userProfile = UserProfile.fromMap(
+                                    userData,
+                                    userId,
+                                  );
+
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => EnhancedChatScreen(
+                                        otherUser: userProfile,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              );
+                            },
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+>>>>>>> 0b200533559aaaa698b1f78c4e132361824f41ef:lib/screens/home/conversations_screen.dart
     );
   }
 }

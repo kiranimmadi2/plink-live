@@ -12,7 +12,12 @@ import 'package:supper/screens/login/onboarding_screen.dart';
 
 import 'firebase_options.dart';
 import 'screens/login/splash_screen.dart';
+<<<<<<< HEAD
 import 'screens/main_navigation_screen.dart';
+=======
+import 'screens/login/login_screen.dart';
+import 'screens/home/main_navigation_screen.dart';
+>>>>>>> 0b200533559aaaa698b1f78c4e132361824f41ef
 
 import 'services/auth_service.dart';
 import 'services/profile_service.dart';
@@ -23,8 +28,12 @@ import 'services/location_service.dart';
 import 'services/connectivity_service.dart';
 import 'services/user_migration_service.dart';
 import 'services/conversation_migration_service.dart';
+<<<<<<< HEAD
 import 'services/analytics_service.dart';
 import 'services/error_tracking_service.dart';
+=======
+import 'services/video_preload_service.dart';
+>>>>>>> 0b200533559aaaa698b1f78c4e132361824f41ef
 import 'providers/theme_provider.dart';
 import 'utils/app_optimizer.dart';
 import 'utils/memory_manager.dart';
@@ -38,16 +47,22 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 /// Validate that Firebase configuration is loaded from .env
 void _validateFirebaseConfig() {
   final projectId = dotenv.env['FIREBASE_WEB_PROJECT_ID'];
-  final apiKey = dotenv.env['FIREBASE_ANDROID_API_KEY'] ?? dotenv.env['FIREBASE_WEB_API_KEY'];
+  final apiKey =
+      dotenv.env['FIREBASE_ANDROID_API_KEY'] ??
+      dotenv.env['FIREBASE_WEB_API_KEY'];
 
   if (projectId == null || projectId.isEmpty) {
     debugPrint('⚠️ WARNING: Firebase project ID is missing!');
-    debugPrint('   Please ensure .env file exists with FIREBASE_WEB_PROJECT_ID');
+    debugPrint(
+      '   Please ensure .env file exists with FIREBASE_WEB_PROJECT_ID',
+    );
   }
 
   if (apiKey == null || apiKey.isEmpty) {
     debugPrint('⚠️ WARNING: Firebase API key is missing!');
-    debugPrint('   Please ensure .env file exists with FIREBASE_ANDROID_API_KEY or FIREBASE_WEB_API_KEY');
+    debugPrint(
+      '   Please ensure .env file exists with FIREBASE_ANDROID_API_KEY or FIREBASE_WEB_API_KEY',
+    );
   }
 
   if ((projectId?.isNotEmpty ?? false) && (apiKey?.isNotEmpty ?? false)) {
@@ -58,7 +73,27 @@ void _validateFirebaseConfig() {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+<<<<<<< HEAD
   // Load environment variables first
+=======
+  // Set up global error handling for image decode errors
+  FlutterError.onError = (FlutterErrorDetails details) {
+    final exception = details.exception;
+    // Suppress image decode errors - they're non-fatal
+    if (exception.toString().contains('ImageDecoder') ||
+        exception.toString().contains('Failed to decode image') ||
+        exception.toString().contains('codec')) {
+      debugPrint(
+        ' Image decode error (suppressed): ${details.exceptionAsString()}',
+      );
+      return; // Don't propagate
+    }
+    // For other errors, use default handler
+    FlutterError.presentError(details);
+  };
+
+  // Load environment variables
+>>>>>>> 0b200533559aaaa698b1f78c4e132361824f41ef
   await dotenv.load(fileName: ".env");
 
   // Initialize Sentry for error tracking (wraps the entire app)
@@ -111,10 +146,30 @@ void main() async {
     // Run app immediately - defer ALL heavy initializations
     runApp(const ProviderScope(child: MyApp()));
 
+<<<<<<< HEAD
     // Defer all non-critical initialization to AFTER first frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeServicesInBackground();
     });
+=======
+  if (!kIsWeb) {
+    FirebaseFirestore.instance.settings = const Settings(
+      persistenceEnabled: true,
+      cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+    );
+  }
+
+  // Start video preload immediately - before app renders
+  // This ensures video is ready when splash screen opens
+  unawaited(VideoPreloadService().preload());
+
+  // Run app immediately - defer ALL heavy initializations
+  runApp(const ProviderScope(child: MyApp()));
+
+  // Defer all non-critical initialization to AFTER first frame
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    _initializeServicesInBackground();
+>>>>>>> 0b200533559aaaa698b1f78c4e132361824f41ef
   });
 }
 
@@ -142,16 +197,26 @@ Future<void> _initializeServicesInBackground() async {
   await Future.delayed(const Duration(milliseconds: 50));
 
   // Initialize notification service (can run in parallel, but don't block)
+<<<<<<< HEAD
   unawaited(NotificationService().initialize().catchError((e) {
     debugPrint('NotificationService init error (non-fatal): $e');
     ErrorTrackingService().captureException(e, message: 'NotificationService init failed');
   }));
+=======
+  unawaited(
+    NotificationService().initialize().catchError((e) {
+      debugPrint('NotificationService init error (non-fatal): $e');
+    }),
+  );
+>>>>>>> 0b200533559aaaa698b1f78c4e132361824f41ef
 
   // Initialize connectivity service after a small delay
   await Future.delayed(const Duration(milliseconds: 100));
-  unawaited(ConnectivityService().initialize().catchError((e) {
-    debugPrint('ConnectivityService init error (non-fatal): $e');
-  }));
+  unawaited(
+    ConnectivityService().initialize().catchError((e) {
+      debugPrint('ConnectivityService init error (non-fatal): $e');
+    }),
+  );
 
   // Log app open event
   unawaited(AnalyticsService().logAppOpen());
@@ -170,9 +235,17 @@ class MyApp extends ConsumerWidget {
 
     return MaterialApp(
       title: 'Supper',
-      theme: themeNotifier.themeData,
+      theme: themeNotifier.themeData.copyWith(
+        scaffoldBackgroundColor: const Color(0xFF0f0f23),
+      ),
       debugShowCheckedModeBanner: false,
       home: const SplashScreen(), // <-- Use AuthWrapper here
+      builder: (context, child) {
+        return Container(
+          color: const Color(0xFF0f0f23),
+          child: child,
+        );
+      },
     );
   }
 }
@@ -251,8 +324,7 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
           String uid = snapshot.data!.uid;
 
           // Initialize user-dependent services only once per session
-          if (!_hasInitializedServices ||
-              _lastInitializedUserId != uid) {
+          if (!_hasInitializedServices || _lastInitializedUserId != uid) {
             if (!_isInitializing) {
               _isInitializing = true;
               _hasInitializedServices = true;
@@ -281,14 +353,16 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
 
   Widget _buildLoadingScreen() {
     return Scaffold(
+      backgroundColor: const Color(0xFF0f0f23),
       body: Container(
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
             colors: [
-              Colors.blue.shade400,
-              Colors.purple.shade400,
+              Color(0xFF1a1a2e),
+              Color(0xFF16213e),
+              Color(0xFF0f0f23),
             ],
           ),
         ),
@@ -311,6 +385,7 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
 
   Widget _buildErrorScreen(String error) {
     return Scaffold(
+      backgroundColor: const Color(0xFF0f0f23),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -321,13 +396,13 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
               const SizedBox(height: 16),
               const Text(
                 'Something went wrong',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
               ),
               const SizedBox(height: 8),
               Text(
                 error,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.grey),
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
               ),
               const SizedBox(height: 24),
               ElevatedButton(
@@ -352,11 +427,11 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
         await _profileService.ensureProfileExists().timeout(
           const Duration(seconds: 10),
           onTimeout: () {
-            debugPrint('⚠️ Profile service timed out');
+            debugPrint(' Profile service timed out');
           },
         );
       } catch (e) {
-        debugPrint('⚠️ Profile service error (non-fatal): $e');
+        debugPrint(' Profile service error (non-fatal): $e');
       }
 
       await Future.delayed(const Duration(milliseconds: 100));
