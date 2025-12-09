@@ -196,9 +196,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     final snappedX = _fabPosition.dx > size.width / 2 ? size.width - 80 : 10.0;
 
     // Clamp Y: 200 from top, 200 from bottom
-    final minY = 200.0;
-    final maxY = size.height - 200.0;
-    final clampedY = _fabPosition.dy.clamp(minY, maxY);
+    const minY = 200.0;
+    const maxY = 200.0;
+    final clampedY = _fabPosition.dy.clamp(minY, size.height - maxY);
 
     setState(() {
       _fabPosition = Offset(snappedX, clampedY);
@@ -270,9 +270,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     final size = MediaQuery.of(context).size;
 
     // Safe area boundaries - FAB must stay within bounds
-    final minX = 10.0;
+    const minX = 10.0;
     final maxX = size.width - 74; // 64 FAB width + 10 margin
-    final minY = 200.0; // 200 from top
+    const minY = 200.0; // 200 from top
     final maxY = size.height - 200.0; // 200 from bottom
 
     final fabX = _fabPosition.dx.clamp(minX, maxX);
@@ -321,9 +321,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
                   final curvedProgress = Curves.easeOutBack.transform(progress);
 
                   // Half circle arc parameters
-                  final radius = 95.0;
+                  const radius = 95.0;
                   final totalButtons = menuItems.length;
-                  final buttonSize = 56.0;
+                  const buttonSize = 56.0;
 
                   // Half circle = 180 degrees = pi radians
                   // Spread buttons from top (-90°) to bottom (90°)
@@ -345,7 +345,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
                   }
 
                   // Center button on FAB
-                  final centerOffset = (64 - buttonSize) / 2;
+                  const centerOffset = (64 - buttonSize) / 2;
 
                   return Positioned(
                     left: fabX + xOffset + centerOffset,
@@ -529,7 +529,7 @@ class _AnimatedMenuItemState extends State<_AnimatedMenuItem> {
             width: 56,
             height: 56,
             transform: Matrix4.identity()
-              ..scale(_isPressed ? 0.9 : 1.0, _isPressed ? 0.9 : 1.0),
+              ..scale(_isPressed ? 0.9 : 1.0),
             transformAlignment: Alignment.center,
             decoration: BoxDecoration(
               shape: BoxShape.circle,

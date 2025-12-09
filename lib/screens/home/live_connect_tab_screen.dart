@@ -3221,8 +3221,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
           final person = _filteredPeople[index];
           final userData = person['userData'] as Map<String, dynamic>;
           final commonInterests = person['commonInterests'] as List<String>;
-          final matchScore =
-              person['matchScore'] as double; // ignore: unused_local_variable
+          // matchScore available but not currently displayed
           final userId = person['userId'] as String;
           final distance = person['distance'] as double?;
 

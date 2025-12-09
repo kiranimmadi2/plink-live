@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'user_profile.dart';
 
 class Activity {
   final String name;
@@ -49,6 +50,13 @@ class ExtendedUserProfile {
   final List<String> connections;
   final int connectionCount;
 
+  // Account type fields
+  final AccountType accountType;
+  final AccountStatus accountStatus;
+  final VerificationStatus verificationStatus;
+  final String? businessName; // For Professional/Business accounts
+  final String? category; // Professional category or Business industry
+
   // Calculated field
   double? distance; // Will be calculated based on current user's location
 
@@ -74,7 +82,19 @@ class ExtendedUserProfile {
     this.connections = const [],
     this.connectionCount = 0,
     this.distance,
+    this.accountType = AccountType.personal,
+    this.accountStatus = AccountStatus.active,
+    this.verificationStatus = VerificationStatus.none,
+    this.businessName,
+    this.category,
   });
+
+  // Helper getters
+  bool get isProfessional => accountType == AccountType.professional;
+  bool get isBusiness => accountType == AccountType.business;
+  bool get isPersonal => accountType == AccountType.personal;
+  bool get isVerifiedAccount => verificationStatus == VerificationStatus.verified;
+  bool get isPendingVerification => verificationStatus == VerificationStatus.pending;
 
   factory ExtendedUserProfile.fromMap(Map<String, dynamic> map, String uid) {
     // Parse activities from map - handle both String and Map formats
@@ -91,6 +111,23 @@ class ExtendedUserProfile {
           return Activity(name: 'Unknown'); // Fallback
         }
       }).toList();
+    }
+
+    // Extract business name from professional or business profile
+    String? businessName;
+    String? category;
+    if (map['professionalProfile'] != null) {
+      businessName = map['professionalProfile']['businessName'];
+      category = map['professionalProfile']['category'];
+    } else if (map['businessProfile'] != null) {
+      businessName = map['businessProfile']['companyName'];
+      category = map['businessProfile']['industry'];
+    }
+
+    // Extract verification status
+    VerificationStatus verificationStatus = VerificationStatus.none;
+    if (map['verification'] != null) {
+      verificationStatus = VerificationStatus.fromString(map['verification']['status']);
     }
 
     return ExtendedUserProfile(
@@ -114,6 +151,12 @@ class ExtendedUserProfile {
       blockedUsers: List<String>.from(map['blockedUsers'] ?? []),
       connections: List<String>.from(map['connections'] ?? []),
       connectionCount: map['connectionCount'] ?? 0,
+      // Account type fields
+      accountType: AccountType.fromString(map['accountType']),
+      accountStatus: AccountStatus.fromString(map['accountStatus']),
+      verificationStatus: verificationStatus,
+      businessName: businessName,
+      category: category,
     );
   }
 
@@ -139,6 +182,9 @@ class ExtendedUserProfile {
       'blockedUsers': blockedUsers,
       'connections': connections,
       'connectionCount': connectionCount,
+      // Account type fields
+      'accountType': accountType.name,
+      'accountStatus': accountStatus.name,
     };
   }
 

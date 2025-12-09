@@ -350,8 +350,7 @@ class _ProfileWithHistoryScreenState
       if (userId == null) return;
 
       final userCity = _userProfile?['city'];
-      final userLocation =
-          _userProfile?['location']; // ignore: unused_local_variable
+      // userLocation available for future geo-filtering
 
       // Build query based on filters
       Query<Map<String, dynamic>> usersQuery = _firestore.collection('users');
@@ -1107,54 +1106,48 @@ class _ProfileWithHistoryScreenState
 
                                                   _loadUserData();
 
-                                                  if (mounted) {
-                                                    ScaffoldMessenger.of(
-                                                      context,
-                                                    ).showSnackBar(
-                                                      // ignore: use_build_context_synchronously
-                                                      const SnackBar(
-                                                        content: Text(
-                                                          'Location updated successfully',
-                                                        ),
-                                                        backgroundColor:
-                                                            Colors.green,
-                                                      ),
-                                                    );
-                                                  }
-                                                } else {
-                                                  if (mounted) {
-                                                    ScaffoldMessenger.of(
-                                                      context,
-                                                    ).showSnackBar(
-                                                      // ignore: use_build_context_synchronously
-                                                      const SnackBar(
-                                                        content: Text(
-                                                          'Could not update location',
-                                                        ),
-                                                        backgroundColor:
-                                                            Colors.red,
-                                                      ),
-                                                    );
-                                                  }
-                                                }
-                                              } catch (e) {
-                                                debugPrint(
-                                                  'Error during manual location update: $e',
-                                                );
-                                                if (mounted) {
+                                                  if (!mounted) return;
                                                   ScaffoldMessenger.of(
                                                     context,
                                                   ).showSnackBar(
-                                                    // ignore: use_build_context_synchronously
                                                     const SnackBar(
                                                       content: Text(
-                                                        'Location update failed',
+                                                        'Location updated successfully',
+                                                      ),
+                                                      backgroundColor:
+                                                          Colors.green,
+                                                    ),
+                                                  );
+                                                } else {
+                                                  if (!mounted) return;
+                                                  ScaffoldMessenger.of(
+                                                    context,
+                                                  ).showSnackBar(
+                                                    const SnackBar(
+                                                      content: Text(
+                                                        'Could not update location',
                                                       ),
                                                       backgroundColor:
                                                           Colors.red,
                                                     ),
                                                   );
                                                 }
+                                              } catch (e) {
+                                                debugPrint(
+                                                  'Error during manual location update: $e',
+                                                );
+                                                if (!mounted) return;
+                                                ScaffoldMessenger.of(
+                                                  context,
+                                                ).showSnackBar(
+                                                  const SnackBar(
+                                                    content: Text(
+                                                      'Location update failed',
+                                                    ),
+                                                    backgroundColor:
+                                                        Colors.red,
+                                                  ),
+                                                );
                                               }
                                             },
                                             child: Column(
@@ -2241,8 +2234,7 @@ class _ProfileWithHistoryScreenState
         final person = _nearbyPeople[index];
         final userData = person['userData'] as Map<String, dynamic>;
         final commonInterests = person['commonInterests'] as List<String>;
-        final matchScore =
-            person['matchScore'] as double; // ignore: unused_local_variable
+        // matchScore available but not currently displayed
 
         return Container(
           margin: const EdgeInsets.only(bottom: 12),

@@ -8,7 +8,8 @@ class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   static final GoogleSignIn _googleSignIn = GoogleSignIn();
 
-  // Phone verification state
+  // Phone verification state - stored for auto-retrieval timeout handling
+  // ignore: unused_field
   String? _verificationId;
   int? _resendToken;
 
@@ -59,16 +60,21 @@ class AuthService {
     }
   }
 
-  Future<User?> signUpWithEmail(String email, String password) async {
+  Future<User?> signUpWithEmail(String email, String password, {String? accountType}) async {
     try {
       final UserCredential result = await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
-      
+
       // Create initial Firestore profile for email signup
       if (result.user != null) {
         final user = result.user!;
+
+        // Determine account type and status
+        final accType = _parseAccountType(accountType);
+        final needsVerification = accType != 'personal';
+
         await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
           'uid': user.uid,
           'name': email.split('@')[0], // Use email prefix as initial name
@@ -85,9 +91,15 @@ class AuthService {
           'blockedUsers': [], // Initialize empty blocked users
           'connectionTypes': [], // Initialize empty connection types
           'activities': [], // Initialize empty activities
+          // Account type fields
+          'accountType': accType,
+          'accountStatus': needsVerification ? 'pendingVerification' : 'active',
+          'verification': {
+            'status': needsVerification ? 'pending' : 'none',
+          },
         }, SetOptions(merge: true));
       }
-      
+
       return result.user;
     } on FirebaseAuthException catch (e) {
       String message;
@@ -113,18 +125,18 @@ class AuthService {
     }
   }
 
-  Future<User?> signInWithGoogle() async {
+  Future<User?> signInWithGoogle({String? accountType}) async {
     try {
       // Check if already signed in
       await _googleSignIn.signOut();
-      
+
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-      
+
       if (googleUser == null) {
         return null;
       }
 
-      final GoogleSignInAuthentication googleAuth = 
+      final GoogleSignInAuthentication googleAuth =
           await googleUser.authentication;
 
       final credential = GoogleAuthProvider.credential(
@@ -132,20 +144,24 @@ class AuthService {
         idToken: googleAuth.idToken,
       );
 
-      final UserCredential result = 
+      final UserCredential result =
           await _auth.signInWithCredential(credential);
-      
+
       // Save Google profile photo URL to Firestore
       if (result.user != null) {
         final user = result.user!;
-        
+
         // Fix Google photo URL to get higher quality version
         String? photoUrl = user.photoURL ?? googleUser.photoUrl;
         photoUrl = PhotoUrlHelper.getHighQualityGooglePhoto(photoUrl);
-        
+
         // Check if this is a new user or existing user
         final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
         final isNewUser = !doc.exists;
+
+        // Determine account type and status for new users
+        final accType = _parseAccountType(accountType);
+        final needsVerification = accType != 'personal';
 
         await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
           'uid': user.uid,
@@ -165,9 +181,15 @@ class AuthService {
             'blockedUsers': [], // Initialize empty blocked users
             'connectionTypes': [], // Initialize empty connection types
             'activities': [], // Initialize empty activities
+            // Account type fields
+            'accountType': accType,
+            'accountStatus': needsVerification ? 'pendingVerification' : 'active',
+            'verification': {
+              'status': needsVerification ? 'pending' : 'none',
+            },
           },
         }, SetOptions(merge: true));
-        
+
         // Also update the auth profile with fixed URL
         if (photoUrl != null && photoUrl != user.photoURL) {
           try {
@@ -177,7 +199,7 @@ class AuthService {
           }
         }
       }
-      
+
       return result.user;
     } on FirebaseAuthException catch (e) {
       String message;
@@ -529,11 +551,32 @@ class AuthService {
     }
   }
 
+  /// Parse account type string to standardized format
+  String _parseAccountType(String? accountType) {
+    if (accountType == null) return 'personal';
+    final lower = accountType.toLowerCase();
+    if (lower.contains('professional')) return 'professional';
+    if (lower.contains('business')) return 'business';
+    return 'personal';
+  }
+
+  // Store account type for phone login (set before OTP verification)
+  String? _pendingAccountType;
+
+  /// Set the account type for pending phone registration
+  void setPendingAccountType(String? accountType) {
+    _pendingAccountType = accountType;
+  }
+
   /// Fire-and-forget: Update user profile on phone login (runs in background)
   void _updateUserProfileOnPhoneLogin(User user) async {
     try {
       final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
       final isNewUser = !doc.exists;
+
+      // Determine account type and status for new users
+      final accType = _parseAccountType(_pendingAccountType);
+      final needsVerification = accType != 'personal';
 
       await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
         'uid': user.uid,
@@ -550,8 +593,17 @@ class AuthService {
           'blockedUsers': [],
           'connectionTypes': [],
           'activities': [],
+          // Account type fields
+          'accountType': accType,
+          'accountStatus': needsVerification ? 'pendingVerification' : 'active',
+          'verification': {
+            'status': needsVerification ? 'pending' : 'none',
+          },
         },
       }, SetOptions(merge: true));
+
+      // Clear pending account type after use
+      _pendingAccountType = null;
     } catch (e) {
       debugPrint('Error updating profile on phone login: $e');
     }

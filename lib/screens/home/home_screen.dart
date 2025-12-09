@@ -39,12 +39,12 @@ class _HomeScreenState extends State<HomeScreen>
   bool _isSearchFocused = false;
   bool _isProcessing = false;
 
-  List<String> _suggestions = [];
+  final List<String> _suggestions = [];
   List<Map<String, dynamic>> _matches = [];
   String _currentUserName = '';
 
   late AnimationController _controller;
-  bool _visible = true;
+  final bool _visible = true;
   Timer? _timer;
 
   final List<Map<String, dynamic>> _conversation = [];
@@ -149,7 +149,7 @@ class _HomeScreenState extends State<HomeScreen>
   Future<void> _loadUserIntents() async {
     final userId = _auth.currentUser?.uid;
     if (userId != null) {
-      final intents = await _intentService.getUserIntents(userId);
+      await _intentService.getUserIntents(userId);
       setState(() {});
     }
   }
@@ -2828,7 +2828,7 @@ class _HomeScreenState extends State<HomeScreen>
                           width: 40,
                           height: 40,
                           margin: const EdgeInsets.only(bottom: 7.5),
-                          decoration: BoxDecoration(
+                          decoration: const BoxDecoration(
                             shape: BoxShape.circle,
                             color: Colors.red,
                           ),
@@ -3675,29 +3675,6 @@ class _HomeScreenState extends State<HomeScreen>
         ),
       ),
     );
-  }
-
-  Color _getReelCategoryColor(String category) {
-    switch (category) {
-      case 'Dance':
-        return Colors.pink;
-      case 'Comedy':
-        return Colors.orange;
-      case 'Food':
-        return Colors.green;
-      case 'Travel':
-        return Colors.blue;
-      case 'Fitness':
-        return Colors.red;
-      case 'Pets':
-        return Colors.amber;
-      case 'Tech':
-        return Colors.purple;
-      case 'Fashion':
-        return Colors.teal;
-      default:
-        return Colors.grey;
-    }
   }
 
   void _showReelPlayer(Map<String, dynamic> item) {

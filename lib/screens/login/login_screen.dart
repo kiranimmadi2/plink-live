@@ -1,16 +1,23 @@
 import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:video_player/video_player.dart';
 import '../../services/auth_service.dart';
 import '../../services/video_preload_service.dart';
+import '../../services/professional_service.dart';
+import '../../services/business_service.dart';
 import '../home/main_navigation_screen.dart';
+import '../professional/professional_setup_screen.dart';
+import '../business/business_setup_screen.dart';
 import 'forgot_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key, required this.accountType});
 
   final String accountType;
+
+  @override
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
@@ -271,10 +278,7 @@ class _LoginScreenState extends State<LoginScreen>
           );
           if (user != null && mounted) {
             _showSuccessSnackBar('Phone verified automatically!');
-            Navigator.of(context).pushAndRemoveUntil(
-              MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
-              (route) => false,
-            );
+            await _navigateAfterAuth(isNewUser: true);
           }
         } catch (e) {
           // Auto-verify failed, user will enter OTP manually
@@ -308,10 +312,7 @@ class _LoginScreenState extends State<LoginScreen>
       if (user != null && mounted) {
         HapticFeedback.lightImpact();
         _showSuccessSnackBar('Phone verified successfully!');
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
-          (route) => false,
-        );
+        await _navigateAfterAuth(isNewUser: true);
       }
     } catch (e) {
       if (mounted) {
@@ -341,6 +342,8 @@ class _LoginScreenState extends State<LoginScreen>
 
     // Check if it's a phone number - send OTP
     if (_isPhoneNumber(input)) {
+      // Set pending account type for phone registration
+      _authService.setPendingAccountType(widget.accountType);
       await _sendPhoneOTP();
       return;
     }
@@ -363,6 +366,7 @@ class _LoginScreenState extends State<LoginScreen>
             ? await _authService.signUpWithEmail(
                 input,
                 _passwordController.text,
+                accountType: widget.accountType,
               )
             : await _authService.signInWithEmail(
                 input,
@@ -374,11 +378,8 @@ class _LoginScreenState extends State<LoginScreen>
           _showSuccessSnackBar(
             _isSignUpMode ? 'Account created successfully!' : 'Welcome back!',
           );
-          // Navigate to main screen after successful login
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
-            (route) => false,
-          );
+          // Navigate based on account type for signup
+          await _navigateAfterAuth(isNewUser: _isSignUpMode);
         }
       } catch (e) {
         if (mounted) {
@@ -395,22 +396,89 @@ class _LoginScreenState extends State<LoginScreen>
     }
   }
 
+  /// Navigate after authentication based on account type
+  Future<void> _navigateAfterAuth({bool isNewUser = false}) async {
+    if (!mounted) return;
+
+    // Get account type - first check widget.accountType (for new signups), then check stored accountType
+    String accountType = widget.accountType.toLowerCase();
+
+    // Also check the stored account type from Firestore for existing users
+    try {
+      final user = _authService.currentUser;
+      if (user != null) {
+        final doc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+        final storedAccountType = doc.data()?['accountType']?.toString().toLowerCase() ?? '';
+        // Use stored account type if widget account type is empty or "personal"
+        if (storedAccountType.isNotEmpty &&
+            (accountType.isEmpty || accountType == 'personal' || accountType.contains('personal'))) {
+          accountType = storedAccountType;
+        }
+      }
+    } catch (e) {
+      debugPrint('Error checking stored account type: $e');
+    }
+
+    // Check for Professional account
+    if (accountType.contains('professional')) {
+      final professionalService = ProfessionalService();
+      final isSetupComplete = await professionalService.isProfessionalSetupComplete();
+
+      if (!isSetupComplete) {
+        if (!mounted) return;
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(
+            builder: (_) => const ProfessionalSetupScreen(),
+          ),
+          (route) => false,
+        );
+        return;
+      }
+    }
+
+    // Check for Business account
+    if (accountType.contains('business')) {
+      final businessService = BusinessService();
+      final isSetupComplete = await businessService.isBusinessSetupComplete();
+
+      if (!isSetupComplete) {
+        if (!mounted) return;
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(
+            builder: (_) => const BusinessSetupScreen(),
+          ),
+          (route) => false,
+        );
+        return;
+      }
+    }
+
+    // Default: go to main navigation
+    if (!mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
+      (route) => false,
+    );
+  }
+
   Future<void> _signInWithGoogle() async {
     setState(() {
       _isLoading = true;
     });
 
     try {
-      final user = await _authService.signInWithGoogle();
+      final user = await _authService.signInWithGoogle(
+        accountType: widget.accountType,
+      );
 
       if (user != null && mounted) {
         HapticFeedback.lightImpact();
         _showSuccessSnackBar('Welcome, ${user.displayName ?? 'User'}!');
-        // Navigate to main screen after successful Google sign-in
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
-          (route) => false,
-        );
+        // Navigate based on account type
+        await _navigateAfterAuth(isNewUser: true);
       }
     } catch (e) {
       if (mounted) {
@@ -1260,7 +1328,7 @@ class _LoginScreenState extends State<LoginScreen>
             // Calculate box size based on available width
             // 6 boxes + 5 gaps (8px each) = total width
             final availableWidth = constraints.maxWidth;
-            final totalGapWidth = 5 * 8.0; // 5 gaps of 8px each
+            const totalGapWidth = 5 * 8.0; // 5 gaps of 8px each
             final boxWidth = ((availableWidth - totalGapWidth) / 6).clamp(
               36.0,
               48.0,

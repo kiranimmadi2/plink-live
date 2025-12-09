@@ -1,4 +1,4 @@
-﻿import 'dart:ui';
+import 'dart:ui';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -10,6 +10,7 @@ import '../../services/universal_intent_service.dart';
 import '../../services/location_service.dart';
 import '../../services/activity_migration_service.dart';
 import '../../widgets/user_avatar.dart';
+import '../../widgets/account_badges.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/app_providers.dart';
 import '../../providers/user_provider.dart';
@@ -17,6 +18,7 @@ import '../login/login_screen.dart';
 import 'profile_view_screen.dart';
 import 'settings_screen.dart';
 import '../enhanced_chat_screen.dart';
+import '../professional/professional_dashboard_screen.dart';
 import '../../models/user_profile.dart';
 
 class ProfileWithHistoryScreen extends ConsumerStatefulWidget {
@@ -909,17 +911,99 @@ class _ProfileWithHistoryScreenState
                                         crossAxisAlignment:
                                             CrossAxisAlignment.start,
                                         children: [
-                                          Text(
-                                            profileState.name,
-                                            style: TextStyle(
-                                              fontSize: 22,
-                                              fontWeight: FontWeight.w700,
-                                              color: isDarkMode
-                                                  ? Colors.white
-                                                  : Colors.black,
-                                              letterSpacing: 0.3,
-                                            ),
+                                          Row(
+                                            children: [
+                                              Flexible(
+                                                child: Text(
+                                                  profileState.name,
+                                                  style: TextStyle(
+                                                    fontSize: 22,
+                                                    fontWeight: FontWeight.w700,
+                                                    color: isDarkMode
+                                                        ? Colors.white
+                                                        : Colors.black,
+                                                    letterSpacing: 0.3,
+                                                  ),
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              UsernameBadge(
+                                                accountType: AccountType.fromString(
+                                                  profileState.profile?['accountType'],
+                                                ),
+                                                verificationStatus: VerificationStatus.fromString(
+                                                  profileState.profile?['verification']?['status'],
+                                                ),
+                                                size: 18,
+                                              ),
+                                            ],
                                           ),
+                                          // Account type badge for non-personal accounts
+                                          if (profileState.profile?['accountType'] != null &&
+                                              profileState.profile?['accountType'] != 'personal') ...[
+                                            const SizedBox(height: 8),
+                                            Row(
+                                              children: [
+                                                AccountTypeBadge(
+                                                  accountType: AccountType.fromString(
+                                                    profileState.profile?['accountType'],
+                                                  ),
+                                                  verificationStatus: VerificationStatus.fromString(
+                                                    profileState.profile?['verification']?['status'],
+                                                  ),
+                                                  showLabel: true,
+                                                  compact: true,
+                                                  size: 14,
+                                                ),
+                                                const Spacer(),
+                                                // Professional Dashboard button
+                                                if (profileState.profile?['accountType']?.toString().toLowerCase().contains('professional') == true)
+                                                  GestureDetector(
+                                                    onTap: () {
+                                                      Navigator.push(
+                                                        context,
+                                                        MaterialPageRoute(
+                                                          builder: (_) => const ProfessionalDashboardScreen(),
+                                                        ),
+                                                      );
+                                                    },
+                                                    child: Container(
+                                                      padding: const EdgeInsets.symmetric(
+                                                        horizontal: 12,
+                                                        vertical: 6,
+                                                      ),
+                                                      decoration: BoxDecoration(
+                                                        color: const Color(0xFF00D67D).withValues(alpha: 0.15),
+                                                        borderRadius: BorderRadius.circular(20),
+                                                        border: Border.all(
+                                                          color: const Color(0xFF00D67D).withValues(alpha: 0.3),
+                                                        ),
+                                                      ),
+                                                      child: const Row(
+                                                        mainAxisSize: MainAxisSize.min,
+                                                        children: [
+                                                          Icon(
+                                                            Icons.dashboard_outlined,
+                                                            size: 14,
+                                                            color: Color(0xFF00D67D),
+                                                          ),
+                                                          SizedBox(width: 4),
+                                                          Text(
+                                                            'Dashboard',
+                                                            style: TextStyle(
+                                                              color: Color(0xFF00D67D),
+                                                              fontSize: 12,
+                                                              fontWeight: FontWeight.w600,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ),
+                                              ],
+                                            ),
+                                          ],
                                           const SizedBox(height: 8),
                                           Row(
                                             children: [

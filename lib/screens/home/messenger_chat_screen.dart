@@ -728,7 +728,11 @@ class _MessengerChatScreenState extends State<MessengerChatScreen> {
 
   Widget _buildMessageBubble(Map<String, dynamic> message, bool isMe, bool showAvatar) {
     final text = message['text'] ?? '';
-    final imageUrl = message['imageUrl'];
+    final imageUrl = message['imageUrl'] as String?;
+    // Check for valid image URL (non-null, non-empty, and valid URL format)
+    final hasValidImage = imageUrl != null &&
+        imageUrl.isNotEmpty &&
+        (imageUrl.startsWith('http://') || imageUrl.startsWith('https://'));
     final timestamp = message['timestamp'] as Timestamp?;
     final messageType = message['type'] ?? 'text';
     final duration = message['duration'] ?? 0;
@@ -769,7 +773,7 @@ class _MessengerChatScreenState extends State<MessengerChatScreen> {
                 constraints: BoxConstraints(
                   maxWidth: MediaQuery.of(context).size.width * 0.7,
                 ),
-                padding: imageUrl != null
+                padding: hasValidImage
                     ? const EdgeInsets.all(4)
                     : const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 decoration: BoxDecoration(
@@ -791,7 +795,7 @@ class _MessengerChatScreenState extends State<MessengerChatScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    if (imageUrl != null)
+                    if (hasValidImage)
                       ClipRRect(
                         borderRadius: BorderRadius.circular(16),
                         child: CachedNetworkImage(
@@ -804,6 +808,32 @@ class _MessengerChatScreenState extends State<MessengerChatScreen> {
                             color: Colors.grey.shade700,
                             child: const Center(
                               child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          ),
+                          errorWidget: (context, url, error) => Container(
+                            width: 200,
+                            height: 100,
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade800,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.broken_image_outlined,
+                                  color: Colors.grey.shade500,
+                                  size: 32,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Image not available',
+                                  style: TextStyle(
+                                    color: Colors.grey.shade500,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
