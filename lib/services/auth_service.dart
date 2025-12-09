@@ -8,6 +8,11 @@ class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   static final GoogleSignIn _googleSignIn = GoogleSignIn();
 
+  // Phone verification state - stored for auto-retrieval timeout handling
+  // ignore: unused_field
+  String? _verificationId;
+  int? _resendToken;
+
   User? get currentUser => _auth.currentUser;
 
   Stream<User?> get authStateChanges => _auth.authStateChanges();
@@ -18,42 +23,15 @@ class AuthService {
         email: email,
         password: password,
       );
-      
-      // Update last seen and ensure profile exists
+
+      // Update last seen in background (don't wait for it)
       if (result.user != null) {
         final user = result.user!;
-        
-        // Check if profile exists
-        final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
-        
-        if (!doc.exists) {
-          // Create profile if it doesn't exist
-          await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-            'uid': user.uid,
-            'email': user.email ?? email,
-            'name': user.displayName ?? email.split('@')[0],
-            'profileImageUrl': user.photoURL,
-            'photoUrl': user.photoURL,
-            'createdAt': FieldValue.serverTimestamp(),
-            'lastSeen': FieldValue.serverTimestamp(),
-            'isOnline': true,
-            'discoveryModeEnabled': true, // Enable Live Connect discovery by default
-            'interests': [], // Initialize empty interests
-            'connections': [], // Initialize empty connections
-            'connectionCount': 0,
-            'blockedUsers': [], // Initialize empty blocked users
-            'connectionTypes': [], // Initialize empty connection types
-            'activities': [], // Initialize empty activities
-          });
-        } else {
-          // Just update last seen
-          await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
-            'lastSeen': FieldValue.serverTimestamp(),
-            'isOnline': true,
-          });
-        }
+
+        // Fire and forget - update profile in background
+        _updateUserProfileOnLogin(user, email);
       }
-      
+
       return result.user;
     } on FirebaseAuthException catch (e) {
       String message;
@@ -82,16 +60,21 @@ class AuthService {
     }
   }
 
-  Future<User?> signUpWithEmail(String email, String password) async {
+  Future<User?> signUpWithEmail(String email, String password, {String? accountType}) async {
     try {
       final UserCredential result = await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
-      
+
       // Create initial Firestore profile for email signup
       if (result.user != null) {
         final user = result.user!;
+
+        // Determine account type and status
+        final accType = _parseAccountType(accountType);
+        final needsVerification = accType != 'personal';
+
         await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
           'uid': user.uid,
           'name': email.split('@')[0], // Use email prefix as initial name
@@ -108,9 +91,15 @@ class AuthService {
           'blockedUsers': [], // Initialize empty blocked users
           'connectionTypes': [], // Initialize empty connection types
           'activities': [], // Initialize empty activities
+          // Account type fields
+          'accountType': accType,
+          'accountStatus': needsVerification ? 'pendingVerification' : 'active',
+          'verification': {
+            'status': needsVerification ? 'pending' : 'none',
+          },
         }, SetOptions(merge: true));
       }
-      
+
       return result.user;
     } on FirebaseAuthException catch (e) {
       String message;
@@ -136,18 +125,18 @@ class AuthService {
     }
   }
 
-  Future<User?> signInWithGoogle() async {
+  Future<User?> signInWithGoogle({String? accountType}) async {
     try {
       // Check if already signed in
       await _googleSignIn.signOut();
-      
+
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-      
+
       if (googleUser == null) {
         return null;
       }
 
-      final GoogleSignInAuthentication googleAuth = 
+      final GoogleSignInAuthentication googleAuth =
           await googleUser.authentication;
 
       final credential = GoogleAuthProvider.credential(
@@ -155,20 +144,24 @@ class AuthService {
         idToken: googleAuth.idToken,
       );
 
-      final UserCredential result = 
+      final UserCredential result =
           await _auth.signInWithCredential(credential);
-      
+
       // Save Google profile photo URL to Firestore
       if (result.user != null) {
         final user = result.user!;
-        
+
         // Fix Google photo URL to get higher quality version
         String? photoUrl = user.photoURL ?? googleUser.photoUrl;
         photoUrl = PhotoUrlHelper.getHighQualityGooglePhoto(photoUrl);
-        
+
         // Check if this is a new user or existing user
         final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
         final isNewUser = !doc.exists;
+
+        // Determine account type and status for new users
+        final accType = _parseAccountType(accountType);
+        final needsVerification = accType != 'personal';
 
         await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
           'uid': user.uid,
@@ -188,9 +181,15 @@ class AuthService {
             'blockedUsers': [], // Initialize empty blocked users
             'connectionTypes': [], // Initialize empty connection types
             'activities': [], // Initialize empty activities
+            // Account type fields
+            'accountType': accType,
+            'accountStatus': needsVerification ? 'pendingVerification' : 'active',
+            'verification': {
+              'status': needsVerification ? 'pending' : 'none',
+            },
           },
         }, SetOptions(merge: true));
-        
+
         // Also update the auth profile with fixed URL
         if (photoUrl != null && photoUrl != user.photoURL) {
           try {
@@ -200,7 +199,7 @@ class AuthService {
           }
         }
       }
-      
+
       return result.user;
     } on FirebaseAuthException catch (e) {
       String message;
@@ -228,21 +227,181 @@ class AuthService {
 
   Future<void> signOut() async {
     try {
-      // Update user's online status to false before signing out
+      // Fire and forget - update user's online status (don't wait for it)
       final user = _auth.currentUser;
       if (user != null) {
-        await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+        FirebaseFirestore.instance.collection('users').doc(user.uid).update({
           'isOnline': false,
           'lastSeen': FieldValue.serverTimestamp(),
+        }).catchError((e) {
+          debugPrint('Error updating status on logout: $e');
         });
       }
-      
+
+      // Sign out from Firebase and Google immediately
       await Future.wait([
         _auth.signOut(),
-        _googleSignIn.signOut(),
+        _googleSignIn.signOut().catchError((e) {
+          debugPrint('Google sign out error (non-fatal): $e');
+          return null;
+        }),
       ]);
     } catch (e) {
-      throw Exception('Sign out failed: ${e.toString()}');
+      // Even if there's an error, try to force sign out from Firebase
+      try {
+        await _auth.signOut();
+      } catch (_) {}
+      debugPrint('Sign out error: $e');
+    }
+  }
+
+  /// Send OTP to phone number
+  /// Returns a Map with 'success' and optionally 'error' message
+  Future<Map<String, dynamic>> sendPhoneOTP({
+    required String phoneNumber,
+    required Function(String verificationId) onCodeSent,
+    required Function(String error) onError,
+    Function(PhoneAuthCredential credential)? onAutoVerify,
+  }) async {
+    try {
+      await _auth.verifyPhoneNumber(
+        phoneNumber: phoneNumber,
+        timeout: const Duration(seconds: 60),
+        verificationCompleted: (PhoneAuthCredential credential) async {
+          // Auto-verification (Android only)
+          debugPrint('Phone auto-verified');
+          if (onAutoVerify != null) {
+            onAutoVerify(credential);
+          }
+        },
+        verificationFailed: (FirebaseAuthException e) {
+          debugPrint('Phone verification failed: ${e.code} - ${e.message}');
+          String message;
+          switch (e.code) {
+            case 'invalid-phone-number':
+              message = 'Invalid phone number format. Please use +91XXXXXXXXXX';
+              break;
+            case 'too-many-requests':
+              message = 'Too many requests. Please try again later.';
+              break;
+            case 'quota-exceeded':
+              message = 'SMS quota exceeded. Please try again tomorrow.';
+              break;
+            case 'app-not-authorized':
+              message = 'App not authorized. Please check Firebase configuration.';
+              break;
+            case 'captcha-check-failed':
+              message = 'reCAPTCHA verification failed. Please try again.';
+              break;
+            case 'missing-client-identifier':
+              message = 'Missing app identifier. Please reinstall the app.';
+              break;
+            default:
+              message = e.message ?? 'Phone verification failed. Please try again.';
+          }
+          onError(message);
+        },
+        codeSent: (String verificationId, int? resendToken) {
+          debugPrint('OTP code sent to $phoneNumber');
+          _verificationId = verificationId;
+          _resendToken = resendToken;
+          onCodeSent(verificationId);
+        },
+        codeAutoRetrievalTimeout: (String verificationId) {
+          debugPrint('Auto retrieval timeout');
+          _verificationId = verificationId;
+        },
+        forceResendingToken: _resendToken,
+      );
+      return {'success': true};
+    } catch (e) {
+      debugPrint('sendPhoneOTP error: $e');
+      onError('Failed to send OTP: ${e.toString()}');
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
+  /// Verify OTP and sign in
+  Future<User?> verifyPhoneOTP({
+    required String verificationId,
+    required String otp,
+  }) async {
+    try {
+      final credential = PhoneAuthProvider.credential(
+        verificationId: verificationId,
+        smsCode: otp,
+      );
+
+      final UserCredential result = await _auth.signInWithCredential(credential);
+
+      // Fire and forget - update profile in background for faster login
+      if (result.user != null) {
+        _updateUserProfileOnPhoneLogin(result.user!);
+      }
+
+      return result.user;
+    } on FirebaseAuthException catch (e) {
+      String message;
+      switch (e.code) {
+        case 'invalid-verification-code':
+          message = 'Invalid OTP. Please check and try again.';
+          break;
+        case 'invalid-verification-id':
+          message = 'Verification expired. Please request a new OTP.';
+          break;
+        case 'session-expired':
+          message = 'Session expired. Please request a new OTP.';
+          break;
+        case 'credential-already-in-use':
+          message = 'This phone number is already linked to another account.';
+          break;
+        default:
+          message = e.message ?? 'OTP verification failed.';
+      }
+      throw Exception(message);
+    } catch (e) {
+      throw Exception('OTP verification failed: ${e.toString()}');
+    }
+  }
+
+  /// Link phone number to existing account
+  Future<void> linkPhoneNumber({
+    required String verificationId,
+    required String otp,
+  }) async {
+    try {
+      final credential = PhoneAuthProvider.credential(
+        verificationId: verificationId,
+        smsCode: otp,
+      );
+
+      await currentUser?.linkWithCredential(credential);
+
+      // Update phone in Firestore
+      if (currentUser != null) {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(currentUser!.uid)
+            .update({'phone': currentUser!.phoneNumber});
+      }
+    } on FirebaseAuthException catch (e) {
+      String message;
+      switch (e.code) {
+        case 'provider-already-linked':
+          message = 'A phone number is already linked to this account.';
+          break;
+        case 'invalid-verification-code':
+          message = 'Invalid OTP. Please check and try again.';
+          break;
+        case 'credential-already-in-use':
+          message = 'This phone number is already used by another account.';
+          break;
+        default:
+          message = e.message ?? 'Failed to link phone number.';
+      }
+      throw Exception(message);
+    } catch (e) {
+      throw Exception('Failed to link phone number: ${e.toString()}');
     }
   }
 
@@ -389,6 +548,92 @@ class AuthService {
         rethrow;
       }
       throw Exception('Password change failed: ${e.toString()}');
+    }
+  }
+
+  /// Parse account type string to standardized format
+  String _parseAccountType(String? accountType) {
+    if (accountType == null) return 'personal';
+    final lower = accountType.toLowerCase();
+    if (lower.contains('professional')) return 'professional';
+    if (lower.contains('business')) return 'business';
+    return 'personal';
+  }
+
+  // Store account type for phone login (set before OTP verification)
+  String? _pendingAccountType;
+
+  /// Set the account type for pending phone registration
+  void setPendingAccountType(String? accountType) {
+    _pendingAccountType = accountType;
+  }
+
+  /// Fire-and-forget: Update user profile on phone login (runs in background)
+  void _updateUserProfileOnPhoneLogin(User user) async {
+    try {
+      final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      final isNewUser = !doc.exists;
+
+      // Determine account type and status for new users
+      final accType = _parseAccountType(_pendingAccountType);
+      final needsVerification = accType != 'personal';
+
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+        'uid': user.uid,
+        'phone': user.phoneNumber,
+        'name': user.displayName ?? 'User',
+        'lastSeen': FieldValue.serverTimestamp(),
+        if (isNewUser) 'createdAt': FieldValue.serverTimestamp(),
+        'isOnline': true,
+        if (isNewUser) ...{
+          'discoveryModeEnabled': true,
+          'interests': [],
+          'connections': [],
+          'connectionCount': 0,
+          'blockedUsers': [],
+          'connectionTypes': [],
+          'activities': [],
+          // Account type fields
+          'accountType': accType,
+          'accountStatus': needsVerification ? 'pendingVerification' : 'active',
+          'verification': {
+            'status': needsVerification ? 'pending' : 'none',
+          },
+        },
+      }, SetOptions(merge: true));
+
+      // Clear pending account type after use
+      _pendingAccountType = null;
+    } catch (e) {
+      debugPrint('Error updating profile on phone login: $e');
+    }
+  }
+
+  /// Fire-and-forget: Update user profile on email login (runs in background)
+  void _updateUserProfileOnLogin(User user, String email) async {
+    try {
+      final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      final isNewUser = !doc.exists;
+
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+        'uid': user.uid,
+        'email': user.email ?? email,
+        'lastSeen': FieldValue.serverTimestamp(),
+        if (isNewUser) 'createdAt': FieldValue.serverTimestamp(),
+        'isOnline': true,
+        if (isNewUser) ...{
+          'name': email.split('@')[0],
+          'discoveryModeEnabled': true,
+          'interests': [],
+          'connections': [],
+          'connectionCount': 0,
+          'blockedUsers': [],
+          'connectionTypes': [],
+          'activities': [],
+        },
+      }, SetOptions(merge: true));
+    } catch (e) {
+      debugPrint('Error updating profile on login: $e');
     }
   }
 

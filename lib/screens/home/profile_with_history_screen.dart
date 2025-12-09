@@ -1,4 +1,4 @@
-import 'dart:ui';
+﻿import 'dart:ui';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -10,15 +10,11 @@ import '../../services/universal_intent_service.dart';
 import '../../services/location_service.dart';
 import '../../services/activity_migration_service.dart';
 import '../../widgets/user_avatar.dart';
-import '../../widgets/account_badges.dart';
 import '../../providers/theme_provider.dart';
-import '../../providers/app_providers.dart';
-import '../../providers/user_provider.dart';
 import '../login/login_screen.dart';
-import 'profile_view_screen.dart';
-import 'settings_screen.dart';
+import '../profile/profile_view_screen.dart';
+import '../profile/settings_screen.dart';
 import '../enhanced_chat_screen.dart';
-import '../professional/professional_dashboard_screen.dart';
 import '../../models/user_profile.dart';
 
 class ProfileWithHistoryScreen extends ConsumerStatefulWidget {
@@ -31,14 +27,19 @@ class ProfileWithHistoryScreen extends ConsumerStatefulWidget {
 
 class _ProfileWithHistoryScreenState
     extends ConsumerState<ProfileWithHistoryScreen> {
+  final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final UniversalIntentService _intentService = UniversalIntentService();
   final LocationService _locationService = LocationService();
   final ActivityMigrationService _migrationService = ActivityMigrationService();
 
-  // Local state that doesn't need to be in providers
+  Map<String, dynamic>? _userProfile;
+  List<Map<String, dynamic>> _searchHistory = [];
+  List<String> _selectedInterests = [];
   List<Map<String, dynamic>> _nearbyPeople = [];
+  bool _isLoading = true;
   bool _isLoadingPeople = false;
+  String? _error;
 
   // Filter options
   bool _filterByExactLocation = false;
@@ -46,43 +47,34 @@ class _ProfileWithHistoryScreenState
 
   StreamSubscription<DocumentSnapshot>? _profileSubscription;
 
+  // Profile edit mode
+  bool _isEditMode = false;
+  List<String> _selectedConnectionTypes = [];
+  List<String> _selectedActivities = []; // Store only activity names, no level
+  String _aboutMe = '';
   final TextEditingController _aboutMeController = TextEditingController();
-
-  // Helper getter for current user ID from provider
-  String? get _currentUserId => ref.read(currentUserIdProvider);
-
-  // Helper getters for profile state from provider (for unused methods)
-  bool get _isEditMode => ref.read(userProfileProvider).isEditMode;
-  List<String> get _selectedConnectionTypes => ref.read(profileEditProvider).selectedConnectionTypes;
-  List<String> get _selectedActivities => ref.read(profileEditProvider).selectedActivities;
-  String get _aboutMe => ref.read(profileEditProvider).aboutMe;
-  List<String> get _selectedInterests => ref.read(userProfileProvider).interests;
 
   @override
   void initState() {
     super.initState();
+    _loadUserData();
+    _setupProfileListener(); // Listen for real-time profile updates
 
-    // Use addPostFrameCallback to load data after first frame
+    // Use addPostFrameCallback to defer location update until after initial frame
+    // This prevents blocking the UI during widget initialization
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        // Load profile and search history using providers
-        ref.read(userProfileProvider.notifier).loadProfile();
-        ref.read(searchHistoryProvider.notifier).loadHistory();
-
-        // Setup profile listener for real-time updates
-        _setupProfileListener();
-
-        // Update location if needed
         _updateLocationIfNeeded();
       }
     });
   }
 
   void _setupProfileListener() {
-    final userId = _currentUserId;
+    final userId = _auth.currentUser?.uid;
     if (userId == null) return;
 
     // Listen for real-time profile changes (like location updates from background service)
+    // Use distinct() to prevent unnecessary rebuilds when data hasn't actually changed
     _profileSubscription = _firestore
         .collection('users')
         .doc(userId)
@@ -92,10 +84,49 @@ class _ProfileWithHistoryScreenState
 
           if (snapshot.exists) {
             final userData = snapshot.data();
-            // Update provider state with new profile data
-            ref.read(userProfileProvider.notifier).updateProfile(userData ?? {});
+
+            // OPTIMIZATION: Only call setState if data actually changed
+            // This prevents unnecessary rebuilds that cause frame drops
+            final newCity = userData?['city'];
+            final newLocation = userData?['location'];
+            final newInterests = List<String>.from(
+              userData?['interests'] ?? [],
+            );
+
+            final oldCity = _userProfile?['city'];
+            final oldLocation = _userProfile?['location'];
+
+            // Check if anything meaningful changed
+            final cityChanged = newCity != oldCity;
+            final locationChanged = newLocation != oldLocation;
+            final interestsChanged = !_listEquals(
+              newInterests,
+              _selectedInterests,
+            );
+
+            if (cityChanged ||
+                locationChanged ||
+                interestsChanged ||
+                _userProfile == null) {
+              setState(() {
+                _userProfile = userData;
+                _selectedInterests = newInterests;
+              });
+
+              // Only log in debug mode
+              // debugPrint('ProfileScreen: Profile updated - city=$newCity');
+            }
           }
         });
+  }
+
+  // Helper to compare lists
+  bool _listEquals(List<String> a, List<String> b) {
+    if (a.length != b.length) return false;
+    for (int i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
   }
 
   @override
@@ -111,7 +142,7 @@ class _ProfileWithHistoryScreenState
       if (!mounted) return;
 
       // Check if user's location needs updating
-      final userId = _currentUserId;
+      final userId = _auth.currentUser?.uid;
       if (userId == null) return;
 
       final userDoc = await _firestore.collection('users').doc(userId).get();
@@ -142,7 +173,7 @@ class _ProfileWithHistoryScreenState
                   // Short delay to let Firestore propagate, then reload
                   Future.delayed(const Duration(milliseconds: 500)).then((_) {
                     if (mounted) {
-                      ref.read(userProfileProvider.notifier).loadProfile();
+                      _loadUserData();
                     }
                   });
                 }
@@ -162,7 +193,7 @@ class _ProfileWithHistoryScreenState
               if (success) {
                 Future.delayed(const Duration(milliseconds: 500)).then((_) {
                   if (mounted) {
-                    ref.read(userProfileProvider.notifier).loadProfile();
+                    _loadUserData();
                   }
                 });
               }
@@ -177,18 +208,107 @@ class _ProfileWithHistoryScreenState
     }
   }
 
-  /// Reload user data from providers
-  Future<void> _reloadUserData() async {
+  Future<void> _loadUserData() async {
     if (!mounted) return;
 
-    await ref.read(userProfileProvider.notifier).loadProfile();
-    await ref.read(searchHistoryProvider.notifier).loadHistory();
-    _loadNearbyPeople();
-  }
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
 
-  /// Alias for backwards compatibility with unused methods
-  // ignore: unused_element
-  Future<void> _loadUserData() => _reloadUserData();
+    try {
+      final userId = _auth.currentUser?.uid;
+      if (userId == null) {
+        setState(() {
+          _error = 'User not logged in';
+          _isLoading = false;
+        });
+        return;
+      }
+
+      // Load user profile
+      final userDoc = await _firestore.collection('users').doc(userId).get();
+      if (userDoc.exists && mounted) {
+        final userData = userDoc.data();
+        setState(() {
+          _userProfile = userData;
+          // Load user's saved interests
+          _selectedInterests = List<String>.from(userData?['interests'] ?? []);
+          // Load connection types, activities, and about me
+          _selectedConnectionTypes = List<String>.from(
+            userData?['connectionTypes'] ?? [],
+          );
+          _aboutMe = userData?['aboutMe'] ?? '';
+          _aboutMeController.text = _aboutMe;
+
+          // Load activities
+          final activitiesData = userData?['activities'] as List<dynamic>?;
+          if (activitiesData != null) {
+            _selectedActivities = activitiesData.map((item) {
+              // Extract only the activity name
+              if (item is Map) {
+                return item['name']?.toString() ?? '';
+              } else if (item is String) {
+                return item;
+              } else {
+                return item.toString();
+              }
+            }).toList();
+          }
+        });
+
+        // Debug logging disabled for production
+        // debugPrint('User profile loaded: city=${userData?['city']}, location=${userData?['location']}, interests=$_selectedInterests');
+
+        // Always load nearby people (filters can be applied via filter dialog)
+        _loadNearbyPeople();
+      }
+
+      // Load search history
+      try {
+        final intentsQuery = _firestore
+            .collection('user_intents')
+            .where('userId', isEqualTo: userId);
+
+        final intents = await intentsQuery.limit(20).get();
+
+        if (mounted) {
+          setState(() {
+            _searchHistory = intents.docs.map((doc) {
+              final data = doc.data();
+              data['id'] = doc.id;
+              return data;
+            }).toList();
+
+            // Sort by createdAt if available
+            _searchHistory.sort((a, b) {
+              final aTime = a['createdAt'];
+              final bTime = b['createdAt'];
+              if (aTime == null) return 1;
+              if (bTime == null) return -1;
+              return (bTime as Timestamp).compareTo(aTime as Timestamp);
+            });
+          });
+        }
+      } catch (e) {
+        debugPrint('Error loading search history: $e');
+      }
+
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading user data: $e');
+      if (mounted) {
+        setState(() {
+          _error = 'Error loading profile data';
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
   // Common interests for users to choose from
   final List<String> _availableInterests = [
@@ -218,30 +338,28 @@ class _ProfileWithHistoryScreenState
   Future<void> _loadNearbyPeople() async {
     if (!mounted) return;
 
-    final profileState = ref.read(userProfileProvider);
-    final selectedInterests = profileState.interests;
-
     // If interest filter is on but no interests selected, return early
-    if (_filterByInterests && selectedInterests.isEmpty) return;
+    if (_filterByInterests && _selectedInterests.isEmpty) return;
 
     setState(() {
       _isLoadingPeople = true;
     });
 
     try {
-      final userId = _currentUserId;
+      final userId = _auth.currentUser?.uid;
       if (userId == null) return;
 
-      final userCity = profileState.profile?['city'];
+      final userCity = _userProfile?['city'];
+      // userLocation available for future geo-filtering
 
       // Build query based on filters
       Query<Map<String, dynamic>> usersQuery = _firestore.collection('users');
 
       // Apply interest filter if enabled
-      if (_filterByInterests && selectedInterests.isNotEmpty) {
+      if (_filterByInterests && _selectedInterests.isNotEmpty) {
         usersQuery = usersQuery.where(
           'interests',
-          arrayContainsAny: selectedInterests,
+          arrayContainsAny: _selectedInterests,
         );
       }
 
@@ -275,15 +393,15 @@ class _ProfileWithHistoryScreenState
         double matchScore =
             1.0; // Default match score when interest filter is off
 
-        if (_filterByInterests && selectedInterests.isNotEmpty) {
-          commonInterests = selectedInterests
+        if (_filterByInterests && _selectedInterests.isNotEmpty) {
+          commonInterests = _selectedInterests
               .where((interest) => userInterests.contains(interest))
               .toList();
 
           // Skip if no common interests when filter is on
           if (commonInterests.isEmpty) continue;
 
-          matchScore = commonInterests.length / selectedInterests.length;
+          matchScore = commonInterests.length / _selectedInterests.length;
         } else {
           // When interest filter is off, show all their interests as "common"
           commonInterests = userInterests;
@@ -320,17 +438,14 @@ class _ProfileWithHistoryScreenState
     }
   }
 
-  Future<void> _updateInterests(List<String> interests) async {
-    final userId = _currentUserId;
+  Future<void> _updateInterests() async {
+    final userId = _auth.currentUser?.uid;
     if (userId == null) return;
 
     try {
       await _firestore.collection('users').doc(userId).update({
-        'interests': interests,
+        'interests': _selectedInterests,
       });
-
-      // Update provider state
-      ref.read(userProfileProvider.notifier).updateProfile({'interests': interests});
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -358,12 +473,11 @@ class _ProfileWithHistoryScreenState
 
   void _showInterestsDialog() {
     HapticFeedback.lightImpact();
-    final profileState = ref.read(userProfileProvider);
 
     showDialog(
       context: context,
       builder: (context) {
-        List<String> tempSelected = List.from(profileState.interests);
+        List<String> tempSelected = List.from(_selectedInterests);
 
         return StatefulBuilder(
           builder: (context, setDialogState) {
@@ -401,8 +515,11 @@ class _ProfileWithHistoryScreenState
                 ),
                 ElevatedButton(
                   onPressed: () {
+                    setState(() {
+                      _selectedInterests = tempSelected;
+                    });
                     Navigator.pop(context);
-                    _updateInterests(tempSelected);
+                    _updateInterests();
                   },
                   child: const Text('Save'),
                 ),
@@ -415,9 +532,6 @@ class _ProfileWithHistoryScreenState
   }
 
   void _showFilterDialog() {
-    final profileState = ref.read(userProfileProvider);
-    final selectedInterests = profileState.interests;
-
     showDialog(
       context: context,
       builder: (context) {
@@ -482,13 +596,13 @@ class _ProfileWithHistoryScreenState
                                     _showInterestsDialog();
                                   },
                                   icon: Icon(
-                                    selectedInterests.isEmpty
+                                    _selectedInterests.isEmpty
                                         ? Icons.add
                                         : Icons.edit,
                                     size: 16,
                                   ),
                                   label: Text(
-                                    selectedInterests.isEmpty
+                                    _selectedInterests.isEmpty
                                         ? 'Select'
                                         : 'Change',
                                     style: const TextStyle(fontSize: 12),
@@ -506,7 +620,7 @@ class _ProfileWithHistoryScreenState
                               ],
                             ),
                             const SizedBox(height: 8),
-                            if (selectedInterests.isEmpty)
+                            if (_selectedInterests.isEmpty)
                               Container(
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
@@ -540,7 +654,7 @@ class _ProfileWithHistoryScreenState
                               Wrap(
                                 spacing: 6,
                                 runSpacing: 6,
-                                children: selectedInterests.map((interest) {
+                                children: _selectedInterests.map((interest) {
                                   return Container(
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 10,
@@ -623,14 +737,11 @@ class _ProfileWithHistoryScreenState
     );
 
     if (shouldLogout == true) {
-      // Clear provider state on logout
-      ref.read(userProfileProvider.notifier).clearProfile();
-      ref.read(searchHistoryProvider.notifier).clearHistory();
-      await FirebaseAuth.instance.signOut();
+      await _auth.signOut();
       if (mounted) {
         Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(builder: (_) => const LoginScreen(accountType: 'Personal Account')),
+          MaterialPageRoute(builder: (_) => const LoginScreen(accountType: '')),
           (route) => false,
         );
       }
@@ -639,30 +750,32 @@ class _ProfileWithHistoryScreenState
 
   // ignore: unused_element
   void _toggleEditMode() {
-    ref.read(userProfileProvider.notifier).setEditMode(
-      !ref.read(userProfileProvider).isEditMode,
-    );
+    setState(() {
+      _isEditMode = !_isEditMode;
+    });
   }
 
   // ignore: unused_element
   Future<void> _saveProfile() async {
-    final userId = _currentUserId;
+    final userId = _auth.currentUser?.uid;
     if (userId == null) return;
 
-    final editState = ref.read(profileEditProvider);
-
     try {
-      final updates = {
-        'connectionTypes': editState.selectedConnectionTypes,
-        'activities': editState.selectedActivities,
+      // Activities are already simple strings
+      final activitiesData = _selectedActivities;
+
+      await _firestore.collection('users').doc(userId).update({
+        'connectionTypes': _selectedConnectionTypes,
+        'activities': activitiesData,
         'aboutMe': _aboutMeController.text.trim(),
-        'interests': ref.read(userProfileProvider).interests,
-      };
+        'interests': _selectedInterests,
+      });
 
-      final success = await ref.read(userProfileProvider.notifier).saveProfile(updates);
-
-      if (mounted && success) {
-        ref.read(userProfileProvider.notifier).setEditMode(false);
+      if (mounted) {
+        setState(() {
+          _isEditMode = false;
+          _aboutMe = _aboutMeController.text.trim();
+        });
 
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -670,6 +783,9 @@ class _ProfileWithHistoryScreenState
             backgroundColor: Colors.green,
           ),
         );
+
+        // Reload profile
+        _loadUserData();
       }
     } catch (e) {
       debugPrint('Error updating profile: $e');
@@ -717,9 +833,6 @@ class _ProfileWithHistoryScreenState
     final themeState = ref.watch(themeProvider);
     final isDarkMode = themeState.isDarkMode;
     final isGlass = themeState.isGlassmorphism;
-
-    // Watch provider state
-    final profileState = ref.watch(userProfileProvider);
 
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -832,9 +945,9 @@ class _ProfileWithHistoryScreenState
             ),
           ],
 
-          profileState.isLoading
+          _isLoading
               ? const Center(child: CircularProgressIndicator())
-              : profileState.error != null
+              : _error != null
               ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -845,10 +958,10 @@ class _ProfileWithHistoryScreenState
                         color: Colors.red,
                       ),
                       const SizedBox(height: 16),
-                      Text(profileState.error!, style: const TextStyle(color: Colors.red)),
+                      Text(_error!, style: const TextStyle(color: Colors.red)),
                       const SizedBox(height: 16),
                       ElevatedButton(
-                        onPressed: () => ref.read(userProfileProvider.notifier).loadProfile(),
+                        onPressed: _loadUserData,
                         child: const Text('Retry'),
                       ),
                     ],
@@ -898,11 +1011,11 @@ class _ProfileWithHistoryScreenState
                                     // Profile Photo
                                     UserAvatar(
                                       profileImageUrl:
-                                          profileState.profile?['profileImageUrl'] ??
-                                          profileState.profile?['photoUrl'],
+                                          _userProfile?['profileImageUrl'] ??
+                                          _userProfile?['photoUrl'],
                                       radius: 50,
                                       fallbackText:
-                                          profileState.name,
+                                          _userProfile?['name'] ?? 'User',
                                     ),
                                     const SizedBox(width: 20),
                                     // User Info
@@ -911,99 +1024,18 @@ class _ProfileWithHistoryScreenState
                                         crossAxisAlignment:
                                             CrossAxisAlignment.start,
                                         children: [
-                                          Row(
-                                            children: [
-                                              Flexible(
-                                                child: Text(
-                                                  profileState.name,
-                                                  style: TextStyle(
-                                                    fontSize: 22,
-                                                    fontWeight: FontWeight.w700,
-                                                    color: isDarkMode
-                                                        ? Colors.white
-                                                        : Colors.black,
-                                                    letterSpacing: 0.3,
-                                                  ),
-                                                  overflow: TextOverflow.ellipsis,
-                                                ),
-                                              ),
-                                              const SizedBox(width: 8),
-                                              UsernameBadge(
-                                                accountType: AccountType.fromString(
-                                                  profileState.profile?['accountType'],
-                                                ),
-                                                verificationStatus: VerificationStatus.fromString(
-                                                  profileState.profile?['verification']?['status'],
-                                                ),
-                                                size: 18,
-                                              ),
-                                            ],
-                                          ),
-                                          // Account type badge for non-personal accounts
-                                          if (profileState.profile?['accountType'] != null &&
-                                              profileState.profile?['accountType'] != 'personal') ...[
-                                            const SizedBox(height: 8),
-                                            Row(
-                                              children: [
-                                                AccountTypeBadge(
-                                                  accountType: AccountType.fromString(
-                                                    profileState.profile?['accountType'],
-                                                  ),
-                                                  verificationStatus: VerificationStatus.fromString(
-                                                    profileState.profile?['verification']?['status'],
-                                                  ),
-                                                  showLabel: true,
-                                                  compact: true,
-                                                  size: 14,
-                                                ),
-                                                const Spacer(),
-                                                // Professional Dashboard button
-                                                if (profileState.profile?['accountType']?.toString().toLowerCase().contains('professional') == true)
-                                                  GestureDetector(
-                                                    onTap: () {
-                                                      Navigator.push(
-                                                        context,
-                                                        MaterialPageRoute(
-                                                          builder: (_) => const ProfessionalDashboardScreen(),
-                                                        ),
-                                                      );
-                                                    },
-                                                    child: Container(
-                                                      padding: const EdgeInsets.symmetric(
-                                                        horizontal: 12,
-                                                        vertical: 6,
-                                                      ),
-                                                      decoration: BoxDecoration(
-                                                        color: const Color(0xFF00D67D).withValues(alpha: 0.15),
-                                                        borderRadius: BorderRadius.circular(20),
-                                                        border: Border.all(
-                                                          color: const Color(0xFF00D67D).withValues(alpha: 0.3),
-                                                        ),
-                                                      ),
-                                                      child: const Row(
-                                                        mainAxisSize: MainAxisSize.min,
-                                                        children: [
-                                                          Icon(
-                                                            Icons.dashboard_outlined,
-                                                            size: 14,
-                                                            color: Color(0xFF00D67D),
-                                                          ),
-                                                          SizedBox(width: 4),
-                                                          Text(
-                                                            'Dashboard',
-                                                            style: TextStyle(
-                                                              color: Color(0xFF00D67D),
-                                                              fontSize: 12,
-                                                              fontWeight: FontWeight.w600,
-                                                            ),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                    ),
-                                                  ),
-                                              ],
+                                          Text(
+                                            _userProfile?['name'] ??
+                                                'Unknown User',
+                                            style: TextStyle(
+                                              fontSize: 22,
+                                              fontWeight: FontWeight.w700,
+                                              color: isDarkMode
+                                                  ? Colors.white
+                                                  : Colors.black,
+                                              letterSpacing: 0.3,
                                             ),
-                                          ],
+                                          ),
                                           const SizedBox(height: 8),
                                           Row(
                                             children: [
@@ -1017,7 +1049,10 @@ class _ProfileWithHistoryScreenState
                                               const SizedBox(width: 6),
                                               Expanded(
                                                 child: Text(
-                                                  profileState.profile?['email'] ??
+                                                  _userProfile?['email'] ??
+                                                      _auth
+                                                          .currentUser
+                                                          ?.email ??
                                                       'No email',
                                                   style: TextStyle(
                                                     fontSize: 14,
@@ -1069,47 +1104,50 @@ class _ProfileWithHistoryScreenState
                                                   // Check mounted again after delay
                                                   if (!mounted) return;
 
-                                                  ref.read(userProfileProvider.notifier).loadProfile();
+                                                  _loadUserData();
 
-                                                  if (mounted) {
-                                                    ScaffoldMessenger.of(context).showSnackBar( // ignore: use_build_context_synchronously
-                                                      const SnackBar(
-                                                        content: Text(
-                                                          'Location updated successfully',
-                                                        ),
-                                                        backgroundColor:
-                                                            Colors.green,
-                                                      ),
-                                                    );
-                                                  }
-                                                } else {
-                                                  if (mounted) {
-                                                    ScaffoldMessenger.of(context).showSnackBar( // ignore: use_build_context_synchronously
-                                                      const SnackBar(
-                                                        content: Text(
-                                                          'Could not update location',
-                                                        ),
-                                                        backgroundColor:
-                                                            Colors.red,
-                                                      ),
-                                                    );
-                                                  }
-                                                }
-                                              } catch (e) {
-                                                debugPrint(
-                                                  'Error during manual location update: $e',
-                                                );
-                                                if (mounted) {
-                                                  ScaffoldMessenger.of(context).showSnackBar( // ignore: use_build_context_synchronously
+                                                  if (!mounted) return;
+                                                  ScaffoldMessenger.of(
+                                                    context,
+                                                  ).showSnackBar(
                                                     const SnackBar(
                                                       content: Text(
-                                                        'Location update failed',
+                                                        'Location updated successfully',
+                                                      ),
+                                                      backgroundColor:
+                                                          Colors.green,
+                                                    ),
+                                                  );
+                                                } else {
+                                                  if (!mounted) return;
+                                                  ScaffoldMessenger.of(
+                                                    context,
+                                                  ).showSnackBar(
+                                                    const SnackBar(
+                                                      content: Text(
+                                                        'Could not update location',
                                                       ),
                                                       backgroundColor:
                                                           Colors.red,
                                                     ),
                                                   );
                                                 }
+                                              } catch (e) {
+                                                debugPrint(
+                                                  'Error during manual location update: $e',
+                                                );
+                                                if (!mounted) return;
+                                                ScaffoldMessenger.of(
+                                                  context,
+                                                ).showSnackBar(
+                                                  const SnackBar(
+                                                    content: Text(
+                                                      'Location update failed',
+                                                    ),
+                                                    backgroundColor:
+                                                        Colors.red,
+                                                  ),
+                                                );
                                               }
                                             },
                                             child: Column(
@@ -1129,18 +1167,18 @@ class _ProfileWithHistoryScreenState
                                                     const SizedBox(width: 6),
                                                     Flexible(
                                                       child: Text(
-                                                        profileState.profile?['displayLocation'] ??
-                                                            profileState.profile?['city'] ??
-                                                            profileState.profile?['location'] ??
+                                                        _userProfile?['displayLocation'] ??
+                                                            _userProfile?['city'] ??
+                                                            _userProfile?['location'] ??
                                                             'Tap to set location',
                                                         style: TextStyle(
                                                           fontSize: 14,
                                                           color:
-                                                              (profileState.profile?['displayLocation'] ==
+                                                              (_userProfile?['displayLocation'] ==
                                                                       null &&
-                                                                  profileState.profile?['city'] ==
+                                                                  _userProfile?['city'] ==
                                                                       null &&
-                                                                  profileState.profile?['location'] ==
+                                                                  _userProfile?['location'] ==
                                                                       null)
                                                               ? Theme.of(
                                                                   context,
@@ -1150,11 +1188,11 @@ class _ProfileWithHistoryScreenState
                                                               : Colors
                                                                     .grey[600],
                                                           decoration:
-                                                              (profileState.profile?['displayLocation'] ==
+                                                              (_userProfile?['displayLocation'] ==
                                                                       null &&
-                                                                  profileState.profile?['city'] ==
+                                                                  _userProfile?['city'] ==
                                                                       null &&
-                                                                  profileState.profile?['location'] ==
+                                                                  _userProfile?['location'] ==
                                                                       null)
                                                               ? TextDecoration
                                                                     .underline
@@ -1168,7 +1206,7 @@ class _ProfileWithHistoryScreenState
                                                   ],
                                                 ),
                                                 // Location freshness indicator
-                                                if (profileState.profile?['locationUpdatedAt'] !=
+                                                if (_userProfile?['locationUpdatedAt'] !=
                                                     null)
                                                   FutureBuilder<int?>(
                                                     future: _locationService
@@ -1508,7 +1546,7 @@ class _ProfileWithHistoryScreenState
                               try {
                                 await FirebaseFirestore.instance
                                     .collection('users')
-                                    .doc(_currentUserId)
+                                    .doc(FirebaseAuth.instance.currentUser?.uid)
                                     .update({
                                       'activities': _selectedActivities,
                                     });
@@ -1794,7 +1832,8 @@ class _ProfileWithHistoryScreenState
           await _loadUserData();
 
           if (!mounted) return;
-          showDialog( // ignore: use_build_context_synchronously
+          showDialog(
+            // ignore: use_build_context_synchronously
             context: context,
             builder: (context) => AlertDialog(
               title: const Text('Migration Complete'),
@@ -1866,23 +1905,7 @@ class _ProfileWithHistoryScreenState
   }
 
   List<Widget> _buildHistorySliver(bool isDarkMode, bool isGlass) {
-    final historyState = ref.watch(searchHistoryProvider);
-    final searchHistory = historyState.history;
-
-    if (historyState.isLoading) {
-      return [
-        const SliverToBoxAdapter(
-          child: Center(
-            child: Padding(
-              padding: EdgeInsets.symmetric(vertical: 100),
-              child: CircularProgressIndicator(),
-            ),
-          ),
-        ),
-      ];
-    }
-
-    if (searchHistory.isEmpty) {
+    if (_searchHistory.isEmpty) {
       return [
         SliverToBoxAdapter(
           child: Padding(
@@ -1923,7 +1946,7 @@ class _ProfileWithHistoryScreenState
         padding: const EdgeInsets.all(16),
         sliver: SliverList(
           delegate: SliverChildBuilderDelegate((context, index) {
-            final intent = searchHistory[index];
+            final intent = _searchHistory[index];
             final createdAt = intent['createdAt'];
             String timeAgo = 'Recently';
 
@@ -1975,8 +1998,6 @@ class _ProfileWithHistoryScreenState
                 if (!mounted) return;
 
                 if (success) {
-                  // Update provider state
-                  ref.read(searchHistoryProvider.notifier).removeHistoryItem(intent['id']);
                   // ignore: use_build_context_synchronously
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
@@ -1984,9 +2005,8 @@ class _ProfileWithHistoryScreenState
                       backgroundColor: Colors.green,
                     ),
                   );
+                  _loadUserData();
                 } else {
-                  // Reload to restore deleted item in UI
-                  ref.read(searchHistoryProvider.notifier).loadHistory();
                   // ignore: use_build_context_synchronously
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
@@ -1994,6 +2014,7 @@ class _ProfileWithHistoryScreenState
                       backgroundColor: Colors.red,
                     ),
                   );
+                  _loadUserData();
                 }
               },
               child: Container(
@@ -2091,7 +2112,7 @@ class _ProfileWithHistoryScreenState
                 ),
               ),
             );
-          }, childCount: searchHistory.length),
+          }, childCount: _searchHistory.length),
         ),
       ),
     ];
@@ -2213,7 +2234,7 @@ class _ProfileWithHistoryScreenState
         final person = _nearbyPeople[index];
         final userData = person['userData'] as Map<String, dynamic>;
         final commonInterests = person['commonInterests'] as List<String>;
-        final matchScore = person['matchScore'] as double; // ignore: unused_local_variable
+        // matchScore available but not currently displayed
 
         return Container(
           margin: const EdgeInsets.only(bottom: 12),

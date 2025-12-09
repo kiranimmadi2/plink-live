@@ -1,7 +1,8 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../models/post_model.dart';
 import '../../models/user_profile.dart';
+import '../../widgets/account_badges.dart';
 import '../enhanced_chat_screen.dart';
 
 class ProfileViewScreen extends StatefulWidget {
@@ -254,15 +255,40 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
         children: [
           Row(
             children: [
-              Text(
-                widget.userProfile.name,
-                style: const TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
+              Expanded(
+                child: Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        widget.userProfile.name,
+                        style: const TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    UsernameBadge(
+                      accountType: widget.userProfile.accountType,
+                      verificationStatus: widget.userProfile.verification.status,
+                      size: 20,
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
+          // Account type badge row
+          if (widget.userProfile.accountType != AccountType.personal) ...[
+            const SizedBox(height: 12),
+            AccountTypeBadge(
+              accountType: widget.userProfile.accountType,
+              verificationStatus: widget.userProfile.verification.status,
+              showLabel: true,
+              size: 18,
+            ),
+          ],
           const SizedBox(height: 8),
           if (widget.userProfile.location != null)
             Row(

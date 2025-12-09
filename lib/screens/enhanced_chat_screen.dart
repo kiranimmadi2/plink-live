@@ -1,14 +1,21 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:open_filex/open_filex.dart';
+import 'package:video_player/video_player.dart';
+// import 'package:chewie/chewie.dart'; // Unused
+import 'package:dio/dio.dart';
+import 'package:path_provider/path_provider.dart';
 import '../models/user_profile.dart';
 import '../models/message_model.dart';
 import '../services/notification_service.dart';
@@ -16,6 +23,7 @@ import '../services/conversation_service.dart';
 import '../services/hybrid_chat_service.dart';
 import '../providers/app_providers.dart';
 import 'profile/profile_view_screen.dart';
+import 'video_player_screen.dart';
 
 class EnhancedChatScreen extends ConsumerStatefulWidget {
   final UserProfile otherUser;
@@ -38,7 +46,7 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
   final TextEditingController _messageController = TextEditingController();
   final FocusNode _messageFocusNode = FocusNode();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseStorage _storage = FirebaseStorage.instance;
+  // final FirebaseStorage _storage = FirebaseStorage.instance; // Unused
   final ScrollController _scrollController = ScrollController();
   final ImagePicker _imagePicker = ImagePicker();
   final ConversationService _conversationService = ConversationService();
@@ -80,14 +88,14 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
   // Chat theme - gradient colors for sent message bubbles
   String _currentTheme = 'default';
   static const Map<String, List<Color>> chatThemes = {
-    'default': [Color(0xFF007AFF), Color(0xFF5856D6)],  // iOS Blue-Purple
-    'sunset': [Color(0xFFFF6B6B), Color(0xFFFF8E53)],   // Red-Orange
-    'ocean': [Color(0xFF00B4DB), Color(0xFF0083B0)],    // Cyan-Blue
-    'forest': [Color(0xFF56AB2F), Color(0xFFA8E063)],   // Green gradient
-    'berry': [Color(0xFF8E2DE2), Color(0xFF4A00E0)],    // Purple
+    'default': [Color(0xFF007AFF), Color(0xFF5856D6)], // iOS Blue-Purple
+    'sunset': [Color(0xFFFF6B6B), Color(0xFFFF8E53)], // Red-Orange
+    'ocean': [Color(0xFF00B4DB), Color(0xFF0083B0)], // Cyan-Blue
+    'forest': [Color(0xFF56AB2F), Color(0xFFA8E063)], // Green gradient
+    'berry': [Color(0xFF8E2DE2), Color(0xFF4A00E0)], // Purple
     'midnight': [Color(0xFF232526), Color(0xFF414345)], // Dark gray
-    'rose': [Color(0xFFFF0844), Color(0xFFFFB199)],     // Pink-Peach
-    'golden': [Color(0xFFF7971E), Color(0xFFFFD200)],   // Orange-Gold
+    'rose': [Color(0xFFFF0844), Color(0xFFFFB199)], // Pink-Peach
+    'golden': [Color(0xFFF7971E), Color(0xFFFFD200)], // Orange-Gold
   };
 
   @override
@@ -246,8 +254,8 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
         setState(() {
           _conversationId = conversationId;
         });
+        _markMessagesAsRead();
       }
-      _markMessagesAsRead();
 
       // Load saved chat theme
       await _loadChatTheme();
@@ -290,10 +298,9 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
     if (_conversationId == null || !mounted) return;
 
     try {
-      await _firestore
-          .collection('conversations')
-          .doc(_conversationId!)
-          .update({'chatTheme': theme});
+      await _firestore.collection('conversations').doc(_conversationId!).update(
+        {'chatTheme': theme},
+      );
 
       setState(() {
         _currentTheme = theme;
@@ -301,9 +308,9 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
     } catch (e) {
       debugPrint('Error saving chat theme: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to save theme')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Failed to save theme')));
       }
     }
   }
@@ -324,7 +331,7 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
+    if (state == AppLifecycleState.resumed && mounted) {
       _markMessagesAsRead();
     }
   }
@@ -661,24 +668,27 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
           final data = doc.data() as Map<String, dynamic>;
           final messageId = doc.id;
           if (!allDisplayMessages.any((m) => m.id == messageId)) {
-            allDisplayMessages.add(MessageModel(
-              id: messageId,
-              senderId: data['senderId'] as String? ?? '',
-              receiverId: data['receiverId'] as String? ?? '',
-              chatId: _conversationId!,
-              text: data['text'] as String?,
-              mediaUrl: data['mediaUrl'] as String? ?? data['imageUrl'] as String?,
-              timestamp: data['timestamp'] != null
-                  ? (data['timestamp'] as Timestamp).toDate()
-                  : DateTime.now(),
-              status: _parseMessageStatusFromInt(data['status']),
-              type: _parseMessageType(data['type']),
-              replyToMessageId: data['replyToMessageId'] as String?,
-              isEdited: data['isEdited'] ?? false,
-              reactions: data['reactions'] != null
-                  ? List<String>.from(data['reactions'])
-                  : null,
-            ));
+            allDisplayMessages.add(
+              MessageModel(
+                id: messageId,
+                senderId: data['senderId'] as String? ?? '',
+                receiverId: data['receiverId'] as String? ?? '',
+                chatId: _conversationId!,
+                text: data['text'] as String?,
+                mediaUrl:
+                    data['mediaUrl'] as String? ?? data['imageUrl'] as String?,
+                timestamp: data['timestamp'] != null
+                    ? (data['timestamp'] as Timestamp).toDate()
+                    : DateTime.now(),
+                status: _parseMessageStatusFromInt(data['status']),
+                type: _parseMessageType(data['type']),
+                replyToMessageId: data['replyToMessageId'] as String?,
+                isEdited: data['isEdited'] ?? false,
+                reactions: data['reactions'] != null
+                    ? List<String>.from(data['reactions'])
+                    : null,
+              ),
+            );
           }
         }
 
@@ -962,16 +972,12 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
     bool isHighlighted = false,
     String? searchQuery,
   }) {
-    // Format timestamp - show actual time
     String formattedTime = _formatMessageTime(message.timestamp);
-
-    // Get theme gradient colors for sent messages
-    final sentGradientColors = chatThemes[_currentTheme] ?? chatThemes['default']!;
-
-    // Received message background - subtle glass effect
+    final sentGradientColors =
+        chatThemes[_currentTheme] ?? chatThemes['default']!;
     final receivedBgColor = isDarkMode
-        ? const Color(0xFF1C1C1E) // iOS dark mode gray
-        : const Color(0xFFE9E9EB); // iOS light mode gray
+        ? const Color(0xFF1C1C1E)
+        : const Color(0xFFE9E9EB);
 
     return GestureDetector(
       onLongPress: () => _showMessageOptions(message, isMe),
@@ -998,38 +1004,7 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               if (!isMe && showAvatar)
-                Container(
-                  margin: const EdgeInsets.only(right: 8, bottom: 2),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.15),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: CircleAvatar(
-                    radius: 16,
-                    backgroundColor: const Color(0xFF007AFF).withValues(alpha: 0.15),
-                    backgroundImage: widget.otherUser.profileImageUrl != null
-                        ? CachedNetworkImageProvider(
-                            widget.otherUser.profileImageUrl!,
-                          )
-                        : null,
-                    child: widget.otherUser.profileImageUrl == null
-                        ? Text(
-                            widget.otherUser.name[0].toUpperCase(),
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF007AFF),
-                            ),
-                          )
-                        : null,
-                  ),
-                )
+                _buildAvatar(isDarkMode)
               else if (!isMe)
                 const SizedBox(width: 40),
               Flexible(
@@ -1046,8 +1021,8 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
                       ),
                     Container(
                       padding: EdgeInsets.symmetric(
-                        horizontal: message.type == MessageType.image ? 4 : 14,
-                        vertical: message.type == MessageType.image ? 4 : 10,
+                        horizontal: message.type == MessageType.text ? 14 : 4,
+                        vertical: message.type == MessageType.text ? 10 : 4,
                       ),
                       decoration: BoxDecoration(
                         gradient: isMe
@@ -1071,8 +1046,8 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
                           BoxShadow(
                             color: isMe
                                 ? sentGradientColors[0].withValues(alpha: 0.25)
-                                : Colors.black.withValues(alpha:
-                                    isDarkMode ? 0.2 : 0.06,
+                                : Colors.black.withValues(
+                                    alpha: isDarkMode ? 0.2 : 0.06,
                                   ),
                             blurRadius: isMe ? 12 : 6,
                             offset: const Offset(0, 3),
@@ -1083,90 +1058,18 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          if (message.type == MessageType.image &&
-                              message.mediaUrl != null)
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(14),
-                              child: CachedNetworkImage(
-                                imageUrl: message.mediaUrl!,
-                                fit: BoxFit.cover,
-                                memCacheWidth: 400,
-                                memCacheHeight: 400,
-                                placeholder: (context, url) => Container(
-                                  width: 200,
-                                  height: 200,
-                                  decoration: BoxDecoration(
-                                    color: isDarkMode
-                                        ? Colors.grey[800]
-                                        : Colors.grey[200],
-                                    borderRadius: BorderRadius.circular(14),
-                                  ),
-                                  child: Center(
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                        const Color(
-                                          0xFF007AFF,
-                                        ).withValues(alpha: 0.5),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                errorWidget: (context, url, error) =>
-                                    const Icon(
-                                      Icons.error_outline,
-                                      color: Colors.red,
-                                    ),
-                              ),
-                            ),
-                          if (message.text != null && message.text!.isNotEmpty)
-                            Padding(
-                              padding: message.type == MessageType.image
-                                  ? const EdgeInsets.only(
-                                      left: 10,
-                                      right: 10,
-                                      top: 8,
-                                      bottom: 4,
-                                    )
-                                  : EdgeInsets.zero,
-                              child:
-                                  searchQuery != null && searchQuery.isNotEmpty
-                                  ? _buildHighlightedText(
-                                      message.text!,
-                                      searchQuery,
-                                      TextStyle(
-                                        color: isMe
-                                            ? Colors.white
-                                            : (isDarkMode
-                                                  ? Colors.white
-                                                  : const Color(0xFF1C1C1E)),
-                                        fontSize: 16,
-                                        height: 1.35,
-                                        letterSpacing: -0.2,
-                                      ),
-                                    )
-                                  : Text(
-                                      message.text!,
-                                      style: TextStyle(
-                                        color: isMe
-                                            ? Colors.white
-                                            : (isDarkMode
-                                                  ? Colors.white
-                                                  : const Color(0xFF1C1C1E)),
-                                        fontSize: 16,
-                                        height: 1.35,
-                                        letterSpacing: -0.2,
-                                      ),
-                                    ),
-                            ),
+                          _buildMessageContent(
+                            message,
+                            isMe,
+                            isDarkMode,
+                            searchQuery,
+                          ),
                           Padding(
-                            padding: message.type == MessageType.image
-                                ? const EdgeInsets.only(
-                                    left: 10,
-                                    right: 10,
-                                    bottom: 4,
-                                  )
-                                : const EdgeInsets.only(top: 3),
+                            padding: const EdgeInsets.only(
+                              left: 4,
+                              right: 4,
+                              bottom: 2,
+                            ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
@@ -1208,30 +1111,7 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
                     ),
                     if (message.reactions != null &&
                         message.reactions!.isNotEmpty)
-                      Container(
-                        margin: const EdgeInsets.only(top: 4),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isDarkMode
-                              ? const Color(0xFF2C2C2E)
-                              : Colors.white,
-                          borderRadius: BorderRadius.circular(14),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.1),
-                              blurRadius: 6,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: Text(
-                          message.reactions!.join(' '),
-                          style: const TextStyle(fontSize: 16),
-                        ),
-                      ),
+                      _buildReactions(message, isDarkMode),
                   ],
                 ),
               ),
@@ -1239,6 +1119,365 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildAvatar(bool isDarkMode) {
+    return Container(
+      margin: const EdgeInsets.only(right: 8, bottom: 2),
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.15),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: CircleAvatar(
+        radius: 16,
+        backgroundColor: const Color(0xFF007AFF).withValues(alpha: 0.15),
+        backgroundImage: widget.otherUser.profileImageUrl != null
+            ? CachedNetworkImageProvider(widget.otherUser.profileImageUrl!)
+            : null,
+        child: widget.otherUser.profileImageUrl == null
+            ? Text(
+                widget.otherUser.name[0].toUpperCase(),
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF007AFF),
+                ),
+              )
+            : null,
+      ),
+    );
+  }
+
+  Widget _buildReactions(MessageModel message, bool isDarkMode) {
+    return Container(
+      margin: const EdgeInsets.only(top: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: isDarkMode ? const Color(0xFF2C2C2E) : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Text(
+        message.reactions!.join(' '),
+        style: const TextStyle(fontSize: 16),
+      ),
+    );
+  }
+
+  Widget _buildMessageContent(
+    MessageModel message,
+    bool isMe,
+    bool isDarkMode,
+    String? searchQuery,
+  ) {
+    switch (message.type) {
+      case MessageType.image:
+        return _buildImageMessage(message, isMe, isDarkMode);
+      case MessageType.video:
+        return _buildVideoMessage(message, isMe, isDarkMode);
+      case MessageType.audio:
+        return _buildAudioMessage(message, isMe, isDarkMode);
+      case MessageType.file:
+        return _buildFileMessage(message, isMe, isDarkMode);
+      case MessageType.text:
+      default:
+        return _buildTextMessage(message, isMe, isDarkMode, searchQuery);
+    }
+  }
+
+  Widget _buildTextMessage(
+    MessageModel message,
+    bool isMe,
+    bool isDarkMode,
+    String? searchQuery,
+  ) {
+    if (message.text == null || message.text!.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final textStyle = TextStyle(
+      color: isMe
+          ? Colors.white
+          : (isDarkMode ? Colors.white : const Color(0xFF1C1C1E)),
+      fontSize: 16,
+      height: 1.35,
+      letterSpacing: -0.2,
+    );
+
+    if (searchQuery != null && searchQuery.isNotEmpty) {
+      return _buildHighlightedText(message.text!, searchQuery, textStyle);
+    }
+
+    return Text(message.text!, style: textStyle);
+  }
+
+  Widget _buildImageMessage(MessageModel message, bool isMe, bool isDarkMode) {
+    if (message.mediaUrl == null && message.localPath == null) {
+      return const SizedBox.shrink();
+    }
+
+    ImageProvider? imageProvider;
+    if (message.localPath != null) {
+      final file = File(message.localPath!);
+      if (file.existsSync()) {
+        imageProvider = FileImage(file);
+      }
+    }
+
+    if (imageProvider == null && message.mediaUrl != null) {
+      imageProvider = CachedNetworkImageProvider(message.mediaUrl!);
+    }
+
+    if (imageProvider == null) return const SizedBox.shrink();
+
+    return GestureDetector(
+      onTap: () {
+        _openFullScreenImage(context, imageProvider!);
+      },
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: Hero(
+          tag: message.id,
+          child: Image(
+            image: imageProvider,
+            fit: BoxFit.cover,
+            width: 200,
+            height: 200,
+            errorBuilder: (context, error, stackTrace) => Container(
+              width: 200,
+              height: 200,
+              color: Colors.grey[300],
+              child: const Icon(Icons.error),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _openFullScreenImage(BuildContext context, ImageProvider imageProvider) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => Scaffold(
+          backgroundColor: Colors.black,
+          appBar: AppBar(
+            backgroundColor: Colors.black,
+            iconTheme: const IconThemeData(color: Colors.white),
+          ),
+          body: Center(
+            child: InteractiveViewer(
+              panEnabled: true,
+              minScale: 0.5,
+              maxScale: 4,
+              child: Image(image: imageProvider, fit: BoxFit.contain),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVideoMessage(MessageModel message, bool isMe, bool isDarkMode) {
+    return GestureDetector(
+      onTap: () {
+        _playVideo(context, message);
+      },
+      child: Container(
+        width: 200,
+        height: 150,
+        decoration: BoxDecoration(
+          color: Colors.black,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            const Icon(Icons.play_circle_fill, size: 50, color: Colors.white),
+            Positioned(
+              bottom: 8,
+              right: 8,
+              child: Text(
+                _formatFileSize(message.fileSize ?? 0),
+                style: const TextStyle(color: Colors.white, fontSize: 10),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _playVideo(BuildContext context, MessageModel message) {
+    if (message.localPath != null) {
+      final file = File(message.localPath!);
+      if (file.existsSync()) {
+        _openVideoPlayer(context, VideoPlayerController.file(file));
+        return;
+      }
+    }
+
+    if (message.mediaUrl != null) {
+      _openVideoPlayer(
+        context,
+        VideoPlayerController.networkUrl(Uri.parse(message.mediaUrl!)),
+      );
+    }
+  }
+
+  void _openVideoPlayer(
+    BuildContext context,
+    VideoPlayerController videoPlayerController,
+  ) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) =>
+            VideoPlayerScreen(controller: videoPlayerController),
+      ),
+    );
+  }
+
+  Widget _buildAudioMessage(MessageModel message, bool isMe, bool isDarkMode) {
+    return Container(
+      width: 200,
+      padding: const EdgeInsets.all(8),
+      child: Row(
+        children: [
+          Icon(
+            Icons.play_arrow_rounded,
+            color: isMe ? Colors.white : Colors.blue,
+            size: 30,
+          ),
+          Expanded(
+            child: Container(
+              height: 4,
+              color: isMe ? Colors.white54 : Colors.grey[300],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFileMessage(MessageModel message, bool isMe, bool isDarkMode) {
+    return GestureDetector(
+      onTap: () {
+        _downloadAndOpenFile(context, message);
+      },
+      child: Container(
+        width: 200,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isMe
+              ? Colors.white.withValues(alpha: 0.2)
+              : Colors.black.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.insert_drive_file,
+              color: isMe ? Colors.white : Colors.grey[700],
+              size: 32,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    message.fileName ?? 'File',
+                    style: TextStyle(
+                      color: isMe
+                          ? Colors.white
+                          : (isDarkMode ? Colors.white : Colors.black),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _formatFileSize(message.fileSize ?? 0),
+                    style: TextStyle(
+                      color: isMe ? Colors.white70 : Colors.grey,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _downloadAndOpenFile(
+    BuildContext context,
+    MessageModel message,
+  ) async {
+    if (message.localPath != null) {
+      final file = File(message.localPath!);
+      if (file.existsSync()) {
+        await OpenFilex.open(message.localPath!);
+        return;
+      }
+    }
+
+    if (message.mediaUrl == null) return;
+
+    try {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Downloading file...')));
+
+      final directory = await getApplicationDocumentsDirectory();
+      final fileName =
+          message.fileName ?? 'file_${DateTime.now().millisecondsSinceEpoch}';
+      final savePath = '${directory.path}/$fileName';
+
+      await Dio().download(message.mediaUrl!, savePath);
+
+      // Update local database with new path
+      // Note: In a real app, we should update the message in the database here
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        await OpenFilex.open(savePath);
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to download file: $e')));
+      }
+    }
+  }
+
+  String _formatFileSize(int bytes) {
+    if (bytes <= 0) return '0 B';
+    const suffixes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    var i = (log(bytes) / log(1024)).floor();
+    return '${(bytes / pow(1024, i)).toStringAsFixed(1)} ${suffixes[i]}';
+  }
+
+  void _shareLocation() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Location sharing coming soon!')),
     );
   }
 
@@ -1652,7 +1891,9 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
                               padding: const EdgeInsets.all(4),
                               decoration: BoxDecoration(
                                 color: _showEmojiPicker
-                                    ? const Color(0xFF007AFF).withValues(alpha: 0.12)
+                                    ? const Color(
+                                        0xFF007AFF,
+                                      ).withValues(alpha: 0.12)
                                     : Colors.transparent,
                                 borderRadius: BorderRadius.circular(16),
                               ),
@@ -1690,7 +1931,9 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
                           onTap: _sendMessage,
                           child: Builder(
                             builder: (context) {
-                              final themeColors = chatThemes[_currentTheme] ?? chatThemes['default']!;
+                              final themeColors =
+                                  chatThemes[_currentTheme] ??
+                                  chatThemes['default']!;
                               return Container(
                                 height: 36,
                                 width: 36,
@@ -1704,7 +1947,9 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
                                   shape: BoxShape.circle,
                                   boxShadow: [
                                     BoxShadow(
-                                      color: themeColors[0].withValues(alpha: 0.4),
+                                      color: themeColors[0].withValues(
+                                        alpha: 0.4,
+                                      ),
                                       blurRadius: 8,
                                       offset: const Offset(0, 2),
                                     ),
@@ -1746,7 +1991,10 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
             builder: (context) {
               // Calculate dynamic height based on screen size (max 35% of screen height)
               final screenHeight = MediaQuery.of(context).size.height;
-              final emojiPickerHeight = (screenHeight * 0.35).clamp(200.0, 350.0);
+              final emojiPickerHeight = (screenHeight * 0.35).clamp(
+                200.0,
+                350.0,
+              );
 
               return Container(
                 height: emojiPickerHeight,
@@ -1779,58 +2027,58 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
                   },
                   config: Config(
                     height: emojiPickerHeight,
-                checkPlatformCompatibility: true,
-                emojiViewConfig: EmojiViewConfig(
-                  columns: 8,
-                  emojiSizeMax: 32,
-                  verticalSpacing: 0,
-                  horizontalSpacing: 0,
-                  gridPadding: const EdgeInsets.symmetric(horizontal: 8),
-                  backgroundColor: isDarkMode
-                      ? const Color(0xFF000000)
-                      : const Color(0xFFF6F6F6),
-                  recentsLimit: 28,
-                  noRecents: Text(
-                    'No Recents',
-                    style: TextStyle(fontSize: 14, color: Colors.grey[500]),
-                  ),
-                  loadingIndicator: const CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      Color(0xFF007AFF),
+                    checkPlatformCompatibility: true,
+                    emojiViewConfig: EmojiViewConfig(
+                      columns: 8,
+                      emojiSizeMax: 32,
+                      verticalSpacing: 0,
+                      horizontalSpacing: 0,
+                      gridPadding: const EdgeInsets.symmetric(horizontal: 8),
+                      backgroundColor: isDarkMode
+                          ? const Color(0xFF000000)
+                          : const Color(0xFFF6F6F6),
+                      recentsLimit: 28,
+                      noRecents: Text(
+                        'No Recents',
+                        style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+                      ),
+                      loadingIndicator: const CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          Color(0xFF007AFF),
+                        ),
+                      ),
+                      buttonMode: ButtonMode.MATERIAL,
+                    ),
+                    skinToneConfig: const SkinToneConfig(),
+                    categoryViewConfig: CategoryViewConfig(
+                      initCategory: Category.RECENT,
+                      backgroundColor: isDarkMode
+                          ? const Color(0xFF000000)
+                          : const Color(0xFFF6F6F6),
+                      indicatorColor: const Color(0xFF007AFF),
+                      iconColor: const Color(0xFF8E8E93),
+                      iconColorSelected: const Color(0xFF007AFF),
+                      categoryIcons: const CategoryIcons(),
+                    ),
+                    bottomActionBarConfig: BottomActionBarConfig(
+                      backgroundColor: isDarkMode
+                          ? const Color(0xFF000000)
+                          : const Color(0xFFF6F6F6),
+                      buttonColor: const Color(0xFF007AFF),
+                      buttonIconColor: Colors.white,
+                    ),
+                    searchViewConfig: SearchViewConfig(
+                      backgroundColor: isDarkMode
+                          ? const Color(0xFF1C1C1E)
+                          : Colors.white,
+                      buttonIconColor: const Color(0xFF007AFF),
                     ),
                   ),
-                  buttonMode: ButtonMode.MATERIAL,
                 ),
-                skinToneConfig: const SkinToneConfig(),
-                categoryViewConfig: CategoryViewConfig(
-                  initCategory: Category.RECENT,
-                  backgroundColor: isDarkMode
-                      ? const Color(0xFF000000)
-                      : const Color(0xFFF6F6F6),
-                  indicatorColor: const Color(0xFF007AFF),
-                  iconColor: const Color(0xFF8E8E93),
-                  iconColorSelected: const Color(0xFF007AFF),
-                  categoryIcons: const CategoryIcons(),
-                ),
-                bottomActionBarConfig: BottomActionBarConfig(
-                  backgroundColor: isDarkMode
-                      ? const Color(0xFF000000)
-                      : const Color(0xFFF6F6F6),
-                  buttonColor: const Color(0xFF007AFF),
-                  buttonIconColor: Colors.white,
-                ),
-                searchViewConfig: SearchViewConfig(
-                  backgroundColor: isDarkMode
-                      ? const Color(0xFF1C1C1E)
-                      : Colors.white,
-                  buttonIconColor: const Color(0xFF007AFF),
-                ),
-              ),
-            ),
-          );
-        },
-      ),
+              );
+            },
+          ),
       ],
     );
   }
@@ -1967,7 +2215,9 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
       setState(() {});
 
       // Send push notification to the other user
-      final currentUserProfile = ref.read(currentUserProfileProvider).valueOrNull;
+      final currentUserProfile = ref
+          .read(currentUserProfileProvider)
+          .valueOrNull;
       final currentUserName = currentUserProfile?.name ?? 'Someone';
 
       NotificationService().sendMessageNotification(
@@ -2005,15 +2255,24 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
   }
 
   void _markMessagesAsRead() async {
+    // Guard against calling after widget is disposed (prevents "ref" access error)
+    if (!mounted) return;
     if (_conversationId == null) return;
+
+    // Cache the current user ID before any async operations
+    final currentUserId = _currentUserId;
+    if (currentUserId == null) return;
 
     try {
       // Use HybridChatService - updates both local DB and Firebase
       await _hybridChatService.markMessagesAsRead(_conversationId!);
 
+      // Check mounted again after async operation
+      if (!mounted) return;
+
       // Update conversation unread count
       await _firestore.collection('conversations').doc(_conversationId!).update(
-        {'unreadCount.${_currentUserId!}': 0},
+        {'unreadCount.$currentUserId': 0},
       );
     } catch (e) {
       // Only log non-critical errors, don't show to user
@@ -2163,9 +2422,9 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
     } catch (e) {
       debugPrint('Error adding reaction: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to add reaction')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Failed to add reaction')));
       }
     }
   }
@@ -2256,7 +2515,9 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
                       .orderBy('timestamp', descending: true)
                       .get();
 
-                  debugPrint('Remaining messages count: ${allMessages.docs.length}');
+                  debugPrint(
+                    'Remaining messages count: ${allMessages.docs.length}',
+                  );
 
                   // Update the conversation's lastMessage fields
                   if (allMessages.docs.isNotEmpty) {
@@ -2346,7 +2607,6 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
     HapticFeedback.lightImpact();
 
     // Keep keyboard focus while showing attachment options
-    final hadFocus = _messageFocusNode.hasFocus; // ignore: unused_local_variable
 
     showModalBottomSheet(
       context: context,
@@ -2445,16 +2705,13 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
 
     final XFile? image = await _imagePicker.pickImage(
       source: ImageSource.gallery,
-      imageQuality: 95, // High quality to prevent blur
-      maxWidth: 1920, // Max width for optimization
-      maxHeight: 1920, // Max height for optimization
+      imageQuality: 95,
     );
 
     if (image != null) {
-      _uploadAndSendImage(File(image.path));
+      _sendMediaMessage(File(image.path), MessageType.image);
     }
 
-    // Restore focus to message input
     if (mounted) {
       FocusScope.of(context).requestFocus(_messageFocusNode);
     }
@@ -2465,80 +2722,64 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
 
     final XFile? photo = await _imagePicker.pickImage(
       source: ImageSource.camera,
-      imageQuality: 95, // High quality to prevent blur
-      maxWidth: 1920, // Max width for optimization
-      maxHeight: 1920, // Max height for optimization
+      imageQuality: 95,
     );
 
     if (photo != null) {
-      _uploadAndSendImage(File(photo.path));
+      _sendMediaMessage(File(photo.path), MessageType.image);
     }
 
-    // Restore focus to message input
     if (mounted) {
       FocusScope.of(context).requestFocus(_messageFocusNode);
     }
   }
 
-  void _uploadAndSendImage(File imageFile) async {
-    if (_conversationId == null || !mounted) return;
+  void _pickFile() async {
+    Navigator.pop(context); // Close attachment options
 
     try {
-      final ref = _storage.ref().child(
-        'chat_images/${DateTime.now().millisecondsSinceEpoch}.jpg',
-      );
-      final uploadTask = ref.putFile(imageFile);
-      final snapshot = await uploadTask;
+      final result = await FilePicker.platform.pickFiles();
 
-      if (!mounted) return;
-      final downloadUrl = await snapshot.ref.getDownloadURL();
+      if (result != null && result.files.single.path != null) {
+        final file = File(result.files.single.path!);
+        final extension = file.path.split('.').last.toLowerCase();
 
-      if (!mounted) return;
+        MessageType type = MessageType.file;
+        if (['jpg', 'jpeg', 'png', 'gif', 'webp'].contains(extension)) {
+          type = MessageType.image;
+        } else if (['mp4', 'mov', 'avi', 'mkv'].contains(extension)) {
+          type = MessageType.video;
+        } else if (['mp3', 'wav', 'aac', 'm4a'].contains(extension)) {
+          type = MessageType.audio;
+        }
 
-      await _firestore
-          .collection('conversations')
-          .doc(_conversationId!)
-          .collection('messages')
-          .add({
-            'senderId': _currentUserId!,
-            'receiverId': widget.otherUser.uid,
-            'chatId': _conversationId,
-            'text': '',
-            'type': MessageType.image.index,
-            'mediaUrl': downloadUrl,
-            'status': MessageStatus.sent.index,
-            'timestamp': FieldValue.serverTimestamp(),
-            'isEdited': false,
-          });
-
-      await _firestore
-          .collection('conversations')
-          .doc(_conversationId!)
-          .update({
-            'lastMessage': '📷 Photo',
-            'lastMessageTime': FieldValue.serverTimestamp(),
-            'lastMessageSenderId': _currentUserId!,
-            'unreadCount.${widget.otherUser.uid}': FieldValue.increment(1),
-          });
+        _sendMediaMessage(file, type);
+      }
     } catch (e) {
-      if (!mounted) return;
-      // ignore: use_build_context_synchronously
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Failed to send image: $e')));
+      debugPrint('Error picking file: $e');
+    }
+
+    if (mounted) {
+      FocusScope.of(context).requestFocus(_messageFocusNode);
     }
   }
 
-  void _shareLocation() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Location sharing coming soon!')),
-    );
-  }
+  void _sendMediaMessage(File file, MessageType type) async {
+    if (_conversationId == null || !mounted) return;
 
-  void _pickFile() {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('File sharing coming soon!')));
+    try {
+      await _hybridChatService.sendMessage(
+        conversationId: _conversationId!,
+        receiverId: widget.otherUser.uid,
+        file: file,
+        type: type,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to send media: $e')));
+    }
   }
 
   void _recordVoice() {
@@ -2946,7 +3187,9 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
                                     : null,
                                 boxShadow: [
                                   BoxShadow(
-                                    color: themeColors[0].withValues(alpha: 0.4),
+                                    color: themeColors[0].withValues(
+                                      alpha: 0.4,
+                                    ),
                                     blurRadius: 10,
                                     offset: const Offset(0, 4),
                                   ),

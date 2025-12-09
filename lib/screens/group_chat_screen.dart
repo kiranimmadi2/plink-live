@@ -2164,7 +2164,11 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen>
     final totalMembers = _memberNames.length;
     final readCount = readBy.length;
     final themeColors = chatThemes[_currentTheme] ?? chatThemes['default']!;
-    final hasContent = text.isNotEmpty || imageUrl != null;
+    // Check for actual content - imageUrl must be non-null, non-empty, and a valid URL
+    final hasValidImage = imageUrl != null &&
+        imageUrl.isNotEmpty &&
+        (imageUrl.startsWith('http://') || imageUrl.startsWith('https://'));
+    final hasContent = text.isNotEmpty || hasValidImage;
 
     if (!hasContent) return const SizedBox.shrink();
 
@@ -2258,8 +2262,8 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen>
                           // Reply preview
                           if (replyToId != null)
                             _buildReplyBubble(replyToId, isMe, isDarkMode),
-                          // Image
-                          if (imageUrl != null)
+                          // Image - only render if imageUrl is valid (non-null and non-empty)
+                          if (hasValidImage)
                             ClipRRect(
                               borderRadius: BorderRadius.only(
                                 topLeft: const Radius.circular(18),
@@ -2287,11 +2291,38 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen>
                                     ),
                                   ),
                                 ),
-                                errorWidget: (context, url, error) =>
-                                    const Icon(
-                                      Icons.error_outline,
-                                      color: Colors.red,
-                                    ),
+                                errorWidget: (context, url, error) => Container(
+                                  width: 200,
+                                  height: 100,
+                                  decoration: BoxDecoration(
+                                    color: isDarkMode
+                                        ? Colors.grey[800]
+                                        : Colors.grey[300],
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.broken_image_outlined,
+                                        color: isDarkMode
+                                            ? Colors.grey[500]
+                                            : Colors.grey[600],
+                                        size: 32,
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'Image not available',
+                                        style: TextStyle(
+                                          color: isDarkMode
+                                              ? Colors.grey[500]
+                                              : Colors.grey[600],
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
                               ),
                             ),
                           // Text
@@ -2300,7 +2331,7 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen>
                               padding: EdgeInsets.only(
                                 left: 14,
                                 right: 14,
-                                top: imageUrl != null ? 8 : 10,
+                                top: hasValidImage ? 8 : 10,
                                 bottom: 4,
                               ),
                               child: Text(

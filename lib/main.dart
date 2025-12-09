@@ -12,7 +12,7 @@ import 'package:supper/screens/login/onboarding_screen.dart';
 
 import 'firebase_options.dart';
 import 'screens/login/splash_screen.dart';
-import 'screens/main_navigation_screen.dart';
+import 'screens/home/main_navigation_screen.dart';
 
 import 'services/auth_service.dart';
 import 'services/profile_service.dart';

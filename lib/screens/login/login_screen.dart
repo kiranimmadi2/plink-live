@@ -1,32 +1,89 @@
+import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:video_player/video_player.dart';
 import '../../services/auth_service.dart';
-import '../main_navigation_screen.dart';
-import 'profile_setup_screen.dart';
+import '../../services/video_preload_service.dart';
+import '../../services/professional_service.dart';
+import '../../services/business_service.dart';
+import '../home/main_navigation_screen.dart';
+import '../professional/professional_setup_screen.dart';
+import '../business/business_setup_screen.dart';
+import 'forgot_password_screen.dart';
 
-class LoginScreen extends ConsumerStatefulWidget {
-  const LoginScreen({super.key});
+class LoginScreen extends StatefulWidget {
+  const LoginScreen({super.key, required this.accountType});
+
+  final String accountType;
 
   @override
-  ConsumerState<LoginScreen> createState() => _LoginScreenState();
+  State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends ConsumerState<LoginScreen>
+class _LoginScreenState extends State<LoginScreen>
     with TickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
+  final _emailOrPhoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final AuthService _authService = AuthService();
+  final VideoPreloadService _videoService = VideoPreloadService();
 
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _isSignUpMode = false;
   bool _rememberMe = false;
-  final bool _acceptTerms = false; // ignore: unused_field
+  bool _acceptTerms = false;
   String _passwordStrength = ''; // ignore: unused_field, prefer_final_fields
   final Color _passwordStrengthColor = Colors.grey; // ignore: unused_field
+
+  // Phone OTP verification state
+  bool _isOtpSent = false;
+  String? _verificationId;
+  final _otpController = TextEditingController();
+
+  // Country code data
+  String _selectedCountryCode = '+91';
+
+  final List<Map<String, String>> _countryCodes = [
+    {'code': '+91', 'country': 'India', 'flag': '🇮🇳'},
+    {'code': '+1', 'country': 'USA', 'flag': '🇺🇸'},
+    {'code': '+44', 'country': 'UK', 'flag': '🇬🇧'},
+    {'code': '+61', 'country': 'Australia', 'flag': '🇦🇺'},
+    {'code': '+971', 'country': 'UAE', 'flag': '🇦🇪'},
+    {'code': '+966', 'country': 'Saudi Arabia', 'flag': '🇸🇦'},
+    {'code': '+65', 'country': 'Singapore', 'flag': '🇸🇬'},
+    {'code': '+60', 'country': 'Malaysia', 'flag': '🇲🇾'},
+    {'code': '+49', 'country': 'Germany', 'flag': '🇩🇪'},
+    {'code': '+33', 'country': 'France', 'flag': '🇫🇷'},
+    {'code': '+39', 'country': 'Italy', 'flag': '🇮🇹'},
+    {'code': '+81', 'country': 'Japan', 'flag': '🇯🇵'},
+    {'code': '+82', 'country': 'South Korea', 'flag': '🇰🇷'},
+    {'code': '+86', 'country': 'China', 'flag': '🇨🇳'},
+    {'code': '+55', 'country': 'Brazil', 'flag': '🇧🇷'},
+    {'code': '+52', 'country': 'Mexico', 'flag': '🇲🇽'},
+    {'code': '+27', 'country': 'South Africa', 'flag': '🇿🇦'},
+    {'code': '+234', 'country': 'Nigeria', 'flag': '🇳🇬'},
+    {'code': '+92', 'country': 'Pakistan', 'flag': '🇵🇰'},
+    {'code': '+880', 'country': 'Bangladesh', 'flag': '🇧🇩'},
+    {'code': '+977', 'country': 'Nepal', 'flag': '🇳🇵'},
+    {'code': '+94', 'country': 'Sri Lanka', 'flag': '🇱🇰'},
+    {'code': '+63', 'country': 'Philippines', 'flag': '🇵🇭'},
+    {'code': '+62', 'country': 'Indonesia', 'flag': '🇮🇩'},
+    {'code': '+66', 'country': 'Thailand', 'flag': '🇹🇭'},
+    {'code': '+84', 'country': 'Vietnam', 'flag': '🇻🇳'},
+    {'code': '+7', 'country': 'Russia', 'flag': '🇷🇺'},
+    {'code': '+34', 'country': 'Spain', 'flag': '🇪🇸'},
+    {'code': '+31', 'country': 'Netherlands', 'flag': '🇳🇱'},
+    {'code': '+46', 'country': 'Sweden', 'flag': '🇸🇪'},
+  ];
+
+  // Individual OTP box controllers
+  final List<TextEditingController> _otpBoxControllers = List.generate(
+    6,
+    (_) => TextEditingController(),
+  );
+  final List<FocusNode> _otpFocusNodes = List.generate(6, (_) => FocusNode());
 
   late AnimationController _animationController;
   late AnimationController _fadeController;
@@ -57,12 +114,40 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     _fadeController.forward();
 
     _passwordController.addListener(_checkPasswordStrength);
+    _emailOrPhoneController.addListener(_onInputChanged);
+
+    // Setup video background
+    if (_videoService.isReady) {
+      _videoService.resume();
+    } else {
+      _videoService.addOnReadyCallback(_onVideoReady);
+      _videoService.preload();
+    }
+  }
+
+  void _onVideoReady() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  void _onInputChanged() {
+    // Rebuild UI when input changes to show/hide password field
+    setState(() {});
   }
 
   @override
   void dispose() {
-    _emailController.dispose();
+    _videoService.removeOnReadyCallback(_onVideoReady);
+    _emailOrPhoneController.dispose();
     _passwordController.dispose();
+    _otpController.dispose();
+    for (var controller in _otpBoxControllers) {
+      controller.dispose();
+    }
+    for (var node in _otpFocusNodes) {
+      node.dispose();
+    }
     _animationController.dispose();
     _fadeController.dispose();
     super.dispose();
@@ -89,12 +174,180 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   void _toggleSignUpMode() {
     setState(() {
       _isSignUpMode = !_isSignUpMode;
+      _isOtpSent = false;
+      _verificationId = null;
+      _otpController.clear();
+      _clearOtpBoxes();
     });
     _animationController.reset();
     _animationController.forward();
   }
 
+  // Check if input is phone number (for validation - 6-15 digits)
+  bool _isPhoneNumber(String input) {
+    final cleaned = input.replaceAll(RegExp(r'[\s\-\(\)]'), '');
+    // Check for 6-15 digit phone numbers
+    return RegExp(r'^[0-9]{6,15}$').hasMatch(cleaned);
+  }
+
+  // Check if input starts with a digit (to show country code picker)
+  bool get _startsWithDigit {
+    final input = _emailOrPhoneController.text.trim();
+    if (input.isEmpty) return false;
+    return RegExp(r'^[0-9]').hasMatch(input);
+  }
+
+  // Check current input type for UI updates
+  bool get _isCurrentInputPhone {
+    final input = _emailOrPhoneController.text.trim();
+    return _isPhoneNumber(input);
+  }
+
+  // Get clean phone number
+  String _getCleanPhoneNumber(String input) {
+    return input.replaceAll(RegExp(r'[\s\-\(\)\+]'), '');
+  }
+
+  void _showCountryCodePicker() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1a1a2e),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return _CountryCodePickerSheet(
+          countryCodes: _countryCodes,
+          selectedCountryCode: _selectedCountryCode,
+          onSelect: (code, flag) {
+            setState(() {
+              _selectedCountryCode = code;
+            });
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _sendPhoneOTP() async {
+    final input = _emailOrPhoneController.text.trim();
+    final phone = _getCleanPhoneNumber(input);
+    if (phone.isEmpty || phone.length < 6 || phone.length > 15) {
+      _showErrorSnackBar('Please enter a valid phone number');
+      return;
+    }
+
+    final fullPhoneNumber = '$_selectedCountryCode$phone';
+
+    // Show loader on Send OTP button first
+    setState(() {
+      _isLoading = true;
+    });
+    HapticFeedback.lightImpact();
+
+    // Send OTP in background
+    _authService.sendPhoneOTP(
+      phoneNumber: fullPhoneNumber,
+      onCodeSent: (verificationId) {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _isOtpSent = true; // Now switch to OTP screen
+            _verificationId = verificationId;
+          });
+          _showSuccessSnackBar('OTP sent to $fullPhoneNumber');
+        }
+      },
+      onError: (error) {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _isOtpSent = false;
+          });
+          HapticFeedback.heavyImpact();
+          _showErrorSnackBar(error);
+        }
+      },
+      onAutoVerify: (credential) async {
+        // Auto verification on Android
+        try {
+          final user = await _authService.verifyPhoneOTP(
+            verificationId: _verificationId!,
+            otp: credential.smsCode ?? '',
+          );
+          if (user != null && mounted) {
+            _showSuccessSnackBar('Phone verified automatically!');
+            await _navigateAfterAuth(isNewUser: true);
+          }
+        } catch (e) {
+          // Auto-verify failed, user will enter OTP manually
+        }
+      },
+    );
+  }
+
+  Future<void> _verifyPhoneOTP() async {
+    final otp = _otpController.text.trim();
+    if (otp.isEmpty || otp.length != 6) {
+      _showErrorSnackBar('Please enter 6-digit OTP');
+      return;
+    }
+
+    if (_verificationId == null) {
+      _showErrorSnackBar('Please request OTP first');
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final user = await _authService.verifyPhoneOTP(
+        verificationId: _verificationId!,
+        otp: otp,
+      );
+
+      if (user != null && mounted) {
+        HapticFeedback.lightImpact();
+        _showSuccessSnackBar('Phone verified successfully!');
+        await _navigateAfterAuth(isNewUser: true);
+      }
+    } catch (e) {
+      if (mounted) {
+        HapticFeedback.heavyImpact();
+        _showErrorSnackBar(e.toString().replaceAll('Exception: ', ''));
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  void _resetOtpState() {
+    setState(() {
+      _isOtpSent = false;
+      _verificationId = null;
+      _otpController.clear();
+      _clearOtpBoxes();
+    });
+  }
+
   Future<void> _handleAuth() async {
+    final input = _emailOrPhoneController.text.trim();
+
+    // Check if it's a phone number - send OTP
+    if (_isPhoneNumber(input)) {
+      // Set pending account type for phone registration
+      _authService.setPendingAccountType(widget.accountType);
+      await _sendPhoneOTP();
+      return;
+    }
+
     if (_formKey.currentState!.validate()) {
       // Check terms acceptance for signup
       if (_isSignUpMode && !_acceptTerms) {
@@ -111,11 +364,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       try {
         final user = _isSignUpMode
             ? await _authService.signUpWithEmail(
-                _emailController.text.trim(),
+                input,
                 _passwordController.text,
+                accountType: widget.accountType,
               )
             : await _authService.signInWithEmail(
-                _emailController.text.trim(),
+                input,
                 _passwordController.text,
               );
 
@@ -124,17 +378,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           _showSuccessSnackBar(
             _isSignUpMode ? 'Account created successfully!' : 'Welcome back!',
           );
-
-          // For new signups, go to profile setup
-          if (_isSignUpMode) {
-            Navigator.of(context).pushAndRemoveUntil(
-              MaterialPageRoute(builder: (_) => const ProfileSetupScreen()),
-              (route) => false,
-            );
-          } else {
-            // For existing users, check if profile setup is complete
-            await _navigateBasedOnProfileStatus(user.uid);
-          }
+          // Navigate based on account type for signup
+          await _navigateAfterAuth(isNewUser: _isSignUpMode);
         }
       } catch (e) {
         if (mounted) {
@@ -151,43 +396,72 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     }
   }
 
-  Future<void> _navigateBasedOnProfileStatus(String userId) async {
+  /// Navigate after authentication based on account type
+  Future<void> _navigateAfterAuth({bool isNewUser = false}) async {
+    if (!mounted) return;
+
+    // Get account type - first check widget.accountType (for new signups), then check stored accountType
+    String accountType = widget.accountType.toLowerCase();
+
+    // Also check the stored account type from Firestore for existing users
     try {
-      final doc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(userId)
-          .get();
-
-      if (!mounted) return;
-
-      final data = doc.data();
-      final profileSetupComplete = data?['profileSetupComplete'] ?? false;
-      final connectionTypes = data?['connectionTypes'] as List?;
-      final activities = data?['activities'] as List?;
-
-      // If profile setup not complete and no data, show setup
-      if (!profileSetupComplete &&
-          (connectionTypes == null || connectionTypes.isEmpty) &&
-          (activities == null || activities.isEmpty)) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const ProfileSetupScreen()),
-          (route) => false,
-        );
-      } else {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
-          (route) => false,
-        );
+      final user = _authService.currentUser;
+      if (user != null) {
+        final doc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+        final storedAccountType = doc.data()?['accountType']?.toString().toLowerCase() ?? '';
+        // Use stored account type if widget account type is empty or "personal"
+        if (storedAccountType.isNotEmpty &&
+            (accountType.isEmpty || accountType == 'personal' || accountType.contains('personal'))) {
+          accountType = storedAccountType;
+        }
       }
     } catch (e) {
-      // On error, just go to main screen
-      if (mounted) {
+      debugPrint('Error checking stored account type: $e');
+    }
+
+    // Check for Professional account
+    if (accountType.contains('professional')) {
+      final professionalService = ProfessionalService();
+      final isSetupComplete = await professionalService.isProfessionalSetupComplete();
+
+      if (!isSetupComplete) {
+        if (!mounted) return;
         Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
+          MaterialPageRoute(
+            builder: (_) => const ProfessionalSetupScreen(),
+          ),
           (route) => false,
         );
+        return;
       }
     }
+
+    // Check for Business account
+    if (accountType.contains('business')) {
+      final businessService = BusinessService();
+      final isSetupComplete = await businessService.isBusinessSetupComplete();
+
+      if (!isSetupComplete) {
+        if (!mounted) return;
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(
+            builder: (_) => const BusinessSetupScreen(),
+          ),
+          (route) => false,
+        );
+        return;
+      }
+    }
+
+    // Default: go to main navigation
+    if (!mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
+      (route) => false,
+    );
   }
 
   Future<void> _signInWithGoogle() async {
@@ -196,13 +470,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     });
 
     try {
-      final user = await _authService.signInWithGoogle();
+      final user = await _authService.signInWithGoogle(
+        accountType: widget.accountType,
+      );
 
       if (user != null && mounted) {
         HapticFeedback.lightImpact();
         _showSuccessSnackBar('Welcome, ${user.displayName ?? 'User'}!');
-        // Check if profile setup is complete
-        await _navigateBasedOnProfileStatus(user.uid);
+        // Navigate based on account type
+        await _navigateAfterAuth(isNewUser: true);
       }
     } catch (e) {
       if (mounted) {
@@ -218,38 +494,73 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     }
   }
 
-  Future<void> _forgotPassword() async {
-    if (_emailController.text.isEmpty) {
-      _showErrorSnackBar('Please enter your email first');
-      return;
-    }
-
-    try {
-      await _authService.resetPassword(_emailController.text.trim());
-      if (mounted) {
-        _showSuccessSnackBar('Password reset email sent!');
-      }
-    } catch (e) {
-      if (mounted) {
-        _showErrorSnackBar(e.toString().replaceAll('Exception: ', ''));
-      }
-    }
+  void _forgotPassword() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()),
+    );
   }
 
   void _showSuccessSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.check_circle, color: Colors.white),
-            const SizedBox(width: 12),
-            Expanded(child: Text(message)),
-          ],
+        content: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.white.withValues(alpha: 0.25),
+                    Colors.greenAccent.withValues(alpha: 0.15),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.3),
+                  width: 1.5,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.1),
+                    blurRadius: 15,
+                    spreadRadius: 2,
+                  ),
+                ],
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.check_circle,
+                    color: Colors.greenAccent,
+                    size: 28,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      message,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w500,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
-        backgroundColor: Colors.green,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        margin: const EdgeInsets.all(16),
+        padding: EdgeInsets.zero,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        margin: const EdgeInsets.only(bottom: 20, left: 16, right: 16),
       ),
     );
   }
@@ -257,17 +568,63 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   void _showErrorSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.error_outline, color: Colors.white),
-            const SizedBox(width: 12),
-            Expanded(child: Text(message)),
-          ],
+        content: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.white.withValues(alpha: 0.25),
+                    Colors.redAccent.withValues(alpha: 0.15),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.3),
+                  width: 1.5,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.1),
+                    blurRadius: 15,
+                    spreadRadius: 2,
+                  ),
+                ],
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.error_outline,
+                    color: Colors.redAccent,
+                    size: 28,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      message,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w500,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
-        backgroundColor: Colors.red,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        margin: const EdgeInsets.all(16),
+        padding: EdgeInsets.zero,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        margin: const EdgeInsets.only(bottom: 20, left: 16, right: 16),
       ),
     );
   }
@@ -275,60 +632,104 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey.shade700,
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            child: FadeTransition(
-              opacity: _fadeAnimation,
-              child: SlideTransition(
-                position: _slideAnimation,
-                child: Container(
-                  margin: const EdgeInsets.all(24),
-                  padding: const EdgeInsets.all(32),
-
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [
-                        Color.fromARGB(255, 133, 117, 95),
-                        Color.fromARGB(255, 77, 58, 57),
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
+      backgroundColor: Colors.black,
+      body: Stack(
+        children: [
+          // Video Background
+          Positioned.fill(
+            child: _videoService.isReady && _videoService.controller != null
+                ? FittedBox(
+                    fit: BoxFit.fill,
+                    child: SizedBox(
+                      width: _videoService.controller!.value.size.width,
+                      height: _videoService.controller!.value.size.height,
+                      child: VideoPlayer(_videoService.controller!),
                     ),
-                    borderRadius: BorderRadius.circular(24),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.1),
-                        blurRadius: 20,
-                        offset: const Offset(0, 10),
+                  )
+                : Container(
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Color(0xFF1a1a2e),
+                          Color(0xFF16213e),
+                          Color(0xFF0f0f23),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _buildHeader(),
-                      const SizedBox(height: 32),
-                      _buildForm(),
+          ),
 
-                      const SizedBox(height: 24),
-                      _buildRememberMeAndForgot(),
-                      const SizedBox(height: 24),
-                      _buildAuthButton(),
-                      const SizedBox(height: 16),
-                      _buildToggleModeButton(),
-                      const SizedBox(height: 24),
-                      _buildDivider(),
-                      const SizedBox(height: 24),
-                      _buildSocialLogin(),
-                    ],
+          // Dark overlay
+          Positioned.fill(
+            child: Container(color: Colors.black.withValues(alpha: 0.5)),
+          ),
+
+          // Content
+          SafeArea(
+            child: Center(
+              child: SingleChildScrollView(
+                child: FadeTransition(
+                  opacity: _fadeAnimation,
+                  child: SlideTransition(
+                    position: _slideAnimation,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(24),
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                        child: Container(
+                          margin: const EdgeInsets.all(24),
+                          padding: const EdgeInsets.all(32),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(24),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.2),
+                              width: 1.5,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.2),
+                                blurRadius: 20,
+                                offset: const Offset(0, 10),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _buildHeader(),
+                              const SizedBox(height: 32),
+                              _buildForm(),
+                              // Show OTP boxes if phone OTP was sent
+                              if (_isOtpSent) ...[
+                                const SizedBox(height: 16),
+                                _buildOtpSection(),
+                              ],
+                              if (!_isOtpSent) ...[
+                                const SizedBox(height: 24),
+                                _buildRememberMeAndForgot(),
+                              ],
+                              const SizedBox(height: 24),
+                              _buildAuthButton(),
+                              const SizedBox(height: 16),
+                              _buildToggleModeButton(),
+                              const SizedBox(height: 24),
+                              _buildDivider(),
+                              const SizedBox(height: 24),
+                              _buildSocialLogin(),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -336,25 +737,35 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   Widget _buildHeader() {
     return Column(
       children: [
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: const BoxDecoration(
-            color: Colors.grey,
-            shape: BoxShape.circle,
-          ),
-          child: Icon(
-            _isSignUpMode ? Icons.person_add : Icons.lock_outline,
-            size: 48,
-            color: Colors.white,
+        ClipOval(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.15),
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+              ),
+              child: Icon(
+                _isSignUpMode ? Icons.person_add : Icons.lock_outline,
+                size: 48,
+                color: Colors.white,
+              ),
+            ),
           ),
         ),
         const SizedBox(height: 16),
-        const Text(
-          'Welcome Back',
+        Text(
+          'Welcome Back\n${widget.accountType}',
+          textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 28,
             fontWeight: FontWeight.bold,
-            color: Colors.black87,
+            color: Colors.white,
+            shadows: [
+              Shadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 4),
+            ],
           ),
         ),
       ],
@@ -366,208 +777,339 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       key: _formKey,
       child: Column(
         children: [
-          TextFormField(
-            controller: _emailController,
-            keyboardType: TextInputType.emailAddress,
-            cursorColor: const Color.fromARGB(255, 247, 245, 245),
-            textInputAction: TextInputAction.next,
-            decoration: InputDecoration(
-              labelText: 'Email',
-              hintText: 'Enter your email',
-              prefixIcon: const Icon(
-                Icons.email_outlined,
-                color: Color.fromARGB(255, 247, 245, 245),
-              ),
-
-              // ---- Border grey for all states ----
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: const BorderSide(color: Colors.grey, width: 1),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: const BorderSide(color: Colors.grey, width: 1),
-              ),
-              errorBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: const BorderSide(color: Colors.red, width: 1),
-              ),
-              focusedErrorBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: const BorderSide(color: Colors.red, width: 1),
-              ),
-
-              filled: true,
-              fillColor: Colors.grey,
-              errorStyle: const TextStyle(height: 0.8),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 20,
-                vertical: 16,
-              ),
-            ),
-            validator: (value) {
-              if (value == null || value.isEmpty) {
-                return 'Please enter your email';
-              }
-              if (!RegExp(
-                r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
-              ).hasMatch(value)) {
-                return 'Please enter a valid email';
-              }
-              return null;
-            },
-          ),
-
-          const SizedBox(height: 16),
-
-          TextFormField(
-            controller: _passwordController,
-            obscureText: _obscurePassword,
-            cursorColor: const Color.fromARGB(255, 247, 245, 245),
-            textInputAction: TextInputAction.done,
-            onFieldSubmitted: (_) => _handleAuth(),
-            decoration: InputDecoration(
-              labelText: 'Password',
-              hintText: 'Enter your password',
-              prefixIcon: const Icon(
-                Icons.lock_outline,
-                color: Color.fromARGB(255, 253, 252, 252),
-              ),
-              suffixIcon: IconButton(
-                icon: Icon(
-                  _obscurePassword
-                      ? Icons.visibility_off_outlined
-                      : Icons.visibility_outlined,
-                  color: const Color.fromARGB(255, 250, 246, 246),
+          // Email or Phone field with country code picker
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Country Code Picker - only show when input starts with a digit
+              if (_startsWithDigit)
+                Container(
+                  height: 56,
+                  margin: const EdgeInsets.only(right: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.3),
+                      width: 1,
+                    ),
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: _isOtpSent ? null : _showCountryCodePicker,
+                      borderRadius: BorderRadius.circular(16),
+                      splashColor: Colors.white.withValues(alpha: 0.2),
+                      highlightColor: Colors.white.withValues(alpha: 0.1),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              _selectedCountryCode,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            Icon(
+                              Icons.arrow_drop_down,
+                              color: Colors.white.withValues(alpha: 0.8),
+                              size: 20,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
-                onPressed: () {
-                  setState(() {
-                    _obscurePassword = !_obscurePassword;
-                  });
-                },
-              ),
+              // Email/Phone input field
+              Expanded(
+                child: TextFormField(
+                  controller: _emailOrPhoneController,
+                  keyboardType: _isCurrentInputPhone
+                      ? TextInputType.phone
+                      : TextInputType.emailAddress,
+                  cursorColor: Colors.white,
+                  textInputAction: TextInputAction.next,
+                  enabled: !_isOtpSent, // Disable when OTP is sent
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  decoration: InputDecoration(
+                    labelText: _startsWithDigit
+                        ? 'Phone Number'
+                        : 'Email or Phone',
+                    labelStyle: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.8),
+                      fontSize: 15,
+                    ),
+                    floatingLabelStyle: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    hintText: _startsWithDigit
+                        ? 'Enter phone number'
+                        : 'Enter email or phone number',
+                    hintStyle: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.5),
+                      fontSize: 14,
+                    ),
+                    // Hide prefix icon when country code picker is shown to save space
+                    prefixIcon: _startsWithDigit
+                        ? null
+                        : Icon(
+                            Icons.person_outline,
+                            color: Colors.white.withValues(alpha: 0.8),
+                          ),
 
-              // ---- Border grey for all states ----
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: const BorderSide(color: Colors.grey, width: 1),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: const BorderSide(color: Colors.grey, width: 1),
-              ),
-              errorBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: const BorderSide(color: Colors.red, width: 1),
-              ),
-              focusedErrorBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: const BorderSide(color: Colors.red, width: 1),
-              ),
+                    // ---- Glassmorphism borders ----
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.3),
+                        width: 1,
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.6),
+                        width: 1.5,
+                      ),
+                    ),
+                    disabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.2),
+                        width: 1,
+                      ),
+                    ),
+                    errorBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: const BorderSide(color: Colors.red, width: 1),
+                    ),
+                    focusedErrorBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: const BorderSide(color: Colors.red, width: 1),
+                    ),
 
-              filled: true,
-              fillColor: Colors.grey,
-              errorStyle: const TextStyle(height: 0.8),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 20,
-                vertical: 16,
+                    filled: true,
+                    fillColor: Colors.white.withValues(alpha: 0.12),
+                    errorStyle: const TextStyle(
+                      height: 0.8,
+                      color: Colors.redAccent,
+                    ),
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: _startsWithDigit ? 16 : 20,
+                      vertical: 16,
+                    ),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter your email or phone number';
+                    }
+                    // Check if it's a valid email or phone
+                    final isEmail = RegExp(
+                      r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+                    ).hasMatch(value);
+                    final isPhone = _isPhoneNumber(value);
+                    if (!isEmail && !isPhone) {
+                      return 'Please enter a valid email or phone number';
+                    }
+                    return null;
+                  },
+                ),
               ),
-            ),
-            validator: (value) {
-              if (value == null || value.isEmpty) {
-                return 'Please enter your password';
-              }
-              if (_isSignUpMode && value.length < 6) {
-                return 'Password must be at least 6 characters';
-              }
-              return null;
-            },
+            ],
           ),
+
+          // Password field - only show for email login (NOT phone, NOT OTP sent)
+          if (!_isOtpSent && !_isCurrentInputPhone) ...[
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _passwordController,
+              obscureText: _obscurePassword,
+              cursorColor: Colors.white,
+              textInputAction: TextInputAction.done,
+              onFieldSubmitted: (_) => _handleAuth(),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+              ),
+              decoration: InputDecoration(
+                labelText: 'Password',
+                labelStyle: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.8),
+                  fontSize: 15,
+                ),
+                floatingLabelStyle: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+                hintText: 'Enter your password',
+                hintStyle: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.5),
+                  fontSize: 15,
+                ),
+                prefixIcon: Icon(
+                  Icons.lock_outline,
+                  color: Colors.white.withValues(alpha: 0.8),
+                ),
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _obscurePassword
+                        ? Icons.visibility_off_outlined
+                        : Icons.visibility_outlined,
+                    color: Colors.white.withValues(alpha: 0.8),
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _obscurePassword = !_obscurePassword;
+                    });
+                  },
+                ),
+
+                // ---- Glassmorphism borders ----
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide(
+                    color: Colors.white.withValues(alpha: 0.3),
+                    width: 1,
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide(
+                    color: Colors.white.withValues(alpha: 0.6),
+                    width: 1.5,
+                  ),
+                ),
+                errorBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: const BorderSide(color: Colors.red, width: 1),
+                ),
+                focusedErrorBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: const BorderSide(color: Colors.red, width: 1),
+                ),
+
+                filled: true,
+                fillColor: Colors.white.withValues(alpha: 0.12),
+                errorStyle: const TextStyle(
+                  height: 0.8,
+                  color: Colors.redAccent,
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 16,
+                ),
+              ),
+              validator: (value) {
+                // Skip password validation for phone login
+                if (_isCurrentInputPhone) {
+                  return null;
+                }
+                if (value == null || value.isEmpty) {
+                  return 'Please enter your password';
+                }
+                if (_isSignUpMode && value.length < 6) {
+                  return 'Password must be at least 6 characters';
+                }
+                return null;
+              },
+            ),
+          ],
         ],
       ),
     );
   }
 
-  Widget _buildRememberMeAndForgot() {
-    if (_isSignUpMode) return const SizedBox.shrink();
+  Widget _buildOtpSection() {
+    return Column(
+      children: [
+        _buildOtpBoxes(),
+        const SizedBox(height: 12),
+        TextButton(
+          onPressed: _isLoading
+              ? null
+              : () {
+                  _clearOtpBoxes();
+                  _sendPhoneOTP();
+                },
+          child: const Text(
+            'Resend OTP',
+            style: TextStyle(
+              color: Color.fromARGB(214, 106, 183, 255),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        TextButton(
+          onPressed: _isLoading ? null : _resetOtpState,
+          child: const Text(
+            'Change Number',
+            style: TextStyle(
+              color: Color.fromARGB(255, 240, 237, 237),
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 
+  Widget _buildRememberMeAndForgot() {
+    // Show terms checkbox for signup mode
+    if (_isSignUpMode) {
+      return Row(
+        children: [
+          SizedBox(
+            height: 24,
+            width: 24,
+            child: Checkbox(
+              value: _acceptTerms,
+              onChanged: (value) {
+                setState(() {
+                  _acceptTerms = value ?? false;
+                });
+              },
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(4),
+              ),
+              fillColor: WidgetStateProperty.resolveWith((states) {
+                if (states.contains(WidgetState.selected)) {
+                  return Colors.green;
+                }
+                return Colors.grey;
+              }),
+            ),
+          ),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Text(
+              'I agree to the Terms of Service and Privacy Policy',
+              style: TextStyle(
+                color: Color.fromARGB(255, 240, 237, 237),
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    // Show remember me and forgot password for login mode
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        // // Remember me for login, Terms acceptance for signup
-        // _isSignUpMode
-        //     ? Row(
-        //         crossAxisAlignment: CrossAxisAlignment.start,
-        //         children: [
-        //           SizedBox(
-        //             height: 24,
-        //             width: 24,
-        //             child: Checkbox(
-        //               value: _acceptTerms,
-        //               onChanged: (value) {
-        //                 setState(() {
-        //                   _acceptTerms = value ?? false;
-        //                 });
-        //               },
-        //               shape: RoundedRectangleBorder(
-        //                 borderRadius: BorderRadius.circular(4),
-        //               ),
-        //             ),
-        //           ),
-        //           const SizedBox(width: 8),
-        // Expanded(
-        //   child: RichText(
-        //     text: TextSpan(
-        //       style: const TextStyle(
-        //         color: Color.fromARGB(255, 155, 39, 39),
-        //         fontSize: 13,
-        //       ),
-        //       children: [
-        //         // const TextSpan(text: 'I agree to the '),
-        //         // TextSpan(
-        //         //   text: 'Terms of Service',
-        //         //   style: const TextStyle(
-        //         //     color: Color.fromARGB(255, 241, 242, 243),
-        //         //     fontWeight: FontWeight.w600,
-        //         //     decoration: TextDecoration.underline,
-        //         //   ),
-        //         //   recognizer: TapGestureRecognizer()
-        //         //     ..onTap = () {
-        //         //       Navigator.push(
-        //         //         context,
-        //         //         MaterialPageRoute(
-        //         //           builder: (context) =>
-        //         //               const TermsOfServiceScreen(),
-        //         //         ),
-        //         //       );
-        //         //     },
-        //         // ),
-        //         // const TextSpan(text: ' and '),
-        //         // TextSpan(
-        //         //   text: 'Privacy Policy',
-        //         //   style: const TextStyle(
-        //         //     color: Color.fromARGB(255, 225, 228, 231),
-        //         //     fontWeight: FontWeight.w600,
-        //         //     decoration: TextDecoration.underline,
-        //         //   ),
-        //         //   recognizer: TapGestureRecognizer()
-        //         //     ..onTap = () {
-        //         //       Navigator.push(
-        //         //         context,
-        //         //         MaterialPageRoute(
-        //         //           builder: (context) =>
-        //         //               const PrivacyPolicyScreen(),
-        //         //         ),
-        //         //       );
-        //         //     },
-        //         // ),
-        //       ],
-        //     ),
-        //   ),
-        // ),
-        //     ],
-        //   )
-        // :
         Row(
           children: [
             SizedBox(
@@ -611,39 +1153,71 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   }
 
   Widget _buildAuthButton() {
+    // Determine button text and action based on state
+    String buttonText;
+    VoidCallback? onPressed;
+    bool showLoader = false;
+
+    if (_isOtpSent) {
+      // OTP screen - show Verify OTP button
+      buttonText = 'Verify OTP';
+      onPressed = _isLoading ? null : _verifyPhoneOTP;
+      showLoader = _isLoading;
+    } else if (_isCurrentInputPhone) {
+      // Phone number entered - show Send OTP button with loader
+      buttonText = 'Send OTP';
+      onPressed = _isLoading ? null : _sendPhoneOTP;
+      showLoader = _isLoading; // Loader shows here when sending OTP
+    } else {
+      // Email entered - show Log In / Sign Up button
+      buttonText = _isSignUpMode ? 'Sign Up' : 'Log In';
+      onPressed = _isLoading ? null : _handleAuth;
+      showLoader = _isLoading;
+    }
+
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
       width: double.infinity,
       height: 56,
-      child: ElevatedButton(
-        onPressed: _isLoading ? null : _handleAuth,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color.fromARGB(255, 141, 112, 112),
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          elevation: _isLoading ? 0 : 3,
-        ),
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 200),
-          child: _isLoading
-              ? const SizedBox(
-                  height: 24,
-                  width: 24,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.5,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                  ),
-                )
-              : Text(
-                  _isSignUpMode ? 'Sign Up' : 'Log In',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.5,
-                  ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+          child: ElevatedButton(
+            onPressed: onPressed,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue.withValues(alpha: 0.4),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(
+                  color: Colors.blue.withValues(alpha: 0.5),
+                  width: 1,
                 ),
+              ),
+              elevation: 0,
+            ),
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 200),
+              child: showLoader
+                  ? const SizedBox(
+                      height: 24,
+                      width: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : Text(
+                      buttonText,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+            ),
+          ),
         ),
       ),
     );
@@ -695,11 +1269,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   }
 
   Widget _buildSocialLogin() {
-    return Column(
-      children: [
-        SizedBox(
-          width: double.infinity,
-          height: 56,
+    return SizedBox(
+      width: double.infinity,
+      height: 56,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
           child: OutlinedButton.icon(
             onPressed: _isLoading ? null : _signInWithGoogle,
             icon: Image.network(
@@ -725,12 +1301,418 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
-              side: BorderSide(color: Colors.grey[300]!),
-              backgroundColor: const Color.fromARGB(255, 141, 112, 112),
+              side: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
+              backgroundColor: Colors.white.withValues(alpha: 0.1),
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildOtpBoxes() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Enter 6-digit OTP',
+          style: TextStyle(
+            color: Color.fromARGB(255, 240, 237, 237),
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 16),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            // Calculate box size based on available width
+            // 6 boxes + 5 gaps (8px each) = total width
+            final availableWidth = constraints.maxWidth;
+            const totalGapWidth = 5 * 8.0; // 5 gaps of 8px each
+            final boxWidth = ((availableWidth - totalGapWidth) / 6).clamp(
+              36.0,
+              48.0,
+            );
+            final boxHeight = boxWidth * 1.1; // Slightly taller than wide
+
+            return Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                for (int i = 0; i < 6; i++)
+                  _buildSingleOtpBox(i, boxWidth, boxHeight),
+              ],
+            );
+          },
+        ),
       ],
+    );
+  }
+
+  Widget _buildSingleOtpBox(int index, double boxWidth, double boxHeight) {
+    final bool hasFocus = _otpFocusNodes[index].hasFocus;
+    final bool hasValue = _otpBoxControllers[index].text.isNotEmpty;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          // Focus on this box when tapped
+          _otpFocusNodes[index].requestFocus();
+          HapticFeedback.selectionClick();
+        },
+        borderRadius: BorderRadius.circular(10),
+        splashColor: Colors.white.withValues(alpha: 0.3),
+        highlightColor: Colors.white.withValues(alpha: 0.1),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          width: boxWidth,
+          height: boxHeight,
+          decoration: BoxDecoration(
+            color: hasFocus
+                ? Colors.white.withValues(alpha: 0.2)
+                : hasValue
+                ? Colors.white.withValues(alpha: 0.15)
+                : Colors.white.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: hasFocus
+                  ? Colors.white
+                  : hasValue
+                  ? Colors.white.withValues(alpha: 0.5)
+                  : Colors.white.withValues(alpha: 0.3),
+              width: hasFocus ? 2 : 1.5,
+            ),
+            boxShadow: hasFocus
+                ? [
+                    BoxShadow(
+                      color: Colors.white.withValues(alpha: 0.3),
+                      blurRadius: 8,
+                      spreadRadius: 1,
+                    ),
+                  ]
+                : null,
+          ),
+          alignment: Alignment.center,
+          child: TextField(
+            controller: _otpBoxControllers[index],
+            focusNode: _otpFocusNodes[index],
+            keyboardType: TextInputType.number,
+            textAlign: TextAlign.center,
+            textAlignVertical: TextAlignVertical.center,
+            maxLength: 1,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            style: TextStyle(
+              fontSize: boxWidth * 0.45, // Dynamic font size based on box width
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+            showCursor: true,
+            cursorColor: Colors.white,
+            cursorWidth: 2,
+            cursorHeight: boxHeight * 0.5,
+            enableSuggestions: false,
+            autocorrect: false,
+            enableInteractiveSelection: false,
+            contextMenuBuilder: null,
+            decoration: const InputDecoration(
+              counterText: '',
+              border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+              disabledBorder: InputBorder.none,
+              errorBorder: InputBorder.none,
+              focusedErrorBorder: InputBorder.none,
+              contentPadding: EdgeInsets.zero,
+              isDense: true,
+              filled: false,
+            ),
+            onChanged: (value) {
+              _onOtpBoxChanged(value, index);
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _onOtpBoxChanged(String value, int index) {
+    // Update UI
+    setState(() {});
+
+    // Move to next box when digit entered
+    if (value.isNotEmpty && index < 5) {
+      _otpFocusNodes[index + 1].requestFocus();
+    }
+
+    // Move to previous box on backspace when empty
+    if (value.isEmpty && index > 0) {
+      _otpFocusNodes[index - 1].requestFocus();
+    }
+
+    // Update the main OTP controller with combined value
+    String otp = _otpBoxControllers.map((c) => c.text).join();
+    _otpController.text = otp;
+
+    // Auto-verify when all 6 digits entered
+    if (otp.length == 6) {
+      // Hide keyboard
+      FocusScope.of(context).unfocus();
+    }
+  }
+
+  void _clearOtpBoxes() {
+    for (var controller in _otpBoxControllers) {
+      controller.clear();
+    }
+    _otpController.clear();
+    if (_otpFocusNodes.isNotEmpty) {
+      _otpFocusNodes[0].requestFocus();
+    }
+  }
+}
+
+// Separate StatefulWidget for Country Code Picker with search
+class _CountryCodePickerSheet extends StatefulWidget {
+  final List<Map<String, String>> countryCodes;
+  final String selectedCountryCode;
+  final Function(String code, String flag) onSelect;
+
+  const _CountryCodePickerSheet({
+    required this.countryCodes,
+    required this.selectedCountryCode,
+    required this.onSelect,
+  });
+
+  @override
+  State<_CountryCodePickerSheet> createState() =>
+      _CountryCodePickerSheetState();
+}
+
+class _CountryCodePickerSheetState extends State<_CountryCodePickerSheet> {
+  final TextEditingController _searchController = TextEditingController();
+  List<Map<String, String>> _filteredCountries = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _filteredCountries = widget.countryCodes;
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _filterCountries(String query) {
+    setState(() {
+      if (query.isEmpty) {
+        _filteredCountries = widget.countryCodes;
+      } else {
+        _filteredCountries = widget.countryCodes.where((country) {
+          final countryName = country['country']!.toLowerCase();
+          final countryCode = country['code']!.toLowerCase();
+          final searchQuery = query.toLowerCase();
+          return countryName.contains(searchQuery) ||
+              countryCode.contains(searchQuery);
+        }).toList();
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+        child: Container(
+          height: MediaQuery.of(context).size.height * 0.7,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.white.withValues(alpha: 0.15),
+                Colors.white.withValues(alpha: 0.05),
+              ],
+            ),
+            border: Border(
+              top: BorderSide(
+                color: Colors.white.withValues(alpha: 0.3),
+                width: 1,
+              ),
+            ),
+          ),
+          child: Column(
+            children: [
+              // Handle bar
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Title
+              Text(
+                'Select Country Code',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  shadows: [
+                    Shadow(
+                      color: Colors.black.withValues(alpha: 0.5),
+                      blurRadius: 4,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Search Field with glassmorphism
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: TextField(
+                    controller: _searchController,
+                    onChanged: _filterCountries,
+                    style: const TextStyle(color: Colors.white, fontSize: 16),
+                    cursorColor: Colors.white,
+                    decoration: InputDecoration(
+                      hintText: 'Search country or code...',
+                      hintStyle: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.6),
+                        fontSize: 15,
+                      ),
+                      prefixIcon: Icon(
+                        Icons.search,
+                        color: Colors.white.withValues(alpha: 0.7),
+                      ),
+                      suffixIcon: _searchController.text.isNotEmpty
+                          ? IconButton(
+                              icon: Icon(
+                                Icons.clear,
+                                color: Colors.white.withValues(alpha: 0.7),
+                              ),
+                              onPressed: () {
+                                _searchController.clear();
+                                _filterCountries('');
+                              },
+                            )
+                          : null,
+                      filled: false,
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              // Country List
+              Expanded(
+                child: _filteredCountries.isEmpty
+                    ? const Center(
+                        child: Text(
+                          'No countries found',
+                          style: TextStyle(color: Colors.white54, fontSize: 16),
+                        ),
+                      )
+                    : ListView.builder(
+                        itemCount: _filteredCountries.length,
+                        itemBuilder: (context, index) {
+                          final country = _filteredCountries[index];
+                          final isSelected =
+                              country['code'] == widget.selectedCountryCode;
+                          return Container(
+                            margin: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? Colors.white.withValues(alpha: 0.15)
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(12),
+                              border: isSelected
+                                  ? Border.all(
+                                      color: Colors.white.withValues(
+                                        alpha: 0.3,
+                                      ),
+                                    )
+                                  : null,
+                            ),
+                            child: ListTile(
+                              leading: Text(
+                                country['flag']!,
+                                style: const TextStyle(fontSize: 24),
+                              ),
+                              title: Text(
+                                country['country']!,
+                                style: const TextStyle(color: Colors.white),
+                              ),
+                              trailing: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: isSelected
+                                      ? Colors.green.withValues(alpha: 0.3)
+                                      : Colors.white.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: isSelected
+                                        ? Colors.green.withValues(alpha: 0.5)
+                                        : Colors.white.withValues(alpha: 0.2),
+                                  ),
+                                ),
+                                child: Text(
+                                  country['code']!,
+                                  style: TextStyle(
+                                    color: isSelected
+                                        ? Colors.green
+                                        : Colors.white,
+                                    fontWeight: isSelected
+                                        ? FontWeight.bold
+                                        : FontWeight.normal,
+                                  ),
+                                ),
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              onTap: () {
+                                widget.onSelect(
+                                  country['code']!,
+                                  country['flag']!,
+                                );
+                                Navigator.pop(context);
+                              },
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
