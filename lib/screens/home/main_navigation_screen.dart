@@ -592,7 +592,9 @@ class _AnimatedMenuItemState extends State<_AnimatedMenuItem> {
             width: 56,
             height: 56,
             transform: Matrix4.identity()
-              ..scale(_isPressed ? 0.9 : 1.0),
+              ..setEntry(0, 0, _isPressed ? 0.9 : 1.0)
+              ..setEntry(1, 1, _isPressed ? 0.9 : 1.0)
+              ..setEntry(2, 2, _isPressed ? 0.9 : 1.0),
             transformAlignment: Alignment.center,
             decoration: BoxDecoration(
               shape: BoxShape.circle,

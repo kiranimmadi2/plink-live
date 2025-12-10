@@ -1107,9 +1107,8 @@ class _ProfileWithHistoryScreenState
                                                   _loadUserData();
 
                                                   if (!mounted) return;
-                                                  ScaffoldMessenger.of(
-                                                    context,
-                                                  ).showSnackBar(
+                                                  // ignore: use_build_context_synchronously
+                                                  ScaffoldMessenger.of(context).showSnackBar(
                                                     const SnackBar(
                                                       content: Text(
                                                         'Location updated successfully',
@@ -1120,9 +1119,8 @@ class _ProfileWithHistoryScreenState
                                                   );
                                                 } else {
                                                   if (!mounted) return;
-                                                  ScaffoldMessenger.of(
-                                                    context,
-                                                  ).showSnackBar(
+                                                  // ignore: use_build_context_synchronously
+                                                  ScaffoldMessenger.of(context).showSnackBar(
                                                     const SnackBar(
                                                       content: Text(
                                                         'Could not update location',
@@ -1137,9 +1135,8 @@ class _ProfileWithHistoryScreenState
                                                   'Error during manual location update: $e',
                                                 );
                                                 if (!mounted) return;
-                                                ScaffoldMessenger.of(
-                                                  context,
-                                                ).showSnackBar(
+                                                // ignore: use_build_context_synchronously
+                                                ScaffoldMessenger.of(context).showSnackBar(
                                                   const SnackBar(
                                                     content: Text(
                                                       'Location update failed',

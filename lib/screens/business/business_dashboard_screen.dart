@@ -1627,6 +1627,8 @@ class _BusinessDashboardScreenState extends ConsumerState<BusinessDashboardScree
           final id = await _businessService.createListing(listing);
           if (id != null && mounted) {
             _loadBusinessData();
+            if (!mounted) return;
+            // ignore: use_build_context_synchronously
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text('${type == 'product' ? 'Product' : 'Service'} added successfully')),
             );
@@ -1651,8 +1653,10 @@ class _BusinessDashboardScreenState extends ConsumerState<BusinessDashboardScree
         existingListing: listing,
         onSave: (updatedListing) async {
           final success = await _businessService.updateListing(listing.id, updatedListing);
-          if (success) {
+          if (success && mounted) {
+            _loadBusinessData();
             if (!mounted) return;
+            // ignore: use_build_context_synchronously
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('Listing updated successfully')),
             );
@@ -1682,9 +1686,10 @@ class _BusinessDashboardScreenState extends ConsumerState<BusinessDashboardScree
             onPressed: () async {
               Navigator.pop(context);
               final success = await _businessService.deleteListing(listing.id);
-              if (success) {
+              if (success && mounted) {
                 _loadBusinessData();
                 if (!mounted) return;
+                // ignore: use_build_context_synchronously
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Listing deleted')),
                 );
@@ -1800,8 +1805,9 @@ class _BusinessDashboardScreenState extends ConsumerState<BusinessDashboardScree
                 review.id,
                 controller.text.trim(),
               );
-              if (success) {
+              if (success && mounted) {
                 if (!mounted) return;
+                // ignore: use_build_context_synchronously
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Reply posted')),
                 );

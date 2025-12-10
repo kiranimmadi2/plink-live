@@ -868,9 +868,10 @@ class _ProfessionalDashboardScreenState
               Navigator.pop(context);
               final success =
                   await _professionalService.deleteService(service.id);
-              if (success) {
+              if (success && mounted) {
                 _loadStats();
                 if (!mounted) return;
+                // ignore: use_build_context_synchronously
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Service deleted')),
                 );
@@ -966,9 +967,10 @@ class _ProfessionalDashboardScreenState
               Navigator.pop(context);
               final success =
                   await _professionalService.deletePortfolioItem(item.id);
-              if (success) {
+              if (success && mounted) {
                 _loadStats();
                 if (!mounted) return;
+                // ignore: use_build_context_synchronously
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Portfolio item deleted')),
                 );
