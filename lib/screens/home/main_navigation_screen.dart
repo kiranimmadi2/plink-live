@@ -13,10 +13,16 @@ import 'live_connect_tab_screen.dart';
 import 'profile_with_history_screen.dart';
 import 'messageser_screen.dart';
 
+// Professional & Business screens
+import '../professional/professional_dashboard_screen.dart';
+import '../business/business_dashboard_screen.dart';
+
 // services
 import '../../services/location_service.dart';
 import '../../services/notification_service.dart';
 import '../../services/video_preload_service.dart';
+import '../../services/account_type_service.dart';
+import '../../models/user_profile.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   const MainNavigationScreen({super.key});
@@ -34,6 +40,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
   Offset _fabPosition = const Offset(0, 0);
   bool _initialPosSet = false;
 
+  // Account type for showing appropriate dashboard
+  AccountType _accountType = AccountType.personal;
+  StreamSubscription<AccountType>? _accountTypeSubscription;
+
   // Stream subscription for cleanup
   StreamSubscription<QuerySnapshot>? _unreadSubscription;
 
@@ -41,6 +51,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final LocationService _location = LocationService();
   final VideoPreloadService _videoService = VideoPreloadService();
+  final AccountTypeService _accountTypeService = AccountTypeService();
 
   // Animation controller
   late AnimationController _menuController;
@@ -61,12 +72,35 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     _listenUnread();
     _updateStatus(true);
     _checkLocation();
+    _loadAccountType();
+  }
+
+  void _loadAccountType() async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    // Initial load
+    final accountType = await _accountTypeService.getCurrentAccountType();
+    if (mounted) {
+      setState(() => _accountType = accountType);
+    }
+
+    // Listen for changes
+    _accountTypeSubscription?.cancel();
+    _accountTypeSubscription = _accountTypeService
+        .watchAccountType(user.uid)
+        .listen((type) {
+          if (mounted) {
+            setState(() => _accountType = type);
+          }
+        });
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _unreadSubscription?.cancel();
+    _accountTypeSubscription?.cancel();
     _menuController.dispose();
     super.dispose();
   }
@@ -213,39 +247,62 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     });
   }
 
-  // MENU ITEMS
-  List<Map<String, dynamic>> menuItems = [
-    {
-      "label": "Discover",
-      "icon": Icons.explore_outlined,
-      "index": 0,
-      "color": Colors.blue,
-    },
-    {
-      "label": "Messages",
-      "icon": Icons.message_outlined,
-      "index": 1,
-      "color": Colors.green,
-    },
-    {
-      "label": "Live",
-      "icon": Icons.people_outline,
-      "index": 2,
-      "color": Colors.orange,
-    },
-    {
-      "label": "Profile",
-      "icon": Icons.person_outline,
-      "index": 3,
-      "color": Colors.purple,
-    },
-    {
+  // MENU ITEMS - Built dynamically based on account type
+  List<Map<String, dynamic>> get menuItems {
+    final items = <Map<String, dynamic>>[
+      {
+        "label": "Discover",
+        "icon": Icons.explore_outlined,
+        "index": 0,
+        "color": Colors.blue,
+      },
+      {
+        "label": "Messages",
+        "icon": Icons.message_outlined,
+        "index": 1,
+        "color": Colors.green,
+      },
+      {
+        "label": "Live",
+        "icon": Icons.people_outline,
+        "index": 2,
+        "color": Colors.orange,
+      },
+      {
+        "label": "Profile",
+        "icon": Icons.person_outline,
+        "index": 3,
+        "color": Colors.purple,
+      },
+    ];
+
+    // Add Dashboard for Professional/Business accounts
+    if (_accountType == AccountType.professional) {
+      items.add({
+        "label": "Dashboard",
+        "icon": Icons.dashboard_outlined,
+        "index": 5,
+        "color": const Color(0xFF9C27B0), // Purple for professional
+      });
+    } else if (_accountType == AccountType.business) {
+      items.add({
+        "label": "Dashboard",
+        "icon": Icons.business_center_outlined,
+        "index": 6,
+        "color": const Color(0xFFFF9800), // Orange for business
+      });
+    }
+
+    // Add Messageser at the end
+    items.add({
       "label": "Messageser",
       "icon": Icons.message_rounded,
       "index": 4,
       "color": Colors.teal,
-    },
-  ];
+    });
+
+    return items;
+  }
 
   // SCREENS
   Widget _buildScreen() {
@@ -260,6 +317,12 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
         return const ProfileWithHistoryScreen();
       case 4:
         return const MessageserScreen();
+      case 5:
+        // Professional Dashboard
+        return const ProfessionalDashboardScreen();
+      case 6:
+        // Business Dashboard
+        return const BusinessDashboardScreen();
       default:
         return const HomeScreen();
     }

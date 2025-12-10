@@ -111,18 +111,25 @@ service cloud.firestore {
     // ============================================
     match /conversations/{conversationId} {
       // Participants can read the conversation
-      allow read: if isAuthenticated() && isParticipant(resource.data);
+      // For list queries with where(participants, arrayContains), we check if user is in participants
+      allow read: if isAuthenticated() &&
+        (request.auth.uid in resource.data.participants ||
+         (resource.data.participantIds != null && request.auth.uid in resource.data.participantIds));
 
       // Any authenticated user can create a conversation they're part of
       allow create: if isAuthenticated() &&
         (request.auth.uid in request.resource.data.participants ||
-         request.auth.uid in request.resource.data.participantIds);
+         (request.resource.data.participantIds != null && request.auth.uid in request.resource.data.participantIds));
 
       // Participants can update conversation metadata
-      allow update: if isAuthenticated() && isParticipant(resource.data);
+      allow update: if isAuthenticated() &&
+        (request.auth.uid in resource.data.participants ||
+         (resource.data.participantIds != null && request.auth.uid in resource.data.participantIds));
 
       // Only participants can delete (archive) conversations
-      allow delete: if isAuthenticated() && isParticipant(resource.data);
+      allow delete: if isAuthenticated() &&
+        (request.auth.uid in resource.data.participants ||
+         (resource.data.participantIds != null && request.auth.uid in resource.data.participantIds));
 
       // Messages subcollection
       match /messages/{messageId} {
@@ -280,6 +287,102 @@ service cloud.firestore {
     match /config/{document=**} {
       allow read: if isAuthenticated();
       allow write: if false;
+    }
+
+    // ============================================
+    // PROFESSIONAL REVIEWS COLLECTION
+    // ============================================
+    match /reviews/{reviewId} {
+      // Anyone authenticated can read reviews
+      allow read: if isAuthenticated();
+
+      // Users can create reviews (reviewer must be themselves)
+      allow create: if isAuthenticated() &&
+        request.resource.data.reviewerId == request.auth.uid;
+
+      // Only reviewer can update their review
+      allow update: if isAuthenticated() &&
+        (resource.data.reviewerId == request.auth.uid ||
+         // Professional can add response to their own reviews
+         resource.data.professionalId == request.auth.uid);
+
+      // Only reviewer can delete their review
+      allow delete: if isAuthenticated() &&
+        resource.data.reviewerId == request.auth.uid;
+    }
+
+    // ============================================
+    // PROFESSIONAL INQUIRIES COLLECTION
+    // ============================================
+    match /inquiries/{inquiryId} {
+      // Client and professional can read the inquiry
+      allow read: if isAuthenticated() &&
+        (resource.data.clientId == request.auth.uid ||
+         resource.data.professionalId == request.auth.uid);
+
+      // Clients can create inquiries (must be themselves)
+      allow create: if isAuthenticated() &&
+        request.resource.data.clientId == request.auth.uid;
+
+      // Both client and professional can update (for status changes, messages)
+      allow update: if isAuthenticated() &&
+        (resource.data.clientId == request.auth.uid ||
+         resource.data.professionalId == request.auth.uid);
+
+      // Only client can delete/cancel their inquiry
+      allow delete: if isAuthenticated() &&
+        resource.data.clientId == request.auth.uid;
+    }
+
+    // ============================================
+    // PROFESSIONAL STATS COLLECTION
+    // ============================================
+    match /professional_stats/{professionalId} {
+      // Anyone can read professional stats (for public profiles)
+      allow read: if isAuthenticated();
+
+      // Only the professional can write their own stats
+      allow write: if isOwner(professionalId);
+    }
+
+    // ============================================
+    // SERVICES COLLECTION (Professional services)
+    // ============================================
+    match /services/{serviceId} {
+      // Anyone authenticated can read services
+      allow read: if isAuthenticated();
+
+      // Only the professional can create their services
+      allow create: if isAuthenticated() &&
+        request.resource.data.professionalId == request.auth.uid;
+
+      // Only the professional can update their services
+      allow update: if isAuthenticated() &&
+        resource.data.professionalId == request.auth.uid;
+
+      // Only the professional can delete their services
+      allow delete: if isAuthenticated() &&
+        resource.data.professionalId == request.auth.uid;
+    }
+
+    // ============================================
+    // PORTFOLIO COLLECTION (Professional portfolio)
+    // ============================================
+    match /portfolio/{itemId} {
+      // Anyone authenticated can read portfolio items
+      allow read: if isAuthenticated();
+
+      // Only the professional can create their portfolio items
+      allow create: if isAuthenticated() &&
+        request.resource.data.professionalId == request.auth.uid;
+
+      // Only the professional can update their portfolio items
+      allow update: if isAuthenticated() &&
+        resource.data.professionalId == request.auth.uid;
+
+      // Only the professional can delete their portfolio items
+      allow delete: if isAuthenticated() &&
+        resource.data.professionalId == request.auth.uid;
     }
   }
 }

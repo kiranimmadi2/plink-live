@@ -5,10 +5,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/service_model.dart';
 import '../../models/portfolio_item_model.dart';
 import '../../services/professional_service.dart';
+import '../../services/inquiry_service.dart';
 import '../../widgets/professional/service_card.dart';
 import '../../widgets/professional/portfolio_card.dart';
 import '../../widgets/professional/add_service_sheet.dart';
 import '../../widgets/professional/add_portfolio_sheet.dart';
+import 'service_detail_screen.dart';
+import 'portfolio_detail_screen.dart';
+import 'inquiries_screen.dart';
 
 /// Tab-based dashboard for managing professional profile, services, and portfolio
 class ProfessionalDashboardScreen extends ConsumerStatefulWidget {
@@ -24,6 +28,7 @@ class _ProfessionalDashboardScreenState
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final ProfessionalService _professionalService = ProfessionalService();
+  final InquiryService _inquiryService = InquiryService();
 
   // Statistics
   Map<String, dynamic> _stats = {
@@ -34,11 +39,21 @@ class _ProfessionalDashboardScreenState
     'inquiries': 0,
   };
 
+  int _pendingInquiries = 0;
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     _loadStats();
+    _loadPendingInquiries();
+  }
+
+  Future<void> _loadPendingInquiries() async {
+    final count = await _inquiryService.getPendingCount();
+    if (mounted) {
+      setState(() => _pendingInquiries = count);
+    }
   }
 
   @override
@@ -80,6 +95,50 @@ class _ProfessionalDashboardScreenState
                 onPressed: () => Navigator.pop(context),
               ),
               actions: [
+                // Inquiries button with badge
+                Stack(
+                  children: [
+                    IconButton(
+                      icon: Icon(
+                        Icons.mail_outline,
+                        color: isDarkMode ? Colors.white : Colors.black87,
+                      ),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const InquiriesScreen(),
+                          ),
+                        ).then((_) => _loadPendingInquiries());
+                      },
+                    ),
+                    if (_pendingInquiries > 0)
+                      Positioned(
+                        right: 6,
+                        top: 6,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF00D67D),
+                            shape: BoxShape.circle,
+                          ),
+                          constraints: const BoxConstraints(
+                            minWidth: 18,
+                            minHeight: 18,
+                          ),
+                          child: Text(
+                            _pendingInquiries > 9 ? '9+' : '$_pendingInquiries',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
                 IconButton(
                   icon: Icon(
                     Icons.settings_outlined,
@@ -780,7 +839,12 @@ class _ProfessionalDashboardScreenState
   }
 
   void _showServiceDetails(ServiceModel service) {
-    // TODO: Navigate to service details screen
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ServiceDetailScreen(service: service),
+      ),
+    );
   }
 
   void _confirmDeleteService(ServiceModel service) {
@@ -873,7 +937,12 @@ class _ProfessionalDashboardScreenState
   }
 
   void _showPortfolioDetails(PortfolioItemModel item) {
-    // TODO: Navigate to portfolio details/gallery view
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PortfolioDetailScreen(item: item),
+      ),
+    );
   }
 
   void _confirmDeletePortfolio(PortfolioItemModel item) {
