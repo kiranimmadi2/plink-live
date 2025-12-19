@@ -1,10 +1,11 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:math';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:timeago/timeago.dart' as timeago;
@@ -18,12 +19,13 @@ import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/user_profile.dart';
 import '../models/message_model.dart';
-import '../services/notification_service.dart';
+import '../utils/photo_url_helper.dart';
 import '../services/conversation_service.dart';
 import '../services/hybrid_chat_service.dart';
 import '../providers/app_providers.dart';
 import 'profile/profile_view_screen.dart';
 import 'video_player_screen.dart';
+import '../widgets/chat_common.dart';
 
 class EnhancedChatScreen extends ConsumerStatefulWidget {
   final UserProfile otherUser;
@@ -244,10 +246,21 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
 
   Future<void> _initializeConversation() async {
     try {
-      // If chatId is provided from Live Connect, use it directly
-      // Otherwise, use ConversationService to get or create conversation
+      // OPTIMIZATION: If chatId is provided, use it immediately without Firestore query
+      if (widget.chatId != null) {
+        if (mounted) {
+          setState(() {
+            _conversationId = widget.chatId;
+          });
+          _markMessagesAsRead();
+        }
+        // Load chat theme in background (non-blocking)
+        _loadChatTheme();
+        return;
+      }
+
+      // Fallback: Create conversation if not provided
       final conversationId =
-          widget.chatId ??
           await _conversationService.getOrCreateConversation(widget.otherUser);
 
       if (mounted) {
@@ -257,8 +270,8 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
         _markMessagesAsRead();
       }
 
-      // Load saved chat theme
-      await _loadChatTheme();
+      // Load saved chat theme in background
+      _loadChatTheme();
 
       // debugPrint('EnhancedChatScreen: Conversation initialized with ID: $conversationId');
     } catch (e) {
@@ -387,17 +400,39 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
                 children: [
                   Stack(
                     children: [
-                      CircleAvatar(
-                        radius: 18,
-                        backgroundImage:
-                            widget.otherUser.profileImageUrl != null
-                            ? CachedNetworkImageProvider(
-                                widget.otherUser.profileImageUrl!,
-                              )
-                            : null,
-                        child: widget.otherUser.profileImageUrl == null
-                            ? Text(widget.otherUser.name[0].toUpperCase())
-                            : null,
+                      Builder(
+                        builder: (context) {
+                          final fixedPhotoUrl = PhotoUrlHelper.fixGooglePhotoUrl(widget.otherUser.profileImageUrl);
+                          final initial = widget.otherUser.name.isNotEmpty ? widget.otherUser.name[0].toUpperCase() : '?';
+
+                          Widget buildFallbackAvatar() {
+                            return CircleAvatar(
+                              radius: 18,
+                              backgroundColor: Theme.of(context).primaryColor.withValues(alpha: 0.1),
+                              child: Text(initial, style: TextStyle(color: Theme.of(context).primaryColor)),
+                            );
+                          }
+
+                          if (fixedPhotoUrl == null || fixedPhotoUrl.isEmpty) {
+                            return buildFallbackAvatar();
+                          }
+
+                          return ClipOval(
+                            child: CachedNetworkImage(
+                              imageUrl: fixedPhotoUrl,
+                              width: 36,
+                              height: 36,
+                              fit: BoxFit.cover,
+                              placeholder: (context, url) => buildFallbackAvatar(),
+                              errorWidget: (context, url, error) {
+                                if (error.toString().contains('429')) {
+                                  PhotoUrlHelper.markAsRateLimited(url);
+                                }
+                                return buildFallbackAvatar();
+                              },
+                            ),
+                          );
+                        },
                       ),
                       StreamBuilder<DocumentSnapshot>(
                         stream: _userStatusStream,
@@ -541,10 +576,11 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
 
                                   if (isOnline) {
                                     return const Text(
-                                      'Active now',
+                                      'Online',
                                       style: TextStyle(
-                                        fontSize: 12,
+                                        fontSize: 13,
                                         color: Colors.green,
+                                        fontWeight: FontWeight.w500,
                                       ),
                                     );
                                   } else if (userData['lastSeen'] != null) {
@@ -574,25 +610,89 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
               ),
             ),
       actions: [
-        if (!_isSearching)
+        if (!_isSearching) ...[
+          // Video call button
           IconButton(
             icon: Icon(
-              Icons.search_rounded,
+              Icons.videocam_outlined,
+              color: isDarkMode ? Colors.white : Colors.black87,
+              size: 26,
+            ),
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Video calling coming soon!'),
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            },
+          ),
+          // Voice call button
+          IconButton(
+            icon: Icon(
+              Icons.call_outlined,
+              color: isDarkMode ? Colors.white : Colors.black87,
+              size: 24,
+            ),
+            onPressed: () => _initiateVoiceCall(),
+          ),
+        ],
+        if (_isSearching)
+          IconButton(
+            icon: Icon(
+              Icons.close_rounded,
               color: isDarkMode ? Colors.white70 : const Color(0xFF007AFF),
               size: 24,
             ),
             onPressed: _toggleSearch,
           ),
-        IconButton(
-          icon: Icon(
-            _isSearching ? Icons.close_rounded : Icons.more_horiz_rounded,
-            color: isDarkMode ? Colors.white70 : const Color(0xFF007AFF),
-            size: 24,
-          ),
-          onPressed: _isSearching ? _toggleSearch : _showChatInfo,
-        ),
       ],
     );
+  }
+
+  void _initiateVoiceCall() async {
+    HapticFeedback.mediumImpact();
+
+    // Navigate to call screen
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) return;
+
+    try {
+      // Create call record in Firestore
+      final callDoc = await _firestore.collection('calls').add({
+        'callerId': currentUser.uid,
+        'callerName': currentUser.displayName ?? 'Unknown',
+        'receiverId': widget.otherUser.uid,
+        'receiverName': widget.otherUser.name,
+        'participants': [currentUser.uid, widget.otherUser.uid],
+        'type': 'voice',
+        'status': 'calling',
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+
+      if (!mounted) return;
+
+      // Navigate to voice call screen
+      Navigator.pushNamed(
+        context,
+        '/voice-call',
+        arguments: {
+          'callId': callDoc.id,
+          'otherUser': widget.otherUser,
+          'isOutgoing': true,
+        },
+      );
+    } catch (e) {
+      debugPrint('Error initiating call: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to initiate call'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   Widget _buildMessagesList(bool isDarkMode) {
@@ -601,6 +701,7 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
     }
 
     // Use StreamBuilder for real-time updates from Firebase with pagination
+    // OPTIMIZATION: Use cache for faster initial load
     return StreamBuilder<QuerySnapshot>(
       stream: _firestore
           .collection('conversations')
@@ -608,7 +709,7 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
           .collection('messages')
           .orderBy('timestamp', descending: true)
           .limit(_messagesPerPage)
-          .snapshots(),
+          .snapshots(includeMetadataChanges: false),
       builder: (context, snapshot) {
         // Skip loading indicator - show content immediately for faster UX
         if (snapshot.connectionState == ConnectionState.waiting &&
@@ -720,26 +821,48 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
                 ),
               ],
             ),
-            child: CircleAvatar(
-              radius: 50,
-              backgroundColor: isDarkMode
-                  ? const Color(0xFF1C1C1E)
-                  : const Color(0xFFE5E5EA),
-              backgroundImage: widget.otherUser.profileImageUrl != null
-                  ? CachedNetworkImageProvider(
-                      widget.otherUser.profileImageUrl!,
-                    )
-                  : null,
-              child: widget.otherUser.profileImageUrl == null
-                  ? Text(
-                      widget.otherUser.name[0].toUpperCase(),
+            child: Builder(
+              builder: (context) {
+                final fixedPhotoUrl = PhotoUrlHelper.fixGooglePhotoUrl(widget.otherUser.profileImageUrl);
+                final initial = widget.otherUser.name.isNotEmpty ? widget.otherUser.name[0].toUpperCase() : '?';
+
+                Widget buildFallbackAvatar() {
+                  return CircleAvatar(
+                    radius: 50,
+                    backgroundColor: isDarkMode
+                        ? const Color(0xFF1C1C1E)
+                        : const Color(0xFFE5E5EA),
+                    child: Text(
+                      initial,
                       style: const TextStyle(
                         fontSize: 40,
                         fontWeight: FontWeight.w600,
                         color: Color(0xFF007AFF),
                       ),
-                    )
-                  : null,
+                    ),
+                  );
+                }
+
+                if (fixedPhotoUrl == null || fixedPhotoUrl.isEmpty) {
+                  return buildFallbackAvatar();
+                }
+
+                return ClipOval(
+                  child: CachedNetworkImage(
+                    imageUrl: fixedPhotoUrl,
+                    width: 100,
+                    height: 100,
+                    fit: BoxFit.cover,
+                    placeholder: (context, url) => buildFallbackAvatar(),
+                    errorWidget: (context, url, error) {
+                      if (error.toString().contains('429')) {
+                        PhotoUrlHelper.markAsRateLimited(url);
+                      }
+                      return buildFallbackAvatar();
+                    },
+                  ),
+                );
+              },
             ),
           ),
           const SizedBox(height: 20),
@@ -767,34 +890,37 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
   }
 
   // Helper to parse message status from int
+  /// Parse message status from dynamic value (handles both int and string)
   MessageStatus _parseMessageStatusFromInt(dynamic status) {
     if (status == null) return MessageStatus.sent;
+
+    // Handle integer status (legacy format)
     if (status is int) {
       return MessageStatus.values[status.clamp(
         0,
         MessageStatus.values.length - 1,
       )];
     }
-    return MessageStatus.sent;
-  }
 
-  // Helper to parse message status from string
-  // ignore: unused_element
-  MessageStatus _parseMessageStatus(String? status) {
-    switch (status) {
-      case 'sending':
-        return MessageStatus.sending;
-      case 'sent':
-        return MessageStatus.sent;
-      case 'delivered':
-        return MessageStatus.delivered;
-      case 'read':
-        return MessageStatus.read;
-      case 'failed':
-        return MessageStatus.failed;
-      default:
-        return MessageStatus.sent;
+    // Handle string status (current format used by HybridChatService)
+    if (status is String) {
+      switch (status.toLowerCase()) {
+        case 'sending':
+          return MessageStatus.sending;
+        case 'sent':
+          return MessageStatus.sent;
+        case 'delivered':
+          return MessageStatus.delivered;
+        case 'read':
+          return MessageStatus.read;
+        case 'failed':
+          return MessageStatus.failed;
+        default:
+          return MessageStatus.sent;
+      }
     }
+
+    return MessageStatus.sent;
   }
 
   Widget _buildMessageListView(bool isDarkMode, List<MessageModel> messages) {
@@ -836,6 +962,10 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
               reverse: true,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               itemCount: displayMessages.length,
+              // Performance optimizations
+              addAutomaticKeepAlives: false,
+              addRepaintBoundaries: true,
+              cacheExtent: 500, // Cache more items for smoother scrolling
               itemBuilder: (context, index) {
                 final message = displayMessages[index];
                 final isMe = message.senderId == _currentUserId!;
@@ -864,6 +994,7 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
                 }
 
                 return Column(
+                  key: ValueKey(message.id), // Add key for efficient rebuilds
                   children: [
                     if (dateSeparator != null) dateSeparator,
                     _buildMessageBubble(
@@ -979,19 +1110,11 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
         ? const Color(0xFF1C1C1E)
         : const Color(0xFFE9E9EB);
 
+    // Removed TweenAnimationBuilder for performance - animations on every message
+    // cause significant lag during scrolling
     return GestureDetector(
       onLongPress: () => _showMessageOptions(message, isMe),
-      child: TweenAnimationBuilder<double>(
-        tween: Tween(begin: 0.0, end: 1.0),
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOutCubic,
-        builder: (context, value, child) {
-          return Transform.scale(
-            scale: 0.8 + (0.2 * value),
-            child: Opacity(opacity: value, child: child),
-          );
-        },
-        child: Padding(
+      child: Padding(
           padding: EdgeInsets.only(
             bottom: 6,
             left: isMe ? 60 : 0,
@@ -1118,7 +1241,6 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
             ],
           ),
         ),
-      ),
     );
   }
 
@@ -1135,22 +1257,46 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
           ),
         ],
       ),
-      child: CircleAvatar(
-        radius: 16,
-        backgroundColor: const Color(0xFF007AFF).withValues(alpha: 0.15),
-        backgroundImage: widget.otherUser.profileImageUrl != null
-            ? CachedNetworkImageProvider(widget.otherUser.profileImageUrl!)
-            : null,
-        child: widget.otherUser.profileImageUrl == null
-            ? Text(
-                widget.otherUser.name[0].toUpperCase(),
+      child: Builder(
+        builder: (context) {
+          final fixedPhotoUrl = PhotoUrlHelper.fixGooglePhotoUrl(widget.otherUser.profileImageUrl);
+          final initial = widget.otherUser.name.isNotEmpty ? widget.otherUser.name[0].toUpperCase() : '?';
+
+          Widget buildFallbackAvatar() {
+            return CircleAvatar(
+              radius: 16,
+              backgroundColor: const Color(0xFF007AFF).withValues(alpha: 0.15),
+              child: Text(
+                initial,
                 style: const TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                   color: Color(0xFF007AFF),
                 ),
-              )
-            : null,
+              ),
+            );
+          }
+
+          if (fixedPhotoUrl == null || fixedPhotoUrl.isEmpty) {
+            return buildFallbackAvatar();
+          }
+
+          return ClipOval(
+            child: CachedNetworkImage(
+              imageUrl: fixedPhotoUrl,
+              width: 32,
+              height: 32,
+              fit: BoxFit.cover,
+              placeholder: (context, url) => buildFallbackAvatar(),
+              errorWidget: (context, url, error) {
+                if (error.toString().contains('429')) {
+                  PhotoUrlHelper.markAsRateLimited(url);
+                }
+                return buildFallbackAvatar();
+              },
+            ),
+          );
+        },
       ),
     );
   }
@@ -1229,43 +1375,73 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
       return const SizedBox.shrink();
     }
 
-    ImageProvider? imageProvider;
+    // Handle local file images
     if (message.localPath != null) {
       final file = File(message.localPath!);
       if (file.existsSync()) {
-        imageProvider = FileImage(file);
+        final imageProvider = FileImage(file);
+        return GestureDetector(
+          onTap: () {
+            _openFullScreenImage(context, imageProvider);
+          },
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: Hero(
+              tag: message.id,
+              child: Image(
+                image: imageProvider,
+                fit: BoxFit.cover,
+                width: 200,
+                height: 200,
+                errorBuilder: (context, error, stackTrace) => Container(
+                  width: 200,
+                  height: 200,
+                  color: Colors.grey[300],
+                  child: const Icon(Icons.error),
+                ),
+              ),
+            ),
+          ),
+        );
       }
     }
 
-    if (imageProvider == null && message.mediaUrl != null) {
-      imageProvider = CachedNetworkImageProvider(message.mediaUrl!);
-    }
-
-    if (imageProvider == null) return const SizedBox.shrink();
-
-    return GestureDetector(
-      onTap: () {
-        _openFullScreenImage(context, imageProvider!);
-      },
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(14),
-        child: Hero(
-          tag: message.id,
-          child: Image(
-            image: imageProvider,
-            fit: BoxFit.cover,
-            width: 200,
-            height: 200,
-            errorBuilder: (context, error, stackTrace) => Container(
+    // Handle network images with CachedNetworkImage for better error handling
+    if (message.mediaUrl != null) {
+      return GestureDetector(
+        onTap: () {
+          _openFullScreenImage(context, CachedNetworkImageProvider(message.mediaUrl!));
+        },
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(14),
+          child: Hero(
+            tag: message.id,
+            child: CachedNetworkImage(
+              imageUrl: message.mediaUrl!,
+              fit: BoxFit.cover,
               width: 200,
               height: 200,
-              color: Colors.grey[300],
-              child: const Icon(Icons.error),
+              placeholder: (context, url) => Container(
+                width: 200,
+                height: 200,
+                color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                child: const Center(
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+              errorWidget: (context, url, error) => Container(
+                width: 200,
+                height: 200,
+                color: Colors.grey[300],
+                child: const Icon(Icons.error),
+              ),
             ),
           ),
         ),
-      ),
-    );
+      );
+    }
+
+    return const SizedBox.shrink();
   }
 
   void _openFullScreenImage(BuildContext context, ImageProvider imageProvider) {
@@ -1430,6 +1606,19 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
     BuildContext context,
     MessageModel message,
   ) async {
+    // Web doesn't support file download to local storage
+    if (kIsWeb) {
+      if (message.mediaUrl != null) {
+        // On web, open the URL directly in a new tab
+        // ignore: use_build_context_synchronously
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Opening file in browser...')),
+        );
+        // For web, the user can right-click to download
+      }
+      return;
+    }
+
     if (message.localPath != null) {
       final file = File(message.localPath!);
       if (file.existsSync()) {
@@ -1662,26 +1851,48 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
           padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
           child: Row(
             children: [
-              CircleAvatar(
-                radius: 14,
-                backgroundColor: isDarkMode
-                    ? const Color(0xFF1C1C1E)
-                    : const Color(0xFFE5E5EA),
-                backgroundImage: widget.otherUser.profileImageUrl != null
-                    ? CachedNetworkImageProvider(
-                        widget.otherUser.profileImageUrl!,
-                      )
-                    : null,
-                child: widget.otherUser.profileImageUrl == null
-                    ? Text(
-                        widget.otherUser.name[0].toUpperCase(),
+              Builder(
+                builder: (context) {
+                  final fixedPhotoUrl = PhotoUrlHelper.fixGooglePhotoUrl(widget.otherUser.profileImageUrl);
+                  final initial = widget.otherUser.name.isNotEmpty ? widget.otherUser.name[0].toUpperCase() : '?';
+
+                  Widget buildFallbackAvatar() {
+                    return CircleAvatar(
+                      radius: 14,
+                      backgroundColor: isDarkMode
+                          ? const Color(0xFF1C1C1E)
+                          : const Color(0xFFE5E5EA),
+                      child: Text(
+                        initial,
                         style: const TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w600,
                           color: Color(0xFF007AFF),
                         ),
-                      )
-                    : null,
+                      ),
+                    );
+                  }
+
+                  if (fixedPhotoUrl == null || fixedPhotoUrl.isEmpty) {
+                    return buildFallbackAvatar();
+                  }
+
+                  return ClipOval(
+                    child: CachedNetworkImage(
+                      imageUrl: fixedPhotoUrl,
+                      width: 28,
+                      height: 28,
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => buildFallbackAvatar(),
+                      errorWidget: (context, url, error) {
+                        if (error.toString().contains('429')) {
+                          PhotoUrlHelper.markAsRateLimited(url);
+                        }
+                        return buildFallbackAvatar();
+                      },
+                    ),
+                  );
+                },
               ),
               const SizedBox(width: 8),
               Container(
@@ -1747,15 +1958,15 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // Input Area - Premium iMessage style
+        // Input Area - Modern design like screenshot
         Container(
           padding: EdgeInsets.only(
-            left: 8,
-            right: 8,
-            top: 8,
+            left: 12,
+            right: 12,
+            top: 10,
             bottom: _showEmojiPicker
-                ? 8
-                : MediaQuery.of(context).padding.bottom + 8,
+                ? 10
+                : MediaQuery.of(context).padding.bottom + 10,
           ),
           decoration: BoxDecoration(
             color: isDarkMode
@@ -1775,43 +1986,21 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                // Attachment button - iOS style
+                // Attachment button - Paperclip icon
                 GestureDetector(
                   onTap: _showAttachmentOptions,
                   child: Container(
-                    height: 36,
-                    width: 36,
-                    margin: const EdgeInsets.only(bottom: 2, right: 4),
-                    decoration: BoxDecoration(
-                      color: isDarkMode
-                          ? const Color(0xFF1C1C1E)
-                          : const Color(0xFFE5E5EA),
-                      shape: BoxShape.circle,
-                    ),
+                    height: 40,
+                    width: 40,
+                    margin: const EdgeInsets.only(bottom: 4),
                     child: Icon(
-                      Icons.add_rounded,
-                      color: isDarkMode
-                          ? const Color(0xFF007AFF)
-                          : const Color(0xFF007AFF),
-                      size: 22,
+                      Icons.attach_file_rounded,
+                      color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                      size: 26,
                     ),
                   ),
                 ),
-                // Camera button - iOS style
-                GestureDetector(
-                  onTap: _takePhoto,
-                  child: Container(
-                    height: 36,
-                    width: 36,
-                    margin: const EdgeInsets.only(bottom: 2, right: 6),
-                    child: Icon(
-                      Icons.camera_alt_rounded,
-                      color: isDarkMode ? Colors.grey[500] : Colors.grey[600],
-                      size: 24,
-                    ),
-                  ),
-                ),
-                // Message input field - Premium rounded design
+                // Message input field - Rounded design
                 Expanded(
                   child: Container(
                     constraints: const BoxConstraints(maxHeight: 120),
@@ -1819,7 +2008,7 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
                       color: isDarkMode
                           ? const Color(0xFF1C1C1E)
                           : Colors.white,
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(22),
                       border: Border.all(
                         color: isDarkMode
                             ? const Color(0xFF38383A)
@@ -1844,23 +2033,21 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
                               color: isDarkMode
                                   ? Colors.white
                                   : const Color(0xFF1C1C1E),
-                              fontSize: 17,
+                              fontSize: 16,
                               height: 1.3,
-                              letterSpacing: -0.4,
                             ),
                             decoration: InputDecoration(
-                              hintText: 'Message',
+                              hintText: 'Message...',
                               hintStyle: TextStyle(
                                 color: isDarkMode
-                                    ? const Color(0xFF8E8E93)
-                                    : const Color(0xFF8E8E93),
-                                fontSize: 17,
-                                letterSpacing: -0.4,
+                                    ? Colors.grey[600]
+                                    : Colors.grey[500],
+                                fontSize: 16,
                               ),
                               border: InputBorder.none,
                               contentPadding: const EdgeInsets.symmetric(
                                 horizontal: 16,
-                                vertical: 10,
+                                vertical: 12,
                               ),
                             ),
                             onChanged: (text) {
@@ -1875,9 +2062,9 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
                             },
                           ),
                         ),
-                        // Emoji button - iOS style
+                        // Emoji button inside text field
                         Padding(
-                          padding: const EdgeInsets.only(right: 4, bottom: 6),
+                          padding: const EdgeInsets.only(right: 8, bottom: 8),
                           child: GestureDetector(
                             onTap: () {
                               setState(() {
@@ -1887,92 +2074,10 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
                                 }
                               });
                             },
-                            child: Container(
-                              padding: const EdgeInsets.all(4),
-                              decoration: BoxDecoration(
-                                color: _showEmojiPicker
-                                    ? const Color(
-                                        0xFF007AFF,
-                                      ).withValues(alpha: 0.12)
-                                    : Colors.transparent,
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: Icon(
-                                _showEmojiPicker
-                                    ? Icons.keyboard_rounded
-                                    : Icons.emoji_emotions_outlined,
-                                color: _showEmojiPicker
-                                    ? const Color(0xFF007AFF)
-                                    : (isDarkMode
-                                          ? const Color(0xFF8E8E93)
-                                          : const Color(0xFF8E8E93)),
-                                size: 26,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                // Send / Mic button - Premium animated
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 200),
-                  switchInCurve: Curves.easeOutBack,
-                  switchOutCurve: Curves.easeIn,
-                  transitionBuilder:
-                      (Widget child, Animation<double> animation) {
-                        return ScaleTransition(scale: animation, child: child);
-                      },
-                  child: hasText
-                      ? GestureDetector(
-                          key: const ValueKey('send'),
-                          onTap: _sendMessage,
-                          child: Builder(
-                            builder: (context) {
-                              final themeColors =
-                                  chatThemes[_currentTheme] ??
-                                  chatThemes['default']!;
-                              return Container(
-                                height: 36,
-                                width: 36,
-                                margin: const EdgeInsets.only(bottom: 2),
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: themeColors,
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                  ),
-                                  shape: BoxShape.circle,
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: themeColors[0].withValues(
-                                        alpha: 0.4,
-                                      ),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ],
-                                ),
-                                child: const Icon(
-                                  Icons.arrow_upward_rounded,
-                                  color: Colors.white,
-                                  size: 20,
-                                ),
-                              );
-                            },
-                          ),
-                        )
-                      : GestureDetector(
-                          key: const ValueKey('mic'),
-                          onTap: _recordVoice,
-                          child: Container(
-                            height: 36,
-                            width: 36,
-                            margin: const EdgeInsets.only(bottom: 2),
                             child: Icon(
-                              Icons.mic_rounded,
+                              _showEmojiPicker
+                                  ? Icons.keyboard_rounded
+                                  : Icons.emoji_emotions_outlined,
                               color: isDarkMode
                                   ? Colors.grey[500]
                                   : Colors.grey[600],
@@ -1980,6 +2085,43 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
                             ),
                           ),
                         ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Mic button (when no text)
+                if (!hasText)
+                  GestureDetector(
+                    onTap: _recordVoice,
+                    child: Container(
+                      height: 40,
+                      width: 40,
+                      margin: const EdgeInsets.only(bottom: 4),
+                      child: Icon(
+                        Icons.mic_rounded,
+                        color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                        size: 26,
+                      ),
+                    ),
+                  ),
+                // Send button - Blue circular
+                GestureDetector(
+                  onTap: hasText ? _sendMessage : null,
+                  child: Container(
+                    height: 42,
+                    width: 42,
+                    margin: const EdgeInsets.only(bottom: 3),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).primaryColor,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.send_rounded,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -2214,18 +2356,9 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
       // Reload messages to show the new message instantly
       setState(() {});
 
-      // Send push notification to the other user
-      final currentUserProfile = ref
-          .read(currentUserProfileProvider)
-          .valueOrNull;
-      final currentUserName = currentUserProfile?.name ?? 'Someone';
-
-      NotificationService().sendMessageNotification(
-        recipientToken: widget.otherUser.fcmToken ?? '',
-        senderName: currentUserName,
-        message: text,
-        conversationId: _conversationId,
-      );
+      // NOTE: Push notification is automatically sent to the recipient
+      // via Firebase Cloud Functions when the message is created in Firestore.
+      // No client-side notification sending needed.
     } catch (e) {
       if (!mounted) return;
       // ignore: use_build_context_synchronously
@@ -2264,7 +2397,12 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
     if (currentUserId == null) return;
 
     try {
-      // Use HybridChatService - updates both local DB and Firebase
+      // Step 1: Mark incoming messages as delivered (recipient opened chat)
+      // This updates sender's view: ✓ → ✓✓ (grey)
+      await _hybridChatService.markMessagesAsDelivered(_conversationId!);
+
+      // Step 2: Mark messages as read (recipient viewing messages)
+      // This updates sender's view: ✓✓ (grey) → ✓✓ (green/blue)
       await _hybridChatService.markMessagesAsRead(_conversationId!);
 
       // Check mounted again after async operation
@@ -2834,20 +2972,45 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
                       padding: const EdgeInsets.all(16),
                       children: [
                         Center(
-                          child: CircleAvatar(
-                            radius: 50,
-                            backgroundImage:
-                                widget.otherUser.profileImageUrl != null
-                                ? CachedNetworkImageProvider(
-                                    widget.otherUser.profileImageUrl!,
-                                  )
-                                : null,
-                            child: widget.otherUser.profileImageUrl == null
-                                ? Text(
-                                    widget.otherUser.name[0].toUpperCase(),
-                                    style: const TextStyle(fontSize: 32),
-                                  )
-                                : null,
+                          child: Builder(
+                            builder: (context) {
+                              final fixedPhotoUrl = PhotoUrlHelper.fixGooglePhotoUrl(widget.otherUser.profileImageUrl);
+                              final initial = widget.otherUser.name.isNotEmpty ? widget.otherUser.name[0].toUpperCase() : '?';
+
+                              Widget buildFallbackAvatar() {
+                                return CircleAvatar(
+                                  radius: 50,
+                                  backgroundColor: Theme.of(context).primaryColor.withValues(alpha: 0.1),
+                                  child: Text(
+                                    initial,
+                                    style: TextStyle(
+                                      fontSize: 32,
+                                      color: Theme.of(context).primaryColor,
+                                    ),
+                                  ),
+                                );
+                              }
+
+                              if (fixedPhotoUrl == null || fixedPhotoUrl.isEmpty) {
+                                return buildFallbackAvatar();
+                              }
+
+                              return ClipOval(
+                                child: CachedNetworkImage(
+                                  imageUrl: fixedPhotoUrl,
+                                  width: 100,
+                                  height: 100,
+                                  fit: BoxFit.cover,
+                                  placeholder: (context, url) => buildFallbackAvatar(),
+                                  errorWidget: (context, url, error) {
+                                    if (error.toString().contains('429')) {
+                                      PhotoUrlHelper.markAsRateLimited(url);
+                                    }
+                                    return buildFallbackAvatar();
+                                  },
+                                ),
+                              );
+                            },
                           ),
                         ),
                         const SizedBox(height: 16),
