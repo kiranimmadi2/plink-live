@@ -7,6 +7,8 @@ import 'package:timeago/timeago.dart' as timeago;
 
 import '../../models/conversation_model.dart';
 import '../../models/user_profile.dart';
+import '../../utils/photo_url_helper.dart';
+import '../../widgets/chat_common.dart';
 import '../enhanced_chat_screen.dart';
 import '../create_group_screen.dart';
 import '../group_chat_screen.dart';
@@ -25,16 +27,22 @@ class _ConversationsScreenState extends State<ConversationsScreen>
   final TextEditingController _searchController = TextEditingController();
 
   late TabController _tabController;
-  bool _isSearching = false;
   String _searchQuery = '';
+  int _currentTabIndex = 0;
+
+  // User cache to avoid repeated Firestore reads
+  final Map<String, Map<String, dynamic>> _userCache = {};
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(
-      length: 1,
-      vsync: this,
-    ); // Changed to 1 tab only
+    _tabController = TabController(length: 3, vsync: this);
+    _tabController.addListener(() {
+      if (_tabController.indexIsChanging) return;
+      setState(() {
+        _currentTabIndex = _tabController.index;
+      });
+    });
   }
 
   @override
@@ -44,27 +52,49 @@ class _ConversationsScreenState extends State<ConversationsScreen>
     super.dispose();
   }
 
-  String _getLastSeenText(dynamic lastSeen) {
-    if (lastSeen == null) return 'Offline';
+  /// Get user data with caching to reduce Firestore reads
+  Future<Map<String, dynamic>?> _getUserWithCache(String userId) async {
+    if (userId.isEmpty) return null;
 
-    if (lastSeen is Timestamp) {
-      final lastSeenTime = lastSeen.toDate();
-      final difference = DateTime.now().difference(lastSeenTime);
-
-      if (difference.inMinutes < 1) {
-        return 'Just now';
-      } else if (difference.inMinutes < 60) {
-        return '${difference.inMinutes}m ago';
-      } else if (difference.inHours < 24) {
-        return '${difference.inHours}h ago';
-      } else if (difference.inDays < 7) {
-        return '${difference.inDays}d ago';
-      } else {
-        return 'Offline';
-      }
+    // Check cache first
+    if (_userCache.containsKey(userId)) {
+      return _userCache[userId];
     }
 
-    return 'Offline';
+    // Fetch from Firestore
+    try {
+      final doc = await _firestore.collection('users').doc(userId).get();
+      if (doc.exists) {
+        final userData = doc.data()!;
+        _userCache[userId] = userData;
+        return userData;
+      }
+    } catch (e) {
+      debugPrint('Error fetching user $userId: $e');
+    }
+    return null;
+  }
+
+  /// Prefetch user data for a list of user IDs
+  Future<void> _prefetchUsers(List<String> userIds) async {
+    final uncachedIds = userIds.where((id) => !_userCache.containsKey(id) && id.isNotEmpty).toList();
+    if (uncachedIds.isEmpty) return;
+
+    // Batch fetch users (max 10 at a time due to Firestore limitations)
+    for (var i = 0; i < uncachedIds.length; i += 10) {
+      final batch = uncachedIds.skip(i).take(10).toList();
+      try {
+        final futures = batch.map((id) => _firestore.collection('users').doc(id).get());
+        final results = await Future.wait(futures);
+        for (var doc in results) {
+          if (doc.exists) {
+            _userCache[doc.id] = doc.data()!;
+          }
+        }
+      } catch (e) {
+        debugPrint('Error prefetching users: $e');
+      }
+    }
   }
 
   @override
@@ -73,137 +103,233 @@ class _ConversationsScreenState extends State<ConversationsScreen>
 
     return Scaffold(
       backgroundColor: isDarkMode ? const Color(0xFF000000) : Colors.white,
-      appBar: _buildAppBar(isDarkMode),
-      body: Column(
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header with title and profile avatar
+            _buildHeader(isDarkMode),
+            // Search bar
+            _buildSearchBar(isDarkMode),
+            // Tab content
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  _buildChatsList(isDarkMode, isGroup: false),
+                  _buildChatsList(isDarkMode, isGroup: true),
+                  _buildCallsList(isDarkMode),
+                ],
+              ),
+            ),
+            // Bottom tab bar
+            _buildBottomTabBar(isDarkMode),
+          ],
+        ),
+      ),
+      floatingActionButton: Container(
+        margin: const EdgeInsets.only(bottom: 65, right: 4),
+        height: 56,
+        width: 56,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Theme.of(context).primaryColor,
+          boxShadow: [
+            BoxShadow(
+              color: Theme.of(context).primaryColor.withValues(alpha: 0.35),
+              blurRadius: 16,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: _currentTabIndex == 1 ? _createGroup : _showNewChatDialog,
+            customBorder: const CircleBorder(),
+            child: const Center(
+              child: Icon(Icons.add, color: Colors.white, size: 26),
+            ),
+          ),
+        ),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+    );
+  }
+
+  Widget _buildHeader(bool isDarkMode) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          if (_isSearching) _buildSearchBar(isDarkMode),
-          Expanded(
-            child: _buildChatsList(
-              isDarkMode,
-            ), // Direct chat list without TabBar
+          Text(
+            'Messages',
+            style: TextStyle(
+              fontSize: 32,
+              fontWeight: FontWeight.bold,
+              color: isDarkMode ? Colors.white : Colors.black,
+            ),
+          ),
+          // Profile avatar
+          StreamBuilder<DocumentSnapshot>(
+            stream: _firestore
+                .collection('users')
+                .doc(_auth.currentUser?.uid)
+                .snapshots(),
+            builder: (context, snapshot) {
+              String? photoUrl;
+              if (snapshot.hasData && snapshot.data!.exists) {
+                final userData = snapshot.data!.data() as Map<String, dynamic>;
+                photoUrl = userData['photoUrl'];
+              }
+
+              final fixedPhotoUrl = PhotoUrlHelper.fixGooglePhotoUrl(photoUrl);
+
+              return Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: isDarkMode
+                        ? Colors.white.withValues(alpha: 0.2)
+                        : Colors.grey.withValues(alpha: 0.3),
+                    width: 2,
+                  ),
+                ),
+                child: ClipOval(
+                  child: fixedPhotoUrl != null && fixedPhotoUrl.isNotEmpty
+                      ? CachedNetworkImage(
+                          imageUrl: fixedPhotoUrl,
+                          fit: BoxFit.cover,
+                          placeholder: (context, url) => Container(
+                            color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                          ),
+                          errorWidget: (context, url, error) => Container(
+                            color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                            child: Icon(
+                              Icons.person,
+                              color: isDarkMode ? Colors.grey[600] : Colors.grey[400],
+                            ),
+                          ),
+                        )
+                      : Container(
+                          color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                          child: Icon(
+                            Icons.person,
+                            color: isDarkMode ? Colors.grey[600] : Colors.grey[400],
+                          ),
+                        ),
+                ),
+              );
+            },
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _showNewChatDialog,
-        backgroundColor: Theme.of(context).primaryColor,
-        child: const Icon(Icons.add, color: Colors.white),
-      ),
     );
-  }
-
-  PreferredSizeWidget _buildAppBar(bool isDarkMode) {
-    return AppBar(
-      backgroundColor: isDarkMode ? const Color(0xFF000000) : Colors.white,
-      elevation: 0,
-      title: Text(
-        'Messages',
-        style: TextStyle(
-          fontSize: 24,
-          fontWeight: FontWeight.bold,
-          color: isDarkMode ? Colors.white : Colors.black,
-        ),
-      ),
-      actions: [
-        IconButton(
-          icon: Icon(
-            Icons.group_add,
-            color: isDarkMode ? Colors.white : Colors.black,
-          ),
-          tooltip: 'Create Group',
-          onPressed: _createGroup,
-        ),
-        IconButton(
-          icon: Icon(
-            _isSearching ? Icons.close : Icons.search,
-            color: isDarkMode ? Colors.white : Colors.black,
-          ),
-          onPressed: () {
-            setState(() {
-              _isSearching = !_isSearching;
-              if (!_isSearching) {
-                _searchController.clear();
-                _searchQuery = '';
-              }
-            });
-          },
-        ),
-      ],
-    );
-  }
-
-  void _createGroup() async {
-    HapticFeedback.lightImpact();
-    final result = await Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const CreateGroupScreen()),
-    );
-    if (result != null && result is String) {
-      _openGroupChat(result);
-    }
-  }
-
-  void _openGroupChat(String groupId) async {
-    try {
-      final groupDoc = await _firestore
-          .collection('conversations')
-          .doc(groupId)
-          .get();
-      if (groupDoc.exists) {
-        final data = groupDoc.data()!;
-        if (data['isGroup'] == true) {
-          if (!mounted) return;
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => GroupChatScreen(
-                groupId: groupId,
-                groupName: data['groupName'] ?? 'Group',
-              ),
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      debugPrint('Error opening group: $e');
-    }
   }
 
   Widget _buildSearchBar(bool isDarkMode) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: isDarkMode ? const Color(0xFF000000) : Colors.white,
-      child: TextField(
-        controller: _searchController,
-        autofocus: true,
-        style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
-        decoration: InputDecoration(
-          hintText: 'Search conversations...',
-          hintStyle: TextStyle(
-            color: isDarkMode ? Colors.grey[600] : Colors.grey[400],
-          ),
-          prefixIcon: Icon(
-            Icons.search,
-            color: isDarkMode ? Colors.grey[600] : Colors.grey[400],
-          ),
-          filled: true,
-          fillColor: isDarkMode ? Colors.grey[900] : Colors.grey[100],
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(20),
-            borderSide: BorderSide.none,
-          ),
-          contentPadding: const EdgeInsets.symmetric(vertical: 8),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      child: Container(
+        height: 44,
+        decoration: BoxDecoration(
+          color: isDarkMode
+              ? Colors.white.withValues(alpha: 0.08)
+              : Colors.grey.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(12),
         ),
-        onChanged: (value) {
-          setState(() {
-            _searchQuery = value.toLowerCase();
-          });
-        },
+        child: TextField(
+          controller: _searchController,
+          style: TextStyle(
+            color: isDarkMode ? Colors.white : Colors.black,
+            fontSize: 16,
+          ),
+          decoration: InputDecoration(
+            hintText: 'Search',
+            hintStyle: TextStyle(
+              color: isDarkMode ? Colors.grey[600] : Colors.grey[500],
+              fontSize: 16,
+            ),
+            prefixIcon: Icon(
+              Icons.search,
+              color: isDarkMode ? Colors.grey[600] : Colors.grey[500],
+              size: 22,
+            ),
+            border: InputBorder.none,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 12,
+            ),
+          ),
+          onChanged: (value) {
+            setState(() {
+              _searchQuery = value.toLowerCase();
+            });
+          },
+        ),
       ),
     );
   }
 
-  Widget _buildChatsList(bool isDarkMode) {
+  Widget _buildBottomTabBar(bool isDarkMode) {
+    return Container(
+      decoration: BoxDecoration(
+        color: isDarkMode ? const Color(0xFF1A1A1A) : Colors.white,
+        border: Border(
+          top: BorderSide(
+            color: isDarkMode
+                ? Colors.white.withValues(alpha: 0.1)
+                : Colors.grey.withValues(alpha: 0.2),
+            width: 0.5,
+          ),
+        ),
+      ),
+      child: TabBar(
+        controller: _tabController,
+        indicatorColor: Colors.transparent,
+        labelColor: Theme.of(context).primaryColor,
+        unselectedLabelColor: isDarkMode ? Colors.grey[600] : Colors.grey[500],
+        labelStyle: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
+        unselectedLabelStyle: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+        ),
+        tabs: [
+          Tab(
+            icon: Icon(
+              _currentTabIndex == 0
+                  ? Icons.chat_bubble
+                  : Icons.chat_bubble_outline,
+              size: 24,
+            ),
+            text: 'Chats',
+          ),
+          Tab(
+            icon: Icon(
+              _currentTabIndex == 1 ? Icons.group : Icons.group_outlined,
+              size: 24,
+            ),
+            text: 'Groups',
+          ),
+          Tab(
+            icon: Icon(
+              _currentTabIndex == 2 ? Icons.call : Icons.call_outlined,
+              size: 24,
+            ),
+            text: 'Calls',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChatsList(bool isDarkMode, {required bool isGroup}) {
     final currentUserId = _auth.currentUser?.uid;
     if (currentUserId == null) {
       return const Center(child: Text('Please login to see conversations'));
@@ -213,162 +339,33 @@ class _ConversationsScreenState extends State<ConversationsScreen>
       stream: _firestore
           .collection('conversations')
           .where('participants', arrayContains: currentUserId)
+          .limit(50) // Pagination for better performance
           .snapshots(),
       builder: (context, snapshot) {
-        // Debug logging disabled for production performance
-        // Uncomment for debugging: debugPrint('ConversationsScreen: rebuild, state=${snapshot.connectionState}');
-
-        if (snapshot.connectionState == ConnectionState.waiting) {
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            !snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
 
         if (snapshot.hasError) {
-          // Log the error for debugging
-          debugPrint('ConversationsScreen: Error: ${snapshot.error}');
-
-          // Handle permission errors gracefully
-          final error = snapshot.error.toString();
-          if (error.contains('permission-denied') ||
-              error.contains('PERMISSION_DENIED')) {
-            // Show error with option to retry instead of just empty state
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(
-                    Icons.error_outline,
-                    size: 80,
-                    color: Colors.orange,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Permission Error',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: isDarkMode ? Colors.white : Colors.black,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 40),
-                    child: Text(
-                      'Unable to load conversations. Please try logging out and logging back in.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: isDarkMode ? Colors.grey[600] : Colors.grey,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      setState(() {}); // Trigger rebuild to retry
-                    },
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('Retry'),
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 12,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }
-
-          // For other errors, show a more detailed error message
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.error_outline, size: 80, color: Colors.red),
-                const SizedBox(height: 16),
-                Text(
-                  'Error Loading Conversations',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: isDarkMode ? Colors.white : Colors.black,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 40),
-                  child: Text(
-                    error.length > 100
-                        ? '${error.substring(0, 100)}...'
-                        : error,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: isDarkMode ? Colors.grey[600] : Colors.grey,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    ElevatedButton.icon(
-                      onPressed: () {
-                        setState(() {}); // Trigger rebuild to retry
-                      },
-                      icon: const Icon(Icons.refresh),
-                      label: const Text('Retry'),
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 12,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    OutlinedButton.icon(
-                      onPressed: _showNewChatDialog,
-                      icon: const Icon(Icons.message),
-                      label: const Text('New Chat'),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 12,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          );
+          return _buildErrorState(isDarkMode, snapshot.error.toString());
         }
 
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return _buildEmptyState(isDarkMode);
+          return _buildEmptyState(isDarkMode, isGroup);
         }
 
-        // Parse and sort conversations manually
+        // Filter conversations based on isGroup
         final List<ConversationModel> conversations = [];
+        final List<String> userIdsToPrefetch = [];
 
         for (var doc in snapshot.data!.docs) {
           try {
             final conv = ConversationModel.fromFirestore(doc);
 
-            // Note: Orphaned conversations (where user doesn't exist) are handled
-            // when user taps the conversation (it will be deleted gracefully)
+            // Filter by group or direct chat
+            if (conv.isGroup != isGroup) continue;
 
-            // Show all conversations, even those without messages
             if (_searchQuery.isEmpty) {
               conversations.add(conv);
             } else {
@@ -377,14 +374,25 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                 conversations.add(conv);
               }
             }
+
+            // Collect user IDs for prefetching (only for direct chats)
+            if (!conv.isGroup) {
+              final otherUserId = conv.getOtherParticipantId(currentUserId);
+              if (otherUserId.isNotEmpty && !_userCache.containsKey(otherUserId)) {
+                userIdsToPrefetch.add(otherUserId);
+              }
+            }
           } catch (e) {
-            debugPrint(
-              'ConversationsScreen: Error parsing conversation ${doc.id}: $e',
-            );
+            debugPrint('Error parsing conversation ${doc.id}: $e');
           }
         }
 
-        // Sort by lastMessageTime
+        // OPTIMIZATION: Prefetch all user data in parallel (non-blocking)
+        if (userIdsToPrefetch.isNotEmpty) {
+          _prefetchUsers(userIdsToPrefetch);
+        }
+
+        // Sort by lastMessageTime (client-side to avoid index requirement)
         conversations.sort((a, b) {
           if (a.lastMessageTime == null) return 1;
           if (b.lastMessageTime == null) return -1;
@@ -392,10 +400,11 @@ class _ConversationsScreenState extends State<ConversationsScreen>
         });
 
         if (conversations.isEmpty) {
-          return _buildEmptyState(isDarkMode);
+          return _buildEmptyState(isDarkMode, isGroup);
         }
 
         return ListView.builder(
+          padding: const EdgeInsets.only(top: 8),
           itemCount: conversations.length,
           itemBuilder: (context, index) {
             final conversation = conversations[index];
@@ -406,6 +415,355 @@ class _ConversationsScreenState extends State<ConversationsScreen>
     );
   }
 
+  Widget _buildCallsList(bool isDarkMode) {
+    final currentUserId = _auth.currentUser?.uid;
+    if (currentUserId == null) {
+      return const Center(child: Text('Please login to see calls'));
+    }
+
+    // Use a simpler query without orderBy to avoid index requirement
+    // Sort client-side instead
+    return StreamBuilder<QuerySnapshot>(
+      stream: _firestore
+          .collection('calls')
+          .where('participants', arrayContains: currentUserId)
+          .limit(50)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (snapshot.hasError) {
+          debugPrint('Calls error: ${snapshot.error}');
+          return _buildEmptyCallsState(isDarkMode);
+        }
+
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return _buildEmptyCallsState(isDarkMode);
+        }
+
+        // Sort client-side by timestamp (descending)
+        final calls = snapshot.data!.docs.toList();
+        calls.sort((a, b) {
+          final aData = a.data() as Map<String, dynamic>;
+          final bData = b.data() as Map<String, dynamic>;
+          final aTime = aData['timestamp'] as Timestamp?;
+          final bTime = bData['timestamp'] as Timestamp?;
+          if (aTime == null && bTime == null) return 0;
+          if (aTime == null) return 1;
+          if (bTime == null) return -1;
+          return bTime.compareTo(aTime);
+        });
+
+        // Prefetch all user data for calls
+        final userIds = <String>[];
+        for (var doc in calls) {
+          final data = doc.data() as Map<String, dynamic>;
+          final callerId = data['callerId'] as String? ?? '';
+          final receiverId = data['receiverId'] as String? ?? '';
+          if (callerId != currentUserId && callerId.isNotEmpty) userIds.add(callerId);
+          if (receiverId != currentUserId && receiverId.isNotEmpty) userIds.add(receiverId);
+        }
+
+        return FutureBuilder<void>(
+          future: _prefetchUsers(userIds),
+          builder: (context, prefetchSnapshot) {
+            // Filter by search query using cached names
+            final filteredCalls = _searchQuery.isEmpty
+                ? calls
+                : calls.where((doc) {
+                    final data = doc.data() as Map<String, dynamic>;
+                    final callerId = data['callerId'] as String? ?? '';
+                    final receiverId = data['receiverId'] as String? ?? '';
+                    final otherUserId = callerId == currentUserId ? receiverId : callerId;
+                    final userData = _userCache[otherUserId];
+                    final name = (userData?['name'] ?? '').toString().toLowerCase();
+                    return name.contains(_searchQuery);
+                  }).toList();
+
+            if (filteredCalls.isEmpty) {
+              return _buildEmptyCallsState(isDarkMode);
+            }
+
+            return ListView.builder(
+              padding: const EdgeInsets.only(top: 8),
+              itemCount: filteredCalls.length,
+              itemExtent: 80, // Fixed height for better performance
+              itemBuilder: (context, index) {
+                final callDoc = filteredCalls[index];
+                final callData = callDoc.data() as Map<String, dynamic>;
+                return _buildCallTileOptimized(callData, isDarkMode, currentUserId);
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  /// Optimized call tile using cached user data (no FutureBuilder inside ListView)
+  Widget _buildCallTileOptimized(
+    Map<String, dynamic> callData,
+    bool isDarkMode,
+    String currentUserId,
+  ) {
+    final callerId = callData['callerId'] ?? '';
+    final receiverId = callData['receiverId'] ?? '';
+    final isOutgoing = callerId == currentUserId;
+    final otherUserId = isOutgoing ? receiverId : callerId;
+    final callStatus = callData['status'] ?? 'unknown';
+    final callType = callData['type'] ?? 'voice';
+    final timestamp = callData['timestamp'] as Timestamp?;
+
+    // Get user data from cache (prefetched earlier)
+    final userData = _userCache[otherUserId];
+    final displayName = userData?['name'] ?? 'Unknown User';
+    final photoUrl = userData?['photoUrl'];
+    final fixedPhotoUrl = PhotoUrlHelper.fixGooglePhotoUrl(photoUrl);
+    final initial = displayName.isNotEmpty ? displayName[0].toUpperCase() : '?';
+
+    // Determine call status icon and color
+    IconData statusIcon;
+    Color statusColor;
+
+    if (callStatus == 'missed') {
+      statusIcon = Icons.call_missed;
+      statusColor = Colors.red;
+    } else if (callStatus == 'declined') {
+      statusIcon = Icons.call_missed_outgoing;
+      statusColor = Colors.red;
+    } else if (isOutgoing) {
+      statusIcon = Icons.call_made;
+      statusColor = Colors.green;
+    } else {
+      statusIcon = Icons.call_received;
+      statusColor = Colors.green;
+    }
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      decoration: BoxDecoration(
+        color: isDarkMode
+            ? Colors.white.withValues(alpha: 0.06)
+            : Colors.grey.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 8,
+        ),
+        leading: CircleAvatar(
+          radius: 26,
+          backgroundColor: Theme.of(context).primaryColor.withValues(alpha: 0.15),
+          backgroundImage: fixedPhotoUrl != null && fixedPhotoUrl.isNotEmpty
+              ? CachedNetworkImageProvider(fixedPhotoUrl)
+              : null,
+          child: fixedPhotoUrl == null || fixedPhotoUrl.isEmpty
+              ? Text(
+                  initial,
+                  style: TextStyle(
+                    color: Theme.of(context).primaryColor,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                )
+              : null,
+        ),
+        title: Text(
+          formatDisplayName(displayName),
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 16,
+            color: isDarkMode ? Colors.white : Colors.black,
+          ),
+        ),
+        subtitle: Row(
+          children: [
+            Icon(statusIcon, size: 16, color: statusColor),
+            const SizedBox(width: 4),
+            Text(
+              timestamp != null
+                  ? timeago.format(timestamp.toDate())
+                  : 'Unknown time',
+              style: TextStyle(
+                color: isDarkMode ? Colors.grey[500] : Colors.grey[600],
+                fontSize: 13,
+              ),
+            ),
+          ],
+        ),
+        trailing: IconButton(
+          icon: Icon(
+            callType == 'video' ? Icons.videocam : Icons.call,
+            color: Theme.of(context).primaryColor,
+          ),
+          onPressed: () => _initiateCall(otherUserId, callType == 'video'),
+        ),
+        onTap: () => _showCallDetails(callData, formatDisplayName(displayName), isDarkMode),
+      ),
+    );
+  }
+
+  Widget _buildEmptyCallsState(bool isDarkMode) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.call_outlined,
+            size: 80,
+            color: isDarkMode ? Colors.grey[700] : Colors.grey[300],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'No calls yet',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: isDarkMode ? Colors.white : Colors.black,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Your call history will appear here',
+            style: TextStyle(
+              fontSize: 14,
+              color: isDarkMode ? Colors.grey[600] : Colors.grey,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _initiateCall(String userId, bool isVideo) async {
+    // TODO: Implement call initiation
+    HapticFeedback.lightImpact();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(isVideo ? 'Video calling coming soon!' : 'Calling...'),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  void _showCallDetails(
+    Map<String, dynamic> callData,
+    String displayName,
+    bool isDarkMode,
+  ) {
+    final timestamp = callData['timestamp'] as Timestamp?;
+    final duration = callData['duration'] ?? 0;
+    final callStatus = callData['status'] ?? 'unknown';
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: isDarkMode ? const Color(0xFF1A1A1A) : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: isDarkMode ? Colors.grey[700] : Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              displayName,
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: isDarkMode ? Colors.white : Colors.black,
+              ),
+            ),
+            const SizedBox(height: 16),
+            _buildCallDetailRow(
+              'Status',
+              callStatus.toString().toUpperCase(),
+              isDarkMode,
+            ),
+            _buildCallDetailRow(
+              'Time',
+              timestamp != null
+                  ? _formatCallTime(timestamp.toDate())
+                  : 'Unknown',
+              isDarkMode,
+            ),
+            if (duration > 0)
+              _buildCallDetailRow(
+                'Duration',
+                _formatDuration(duration),
+                isDarkMode,
+              ),
+            const SizedBox(height: 24),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCallDetailRow(String label, String value, bool isDarkMode) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              color: isDarkMode ? Colors.grey[500] : Colors.grey[600],
+              fontSize: 14,
+            ),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              color: isDarkMode ? Colors.white : Colors.black,
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatCallTime(DateTime time) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final callDate = DateTime(time.year, time.month, time.day);
+
+    String timeStr =
+        '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+
+    if (callDate == today) {
+      return 'Today, $timeStr';
+    } else if (callDate == today.subtract(const Duration(days: 1))) {
+      return 'Yesterday, $timeStr';
+    } else {
+      return '${time.day}/${time.month}/${time.year}, $timeStr';
+    }
+  }
+
+  String _formatDuration(int seconds) {
+    final minutes = seconds ~/ 60;
+    final secs = seconds % 60;
+    if (minutes > 0) {
+      return '$minutes min ${secs}s';
+    }
+    return '${secs}s';
+  }
+
   Widget _buildConversationTile(
     ConversationModel conversation,
     bool isDarkMode,
@@ -413,42 +771,45 @@ class _ConversationsScreenState extends State<ConversationsScreen>
     final currentUserId = _auth.currentUser!.uid;
     final otherUserId = conversation.getOtherParticipantId(currentUserId);
 
-    // Skip rendering if otherUserId is empty (invalid conversation)
     if (otherUserId.isEmpty && !conversation.isGroup) {
       return const SizedBox.shrink();
     }
 
-    // Get display name from conversation model or fallback to fetching from users collection
     String displayName = conversation.getDisplayName(currentUserId);
-    final displayPhoto = conversation.getDisplayPhoto(currentUserId);
+    String? displayPhoto = conversation.getDisplayPhoto(currentUserId);
     final unreadCount = conversation.getUnreadCount(currentUserId);
     final isTyping = conversation.isUserTyping(otherUserId);
 
-    // If the name is "Unknown User", try to fetch it from the users collection
-    if (displayName == 'Unknown User' && otherUserId.isNotEmpty) {
-      return FutureBuilder<DocumentSnapshot>(
-        future: _firestore.collection('users').doc(otherUserId).get(),
-        builder: (context, userSnapshot) {
-          String finalDisplayName = displayName;
-          String? finalDisplayPhoto = displayPhoto;
-
-          if (userSnapshot.hasData && userSnapshot.data!.exists) {
-            final userData = userSnapshot.data!.data() as Map<String, dynamic>;
-            finalDisplayName = userData['name'] ?? 'Unknown User';
-            finalDisplayPhoto = displayPhoto ?? userData['photoUrl'];
-          }
-
-          return _buildConversationTileContent(
-            conversation: conversation,
-            otherUserId: otherUserId,
-            displayName: finalDisplayName,
-            displayPhoto: finalDisplayPhoto,
-            unreadCount: unreadCount,
-            isTyping: isTyping,
-            isDarkMode: isDarkMode,
-          );
-        },
+    // For groups, show group icon
+    if (conversation.isGroup) {
+      return _buildConversationTileContent(
+        conversation: conversation,
+        otherUserId: '',
+        displayName: conversation.groupName ?? 'Group',
+        displayPhoto: displayPhoto,
+        unreadCount: unreadCount,
+        isTyping: false,
+        isDarkMode: isDarkMode,
       );
+    }
+
+    // Try to get user data from cache first
+    if (otherUserId.isNotEmpty && _userCache.containsKey(otherUserId)) {
+      final cachedUser = _userCache[otherUserId]!;
+      if (displayName == 'Unknown User') {
+        displayName = cachedUser['name'] ?? 'Unknown User';
+      }
+      displayPhoto ??= cachedUser['photoUrl'];
+    }
+
+    // Fetch user details if name is unknown (with caching)
+    if (displayName == 'Unknown User' && otherUserId.isNotEmpty) {
+      // Trigger async fetch without blocking UI
+      _getUserWithCache(otherUserId).then((userData) {
+        if (mounted && userData != null) {
+          setState(() {}); // Refresh to show cached data
+        }
+      });
     }
 
     return _buildConversationTileContent(
@@ -471,195 +832,65 @@ class _ConversationsScreenState extends State<ConversationsScreen>
     required bool isTyping,
     required bool isDarkMode,
   }) {
+    final fixedPhotoUrl = PhotoUrlHelper.fixGooglePhotoUrl(displayPhoto);
+    final initial = displayName.isNotEmpty ? displayName[0].toUpperCase() : '?';
+
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
         color: isDarkMode
-            ? Colors.white.withValues(alpha: 0.08)
-            : Colors.grey.withValues(alpha: 0.1),
+            ? Colors.white.withValues(alpha: 0.06)
+            : Colors.grey.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isDarkMode
-              ? Colors.white.withValues(alpha: 0.1)
-              : Colors.grey.withValues(alpha: 0.2),
-          width: 1,
-        ),
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
-          onTap: () async {
-            HapticFeedback.lightImpact();
-
-            // Handle group conversations
-            if (conversation.isGroup) {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => GroupChatScreen(
-                    groupId: conversation.id,
-                    groupName: conversation.groupName ?? 'Group',
-                  ),
-                ),
-              );
-              return;
-            }
-
-            // Handle direct messages
-            try {
-              final otherUserDoc = await _firestore
-                  .collection('users')
-                  .doc(otherUserId)
-                  .get();
-
-              if (otherUserDoc.exists) {
-                final otherUser = UserProfile.fromMap(
-                  otherUserDoc.data()!,
-                  otherUserId,
-                );
-
-                if (!mounted) return;
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => EnhancedChatScreen(otherUser: otherUser),
-                  ),
-                );
-              } else {
-                // User no longer exists - delete this orphaned conversation
-                await _firestore
-                    .collection('conversations')
-                    .doc(conversation.id)
-                    .delete();
-
-                // Show a friendly message
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('This conversation is no longer available'),
-                      backgroundColor: Colors.orange,
-                      duration: Duration(seconds: 2),
-                    ),
-                  );
-                }
-              }
-            } catch (e) {
-              debugPrint('Error loading user data: $e');
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Unable to load conversation'),
-                    backgroundColor: Colors.orange,
-                    duration: Duration(seconds: 2),
-                  ),
-                );
-              }
-            }
-          },
+          onTap: () => _openConversation(conversation, otherUserId),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Row(
               children: [
+                // Avatar
                 Stack(
                   children: [
-                    Builder(
-                      builder: (context) {
-                        // Check for valid photo URL (non-null and non-empty)
-                        final hasValidPhoto = displayPhoto != null && displayPhoto.isNotEmpty && !conversation.isGroup;
-                        return CircleAvatar(
-                          radius: 28,
-                          backgroundImage: hasValidPhoto
-                              ? CachedNetworkImageProvider(displayPhoto)
-                              : null,
-                          backgroundColor: conversation.isGroup
-                              ? Theme.of(context).primaryColor.withValues(alpha: 0.15)
-                              : Theme.of(context).primaryColor.withValues(alpha: 0.1),
-                          child: !hasValidPhoto
-                              ? (conversation.isGroup
-                                    ? Icon(
-                                        Icons.group,
-                                        color: Theme.of(context).primaryColor,
-                                        size: 28,
-                                      )
-                                    : Text(
-                                        displayName.isNotEmpty
-                                            ? displayName[0].toUpperCase()
-                                            : '?',
-                                        style: TextStyle(
-                                          color: Theme.of(context).primaryColor,
-                                          fontSize: 20,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ))
-                              : null,
-                        );
-                      },
-                    ),
-                    Positioned(
-                      right: 0,
-                      bottom: 0,
-                      child: otherUserId.isNotEmpty && !conversation.isGroup
-                          ? StreamBuilder<DocumentSnapshot>(
-                              stream: _firestore
-                                  .collection('users')
-                                  .doc(otherUserId)
-                                  .snapshots(),
-                              builder: (context, snapshot) {
-                                bool isOnline = false;
-                                if (snapshot.hasData && snapshot.data!.exists) {
-                                  final userData =
-                                      snapshot.data!.data() as Map<String, dynamic>;
-                                  final showOnlineStatus =
-                                      userData['showOnlineStatus'] ?? true;
-
-                                  // Only show online if user allows it and they're actually online
-                                  if (showOnlineStatus) {
-                                    isOnline = userData['isOnline'] ?? false;
-
-                                    // Also check if lastSeen is recent
-                                    if (isOnline) {
-                                      final lastSeen = userData['lastSeen'];
-                                      if (lastSeen != null &&
-                                          lastSeen is Timestamp) {
-                                        final lastSeenTime = lastSeen.toDate();
-                                        final difference = DateTime.now()
-                                            .difference(lastSeenTime);
-                                        // Consider offline if last seen more than 5 minutes ago
-                                        if (difference.inMinutes > 5) {
-                                          isOnline = false;
-                                        }
-                                      } else {
-                                        // No lastSeen timestamp, consider offline
-                                        isOnline = false;
-                                      }
-                                    }
-                                  }
-                                }
-
-                                if (!isOnline) return const SizedBox.shrink();
-
-                                return Container(
-                                  width: 14,
-                                  height: 14,
-                                  decoration: BoxDecoration(
-                                    color: Colors.green,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: isDarkMode
-                                          ? Colors.black
-                                          : Colors.white,
-                                      width: 2,
-                                    ),
-                                  ),
-                                );
-                              },
+                    CircleAvatar(
+                      radius: 26,
+                      backgroundColor: conversation.isGroup
+                          ? Theme.of(context).primaryColor.withValues(alpha: 0.15)
+                          : (fixedPhotoUrl != null && fixedPhotoUrl.isNotEmpty
+                              ? Colors.transparent
+                              : Theme.of(context).primaryColor.withValues(alpha: 0.1)),
+                      backgroundImage: !conversation.isGroup &&
+                              fixedPhotoUrl != null &&
+                              fixedPhotoUrl.isNotEmpty
+                          ? CachedNetworkImageProvider(fixedPhotoUrl)
+                          : null,
+                      child: conversation.isGroup
+                          ? Icon(
+                              Icons.group,
+                              color: Theme.of(context).primaryColor,
+                              size: 26,
                             )
-                          : const SizedBox.shrink(),
+                          : (fixedPhotoUrl == null || fixedPhotoUrl.isEmpty
+                              ? Text(
+                                  initial,
+                                  style: TextStyle(
+                                    color: Theme.of(context).primaryColor,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                )
+                              : null),
                     ),
+                    // Online indicator for direct chats
+                    if (!conversation.isGroup && otherUserId.isNotEmpty)
+                      _buildOnlineIndicator(otherUserId, isDarkMode),
                   ],
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 14),
+                // Content
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -669,12 +900,12 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                         children: [
                           Expanded(
                             child: Text(
-                              displayName,
+                              formatDisplayName(displayName),
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: unreadCount > 0
                                     ? FontWeight.bold
-                                    : FontWeight.w500,
+                                    : FontWeight.w600,
                                 color: isDarkMode ? Colors.white : Colors.black,
                               ),
                               overflow: TextOverflow.ellipsis,
@@ -687,7 +918,9 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                                 fontSize: 12,
                                 color: unreadCount > 0
                                     ? Theme.of(context).primaryColor
-                                    : (isDarkMode ? Colors.grey[600] : Colors.grey),
+                                    : (isDarkMode
+                                        ? Colors.grey[600]
+                                        : Colors.grey[500]),
                               ),
                             ),
                         ],
@@ -695,29 +928,33 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                       const SizedBox(height: 4),
                       Row(
                         children: [
+                          // Message preview with voice message indicator
+                          if (conversation.lastMessage?.contains('Voice message') ==
+                              true)
+                            Padding(
+                              padding: const EdgeInsets.only(right: 4),
+                              child: Icon(
+                                Icons.mic,
+                                size: 16,
+                                color: isDarkMode
+                                    ? Colors.grey[500]
+                                    : Colors.grey[600],
+                              ),
+                            ),
                           Expanded(
                             child: Text(
                               isTyping
                                   ? 'Typing...'
-                                  : conversation.lastMessage ??
-                                        'Start a conversation',
+                                  : conversation.lastMessage ?? 'Start a conversation',
                               style: TextStyle(
                                 fontSize: 14,
                                 color: isTyping
                                     ? Theme.of(context).primaryColor
-                                    : (unreadCount > 0
-                                          ? (isDarkMode
-                                                ? Colors.white
-                                                : Colors.black87)
-                                          : (isDarkMode
-                                                ? Colors.grey[600]
-                                                : Colors.grey)),
-                                fontWeight: unreadCount > 0
-                                    ? FontWeight.w500
-                                    : FontWeight.normal,
-                                fontStyle: isTyping
-                                    ? FontStyle.italic
-                                    : FontStyle.normal,
+                                    : (isDarkMode
+                                        ? Colors.grey[500]
+                                        : Colors.grey[600]),
+                                fontStyle:
+                                    isTyping ? FontStyle.italic : FontStyle.normal,
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -737,7 +974,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                                 unreadCount > 99 ? '99+' : unreadCount.toString(),
                                 style: const TextStyle(
                                   color: Colors.white,
-                                  fontSize: 12,
+                                  fontSize: 11,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
@@ -755,99 +992,187 @@ class _ConversationsScreenState extends State<ConversationsScreen>
     );
   }
 
-  // ignore: unused_element
-  Widget _buildActiveUserCard(
-    Map<String, dynamic> userData,
-    String userId,
-    bool isDarkMode,
-  ) {
-    final name = userData['name'] ?? 'Unknown';
-    final photoUrl = userData['photoUrl'];
+  Widget _buildOnlineIndicator(String userId, bool isDarkMode) {
+    // Check cache first for quick render without stream
+    bool isOnlineFromCache = false;
+    if (_userCache.containsKey(userId)) {
+      final userData = _userCache[userId]!;
+      final showOnlineStatus = userData['showOnlineStatus'] ?? true;
+      if (showOnlineStatus) {
+        isOnlineFromCache = userData['isOnline'] ?? false;
+        if (isOnlineFromCache) {
+          final lastSeen = userData['lastSeen'];
+          if (lastSeen != null && lastSeen is Timestamp) {
+            final difference = DateTime.now().difference(lastSeen.toDate());
+            if (difference.inMinutes > 5) {
+              isOnlineFromCache = false;
+            }
+          } else {
+            isOnlineFromCache = false;
+          }
+        }
+      }
+    }
 
-    return InkWell(
-      onTap: () async {
-        HapticFeedback.lightImpact();
-
-        final userProfile = UserProfile.fromMap(userData, userId);
-
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => EnhancedChatScreen(otherUser: userProfile),
-          ),
-        );
-      },
-      borderRadius: BorderRadius.circular(12),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Stack(
-            children: [
-              CircleAvatar(
-                radius: 35,
-                backgroundImage: photoUrl != null
-                    ? CachedNetworkImageProvider(photoUrl)
-                    : null,
-                backgroundColor: Theme.of(
-                  context,
-                ).primaryColor.withValues(alpha: 0.1),
-                child: photoUrl == null
-                    ? Text(
-                        name[0].toUpperCase(),
-                        style: TextStyle(
-                          color: Theme.of(context).primaryColor,
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      )
-                    : null,
-              ),
-              Positioned(
-                right: 2,
-                bottom: 2,
-                child: Container(
-                  width: 16,
-                  height: 16,
-                  decoration: BoxDecoration(
-                    color: Colors.green,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: isDarkMode ? Colors.black : Colors.white,
-                      width: 2,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            name.split(' ')[0],
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-              color: isDarkMode ? Colors.white : Colors.black,
+    // Return cached result immediately if available
+    if (_userCache.containsKey(userId)) {
+      if (!isOnlineFromCache) return const SizedBox.shrink();
+      return Positioned(
+        right: 0,
+        bottom: 0,
+        child: Container(
+          width: 14,
+          height: 14,
+          decoration: BoxDecoration(
+            color: Colors.green,
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: isDarkMode ? Colors.black : Colors.white,
+              width: 2,
             ),
-            overflow: TextOverflow.ellipsis,
           ),
-        ],
+        ),
+      );
+    }
+
+    // Only use stream if not cached (first load)
+    return Positioned(
+      right: 0,
+      bottom: 0,
+      child: StreamBuilder<DocumentSnapshot>(
+        stream: _firestore.collection('users').doc(userId).snapshots(),
+        builder: (context, snapshot) {
+          bool isOnline = false;
+          if (snapshot.hasData && snapshot.data!.exists) {
+            final userData = snapshot.data!.data() as Map<String, dynamic>;
+            // Update cache
+            _userCache[userId] = userData;
+
+            final showOnlineStatus = userData['showOnlineStatus'] ?? true;
+
+            if (showOnlineStatus) {
+              isOnline = userData['isOnline'] ?? false;
+              if (isOnline) {
+                final lastSeen = userData['lastSeen'];
+                if (lastSeen != null && lastSeen is Timestamp) {
+                  final difference =
+                      DateTime.now().difference(lastSeen.toDate());
+                  if (difference.inMinutes > 5) {
+                    isOnline = false;
+                  }
+                } else {
+                  isOnline = false;
+                }
+              }
+            }
+          }
+
+          if (!isOnline) return const SizedBox.shrink();
+
+          return Container(
+            width: 14,
+            height: 14,
+            decoration: BoxDecoration(
+              color: Colors.green,
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: isDarkMode ? Colors.black : Colors.white,
+                width: 2,
+              ),
+            ),
+          );
+        },
       ),
     );
   }
 
-  Widget _buildEmptyState(bool isDarkMode) {
+  void _openConversation(ConversationModel conversation, String otherUserId) async {
+    HapticFeedback.lightImpact();
+
+    if (conversation.isGroup) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => GroupChatScreen(
+            groupId: conversation.id,
+            groupName: conversation.groupName ?? 'Group',
+          ),
+        ),
+      );
+      return;
+    }
+
+    // OPTIMIZATION: Use cached user data first for instant navigation
+    if (_userCache.containsKey(otherUserId)) {
+      final cachedData = _userCache[otherUserId]!;
+      final otherUser = UserProfile.fromMap(cachedData, otherUserId);
+
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => EnhancedChatScreen(
+            otherUser: otherUser,
+            chatId: conversation.id, // Pass chatId to avoid another query
+          ),
+        ),
+      );
+      return;
+    }
+
+    // Fallback: Fetch from Firestore if not in cache
+    try {
+      final otherUserDoc =
+          await _firestore.collection('users').doc(otherUserId).get();
+
+      if (otherUserDoc.exists) {
+        final userData = otherUserDoc.data()!;
+        // Cache for future use
+        _userCache[otherUserId] = userData;
+
+        final otherUser = UserProfile.fromMap(userData, otherUserId);
+
+        if (!mounted) return;
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => EnhancedChatScreen(
+              otherUser: otherUser,
+              chatId: conversation.id, // Pass chatId to avoid another query
+            ),
+          ),
+        );
+      } else {
+        // User no longer exists - delete orphaned conversation
+        await _firestore.collection('conversations').doc(conversation.id).delete();
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('This conversation is no longer available'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading user data: $e');
+    }
+  }
+
+  Widget _buildEmptyState(bool isDarkMode, bool isGroup) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            Icons.chat_bubble_outline,
+            isGroup ? Icons.group_outlined : Icons.chat_bubble_outline,
             size: 80,
             color: isDarkMode ? Colors.grey[700] : Colors.grey[300],
           ),
           const SizedBox(height: 16),
           Text(
-            'No conversations yet',
+            isGroup ? 'No groups yet' : 'No chats yet',
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
@@ -856,27 +1181,80 @@ class _ConversationsScreenState extends State<ConversationsScreen>
           ),
           const SizedBox(height: 8),
           Text(
-            'Start a new conversation',
+            isGroup ? 'Create a group to get started' : 'Start a new conversation',
             style: TextStyle(
               fontSize: 14,
               color: isDarkMode ? Colors.grey[600] : Colors.grey,
             ),
           ),
-          const SizedBox(height: 24),
-          ElevatedButton.icon(
-            onPressed: _showNewChatDialog,
-            icon: const Icon(Icons.message),
-            label: const Text('New Message'),
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-              ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorState(bool isDarkMode, String error) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(
+            Icons.error_outline,
+            size: 64,
+            color: Colors.orange,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Unable to load',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: isDarkMode ? Colors.white : Colors.black,
             ),
+          ),
+          const SizedBox(height: 8),
+          TextButton.icon(
+            onPressed: () => setState(() {}),
+            icon: const Icon(Icons.refresh),
+            label: const Text('Retry'),
           ),
         ],
       ),
     );
+  }
+
+  void _createGroup() async {
+    HapticFeedback.lightImpact();
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const CreateGroupScreen()),
+    );
+    if (result != null && result is String) {
+      _openGroupChat(result);
+    }
+  }
+
+  void _openGroupChat(String groupId) async {
+    try {
+      final groupDoc =
+          await _firestore.collection('conversations').doc(groupId).get();
+      if (groupDoc.exists) {
+        final data = groupDoc.data()!;
+        if (data['isGroup'] == true) {
+          if (!mounted) return;
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => GroupChatScreen(
+                groupId: groupId,
+                groupName: data['groupName'] ?? 'Group',
+              ),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error opening group: $e');
+    }
   }
 
   void _showNewChatDialog() {
@@ -898,9 +1276,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
           return Container(
             decoration: BoxDecoration(
               color: isDarkMode ? const Color(0xFF1A1A1A) : Colors.white,
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(20),
-              ),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
             ),
             child: Column(
               children: [
@@ -925,280 +1301,205 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                   ),
                 ),
                 Expanded(
-                  // Show only users from existing conversations
-                  child: StreamBuilder<QuerySnapshot>(
-                    stream: _firestore
-                        .collection('conversations')
-                        .where('participants', arrayContains: currentUserId)
-                        .where('isGroup', isEqualTo: false)
-                        .snapshots(),
-                    builder: (context, convSnapshot) {
-                      if (convSnapshot.connectionState ==
-                          ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
-                      }
-
-                      if (!convSnapshot.hasData ||
-                          convSnapshot.data!.docs.isEmpty) {
-                        return Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.people_outline,
-                                size: 64,
-                                color: isDarkMode
-                                    ? Colors.grey[700]
-                                    : Colors.grey[400],
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                'No contacts yet',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w600,
-                                  color: isDarkMode
-                                      ? Colors.white
-                                      : Colors.black,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 40,
-                                ),
-                                child: Text(
-                                  'Start chatting with people from Discover or Live Connect to add them here',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: isDarkMode
-                                        ? Colors.grey[600]
-                                        : Colors.grey,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }
-
-                      // Extract other user IDs from conversations
-                      final Set<String> otherUserIds = {};
-                      for (var doc in convSnapshot.data!.docs) {
-                        final data = doc.data() as Map<String, dynamic>;
-                        final participants = List<String>.from(
-                          data['participants'] ?? [],
-                        );
-                        for (var participant in participants) {
-                          if (participant != currentUserId) {
-                            otherUserIds.add(participant);
-                          }
-                        }
-                      }
-
-                      if (otherUserIds.isEmpty) {
-                        return Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.people_outline,
-                                size: 64,
-                                color: isDarkMode
-                                    ? Colors.grey[700]
-                                    : Colors.grey[400],
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                'No contacts yet',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w600,
-                                  color: isDarkMode
-                                      ? Colors.white
-                                      : Colors.black,
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }
-
-                      // Fetch user details for these IDs
-                      return FutureBuilder<List<DocumentSnapshot>>(
-                        future: Future.wait(
-                          otherUserIds.map(
-                            (id) =>
-                                _firestore.collection('users').doc(id).get(),
-                          ),
-                        ),
-                        builder: (context, usersSnapshot) {
-                          if (usersSnapshot.connectionState ==
-                              ConnectionState.waiting) {
-                            return const Center(
-                              child: CircularProgressIndicator(),
-                            );
-                          }
-
-                          if (!usersSnapshot.hasData) {
-                            return const Center(
-                              child: Text('Error loading contacts'),
-                            );
-                          }
-
-                          // Filter out non-existent users
-                          final validUsers = usersSnapshot.data!
-                              .where((doc) => doc.exists)
-                              .toList();
-
-                          if (validUsers.isEmpty) {
-                            return Center(
-                              child: Text(
-                                'No contacts available',
-                                style: TextStyle(
-                                  color: isDarkMode
-                                      ? Colors.grey[600]
-                                      : Colors.grey,
-                                ),
-                              ),
-                            );
-                          }
-
-                          return ListView.builder(
-                            controller: scrollController,
-                            itemCount: validUsers.length,
-                            itemBuilder: (context, index) {
-                              final userDoc = validUsers[index];
-                              final userData =
-                                  userDoc.data() as Map<String, dynamic>;
-                              final userId = userDoc.id;
-                              final name = userData['name'] ?? 'Unknown';
-                              final photoUrl = userData['photoUrl'];
-                              final showOnlineStatus =
-                                  userData['showOnlineStatus'] ?? true;
-                              var isOnline = false;
-
-                              // Only show online if user allows it
-                              if (showOnlineStatus) {
-                                isOnline = userData['isOnline'] ?? false;
-
-                                // Check if lastSeen is recent
-                                if (isOnline) {
-                                  final lastSeen = userData['lastSeen'];
-                                  if (lastSeen != null &&
-                                      lastSeen is Timestamp) {
-                                    final lastSeenTime = lastSeen.toDate();
-                                    final difference = DateTime.now()
-                                        .difference(lastSeenTime);
-                                    if (difference.inMinutes > 5) {
-                                      isOnline = false;
-                                    }
-                                  } else {
-                                    isOnline = false;
-                                  }
-                                }
-                              }
-
-                              return ListTile(
-                                leading: Stack(
-                                  children: [
-                                    CircleAvatar(
-                                      backgroundImage: photoUrl != null
-                                          ? CachedNetworkImageProvider(photoUrl)
-                                          : null,
-                                      backgroundColor: Theme.of(
-                                        context,
-                                      ).primaryColor.withValues(alpha: 0.1),
-                                      child: photoUrl == null
-                                          ? Text(
-                                              name.isNotEmpty
-                                                  ? name[0].toUpperCase()
-                                                  : '?',
-                                              style: TextStyle(
-                                                color: Theme.of(
-                                                  context,
-                                                ).primaryColor,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            )
-                                          : null,
-                                    ),
-                                    if (isOnline)
-                                      Positioned(
-                                        right: 0,
-                                        bottom: 0,
-                                        child: Container(
-                                          width: 12,
-                                          height: 12,
-                                          decoration: BoxDecoration(
-                                            color: Colors.green,
-                                            shape: BoxShape.circle,
-                                            border: Border.all(
-                                              color: isDarkMode
-                                                  ? Colors.black
-                                                  : Colors.white,
-                                              width: 2,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                                title: Text(
-                                  name,
-                                  style: TextStyle(
-                                    color: isDarkMode
-                                        ? Colors.white
-                                        : Colors.black,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                subtitle: Text(
-                                  isOnline
-                                      ? 'Active now'
-                                      : (!showOnlineStatus
-                                            ? 'Status hidden'
-                                            : _getLastSeenText(
-                                                userData['lastSeen'],
-                                              )),
-                                  style: TextStyle(
-                                    color: isOnline
-                                        ? Colors.green
-                                        : (isDarkMode
-                                              ? Colors.grey[600]
-                                              : Colors.grey),
-                                  ),
-                                ),
-                                onTap: () async {
-                                  Navigator.pop(context);
-
-                                  final userProfile = UserProfile.fromMap(
-                                    userData,
-                                    userId,
-                                  );
-
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => EnhancedChatScreen(
-                                        otherUser: userProfile,
-                                      ),
-                                    ),
-                                  );
-                                },
-                              );
-                            },
-                          );
-                        },
-                      );
-                    },
-                  ),
+                  child: _buildContactsList(currentUserId, scrollController, isDarkMode),
                 ),
               ],
             ),
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildContactsList(
+    String currentUserId,
+    ScrollController scrollController,
+    bool isDarkMode,
+  ) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: _firestore
+          .collection('conversations')
+          .where('participants', arrayContains: currentUserId)
+          .where('isGroup', isEqualTo: false)
+          .snapshots(),
+      builder: (context, convSnapshot) {
+        if (convSnapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (!convSnapshot.hasData || convSnapshot.data!.docs.isEmpty) {
+          return _buildEmptyContactsState(isDarkMode);
+        }
+
+        final Set<String> otherUserIds = {};
+        for (var doc in convSnapshot.data!.docs) {
+          final data = doc.data() as Map<String, dynamic>;
+          final participants = List<String>.from(data['participants'] ?? []);
+          for (var participant in participants) {
+            if (participant != currentUserId) {
+              otherUserIds.add(participant);
+            }
+          }
+        }
+
+        if (otherUserIds.isEmpty) {
+          return _buildEmptyContactsState(isDarkMode);
+        }
+
+        return FutureBuilder<List<DocumentSnapshot>>(
+          future: Future.wait(
+            otherUserIds.map((id) => _firestore.collection('users').doc(id).get()),
+          ),
+          builder: (context, usersSnapshot) {
+            if (usersSnapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            if (!usersSnapshot.hasData) {
+              return const Center(child: Text('Error loading contacts'));
+            }
+
+            final validUsers =
+                usersSnapshot.data!.where((doc) => doc.exists).toList();
+
+            if (validUsers.isEmpty) {
+              return _buildEmptyContactsState(isDarkMode);
+            }
+
+            return ListView.builder(
+              controller: scrollController,
+              itemCount: validUsers.length,
+              itemBuilder: (context, index) {
+                final userDoc = validUsers[index];
+                final userData = userDoc.data() as Map<String, dynamic>;
+                final userId = userDoc.id;
+
+                return _buildContactTile(userData, userId, isDarkMode);
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildContactTile(
+    Map<String, dynamic> userData,
+    String userId,
+    bool isDarkMode,
+  ) {
+    final name = userData['name'] ?? 'Unknown';
+    final photoUrl = userData['photoUrl'];
+    final fixedPhotoUrl = PhotoUrlHelper.fixGooglePhotoUrl(photoUrl);
+    final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
+
+    // Properly validate online status with lastSeen check
+    bool isOnline = false;
+    final showOnlineStatus = userData['showOnlineStatus'] ?? true;
+    if (showOnlineStatus && userData['isOnline'] == true) {
+      final lastSeen = userData['lastSeen'];
+      if (lastSeen != null && lastSeen is Timestamp) {
+        final difference = DateTime.now().difference(lastSeen.toDate());
+        // Only show as online if lastSeen within 5 minutes
+        isOnline = difference.inMinutes <= 5;
+      }
+    }
+
+    return ListTile(
+      leading: Stack(
+        children: [
+          CircleAvatar(
+            backgroundColor: Theme.of(context).primaryColor.withValues(alpha: 0.1),
+            backgroundImage: fixedPhotoUrl != null && fixedPhotoUrl.isNotEmpty
+                ? CachedNetworkImageProvider(fixedPhotoUrl)
+                : null,
+            child: fixedPhotoUrl == null || fixedPhotoUrl.isEmpty
+                ? Text(
+                    initial,
+                    style: TextStyle(
+                      color: Theme.of(context).primaryColor,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  )
+                : null,
+          ),
+          if (isOnline)
+            Positioned(
+              right: 0,
+              bottom: 0,
+              child: Container(
+                width: 12,
+                height: 12,
+                decoration: BoxDecoration(
+                  color: Colors.green,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: isDarkMode ? Colors.black : Colors.white,
+                    width: 2,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+      title: Text(
+        formatDisplayName(name),
+        style: TextStyle(
+          color: isDarkMode ? Colors.white : Colors.black,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+      subtitle: Text(
+        isOnline ? 'Active now' : 'Tap to message',
+        style: TextStyle(
+          color: isOnline ? Colors.green : (isDarkMode ? Colors.grey[600] : Colors.grey),
+        ),
+      ),
+      onTap: () async {
+        Navigator.pop(context);
+        final userProfile = UserProfile.fromMap(userData, userId);
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => EnhancedChatScreen(otherUser: userProfile),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildEmptyContactsState(bool isDarkMode) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.people_outline,
+            size: 64,
+            color: isDarkMode ? Colors.grey[700] : Colors.grey[400],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'No contacts yet',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: isDarkMode ? Colors.white : Colors.black,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 40),
+            child: Text(
+              'Start chatting with people from Discover or Live Connect',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                color: isDarkMode ? Colors.grey[600] : Colors.grey,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -121,14 +121,17 @@ class ConnectionService {
       // Create bidirectional connection
       await _createConnection(senderId, receiverId);
 
-      // Send notification to sender
-      final receiverDoc = await _firestore.collection('users').doc(receiverId).get();
-      final receiverName = receiverDoc.data()?['name'] ?? 'Someone';
+      // Get current user's name (the one who accepted)
+      final currentUserDoc = await _firestore.collection('users').doc(currentUserId).get();
+      final currentUserName = currentUserDoc.data()?['name'] ?? 'Someone';
 
-      await _notificationService.showNotification(
+      // Send notification to the SENDER (the person who sent the request)
+      await _notificationService.sendNotificationToUser(
+        userId: senderId,
         title: 'Connection Accepted',
-        body: '$receiverName accepted your connection request',
-        payload: 'connection:$senderId',
+        body: '$currentUserName accepted your connection request',
+        type: 'connection_accepted',
+        data: {'connectionUserId': currentUserId},
       );
 
       debugPrint('✅ Connection request accepted: $requestId');
@@ -397,17 +400,20 @@ class ConnectionService {
 
   // ==================== NOTIFICATIONS ====================
 
-  /// Send connection request notification
+  /// Send connection request notification to the RECEIVER
   Future<void> _sendConnectionNotification({
     required String receiverId,
     required String senderName,
     required String requestId,
   }) async {
     try {
-      await _notificationService.showNotification(
+      // Send notification to the RECEIVER (the person receiving the request)
+      await _notificationService.sendNotificationToUser(
+        userId: receiverId,
         title: 'New Connection Request',
         body: '$senderName wants to connect with you',
-        payload: 'connection_request:$requestId',
+        type: 'connection_request',
+        data: {'requestId': requestId},
       );
     } catch (e) {
       debugPrint('❌ Error sending connection notification: $e');

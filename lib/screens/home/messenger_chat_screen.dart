@@ -1,3 +1,5 @@
+// COMMENTED OUT - Messenger Chat Screen temporarily disabled
+/*
 import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
@@ -11,6 +13,7 @@ import 'package:timeago/timeago.dart' as timeago;
 import 'dart:io';
 
 import '../../models/user_profile.dart';
+import '../../utils/photo_url_helper.dart';
 
 class MessengerChatScreen extends StatefulWidget {
   final UserProfile otherUser;
@@ -476,24 +479,46 @@ class _MessengerChatScreenState extends State<MessengerChatScreen> {
                         width: 2,
                       ),
                     ),
-                    child: CircleAvatar(
-                      radius: 22,
-                      backgroundColor: Colors.grey.shade700,
-                      backgroundImage: widget.otherUser.profileImageUrl != null
-                          ? CachedNetworkImageProvider(widget.otherUser.profileImageUrl!)
-                          : null,
-                      child: widget.otherUser.profileImageUrl == null
-                          ? Text(
-                              widget.otherUser.name.isNotEmpty
-                                  ? widget.otherUser.name[0].toUpperCase()
-                                  : '?',
+                    child: Builder(
+                      builder: (context) {
+                        final fixedPhotoUrl = PhotoUrlHelper.fixGooglePhotoUrl(widget.otherUser.profileImageUrl);
+                        final initial = widget.otherUser.name.isNotEmpty ? widget.otherUser.name[0].toUpperCase() : '?';
+
+                        Widget buildFallback() {
+                          return CircleAvatar(
+                            radius: 22,
+                            backgroundColor: Colors.grey.shade700,
+                            child: Text(
+                              initial,
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
                               ),
-                            )
-                          : null,
+                            ),
+                          );
+                        }
+
+                        if (fixedPhotoUrl == null || fixedPhotoUrl.isEmpty) {
+                          return buildFallback();
+                        }
+
+                        return ClipOval(
+                          child: CachedNetworkImage(
+                            imageUrl: fixedPhotoUrl,
+                            width: 44,
+                            height: 44,
+                            fit: BoxFit.cover,
+                            placeholder: (context, url) => buildFallback(),
+                            errorWidget: (context, url, error) {
+                              if (error.toString().contains('429')) {
+                                PhotoUrlHelper.markAsRateLimited(url);
+                              }
+                              return buildFallback();
+                            },
+                          ),
+                        );
+                      },
                     ),
                   ),
                   // Online indicator
@@ -671,24 +696,46 @@ class _MessengerChatScreenState extends State<MessengerChatScreen> {
               shape: BoxShape.circle,
               color: Colors.blue.withValues(alpha: 0.1),
             ),
-            child: CircleAvatar(
-              radius: 50,
-              backgroundColor: Colors.grey.shade700,
-              backgroundImage: widget.otherUser.profileImageUrl != null
-                  ? CachedNetworkImageProvider(widget.otherUser.profileImageUrl!)
-                  : null,
-              child: widget.otherUser.profileImageUrl == null
-                  ? Text(
-                      widget.otherUser.name.isNotEmpty
-                          ? widget.otherUser.name[0].toUpperCase()
-                          : '?',
+            child: Builder(
+              builder: (context) {
+                final fixedPhotoUrl = PhotoUrlHelper.fixGooglePhotoUrl(widget.otherUser.profileImageUrl);
+                final initial = widget.otherUser.name.isNotEmpty ? widget.otherUser.name[0].toUpperCase() : '?';
+
+                Widget buildFallback() {
+                  return CircleAvatar(
+                    radius: 50,
+                    backgroundColor: Colors.grey.shade700,
+                    child: Text(
+                      initial,
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 36,
                         fontWeight: FontWeight.bold,
                       ),
-                    )
-                  : null,
+                    ),
+                  );
+                }
+
+                if (fixedPhotoUrl == null || fixedPhotoUrl.isEmpty) {
+                  return buildFallback();
+                }
+
+                return ClipOval(
+                  child: CachedNetworkImage(
+                    imageUrl: fixedPhotoUrl,
+                    width: 100,
+                    height: 100,
+                    fit: BoxFit.cover,
+                    placeholder: (context, url) => buildFallback(),
+                    errorWidget: (context, url, error) {
+                      if (error.toString().contains('429')) {
+                        PhotoUrlHelper.markAsRateLimited(url);
+                      }
+                      return buildFallback();
+                    },
+                  ),
+                );
+              },
             ),
           ),
           const SizedBox(height: 16),
@@ -745,20 +792,42 @@ class _MessengerChatScreenState extends State<MessengerChatScreen> {
         children: [
           // Other user's avatar
           if (!isMe && showAvatar)
-            CircleAvatar(
-              radius: 14,
-              backgroundColor: Colors.grey.shade700,
-              backgroundImage: widget.otherUser.profileImageUrl != null
-                  ? CachedNetworkImageProvider(widget.otherUser.profileImageUrl!)
-                  : null,
-              child: widget.otherUser.profileImageUrl == null
-                  ? Text(
-                      widget.otherUser.name.isNotEmpty
-                          ? widget.otherUser.name[0].toUpperCase()
-                          : '?',
+            Builder(
+              builder: (context) {
+                final fixedPhotoUrl = PhotoUrlHelper.fixGooglePhotoUrl(widget.otherUser.profileImageUrl);
+                final initial = widget.otherUser.name.isNotEmpty ? widget.otherUser.name[0].toUpperCase() : '?';
+
+                Widget buildFallback() {
+                  return CircleAvatar(
+                    radius: 14,
+                    backgroundColor: Colors.grey.shade700,
+                    child: Text(
+                      initial,
                       style: const TextStyle(fontSize: 10, color: Colors.white),
-                    )
-                  : null,
+                    ),
+                  );
+                }
+
+                if (fixedPhotoUrl == null || fixedPhotoUrl.isEmpty) {
+                  return buildFallback();
+                }
+
+                return ClipOval(
+                  child: CachedNetworkImage(
+                    imageUrl: fixedPhotoUrl,
+                    width: 28,
+                    height: 28,
+                    fit: BoxFit.cover,
+                    placeholder: (context, url) => buildFallback(),
+                    errorWidget: (context, url, error) {
+                      if (error.toString().contains('429')) {
+                        PhotoUrlHelper.markAsRateLimited(url);
+                      }
+                      return buildFallback();
+                    },
+                  ),
+                );
+              },
             )
           else if (!isMe)
             const SizedBox(width: 28),
@@ -1250,6 +1319,43 @@ class _RecordingIndicatorState extends State<_RecordingIndicator> {
           }),
         ),
       ],
+    );
+  }
+}
+*/
+
+// Placeholder class to prevent import errors
+import 'package:flutter/material.dart';
+import '../../models/user_profile.dart';
+
+class MessengerChatScreen extends StatelessWidget {
+  final UserProfile otherUser;
+  final String? chatId;
+
+  const MessengerChatScreen({
+    super.key,
+    required this.otherUser,
+    this.chatId,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF0f0f23),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF1a1a2e),
+        title: Text(otherUser.name, style: const TextStyle(color: Colors.white)),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      body: const Center(
+        child: Text(
+          'Messenger temporarily disabled',
+          style: TextStyle(color: Colors.white70, fontSize: 16),
+        ),
+      ),
     );
   }
 }

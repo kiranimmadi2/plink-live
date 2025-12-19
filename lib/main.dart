@@ -13,6 +13,8 @@ import 'package:supper/screens/login/onboarding_screen.dart';
 import 'firebase_options.dart';
 import 'screens/login/splash_screen.dart';
 import 'screens/home/main_navigation_screen.dart';
+import 'screens/voice_call_screen.dart';
+import 'models/user_profile.dart';
 
 import 'services/auth_service.dart';
 import 'services/profile_service.dart';
@@ -179,11 +181,28 @@ class MyApp extends ConsumerWidget {
 
     return MaterialApp(
       title: 'Supper',
+      navigatorKey: navigatorKey,
       theme: themeNotifier.themeData.copyWith(
         scaffoldBackgroundColor: const Color(0xFF0f0f23),
       ),
       debugShowCheckedModeBanner: false,
       home: const SplashScreen(),
+      onGenerateRoute: (settings) {
+        // Handle voice call route
+        if (settings.name == '/voice-call') {
+          final args = settings.arguments as Map<String, dynamic>?;
+          if (args != null) {
+            return MaterialPageRoute(
+              builder: (context) => VoiceCallScreen(
+                callId: args['callId'] as String,
+                otherUser: args['otherUser'] as UserProfile,
+                isOutgoing: args['isOutgoing'] as bool? ?? true,
+              ),
+            );
+          }
+        }
+        return null;
+      },
       builder: (context, child) {
         return Container(
           color: const Color(0xFF0f0f23),
@@ -206,10 +225,12 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
   final ProfileService _profileService = ProfileService();
   final LocationService _locationService = LocationService();
   final ConversationService _conversationService = ConversationService();
+  final NotificationService _notificationService = NotificationService();
 
   bool _hasInitializedServices = false;
   String? _lastInitializedUserId;
   bool _isInitializing = false;
+  StreamSubscription<List<Map<String, dynamic>>>? _notificationSubscription;
 
   @override
   void initState() {
@@ -219,6 +240,7 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    _notificationSubscription?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -375,12 +397,31 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
       _locationService.startLocationStream();
       _conversationService.cleanupDuplicateConversations();
 
+      // Start listening for notifications from other users
+      _startNotificationListener();
+
       _runMigrationsInBackground();
 
       debugPrint('✓ AuthWrapper: User services initialized');
     } catch (e) {
       debugPrint("User services init failed: $e");
     }
+  }
+
+  /// Listen for notifications from Firestore and show them locally
+  void _startNotificationListener() {
+    _notificationSubscription?.cancel();
+    _notificationSubscription = _notificationService.getUserNotificationsStream().listen(
+      (notifications) async {
+        for (final notification in notifications) {
+          await _notificationService.processNewNotification(notification);
+        }
+      },
+      onError: (e) {
+        debugPrint('❌ Notification listener error: $e');
+      },
+    );
+    debugPrint('✓ Notification listener started');
   }
 
   void _runMigrationsInBackground() {

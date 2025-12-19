@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/connection_service.dart';
 import '../widgets/user_avatar.dart';
+import '../widgets/chat_common.dart';
 import '../models/user_profile.dart';
 import '../providers/app_providers.dart';
 import 'enhanced_chat_screen.dart';
@@ -334,70 +335,138 @@ class _MyConnectionsScreenState extends ConsumerState<MyConnectionsScreen> {
   }
 
   Widget _buildRequestCard(Map<String, dynamic> request, bool isDarkMode) {
-    final senderData = request['senderData'] as Map<String, dynamic>?;
+    final requestId = request['id'] as String?;
     final senderId = request['senderId'] as String?;
+    final senderName = request['senderName'] as String? ?? 'Unknown User';
+    final senderPhoto = request['senderPhoto'] as String?;
+    final message = request['message'] as String?;
+    final createdAt = request['createdAt'];
 
-    if (senderData == null || senderId == null) return const SizedBox.shrink();
+    if (requestId == null || senderId == null) return const SizedBox.shrink();
 
-    final name = senderData['name'] ?? 'Unknown User';
-    final photoUrl = senderData['photoUrl'] as String?;
-    final bio = senderData['bio'] ?? 'No bio available';
+    // Format time ago
+    String timeAgo = '';
+    if (createdAt != null) {
+      final timestamp = createdAt.toDate();
+      final difference = DateTime.now().difference(timestamp);
+      if (difference.inDays > 0) {
+        timeAgo = '${difference.inDays}d';
+      } else if (difference.inHours > 0) {
+        timeAgo = '${difference.inHours}h';
+      } else if (difference.inMinutes > 0) {
+        timeAgo = '${difference.inMinutes}m';
+      } else {
+        timeAgo = 'now';
+      }
+    }
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       color: isDarkMode ? const Color(0xFF333333) : Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      elevation: 0,
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            UserAvatar(
-              profileImageUrl: photoUrl,
-              fallbackText: name.isNotEmpty ? name[0].toUpperCase() : 'U',
-              radius: 28,
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    name,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    bio,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 12),
+            // Header row with avatar and info
             Row(
               children: [
-                IconButton(
-                  onPressed: () => _rejectRequest(senderId),
-                  icon: const Icon(Icons.close, color: Colors.red),
-                  style: IconButton.styleFrom(
-                    backgroundColor: Colors.red.withValues(alpha: 0.1),
+                UserAvatar(
+                  profileImageUrl: senderPhoto,
+                  fallbackText: senderName.isNotEmpty ? senderName[0].toUpperCase() : 'U',
+                  radius: 28,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              formatDisplayName(senderName),
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: isDarkMode ? Colors.white : Colors.black,
+                              ),
+                            ),
+                          ),
+                          if (timeAgo.isNotEmpty)
+                            Text(
+                              timeAgo,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isDarkMode ? Colors.grey[500] : Colors.grey[600],
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        message ?? 'Wants to connect with you',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            // Action buttons - Instagram style
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => _acceptRequest(requestId, senderName),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0095F6),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: const Text(
+                      'Confirm',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
-                IconButton(
-                  onPressed: () => _acceptRequest(senderId),
-                  icon: const Icon(Icons.check, color: Color(0xFF00D67D)),
-                  style: IconButton.styleFrom(
-                    backgroundColor: const Color(0xFF00D67D).withValues(alpha: 0.1),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => _rejectRequest(requestId),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: isDarkMode
+                          ? const Color(0xFF363636)
+                          : const Color(0xFFEFEFEF),
+                      foregroundColor: isDarkMode ? Colors.white : Colors.black,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: const Text(
+                      'Delete',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -415,12 +484,12 @@ class _MyConnectionsScreenState extends ConsumerState<MyConnectionsScreen> {
   ) {
     final name = userData['name'] ?? 'Unknown User';
     final photoUrl = userData['photoUrl'] as String?;
-    final bio = userData['bio'] ?? 'No bio available';
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       color: isDarkMode ? const Color(0xFF333333) : Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      elevation: 0,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Row(
@@ -430,68 +499,50 @@ class _MyConnectionsScreenState extends ConsumerState<MyConnectionsScreen> {
               fallbackText: name.isNotEmpty ? name[0].toUpperCase() : 'U',
               radius: 28,
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    name,
-                    style: const TextStyle(
+                    formatDisplayName(name),
+                    style: TextStyle(
                       fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      color: isDarkMode ? Colors.white : Colors.black,
                     ),
                   ),
                   const SizedBox(height: 4),
-                  Text(
-                    bio,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 8),
                   const Text(
                     'Connected',
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 13,
                       color: Color(0xFF00D67D),
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(width: 12),
-            Row(
-              children: [
-                IconButton(
-                  onPressed: () => _openChat(userId, userData),
-                  icon: const Icon(
-                    Icons.message_outlined,
-                    color: Color(0xFF00D67D),
-                  ),
-                  tooltip: 'Message',
-                  style: IconButton.styleFrom(
-                    backgroundColor: const Color(0xFF00D67D).withValues(alpha: 0.1),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                IconButton(
-                  onPressed: () => _removeConnection(userId, name),
-                  icon: const Icon(
-                    Icons.person_remove_outlined,
-                    color: Colors.red,
-                  ),
-                  tooltip: 'Remove Connection',
-                  style: IconButton.styleFrom(
-                    backgroundColor: Colors.red.withValues(alpha: 0.1),
-                  ),
-                ),
-              ],
+            // Action buttons
+            IconButton(
+              onPressed: () => _openChat(userId, userData),
+              icon: const Icon(Icons.message_outlined),
+              tooltip: 'Message',
+              style: IconButton.styleFrom(
+                backgroundColor: const Color(0xFF00D67D).withValues(alpha: 0.15),
+                foregroundColor: const Color(0xFF00D67D),
+              ),
+            ),
+            const SizedBox(width: 4),
+            IconButton(
+              onPressed: () => _removeConnection(userId, name),
+              icon: const Icon(Icons.person_remove_outlined),
+              tooltip: 'Remove',
+              style: IconButton.styleFrom(
+                backgroundColor: Colors.red.withValues(alpha: 0.1),
+                foregroundColor: Colors.red,
+              ),
             ),
           ],
         ),
@@ -499,34 +550,38 @@ class _MyConnectionsScreenState extends ConsumerState<MyConnectionsScreen> {
     );
   }
 
-  Future<void> _acceptRequest(String senderId) async {
+  Future<void> _acceptRequest(String requestId, String senderName) async {
     try {
-      final result = await _connectionService.acceptConnectionRequest(senderId);
+      final result = await _connectionService.acceptConnectionRequest(requestId);
 
       if (mounted) {
         if (result['success'] == true) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
+            SnackBar(
               content: Row(
                 children: [
-                  Icon(Icons.check_circle, color: Colors.white),
-                  SizedBox(width: 12),
-                  Text('Connection request accepted!'),
+                  const Icon(Icons.check_circle, color: Colors.white),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text('You and ${formatDisplayName(senderName)} are now connected!'),
+                  ),
                 ],
               ),
-              backgroundColor: Color(0xFF00D67D),
-              duration: Duration(seconds: 2),
+              backgroundColor: const Color(0xFF00D67D),
+              duration: const Duration(seconds: 3),
             ),
           );
+          // Refresh the connections list
+          setState(() {});
         } else {
-          throw Exception(result['error'] ?? 'Failed to accept request');
+          throw Exception(result['message'] ?? 'Failed to accept request');
         }
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: ${e.toString()}'),
+            content: Text('Error: ${e.toString().replaceAll('Exception: ', '')}'),
             backgroundColor: Colors.red,
           ),
         );
@@ -534,9 +589,9 @@ class _MyConnectionsScreenState extends ConsumerState<MyConnectionsScreen> {
     }
   }
 
-  Future<void> _rejectRequest(String senderId) async {
+  Future<void> _rejectRequest(String requestId) async {
     try {
-      final result = await _connectionService.rejectConnectionRequest(senderId);
+      final result = await _connectionService.rejectConnectionRequest(requestId);
 
       if (mounted) {
         if (result['success'] == true) {
@@ -544,24 +599,24 @@ class _MyConnectionsScreenState extends ConsumerState<MyConnectionsScreen> {
             const SnackBar(
               content: Row(
                 children: [
-                  Icon(Icons.block, color: Colors.white),
+                  Icon(Icons.check, color: Colors.white),
                   SizedBox(width: 12),
-                  Text('Connection request rejected'),
+                  Text('Request removed'),
                 ],
               ),
-              backgroundColor: Colors.orange,
+              backgroundColor: Colors.grey,
               duration: Duration(seconds: 2),
             ),
           );
         } else {
-          throw Exception(result['error'] ?? 'Failed to reject request');
+          throw Exception(result['message'] ?? 'Failed to delete request');
         }
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: ${e.toString()}'),
+            content: Text('Error: ${e.toString().replaceAll('Exception: ', '')}'),
             backgroundColor: Colors.red,
           ),
         );

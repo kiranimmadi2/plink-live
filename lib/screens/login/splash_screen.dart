@@ -134,7 +134,9 @@ class _SplashScreenState extends State<SplashScreen>
                   return Transform(
                     alignment: Alignment.center,
                     transform: Matrix4.identity()
-                      ..scale(scale)
+                      ..setEntry(0, 0, scale)
+                      ..setEntry(1, 1, scale)
+                      ..setEntry(2, 2, scale)
                       ..rotateY(rotationY),
                     child: child,
                   );
