@@ -150,7 +150,9 @@ class _HomeScreenState extends State<HomeScreen>
     final userId = _auth.currentUser?.uid;
     if (userId != null) {
       await _intentService.getUserIntents(userId);
-      setState(() {});
+      if (mounted) {
+        setState(() {});
+      }
     }
   }
 
@@ -176,6 +178,8 @@ class _HomeScreenState extends State<HomeScreen>
     _intentController.clear();
 
     await Future.delayed(const Duration(milliseconds: 1000));
+
+    if (!mounted) return;
 
     final aiResponse = _generateAIResponse(userMessage);
 
@@ -1202,6 +1206,8 @@ class _HomeScreenState extends State<HomeScreen>
 
     await Future.delayed(const Duration(seconds: 1));
 
+    if (!mounted) return;
+
     final mockVoiceResults = [
       "I'm looking for a bicycle under 200 dollars",
       "Need a room for rent near college campus",
@@ -1240,6 +1246,8 @@ class _HomeScreenState extends State<HomeScreen>
     });
 
     await Future.delayed(const Duration(milliseconds: 1000));
+
+    if (!mounted) return;
 
     final aiResponse = _generateAIResponse(message);
     final lowerMessage = message.toLowerCase();
@@ -1388,52 +1396,53 @@ class _HomeScreenState extends State<HomeScreen>
     }
   }
 
-  void _showChatHistoryDrawer() {
-    showGeneralDialog(
-      context: context,
-      barrierDismissible: true,
-      barrierLabel: 'Chat History',
-      barrierColor: Colors.transparent,
-      transitionDuration: const Duration(milliseconds: 500),
-      pageBuilder: (context, animation, secondaryAnimation) {
-        return const SizedBox.shrink();
-      },
-      transitionBuilder: (context, animation, secondaryAnimation, child) {
-        final curvedAnimation = CurvedAnimation(
-          parent: animation,
-          curve: Curves.easeOutBack,
-          reverseCurve: Curves.easeInCubic,
-        );
+  // void _showChatHistoryDrawer() {
+  //   showGeneralDialog(
+  //     context: context,
+  //     barrierDismissible: true,
+  //     barrierLabel: 'Chat History',
+  //     barrierColor: Colors.transparent,
+  //     transitionDuration: const Duration(milliseconds: 500),
+  //     pageBuilder: (context, animation, secondaryAnimation) {
+  //       return const SizedBox.shrink();
+  //     },
+  //     transitionBuilder: (context, animation, secondaryAnimation, child) {
+  //       final curvedAnimation = CurvedAnimation(
+  //         parent: animation,
+  //         curve: Curves.easeOutBack,
+  //         reverseCurve: Curves.easeInCubic,
+  //       );
+  //
+  //       return Drawer3DTransition(
+  //         animation: curvedAnimation,
+  //         child: _ChatHistorySideDrawer(
+  //           onNewChat: () {
+  //             Navigator.pop(context);
+  //             _startNewChat();
+  //           },
+  //           onSearchChats: () {
+  //             Navigator.pop(context);
+  //             _showSearchChatsDialog();
+  //           },
+  //           onLibrary: () {
+  //             Navigator.pop(context);
+  //             _showLibraryDialog();
+  //           },
+  //           onProjects: () {
+  //             Navigator.pop(context);
+  //             _showProjectsDialog();
+  //           },
+  //           onGroupChat: () {
+  //             Navigator.pop(context);
+  //             _showGroupChatDialog();
+  //           },
+  //         ),
+  //       );
+  //     },
+  //   );
+  // }
 
-        return Drawer3DTransition(
-          animation: curvedAnimation,
-          child: _ChatHistorySideDrawer(
-            onNewChat: () {
-              Navigator.pop(context);
-              _startNewChat();
-            },
-            onSearchChats: () {
-              Navigator.pop(context);
-              _showSearchChatsDialog();
-            },
-            onLibrary: () {
-              Navigator.pop(context);
-              _showLibraryDialog();
-            },
-            onProjects: () {
-              Navigator.pop(context);
-              _showProjectsDialog();
-            },
-            onGroupChat: () {
-              Navigator.pop(context);
-              _showGroupChatDialog();
-            },
-          ),
-        );
-      },
-    );
-  }
-
+  // ignore: unused_element
   void _showSearchChatsDialog() {
     showModalBottomSheet(
       context: context,
@@ -1651,6 +1660,7 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
+  // ignore: unused_element
   void _showLibraryDialog() {
     showModalBottomSheet(
       context: context,
@@ -1863,6 +1873,7 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
+  // ignore: unused_element
   void _showProjectsDialog() {
     showModalBottomSheet(
       context: context,
@@ -2134,6 +2145,7 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
+  // ignore: unused_element
   void _showGroupChatDialog() {
     showModalBottomSheet(
       context: context,
@@ -2420,6 +2432,7 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
+  // ignore: unused_element
   void _startNewChat() {
     setState(() {
       _conversation.clear();
@@ -2456,32 +2469,32 @@ class _HomeScreenState extends State<HomeScreen>
         toolbarHeight: 60,
         centerTitle: false,
         leadingWidth: 56,
-        leading: Padding(
-          padding: const EdgeInsets.only(left: 12),
-          child: GestureDetector(
-            onTap: () {
-              HapticFeedback.lightImpact();
-              _showChatHistoryDrawer();
-            },
-            child: Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.3),
-                  width: 1,
-                ),
-              ),
-              child: const Icon(
-                Icons.menu_rounded,
-                color: Colors.white,
-                size: 22,
-              ),
-            ),
-          ),
-        ),
+        // leading: Padding(
+        //   padding: const EdgeInsets.only(left: 12),
+        //   child: GestureDetector(
+        //     onTap: () {
+        //       HapticFeedback.lightImpact();
+        //       _showChatHistoryDrawer();
+        //     },
+        //     child: Container(
+        //       width: 40,
+        //       height: 40,
+        //       decoration: BoxDecoration(
+        //         color: Colors.white.withValues(alpha: 0.15),
+        //         borderRadius: BorderRadius.circular(12),
+        //         border: Border.all(
+        //           color: Colors.white.withValues(alpha: 0.3),
+        //           width: 1,
+        //         ),
+        //       ),
+        //       child: const Icon(
+        //         Icons.menu_rounded,
+        //         color: Colors.white,
+        //         size: 22,
+        //       ),
+        //     ),
+        //   ),
+        // ),
         title: ShaderMask(
           shaderCallback: (bounds) => LinearGradient(
             colors: isDarkMode
