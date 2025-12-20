@@ -77,6 +77,8 @@ User Input → UnifiedIntentProcessor → Gemini AI Analysis → UnifiedPostServ
 - `UnifiedPostService`: ⭐ PRIMARY service for all post operations (create, find matches, delete)
 - `UnifiedMatchingService`: Performs semantic matching using AI embeddings
 - `GeminiService`: Interacts with Google Gemini API for embeddings and intent analysis
+- `NotificationService`: Handles FCM tokens, local notifications, and cross-user Firestore notifications
+- `ConnectionService`: Manages connection requests (send, accept, reject, cancel)
 
 #### Data Flow
 1. User types natural language prompt (e.g., "iPhone", "looking for friend in NYC")
@@ -155,20 +157,31 @@ User Input → UnifiedIntentProcessor → Gemini AI Analysis → UnifiedPostServ
 }
 ```
 
-**calls/** - Voice call state (ZEGOCLOUD + Firestore signaling)
+**notifications/** - Cross-user notifications
 ```javascript
 {
-  callId: string,
-  callerId: string,
-  callerName: string,
-  callerPhoto: string,
+  userId: string,           // Target user who should receive notification
+  senderId: string,         // User who triggered the notification
+  title: string,
+  body: string,
+  type: string,             // 'connection_request', 'connection_accepted', 'message', etc.
+  data: {...},              // Additional payload data
+  read: boolean,
+  createdAt: timestamp
+}
+```
+
+**connection_requests/** - Connection requests between users
+```javascript
+{
+  senderId: string,
+  senderName: string,
+  senderPhoto: string,
   receiverId: string,
-  receiverName: string,
-  receiverPhoto: string,
-  type: "audio",                    // Always "audio" (voice-only)
-  state: "calling" | "ringing" | "accepted" | "connected" | "ended" | "rejected",
-  channelName: string,              // ZEGO channel ID
-  timestamp: ISO string
+  message: string,
+  status: 'pending' | 'accepted' | 'rejected',
+  createdAt: timestamp,
+  updatedAt: timestamp
 }
 ```
 
@@ -190,7 +203,6 @@ Main navigation (bottom tabs):
 - **Voice-only calling** - NO video calling feature should be implemented
 - Firestore for call signaling
 - FCM for push notifications
-- Configuration in `lib/config/zego_config.dart`
 
 ### AI Configuration
 
@@ -341,13 +353,31 @@ See `PERFORMANCE_TESTING_GUIDE.md` for scroll performance benchmarks.
 - `SMART_MATCHING_EXPLAINED.md` - Matching algorithm details
 - `LIVE_CONNECT_IMPLEMENTATION_GUIDE.md` - Live Connect feature docs
 
+## Shared UI Components
+
+### chat_common.dart
+Located at `lib/widgets/chat_common.dart`, provides reusable chat components:
+- `formatDisplayName(String name)`: Converts names to Title Case
+- `chatThemeColors`: Predefined gradient themes for message bubbles
+- `ChatMessageInput`: Unified message input with emoji picker toggle
+- `ChatEmojiPicker`: Consistent emoji picker widget
+- `ChatMessageBubble`: Gradient message bubbles with read receipts
+
 ## Project Status
 
-Current branch: `feature/live-connect-enhanced`
+Current branch: `main`
 Version: 1.0.0+1
 
 ### Recent Changes (from git log)
+- Cross-user notification system via Firestore
+- Connection request/accept notifications to correct users
+- Shared chat UI components (chat_common.dart)
+- Title Case name formatting across all screens
 - Enhanced Live Connect features with filters
-- Unified data storage system (posts collection only)
-- Improved matching algorithm
 - Voice calling implementation (with known profile display bug)
+
+## Live Connect Filter Behavior
+
+The Live Connect screen has quick filters with specific selection rules:
+- **Near Me**: Can be toggled independently (works alongside any category filter)
+- **Category Filters** (Dating, Friendship, Business, Sports): **Mutually exclusive** - only ONE can be selected at a time. Selecting a new category automatically deselects the previous one.

@@ -10,7 +10,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'home_screen.dart';
 import 'conversations_screen.dart';
 import 'live_connect_tab_screen.dart';
-import 'profile_with_history_screen.dart';
+import '../profile/profile_with_history_screen.dart'; // Use provider-based version
 import 'messageser_screen.dart';
 
 // Professional & Business screens

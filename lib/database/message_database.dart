@@ -1,6 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'dart:io';
 
 /// Local SQLite database for storing chat messages
@@ -13,11 +14,35 @@ class MessageDatabase {
   MessageDatabase._internal();
 
   static Database? _database;
+  static bool _initFailed = false;
+  static String? _initError;
 
-  Future<Database> get database async {
+  /// Check if local database is available
+  bool get isAvailable => !kIsWeb && !_initFailed;
+
+  /// Get the initialization error message if any
+  String? get initError => _initError;
+
+  Future<Database?> get database async {
+    // Web doesn't support sqflite
+    if (kIsWeb) {
+      _initFailed = true;
+      _initError = 'SQLite not supported on web';
+      return null;
+    }
+
+    if (_initFailed) return null;
     if (_database != null) return _database!;
-    _database = await _initDatabase();
-    return _database!;
+
+    try {
+      _database = await _initDatabase();
+      return _database!;
+    } catch (e) {
+      _initFailed = true;
+      _initError = e.toString();
+      debugPrint('MessageDatabase: Failed to initialize: $e');
+      return null;
+    }
   }
 
   Future<Database> _initDatabase() async {
@@ -95,6 +120,7 @@ class MessageDatabase {
     int offset = 0,
   }) async {
     final db = await database;
+    if (db == null) return [];
     return await db.query(
       'messages',
       where: 'conversationId = ? AND isDeleted = 0',
@@ -108,6 +134,7 @@ class MessageDatabase {
   /// Get single message by ID
   Future<Map<String, dynamic>?> getMessage(String messageId) async {
     final db = await database;
+    if (db == null) return null;
     final results = await db.query(
       'messages',
       where: 'messageId = ?',
@@ -120,6 +147,7 @@ class MessageDatabase {
   /// Get last message timestamp for a conversation
   Future<int?> getLastMessageTimestamp(String conversationId) async {
     final db = await database;
+    if (db == null) return null;
     final results = await db.query(
       'messages',
       columns: ['timestamp'],
@@ -137,6 +165,7 @@ class MessageDatabase {
     String myUserId,
   ) async {
     final db = await database;
+    if (db == null) return 0;
     final results = await db.rawQuery(
       'SELECT COUNT(*) as count FROM messages WHERE conversationId = ? AND isRead = 0 AND senderId != ?',
       [conversationId, myUserId],
@@ -149,8 +178,10 @@ class MessageDatabase {
   // ═══════════════════════════════════════════════════════════════
 
   /// Save a new message to local storage
+  /// Returns -1 if database is unavailable
   Future<int> saveMessage(Map<String, dynamic> message) async {
     final db = await database;
+    if (db == null) return -1;
     return await db.insert(
       'messages',
       message,
@@ -161,6 +192,7 @@ class MessageDatabase {
   /// Save multiple messages in batch (for sync)
   Future<void> saveMessages(List<Map<String, dynamic>> messages) async {
     final db = await database;
+    if (db == null) return;
     final batch = db.batch();
     for (var message in messages) {
       batch.insert(
@@ -180,6 +212,7 @@ class MessageDatabase {
     int? readAt,
   }) async {
     final db = await database;
+    if (db == null) return 0;
     final updates = <String, dynamic>{'status': status};
     if (deliveredAt != null) updates['deliveredAt'] = deliveredAt;
     if (readAt != null) updates['readAt'] = readAt;
@@ -200,6 +233,7 @@ class MessageDatabase {
     int? fileSize,
   ) async {
     final db = await database;
+    if (db == null) return 0;
     return await db.update(
       'messages',
       {'mediaUrl': mediaUrl, 'fileName': fileName, 'fileSize': fileSize},
@@ -211,6 +245,7 @@ class MessageDatabase {
   /// Mark messages as read
   Future<int> markMessagesAsRead(String conversationId, String myUserId) async {
     final db = await database;
+    if (db == null) return 0;
     return await db.update(
       'messages',
       {'isRead': 1, 'readAt': DateTime.now().millisecondsSinceEpoch},
@@ -222,6 +257,7 @@ class MessageDatabase {
   /// Update message text (for edit)
   Future<int> updateMessageText(String messageId, String newText) async {
     final db = await database;
+    if (db == null) return 0;
     return await db.update(
       'messages',
       {
@@ -237,6 +273,7 @@ class MessageDatabase {
   /// Delete message locally
   Future<int> deleteMessageLocally(String messageId) async {
     final db = await database;
+    if (db == null) return 0;
     return await db.delete(
       'messages',
       where: 'messageId = ?',
@@ -247,6 +284,7 @@ class MessageDatabase {
   /// Mark message as deleted (for "delete for everyone")
   Future<int> markMessageAsDeleted(String messageId) async {
     final db = await database;
+    if (db == null) return 0;
     return await db.update(
       'messages',
       {'isDeleted': 1, 'text': null, 'imageUrl': null, 'voiceUrl': null},
@@ -282,6 +320,7 @@ class MessageDatabase {
         .join(',');
 
     final db = await database;
+    if (db == null) return 0;
     return await db.update(
       'messages',
       {'reactions': newReactions},
@@ -316,6 +355,7 @@ class MessageDatabase {
         : null;
 
     final db = await database;
+    if (db == null) return 0;
     return await db.update(
       'messages',
       {'reactions': newReactions},
@@ -331,6 +371,7 @@ class MessageDatabase {
   /// Search messages across all conversations
   Future<List<Map<String, dynamic>>> searchMessages(String query) async {
     final db = await database;
+    if (db == null) return [];
     return await db.query(
       'messages',
       where: 'text LIKE ? AND isDeleted = 0',
@@ -346,6 +387,7 @@ class MessageDatabase {
     String query,
   ) async {
     final db = await database;
+    if (db == null) return [];
     return await db.query(
       'messages',
       where: 'conversationId = ? AND text LIKE ? AND isDeleted = 0',
@@ -362,6 +404,7 @@ class MessageDatabase {
   /// Delete old messages (optional - for storage management)
   Future<int> deleteOldMessages(Duration age) async {
     final db = await database;
+    if (db == null) return 0;
     final cutoffTimestamp = DateTime.now().subtract(age).millisecondsSinceEpoch;
     return await db.delete(
       'messages',
@@ -373,6 +416,7 @@ class MessageDatabase {
   /// Clear all messages for a conversation
   Future<int> clearConversation(String conversationId) async {
     final db = await database;
+    if (db == null) return 0;
     return await db.delete(
       'messages',
       where: 'conversationId = ?',
@@ -382,11 +426,16 @@ class MessageDatabase {
 
   /// Get database size in bytes (for storage stats)
   Future<int> getDatabaseSize() async {
-    final documentsDirectory = await getApplicationDocumentsDirectory();
-    final path = join(documentsDirectory.path, 'messages.db');
-    final file = File(path);
-    if (await file.exists()) {
-      return await file.length();
+    if (kIsWeb) return 0;
+    try {
+      final documentsDirectory = await getApplicationDocumentsDirectory();
+      final path = join(documentsDirectory.path, 'messages.db');
+      final file = File(path);
+      if (await file.exists()) {
+        return await file.length();
+      }
+    } catch (e) {
+      debugPrint('MessageDatabase: Failed to get database size: $e');
     }
     return 0;
   }
@@ -394,6 +443,7 @@ class MessageDatabase {
   /// Get total message count
   Future<int> getTotalMessageCount() async {
     final db = await database;
+    if (db == null) return 0;
     final results = await db.rawQuery('SELECT COUNT(*) as count FROM messages');
     return Sqflite.firstIntValue(results) ?? 0;
   }
@@ -401,6 +451,7 @@ class MessageDatabase {
   /// Close database
   Future<void> close() async {
     final db = await database;
+    if (db == null) return;
     await db.close();
   }
 }

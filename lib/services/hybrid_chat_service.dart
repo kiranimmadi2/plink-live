@@ -2,7 +2,7 @@ import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:video_compress/video_compress.dart';
 import 'package:path_provider/path_provider.dart';
@@ -94,6 +94,12 @@ class HybridChatService {
 
   /// Download media file to local storage
   Future<String?> downloadMedia(String url, String? fileName) async {
+    // Web doesn't support local file storage
+    if (kIsWeb) {
+      _log('HybridChat: Media download not supported on web');
+      return null;
+    }
+
     try {
       final dir = await getApplicationDocumentsDirectory();
       final name = fileName ?? url.split('/').last.split('?').first;
@@ -118,28 +124,40 @@ class HybridChatService {
   }
 
   Future<File?> _compressImage(File file) async {
-    final dir = await getTemporaryDirectory();
-    final targetPath =
-        '${dir.path}/${DateTime.now().millisecondsSinceEpoch}.jpg';
+    if (kIsWeb) return null;
+    try {
+      final dir = await getTemporaryDirectory();
+      final targetPath =
+          '${dir.path}/${DateTime.now().millisecondsSinceEpoch}.jpg';
 
-    final result = await FlutterImageCompress.compressAndGetFile(
-      file.absolute.path,
-      targetPath,
-      quality: 70,
-      minWidth: 1024,
-      minHeight: 1024,
-    );
+      final result = await FlutterImageCompress.compressAndGetFile(
+        file.absolute.path,
+        targetPath,
+        quality: 70,
+        minWidth: 1024,
+        minHeight: 1024,
+      );
 
-    return result != null ? File(result.path) : null;
+      return result != null ? File(result.path) : null;
+    } catch (e) {
+      _log('HybridChat: Error compressing image: $e');
+      return null;
+    }
   }
 
   Future<File?> _compressVideo(File file) async {
-    final info = await VideoCompress.compressVideo(
-      file.path,
-      quality: VideoQuality.MediumQuality,
-      deleteOrigin: false,
-    );
-    return info?.file;
+    if (kIsWeb) return null;
+    try {
+      final info = await VideoCompress.compressVideo(
+        file.path,
+        quality: VideoQuality.MediumQuality,
+        deleteOrigin: false,
+      );
+      return info?.file;
+    } catch (e) {
+      _log('HybridChat: Error compressing video: $e');
+      return null;
+    }
   }
 
   String _getContentType(MessageType type, String ext) {
@@ -190,30 +208,36 @@ class HybridChatService {
     String? fileName = file?.path.split('/').last;
     int? fileSize = file != null ? await file.length() : null;
 
-    // STEP 1: Save to LOCAL database FIRST (instant!)
-    await _localDb.saveMessage({
-      'messageId': messageId,
-      'conversationId': conversationId,
-      'senderId': currentUserId,
-      'receiverId': receiverId,
-      'text': text,
-      'type': type.index,
-      'mediaUrl': mediaUrl,
-      'localPath': localPath,
-      'fileName': fileName,
-      'fileSize': fileSize,
-      'status': 'sending', // Shows clock icon
-      'isSentByMe': 1,
-      'timestamp': timestamp,
-      'isRead': 0,
-      'replyToMessageId': replyToMessageId,
-      'replyToText': replyToText,
-      'replyToSenderId': replyToSenderId,
-      'isDeleted': 0,
-      'isEdited': 0,
-    });
+    // Check if local database is available
+    final localDbAvailable = _localDb.isAvailable;
 
-    _log('HybridChat: Message saved to local DB: $messageId');
+    // STEP 1: Save to LOCAL database FIRST (instant!) - skip if unavailable
+    if (localDbAvailable) {
+      await _localDb.saveMessage({
+        'messageId': messageId,
+        'conversationId': conversationId,
+        'senderId': currentUserId,
+        'receiverId': receiverId,
+        'text': text,
+        'type': type.index,
+        'mediaUrl': mediaUrl,
+        'localPath': localPath,
+        'fileName': fileName,
+        'fileSize': fileSize,
+        'status': 'sending', // Shows clock icon
+        'isSentByMe': 1,
+        'timestamp': timestamp,
+        'isRead': 0,
+        'replyToMessageId': replyToMessageId,
+        'replyToText': replyToText,
+        'replyToSenderId': replyToSenderId,
+        'isDeleted': 0,
+        'isEdited': 0,
+      });
+      _log('HybridChat: Message saved to local DB: $messageId');
+    } else {
+      _log('HybridChat: Local DB unavailable, sending directly to Firebase');
+    }
 
     // User sees message immediately! ✓ (grey checkmark)
 
@@ -225,13 +249,15 @@ class HybridChatService {
         fileName = uploadResult['fileName'];
         fileSize = uploadResult['fileSize'];
 
-        // Update local DB with media URL
-        await _localDb.updateMessageMedia(
-          messageId,
-          mediaUrl!,
-          fileName,
-          fileSize,
-        );
+        // Update local DB with media URL (if available)
+        if (localDbAvailable) {
+          await _localDb.updateMessageMedia(
+            messageId,
+            mediaUrl!,
+            fileName,
+            fileSize,
+          );
+        }
       }
 
       await _firestore
@@ -259,9 +285,11 @@ class HybridChatService {
 
       _log('HybridChat: Message uploaded to Firebase: $messageId');
 
-      // STEP 3: Update local status to "sent"
-      await _localDb.updateMessageStatus(messageId, 'sent');
-      _log('HybridChat: Message status updated to sent');
+      // STEP 3: Update local status to "sent" (if available)
+      if (localDbAvailable) {
+        await _localDb.updateMessageStatus(messageId, 'sent');
+        _log('HybridChat: Message status updated to sent');
+      }
 
       // User sees ✓ (single grey checkmark)
 
@@ -281,8 +309,10 @@ class HybridChatService {
     } catch (e) {
       _log('HybridChat: ERROR uploading message: $e');
 
-      // Update local status to "failed"
-      await _localDb.updateMessageStatus(messageId, 'failed');
+      // Update local status to "failed" (if available)
+      if (localDbAvailable) {
+        await _localDb.updateMessageStatus(messageId, 'failed');
+      }
 
       rethrow;
     }
@@ -404,13 +434,73 @@ class HybridChatService {
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // MARK AS READ
+  // MESSAGE DELIVERY & READ STATUS (WhatsApp-style)
+  // ═══════════════════════════════════════════════════════════════
+  //
+  // Status flow:
+  // 1. 'sending' → Clock icon (message being sent)
+  // 2. 'sent' → Single tick ✓ (delivered to server)
+  // 3. 'delivered' → Double ticks ✓✓ (delivered to recipient's device)
+  // 4. 'read' → Double ticks ✓✓ (blue/green - seen by recipient)
+  //
   // ═══════════════════════════════════════════════════════════════
 
   // Guard to prevent duplicate calls
   final Set<String> _markingAsReadInProgress = {};
+  final Set<String> _markingAsDeliveredInProgress = {};
+
+  /// Mark messages as delivered when recipient opens the conversation
+  /// This updates sent messages from other user to 'delivered' status
+  Future<void> markMessagesAsDelivered(String conversationId) async {
+    final currentUserId = _auth.currentUser?.uid;
+    if (currentUserId == null) return;
+
+    // Prevent duplicate calls
+    if (_markingAsDeliveredInProgress.contains(conversationId)) {
+      return;
+    }
+    _markingAsDeliveredInProgress.add(conversationId);
+
+    try {
+      // Get messages that are 'sent' (not yet delivered) from other users
+      final sentMessages = await _firestore
+          .collection('conversations')
+          .doc(conversationId)
+          .collection('messages')
+          .where('status', isEqualTo: 'sent')
+          .limit(100)
+          .get();
+
+      // Filter to only messages NOT from current user (messages we received)
+      final messagesToUpdate = sentMessages.docs
+          .where((doc) => doc.data()['senderId'] != currentUserId)
+          .toList();
+
+      if (messagesToUpdate.isEmpty) {
+        return;
+      }
+
+      _log('HybridChat: Marking ${messagesToUpdate.length} messages as delivered');
+
+      final batch = _firestore.batch();
+      for (var doc in messagesToUpdate) {
+        batch.update(doc.reference, {
+          'status': 'delivered',
+          'deliveredAt': FieldValue.serverTimestamp(),
+        });
+      }
+
+      await batch.commit();
+      _log('HybridChat: Messages marked as delivered');
+    } catch (e) {
+      _log('HybridChat: Error marking messages as delivered: $e');
+    } finally {
+      _markingAsDeliveredInProgress.remove(conversationId);
+    }
+  }
 
   /// Mark messages as read (updates both local DB and Firebase)
+  /// Called when user is actively viewing the conversation
   Future<void> markMessagesAsRead(String conversationId) async {
     final currentUserId = _auth.currentUser?.uid;
     if (currentUserId == null) return;
@@ -425,27 +515,29 @@ class HybridChatService {
       // Update local database first (silent)
       await _localDb.markMessagesAsRead(conversationId, currentUserId);
 
-      // Update Firebase - use simpler query (only isRead filter)
-      // Then filter by senderId in memory to avoid needing composite index
-      final allUnreadMessages = await _firestore
+      // Get all unread/undelivered messages from other users
+      // Query messages that are either 'sent', 'delivered', or have isRead=false
+      final unreadMessages = await _firestore
           .collection('conversations')
           .doc(conversationId)
           .collection('messages')
           .where('isRead', isEqualTo: false)
-          .limit(50) // Limit for performance
+          .limit(100)
           .get();
 
       // Filter to only messages from other user
-      final unreadFromOthers = allUnreadMessages.docs
+      final messagesToMarkRead = unreadMessages.docs
           .where((doc) => doc.data()['senderId'] != currentUserId)
           .toList();
 
-      if (unreadFromOthers.isEmpty) {
+      if (messagesToMarkRead.isEmpty) {
         return;
       }
 
+      _log('HybridChat: Marking ${messagesToMarkRead.length} messages as read');
+
       final batch = _firestore.batch();
-      for (var doc in unreadFromOthers) {
+      for (var doc in messagesToMarkRead) {
         batch.update(doc.reference, {
           'isRead': true,
           'readAt': FieldValue.serverTimestamp(),
@@ -454,8 +546,9 @@ class HybridChatService {
       }
 
       await batch.commit();
+      _log('HybridChat: Messages marked as read');
     } catch (e) {
-      // Silent fail - non-fatal error
+      _log('HybridChat: Error marking messages as read: $e');
     } finally {
       _markingAsReadInProgress.remove(conversationId);
     }

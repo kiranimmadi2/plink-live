@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 
 import 'package:timeago/timeago.dart' as timeago;
+import 'safe_circle_avatar.dart';
 import '../models/conversation_model.dart';
 import '../models/user_profile.dart';
 import '../screens/enhanced_chat_screen.dart';
@@ -348,19 +348,10 @@ class _ConversationTile extends StatelessWidget {
                         width: 2,
                       ),
                     ),
-                    child: ClipOval(
-                      child: otherUser.photoUrl != null
-                          ? CachedNetworkImage(
-                              imageUrl: otherUser.photoUrl!,
-                              fit: BoxFit.cover,
-                              memCacheWidth: 112,
-                              memCacheHeight: 112,
-                              placeholder: (context, url) =>
-                                  Container(color: Colors.grey[300]),
-                              errorWidget: (context, url, error) =>
-                                  _buildDefaultAvatar(otherUser),
-                            )
-                          : _buildDefaultAvatar(otherUser),
+                    child: SafeCircleAvatar(
+                      photoUrl: otherUser.photoUrl,
+                      name: otherUser.name,
+                      radius: 26,
                     ),
                   ),
                   if (isOnline)
@@ -464,22 +455,6 @@ class _ConversationTile extends StatelessWidget {
                 ),
               ),
             ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDefaultAvatar(UserProfile user) {
-    return Container(
-      color: Colors.grey[300],
-      child: Center(
-        child: Text(
-          user.name.isNotEmpty ? user.name[0].toUpperCase() : '?',
-          style: const TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
           ),
         ),
       ),

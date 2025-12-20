@@ -9,6 +9,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:supper/providers/theme_provider.dart';
 import '../../widgets/user_avatar.dart';
+import '../../utils/photo_url_helper.dart';
 import '../enhanced_chat_screen.dart';
 import '../../models/user_profile.dart';
 import '../../models/extended_user_profile.dart';
@@ -2638,9 +2639,10 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                             setState(() {
                               if (selected) {
                                 _filterByInterests = true;
-                                if (!_selectedInterests.contains('Dating')) {
-                                  _selectedInterests.add('Dating');
-                                }
+                                // Clear other category filters (mutually exclusive)
+                                _selectedInterests.removeWhere((item) =>
+                                  ['Dating', 'Friendship', 'Business', 'Sports'].contains(item));
+                                _selectedInterests.add('Dating');
                               } else {
                                 _selectedInterests.remove('Dating');
                                 if (_selectedInterests.isEmpty) {
@@ -2694,11 +2696,10 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                             setState(() {
                               if (selected) {
                                 _filterByInterests = true;
-                                if (!_selectedInterests.contains(
-                                  'Friendship',
-                                )) {
-                                  _selectedInterests.add('Friendship');
-                                }
+                                // Clear other category filters (mutually exclusive)
+                                _selectedInterests.removeWhere((item) =>
+                                  ['Dating', 'Friendship', 'Business', 'Sports'].contains(item));
+                                _selectedInterests.add('Friendship');
                               } else {
                                 _selectedInterests.remove('Friendship');
                                 if (_selectedInterests.isEmpty) {
@@ -2752,9 +2753,10 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                             setState(() {
                               if (selected) {
                                 _filterByInterests = true;
-                                if (!_selectedInterests.contains('Business')) {
-                                  _selectedInterests.add('Business');
-                                }
+                                // Clear other category filters (mutually exclusive)
+                                _selectedInterests.removeWhere((item) =>
+                                  ['Dating', 'Friendship', 'Business', 'Sports'].contains(item));
+                                _selectedInterests.add('Business');
                               } else {
                                 _selectedInterests.remove('Business');
                                 if (_selectedInterests.isEmpty) {
@@ -2808,9 +2810,10 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                             setState(() {
                               if (selected) {
                                 _filterByInterests = true;
-                                if (!_selectedInterests.contains('Sports')) {
-                                  _selectedInterests.add('Sports');
-                                }
+                                // Clear other category filters (mutually exclusive)
+                                _selectedInterests.removeWhere((item) =>
+                                  ['Dating', 'Friendship', 'Business', 'Sports'].contains(item));
+                                _selectedInterests.add('Sports');
                               } else {
                                 _selectedInterests.remove('Sports');
                                 if (_selectedInterests.isEmpty) {
@@ -3293,8 +3296,14 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                   // Profile Image with gradient background
                   Stack(
                     children: [
-                      extendedProfile.photoUrl == null
-                          ? Container(
+                      Builder(
+                        builder: (context) {
+                          final fixedPhotoUrl = PhotoUrlHelper.fixGooglePhotoUrl(extendedProfile.photoUrl);
+                          final userInitial = userName.isNotEmpty ? userName[0].toUpperCase() : '?';
+
+                          // Fallback widget showing user's initial
+                          Widget buildInitialAvatar() {
+                            return Container(
                               width: 64,
                               height: 64,
                               decoration: BoxDecoration(
@@ -3306,9 +3315,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                 ),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: gradientColors[0].withValues(
-                                      alpha: 0.3,
-                                    ),
+                                    color: gradientColors[0].withValues(alpha: 0.3),
                                     blurRadius: 12,
                                     offset: const Offset(0, 4),
                                   ),
@@ -3316,9 +3323,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                               ),
                               child: Center(
                                 child: Text(
-                                  userName.isNotEmpty
-                                      ? userName[0].toUpperCase()
-                                      : '?',
+                                  userInitial,
                                   style: const TextStyle(
                                     fontSize: 28,
                                     fontWeight: FontWeight.bold,
@@ -3326,29 +3331,83 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                   ),
                                 ),
                               ),
-                            )
-                          : Container(
-                              width: 64,
-                              height: 64,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: gradientColors[0].withValues(
-                                      alpha: 0.3,
-                                    ),
-                                    blurRadius: 12,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ],
-                              ),
-                              child: CircleAvatar(
-                                radius: 32,
-                                backgroundImage: CachedNetworkImageProvider(
-                                  extendedProfile.photoUrl!,
+                            );
+                          }
+
+                          // If no valid photo URL, show initial
+                          if (fixedPhotoUrl == null || fixedPhotoUrl.isEmpty) {
+                            return buildInitialAvatar();
+                          }
+
+                          // Show photo with fallback to initial on error
+                          return Container(
+                            width: 64,
+                            height: 64,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: gradientColors[0].withValues(alpha: 0.3),
+                                  blurRadius: 12,
+                                  offset: const Offset(0, 4),
                                 ),
+                              ],
+                            ),
+                            child: ClipOval(
+                              child: CachedNetworkImage(
+                                imageUrl: fixedPhotoUrl,
+                                width: 64,
+                                height: 64,
+                                fit: BoxFit.cover,
+                                placeholder: (context, url) => Container(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: gradientColors,
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    ),
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      userInitial,
+                                      style: const TextStyle(
+                                        fontSize: 28,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                errorWidget: (context, url, error) {
+                                  // Mark as rate-limited if 429 error
+                                  if (error.toString().contains('429')) {
+                                    PhotoUrlHelper.markAsRateLimited(url);
+                                  }
+                                  return Container(
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: gradientColors,
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                      ),
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        userInitial,
+                                        style: const TextStyle(
+                                          fontSize: 28,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
                               ),
                             ),
+                          );
+                        },
+                      ),
                       if (extendedProfile.isOnline)
                         Positioned(
                           right: 0,

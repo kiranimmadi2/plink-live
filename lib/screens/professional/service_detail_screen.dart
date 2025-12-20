@@ -6,6 +6,7 @@ import '../../models/review_model.dart';
 import '../../models/user_profile.dart';
 import '../../services/professional_service.dart';
 import '../../services/review_service.dart';
+import '../../utils/photo_url_helper.dart';
 import '../../widgets/professional/send_inquiry_sheet.dart';
 import 'public_professional_profile_screen.dart';
 
@@ -381,15 +382,47 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
         child: Row(
           children: [
             // Profile Photo
-            CircleAvatar(
-              radius: 28,
-              backgroundColor: const Color(0xFF00D67D).withValues(alpha: 0.2),
-              backgroundImage: _professional?.profileImageUrl != null
-                  ? CachedNetworkImageProvider(_professional!.profileImageUrl!)
-                  : null,
-              child: _professional?.profileImageUrl == null
-                  ? const Icon(Icons.person, color: Color(0xFF00D67D))
-                  : null,
+            Builder(
+              builder: (context) {
+                final fixedPhotoUrl = PhotoUrlHelper.fixGooglePhotoUrl(_professional?.profileImageUrl);
+                final name = _professional?.professionalProfile?.businessName ?? _professional?.name ?? 'P';
+                final initial = name.isNotEmpty ? name[0].toUpperCase() : 'P';
+
+                Widget buildFallbackAvatar() {
+                  return CircleAvatar(
+                    radius: 28,
+                    backgroundColor: const Color(0xFF00D67D).withValues(alpha: 0.2),
+                    child: Text(
+                      initial,
+                      style: const TextStyle(
+                        color: Color(0xFF00D67D),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 20,
+                      ),
+                    ),
+                  );
+                }
+
+                if (fixedPhotoUrl == null || fixedPhotoUrl.isEmpty) {
+                  return buildFallbackAvatar();
+                }
+
+                return ClipOval(
+                  child: CachedNetworkImage(
+                    imageUrl: fixedPhotoUrl,
+                    width: 56,
+                    height: 56,
+                    fit: BoxFit.cover,
+                    placeholder: (context, url) => buildFallbackAvatar(),
+                    errorWidget: (context, url, error) {
+                      if (error.toString().contains('429')) {
+                        PhotoUrlHelper.markAsRateLimited(url);
+                      }
+                      return buildFallbackAvatar();
+                    },
+                  ),
+                );
+              },
             ),
 
             const SizedBox(width: 16),
@@ -804,21 +837,45 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
           // Reviewer info
           Row(
             children: [
-              CircleAvatar(
-                radius: 20,
-                backgroundColor: const Color(0xFF00D67D).withValues(alpha: 0.2),
-                backgroundImage: review.reviewerPhoto != null
-                    ? CachedNetworkImageProvider(review.reviewerPhoto!)
-                    : null,
-                child: review.reviewerPhoto == null
-                    ? Text(
-                        review.reviewerName[0].toUpperCase(),
+              Builder(
+                builder: (context) {
+                  final fixedPhotoUrl = PhotoUrlHelper.fixGooglePhotoUrl(review.reviewerPhoto);
+                  final initial = review.reviewerName.isNotEmpty ? review.reviewerName[0].toUpperCase() : '?';
+
+                  Widget buildFallbackAvatar() {
+                    return CircleAvatar(
+                      radius: 20,
+                      backgroundColor: const Color(0xFF00D67D).withValues(alpha: 0.2),
+                      child: Text(
+                        initial,
                         style: const TextStyle(
                           color: Color(0xFF00D67D),
                           fontWeight: FontWeight.bold,
                         ),
-                      )
-                    : null,
+                      ),
+                    );
+                  }
+
+                  if (fixedPhotoUrl == null || fixedPhotoUrl.isEmpty) {
+                    return buildFallbackAvatar();
+                  }
+
+                  return ClipOval(
+                    child: CachedNetworkImage(
+                      imageUrl: fixedPhotoUrl,
+                      width: 40,
+                      height: 40,
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => buildFallbackAvatar(),
+                      errorWidget: (context, url, error) {
+                        if (error.toString().contains('429')) {
+                          PhotoUrlHelper.markAsRateLimited(url);
+                        }
+                        return buildFallbackAvatar();
+                      },
+                    ),
+                  );
+                },
               ),
               const SizedBox(width: 12),
               Expanded(

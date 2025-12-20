@@ -12,6 +12,7 @@ import '../models/conversation_model.dart';
 import '../models/user_profile.dart';
 import '../providers/conversation_providers.dart';
 import '../providers/app_providers.dart';
+import '../utils/photo_url_helper.dart';
 import 'enhanced_chat_screen.dart';
 import 'create_group_screen.dart';
 import 'group_chat_screen.dart';
@@ -468,30 +469,60 @@ class _ConversationsScreenState extends ConsumerState<ConversationsScreen>
           children: [
             Stack(
               children: [
-                CircleAvatar(
-                  radius: 28,
-                  backgroundImage: displayPhoto != null && !conversation.isGroup
-                      ? CachedNetworkImageProvider(displayPhoto)
-                      : null,
-                  backgroundColor: conversation.isGroup
-                      ? Theme.of(context).primaryColor.withValues(alpha: 0.15)
-                      : Theme.of(context).primaryColor.withValues(alpha: 0.1),
-                  child: displayPhoto == null || conversation.isGroup
-                      ? (conversation.isGroup
-                          ? Icon(
-                              Icons.group,
-                              color: Theme.of(context).primaryColor,
-                              size: 28,
-                            )
-                          : Text(
-                              displayName.isNotEmpty ? displayName[0].toUpperCase() : '?',
-                              style: TextStyle(
-                                color: Theme.of(context).primaryColor,
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ))
-                      : null,
+                Builder(
+                  builder: (context) {
+                    // Handle group conversations
+                    if (conversation.isGroup) {
+                      return CircleAvatar(
+                        radius: 28,
+                        backgroundColor: Theme.of(context).primaryColor.withValues(alpha: 0.15),
+                        child: Icon(
+                          Icons.group,
+                          color: Theme.of(context).primaryColor,
+                          size: 28,
+                        ),
+                      );
+                    }
+
+                    // Handle individual conversations with safe image loading
+                    final fixedPhotoUrl = PhotoUrlHelper.fixGooglePhotoUrl(displayPhoto);
+                    final initial = displayName.isNotEmpty ? displayName[0].toUpperCase() : '?';
+
+                    Widget buildFallbackAvatar() {
+                      return CircleAvatar(
+                        radius: 28,
+                        backgroundColor: Theme.of(context).primaryColor.withValues(alpha: 0.1),
+                        child: Text(
+                          initial,
+                          style: TextStyle(
+                            color: Theme.of(context).primaryColor,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      );
+                    }
+
+                    if (fixedPhotoUrl == null || fixedPhotoUrl.isEmpty) {
+                      return buildFallbackAvatar();
+                    }
+
+                    return ClipOval(
+                      child: CachedNetworkImage(
+                        imageUrl: fixedPhotoUrl,
+                        width: 56,
+                        height: 56,
+                        fit: BoxFit.cover,
+                        placeholder: (context, url) => buildFallbackAvatar(),
+                        errorWidget: (context, url, error) {
+                          if (error.toString().contains('429')) {
+                            PhotoUrlHelper.markAsRateLimited(url);
+                          }
+                          return buildFallbackAvatar();
+                        },
+                      ),
+                    );
+                  },
                 ),
                 Positioned(
                   right: 0,
@@ -678,24 +709,46 @@ class _ConversationsScreenState extends ConsumerState<ConversationsScreen>
         children: [
           Stack(
             children: [
-              CircleAvatar(
-                radius: 35,
-                backgroundImage: photoUrl != null
-                    ? CachedNetworkImageProvider(photoUrl)
-                    : null,
-                backgroundColor: Theme.of(
-                  context,
-                ).primaryColor.withValues(alpha: 0.1),
-                child: photoUrl == null
-                    ? Text(
-                        name[0].toUpperCase(),
+              Builder(
+                builder: (context) {
+                  final fixedPhotoUrl = PhotoUrlHelper.fixGooglePhotoUrl(photoUrl);
+                  final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
+
+                  Widget buildFallbackAvatar() {
+                    return CircleAvatar(
+                      radius: 35,
+                      backgroundColor: Theme.of(context).primaryColor.withValues(alpha: 0.1),
+                      child: Text(
+                        initial,
                         style: TextStyle(
                           color: Theme.of(context).primaryColor,
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
                         ),
-                      )
-                    : null,
+                      ),
+                    );
+                  }
+
+                  if (fixedPhotoUrl == null || fixedPhotoUrl.isEmpty) {
+                    return buildFallbackAvatar();
+                  }
+
+                  return ClipOval(
+                    child: CachedNetworkImage(
+                      imageUrl: fixedPhotoUrl,
+                      width: 70,
+                      height: 70,
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => buildFallbackAvatar(),
+                      errorWidget: (context, url, error) {
+                        if (error.toString().contains('429')) {
+                          PhotoUrlHelper.markAsRateLimited(url);
+                        }
+                        return buildFallbackAvatar();
+                      },
+                    ),
+                  );
+                },
               ),
               Positioned(
                 right: 2,
@@ -1012,21 +1065,44 @@ class _NewMessageSheetState extends State<_NewMessageSheet> {
                     final photoUrl = userData['photoUrl'];
 
                     return ListTile(
-                      leading: CircleAvatar(
-                        backgroundImage: photoUrl != null
-                            ? CachedNetworkImageProvider(photoUrl)
-                            : null,
-                        backgroundColor:
-                            Theme.of(context).primaryColor.withValues(alpha: 0.1),
-                        child: photoUrl == null
-                            ? Text(
-                                name.isNotEmpty ? name[0].toUpperCase() : '?',
+                      leading: Builder(
+                        builder: (context) {
+                          final fixedPhotoUrl = PhotoUrlHelper.fixGooglePhotoUrl(photoUrl);
+                          final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
+
+                          Widget buildFallbackAvatar() {
+                            return CircleAvatar(
+                              backgroundColor: Theme.of(context).primaryColor.withValues(alpha: 0.1),
+                              child: Text(
+                                initial,
                                 style: TextStyle(
                                   color: Theme.of(context).primaryColor,
                                   fontWeight: FontWeight.bold,
                                 ),
-                              )
-                            : null,
+                              ),
+                            );
+                          }
+
+                          if (fixedPhotoUrl == null || fixedPhotoUrl.isEmpty) {
+                            return buildFallbackAvatar();
+                          }
+
+                          return ClipOval(
+                            child: CachedNetworkImage(
+                              imageUrl: fixedPhotoUrl,
+                              width: 40,
+                              height: 40,
+                              fit: BoxFit.cover,
+                              placeholder: (context, url) => buildFallbackAvatar(),
+                              errorWidget: (context, url, error) {
+                                if (error.toString().contains('429')) {
+                                  PhotoUrlHelper.markAsRateLimited(url);
+                                }
+                                return buildFallbackAvatar();
+                              },
+                            ),
+                          );
+                        },
                       ),
                       title: Text(
                         name,

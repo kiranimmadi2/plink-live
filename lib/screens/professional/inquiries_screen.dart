@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../models/inquiry_model.dart';
 import '../../services/inquiry_service.dart';
+import '../../utils/photo_url_helper.dart';
 
 /// Screen for professionals to manage their inquiries
 class InquiriesScreen extends StatefulWidget {
@@ -170,22 +171,46 @@ class _InquiriesScreenState extends State<InquiriesScreen>
               child: Row(
                 children: [
                   // Client avatar
-                  CircleAvatar(
-                    radius: 24,
-                    backgroundColor: const Color(0xFF00D67D).withValues(alpha: 0.2),
-                    backgroundImage: inquiry.clientPhoto != null
-                        ? CachedNetworkImageProvider(inquiry.clientPhoto!)
-                        : null,
-                    child: inquiry.clientPhoto == null
-                        ? Text(
-                            inquiry.clientName[0].toUpperCase(),
+                  Builder(
+                    builder: (context) {
+                      final fixedPhotoUrl = PhotoUrlHelper.fixGooglePhotoUrl(inquiry.clientPhoto);
+                      final initial = inquiry.clientName.isNotEmpty ? inquiry.clientName[0].toUpperCase() : '?';
+
+                      Widget buildFallbackAvatar() {
+                        return CircleAvatar(
+                          radius: 24,
+                          backgroundColor: const Color(0xFF00D67D).withValues(alpha: 0.2),
+                          child: Text(
+                            initial,
                             style: const TextStyle(
                               color: Color(0xFF00D67D),
                               fontWeight: FontWeight.bold,
                               fontSize: 18,
                             ),
-                          )
-                        : null,
+                          ),
+                        );
+                      }
+
+                      if (fixedPhotoUrl == null || fixedPhotoUrl.isEmpty) {
+                        return buildFallbackAvatar();
+                      }
+
+                      return ClipOval(
+                        child: CachedNetworkImage(
+                          imageUrl: fixedPhotoUrl,
+                          width: 48,
+                          height: 48,
+                          fit: BoxFit.cover,
+                          placeholder: (context, url) => buildFallbackAvatar(),
+                          errorWidget: (context, url, error) {
+                            if (error.toString().contains('429')) {
+                              PhotoUrlHelper.markAsRateLimited(url);
+                            }
+                            return buildFallbackAvatar();
+                          },
+                        ),
+                      );
+                    },
                   ),
 
                   const SizedBox(width: 12),
@@ -596,23 +621,46 @@ class _InquiryDetailSheet extends StatelessWidget {
                 padding: const EdgeInsets.all(20),
                 child: Row(
                   children: [
-                    CircleAvatar(
-                      radius: 28,
-                      backgroundColor:
-                          const Color(0xFF00D67D).withValues(alpha: 0.2),
-                      backgroundImage: inquiry.clientPhoto != null
-                          ? CachedNetworkImageProvider(inquiry.clientPhoto!)
-                          : null,
-                      child: inquiry.clientPhoto == null
-                          ? Text(
-                              inquiry.clientName[0].toUpperCase(),
+                    Builder(
+                      builder: (context) {
+                        final fixedPhotoUrl = PhotoUrlHelper.fixGooglePhotoUrl(inquiry.clientPhoto);
+                        final initial = inquiry.clientName.isNotEmpty ? inquiry.clientName[0].toUpperCase() : '?';
+
+                        Widget buildFallbackAvatar() {
+                          return CircleAvatar(
+                            radius: 28,
+                            backgroundColor: const Color(0xFF00D67D).withValues(alpha: 0.2),
+                            child: Text(
+                              initial,
                               style: const TextStyle(
                                 color: Color(0xFF00D67D),
                                 fontWeight: FontWeight.bold,
                                 fontSize: 20,
                               ),
-                            )
-                          : null,
+                            ),
+                          );
+                        }
+
+                        if (fixedPhotoUrl == null || fixedPhotoUrl.isEmpty) {
+                          return buildFallbackAvatar();
+                        }
+
+                        return ClipOval(
+                          child: CachedNetworkImage(
+                            imageUrl: fixedPhotoUrl,
+                            width: 56,
+                            height: 56,
+                            fit: BoxFit.cover,
+                            placeholder: (context, url) => buildFallbackAvatar(),
+                            errorWidget: (context, url, error) {
+                              if (error.toString().contains('429')) {
+                                PhotoUrlHelper.markAsRateLimited(url);
+                              }
+                              return buildFallbackAvatar();
+                            },
+                          ),
+                        );
+                      },
                     ),
                     const SizedBox(width: 16),
                     Expanded(
