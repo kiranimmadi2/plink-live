@@ -14,7 +14,6 @@ import '../profile/profile_with_history_screen.dart';
 import '../../services/photo_cache_service.dart';
 import '../../widgets/floating_particles.dart';
 import 'product_detail_screen.dart';
-import '../../services/video_preload_service.dart';
 
 @immutable
 class HomeScreen extends StatefulWidget {
@@ -54,24 +53,12 @@ class _HomeScreenState extends State<HomeScreen>
   bool _isVoiceProcessing = false;
   Timer? _recordingTimer;
 
-  // Video player for background - use preloaded service
-  final VideoPreloadService _videoService = VideoPreloadService();
-
   @override
   void initState() {
     super.initState();
     _loadUserIntents();
     _loadUserProfile();
     _realtimeService.initialize();
-
-    // Resume video if already preloaded, otherwise wait for it
-    if (_videoService.isReady) {
-      _videoService.resume();
-    } else {
-      // Add callback to rebuild when video is ready
-      _videoService.addOnReadyCallback(_onVideoReady);
-      _videoService.preload();
-    }
 
     _controller = AnimationController(vsync: this);
 
@@ -89,14 +76,6 @@ class _HomeScreenState extends State<HomeScreen>
     });
   }
 
-  void _onVideoReady() {
-    if (mounted) {
-      setState(() {
-        // Rebuild to show video
-      });
-    }
-  }
-
   void _onFocusChange() {
     if (mounted) {
       setState(() {
@@ -108,7 +87,6 @@ class _HomeScreenState extends State<HomeScreen>
   @override
   void dispose() {
     _searchFocusNode.removeListener(_onFocusChange);
-    _videoService.removeOnReadyCallback(_onVideoReady);
     _intentController.dispose();
     _searchFocusNode.dispose();
     _realtimeService.dispose();
@@ -116,7 +94,6 @@ class _HomeScreenState extends State<HomeScreen>
     _timer?.cancel();
     _recordingTimer?.cancel();
     _chatScrollController.dispose();
-    // Don't dispose video service - it's shared singleton
     super.dispose();
   }
 
@@ -2550,32 +2527,22 @@ class _HomeScreenState extends State<HomeScreen>
       ),
       body: Stack(
         children: [
-          // Video Background with smooth fade transition
+          // Image Background
           Positioned.fill(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 500),
-              child: _videoService.isReady && _videoService.controller != null
-                  ? SizedBox.expand(
-                      key: const ValueKey('video'),
-                      child: FittedBox(
-                        fit: BoxFit.fill,
-                        child: SizedBox(
-                          width: _videoService.controller!.value.size.width,
-                          height: _videoService.controller!.value.size.height,
-                          child: VideoPlayer(_videoService.controller!),
-                        ),
-                      ),
-                    )
-                  : Container(
-                      key: const ValueKey('placeholder'),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [Colors.grey.shade900, Colors.black],
-                        ),
-                      ),
+            child: Image.asset(
+              'assets/logo/home_background.webp',
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                return Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Colors.grey.shade900, Colors.black],
                     ),
+                  ),
+                );
+              },
             ),
           ),
 

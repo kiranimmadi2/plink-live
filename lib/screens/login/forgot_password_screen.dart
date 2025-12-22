@@ -2,8 +2,8 @@ import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:video_player/video_player.dart';
-import '../../services/video_preload_service.dart';
+import '../../res/config/app_colors.dart';
+import '../../res/config/app_assets.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -26,7 +26,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final List<FocusNode> _otpFocusNodes = List.generate(6, (_) => FocusNode());
 
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final VideoPreloadService _videoService = VideoPreloadService();
 
   int _currentStep = 0; // 0: Phone, 1: OTP, 2: New Password
   bool _isLoading = false;
@@ -73,24 +72,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   @override
   void initState() {
     super.initState();
-    // Setup video background
-    if (_videoService.isReady) {
-      _videoService.resume();
-    } else {
-      _videoService.addOnReadyCallback(_onVideoReady);
-      _videoService.preload();
-    }
-  }
-
-  void _onVideoReady() {
-    if (mounted) {
-      setState(() {});
-    }
   }
 
   @override
   void dispose() {
-    _videoService.removeOnReadyCallback(_onVideoReady);
     _phoneController.dispose();
     _otpController.dispose();
     _newPasswordController.dispose();
@@ -418,36 +403,25 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       ),
       body: Stack(
         children: [
-          // Video Background
+          // Image Background
           Positioned.fill(
-            child: _videoService.isReady && _videoService.controller != null
-                ? FittedBox(
-                    fit: BoxFit.fill,
-                    child: SizedBox(
-                      width: _videoService.controller!.value.size.width,
-                      height: _videoService.controller!.value.size.height,
-                      child: VideoPlayer(_videoService.controller!),
-                    ),
-                  )
-                : Container(
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Color(0xFF1a1a2e),
-                          Color(0xFF16213e),
-                          Color(0xFF0f0f23),
-                        ],
-                      ),
-                    ),
+            child: Image.asset(
+              AppAssets.homeBackgroundImage,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                return Container(
+                  decoration: const BoxDecoration(
+                    gradient: AppColors.splashGradient,
                   ),
+                );
+              },
+            ),
           ),
 
           // Dark overlay
           Positioned.fill(
             child: Container(
-              color: Colors.black.withValues(alpha: 0.5),
+              color: AppColors.darkOverlay(alpha: 0.5),
             ),
           ),
 
@@ -463,15 +437,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       margin: const EdgeInsets.all(24),
                       padding: const EdgeInsets.all(32),
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.1),
+                        color: AppColors.glassBackgroundDark(alpha: 0.1),
                         borderRadius: BorderRadius.circular(24),
                         border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.2),
+                          color: AppColors.glassBorder(alpha: 0.2),
                           width: 1.5,
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.2),
+                            color: AppColors.darkOverlay(alpha: 0.2),
                             blurRadius: 20,
                             offset: const Offset(0, 10),
                           ),
@@ -580,7 +554,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   void _showCountryCodePicker() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF1a1a2e),
+      backgroundColor: AppColors.splashDark1,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -1235,35 +1209,59 @@ class _CountryCodePickerSheetState extends State<_CountryCodePickerSheet> {
   Widget build(BuildContext context) {
     return ClipRRect(
       borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-        child: Container(
-          height: MediaQuery.of(context).size.height * 0.7,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Colors.white.withValues(alpha: 0.15),
-                Colors.white.withValues(alpha: 0.05),
-              ],
-            ),
-            border: Border(
-              top: BorderSide(
-                color: Colors.white.withValues(alpha: 0.3),
-                width: 1,
+      child: SizedBox(
+        height: MediaQuery.of(context).size.height * 0.7,
+        child: Stack(
+          children: [
+            // Background Image
+            Positioned.fill(
+              child: Image.asset(
+                AppAssets.homeBackgroundImage,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    decoration: const BoxDecoration(
+                      gradient: AppColors.splashGradient,
+                    ),
+                  );
+                },
               ),
             ),
-          ),
-          child: Column(
+            // Dark overlay
+            Positioned.fill(
+              child: Container(
+                color: AppColors.darkOverlay(alpha: 0.5),
+              ),
+            ),
+            // Content with glassmorphism
+            BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      AppColors.glassBackgroundDark(alpha: 0.15),
+                      AppColors.glassBackgroundDark(alpha: 0.05),
+                    ],
+                  ),
+                  border: Border(
+                    top: BorderSide(
+                      color: AppColors.glassBorder(alpha: 0.3),
+                      width: 1,
+                    ),
+                  ),
+                ),
+                child: Column(
             children: [
               // Handle bar
               Container(
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.5),
+                  color: AppColors.glassBorder(alpha: 0.5),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -1413,7 +1411,10 @@ class _CountryCodePickerSheetState extends State<_CountryCodePickerSheet> {
                       ),
               ),
             ],
-          ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

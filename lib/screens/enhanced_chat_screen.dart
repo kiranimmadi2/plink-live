@@ -25,7 +25,6 @@ import '../services/hybrid_chat_service.dart';
 import '../providers/app_providers.dart';
 import 'profile/profile_view_screen.dart';
 import 'video_player_screen.dart';
-import '../widgets/chat_common.dart';
 
 class EnhancedChatScreen extends ConsumerStatefulWidget {
   final UserProfile otherUser;
@@ -304,27 +303,6 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
       }
     } catch (e) {
       debugPrint('Error loading chat theme: $e');
-    }
-  }
-
-  Future<void> _saveChatTheme(String theme) async {
-    if (_conversationId == null || !mounted) return;
-
-    try {
-      await _firestore.collection('conversations').doc(_conversationId!).update(
-        {'chatTheme': theme},
-      );
-
-      setState(() {
-        _currentTheme = theme;
-      });
-    } catch (e) {
-      debugPrint('Error saving chat theme: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Failed to save theme')));
-      }
     }
   }
 
@@ -2397,12 +2375,8 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
     if (currentUserId == null) return;
 
     try {
-      // Step 1: Mark incoming messages as delivered (recipient opened chat)
-      // This updates sender's view: ✓ → ✓✓ (grey)
-      await _hybridChatService.markMessagesAsDelivered(_conversationId!);
-
-      // Step 2: Mark messages as read (recipient viewing messages)
-      // This updates sender's view: ✓✓ (grey) → ✓✓ (green/blue)
+      // Mark messages as read (recipient viewing messages)
+      // This updates sender's view: ✓ → ✓✓ (green/blue)
       await _hybridChatService.markMessagesAsRead(_conversationId!);
 
       // Check mounted again after async operation
@@ -2935,147 +2909,6 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
     );
   }
 
-  void _showChatInfo() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-
-        return DraggableScrollableSheet(
-          initialChildSize: 0.5,
-          minChildSize: 0.3,
-          maxChildSize: 0.9,
-          builder: (context, scrollController) {
-            return Container(
-              decoration: BoxDecoration(
-                color: isDarkMode ? const Color(0xFF1A1A1A) : Colors.white,
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(20),
-                ),
-              ),
-              child: Column(
-                children: [
-                  Container(
-                    margin: const EdgeInsets.only(top: 8),
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: isDarkMode ? Colors.grey[700] : Colors.grey[300],
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                  Expanded(
-                    child: ListView(
-                      controller: scrollController,
-                      padding: const EdgeInsets.all(16),
-                      children: [
-                        Center(
-                          child: Builder(
-                            builder: (context) {
-                              final fixedPhotoUrl = PhotoUrlHelper.fixGooglePhotoUrl(widget.otherUser.profileImageUrl);
-                              final initial = widget.otherUser.name.isNotEmpty ? widget.otherUser.name[0].toUpperCase() : '?';
-
-                              Widget buildFallbackAvatar() {
-                                return CircleAvatar(
-                                  radius: 50,
-                                  backgroundColor: Theme.of(context).primaryColor.withValues(alpha: 0.1),
-                                  child: Text(
-                                    initial,
-                                    style: TextStyle(
-                                      fontSize: 32,
-                                      color: Theme.of(context).primaryColor,
-                                    ),
-                                  ),
-                                );
-                              }
-
-                              if (fixedPhotoUrl == null || fixedPhotoUrl.isEmpty) {
-                                return buildFallbackAvatar();
-                              }
-
-                              return ClipOval(
-                                child: CachedNetworkImage(
-                                  imageUrl: fixedPhotoUrl,
-                                  width: 100,
-                                  height: 100,
-                                  fit: BoxFit.cover,
-                                  placeholder: (context, url) => buildFallbackAvatar(),
-                                  errorWidget: (context, url, error) {
-                                    if (error.toString().contains('429')) {
-                                      PhotoUrlHelper.markAsRateLimited(url);
-                                    }
-                                    return buildFallbackAvatar();
-                                  },
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Center(
-                          child: Text(
-                            widget.otherUser.name,
-                            style: const TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 32),
-                        ListTile(
-                          leading: const Icon(Icons.notifications_off),
-                          title: const Text('Mute Notifications'),
-                          trailing: Switch(value: false, onChanged: (value) {}),
-                        ),
-                        ListTile(
-                          leading: const Icon(Icons.search),
-                          title: const Text('Search in Conversation'),
-                          onTap: () {
-                            Navigator.pop(context);
-                            _toggleSearch();
-                          },
-                        ),
-                        ListTile(
-                          leading: const Icon(Icons.color_lens),
-                          title: const Text('Change Theme'),
-                          onTap: _showThemeSelector,
-                        ),
-                        ListTile(
-                          leading: const Icon(Icons.photo),
-                          title: const Text('Shared Media'),
-                          onTap: () {},
-                        ),
-                        const Divider(),
-                        ListTile(
-                          leading: const Icon(Icons.block, color: Colors.red),
-                          title: const Text(
-                            'Block User',
-                            style: TextStyle(color: Colors.red),
-                          ),
-                          onTap: () {},
-                        ),
-                        ListTile(
-                          leading: const Icon(Icons.delete, color: Colors.red),
-                          title: const Text(
-                            'Delete Conversation',
-                            style: TextStyle(color: Colors.red),
-                          ),
-                          onTap: () {},
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
   // Search-related methods
   void _toggleSearch() {
     setState(() {
@@ -3274,127 +3107,5 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
     }
 
     return RichText(text: TextSpan(children: spans));
-  }
-
-  void _showThemeSelector() {
-    Navigator.pop(context); // Close the chat info sheet first
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-
-        return Container(
-          decoration: BoxDecoration(
-            color: isDarkMode ? const Color(0xFF1A1A1A) : Colors.white,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                margin: const EdgeInsets.only(top: 8),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: isDarkMode ? Colors.grey[700] : Colors.grey[300],
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text(
-                  'Chat Theme',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: isDarkMode ? Colors.white : Colors.black,
-                  ),
-                ),
-              ),
-              SizedBox(
-                height: 120,
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: chatThemes.length,
-                  itemBuilder: (context, index) {
-                    final themeName = chatThemes.keys.elementAt(index);
-                    final themeColors = chatThemes[themeName]!;
-                    final isSelected = themeName == _currentTheme;
-
-                    return GestureDetector(
-                      onTap: () {
-                        HapticFeedback.lightImpact();
-                        _saveChatTheme(themeName);
-                        Navigator.pop(context);
-                      },
-                      child: Container(
-                        width: 80,
-                        margin: const EdgeInsets.only(right: 12),
-                        child: Column(
-                          children: [
-                            Container(
-                              width: 60,
-                              height: 60,
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: themeColors,
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                ),
-                                shape: BoxShape.circle,
-                                border: isSelected
-                                    ? Border.all(color: Colors.white, width: 3)
-                                    : null,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: themeColors[0].withValues(
-                                      alpha: 0.4,
-                                    ),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ],
-                              ),
-                              child: isSelected
-                                  ? const Icon(
-                                      Icons.check,
-                                      color: Colors.white,
-                                      size: 28,
-                                    )
-                                  : null,
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              _capitalizeThemeName(themeName),
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: isSelected
-                                    ? FontWeight.w600
-                                    : FontWeight.normal,
-                                color: isDarkMode ? Colors.white : Colors.black,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(height: 24),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  String _capitalizeThemeName(String name) {
-    if (name.isEmpty) return name;
-    return name[0].toUpperCase() + name.substring(1);
   }
 }

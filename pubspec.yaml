@@ -102,6 +102,18 @@ dependencies:
   flutter_3d_choice_chip: ^0.1.4
   speech_to_text: ^7.3.0
 
+  # Audio player for calls
+  audioplayers: ^6.1.0
+
+  # PDF processing
+  syncfusion_flutter_pdf: ^28.1.33
+
+  # WebRTC for voice calls
+  flutter_webrtc: ^0.12.5
+
+  # MIME type detection
+  mime: ^2.0.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/app_providers.dart';
 import '../home/main_navigation_screen.dart';
+import '../../res/config/app_colors.dart';
 
 class ProfileSetupScreen extends ConsumerStatefulWidget {
   const ProfileSetupScreen({super.key});
@@ -184,7 +185,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF1A1A2E),
+      backgroundColor: AppColors.splashDark1,
       body: SafeArea(
         child: Column(
           children: [
@@ -264,7 +265,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen>
                     height: 4,
                     decoration: BoxDecoration(
                       color: _currentStep >= index
-                          ? const Color(0xFF00D67D)
+                          ? AppColors.success
                           : Colors.white24,
                       borderRadius: BorderRadius.circular(2),
                     ),
@@ -328,13 +329,13 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen>
                   return Theme(
                     data: Theme.of(context).copyWith(
                       colorScheme: const ColorScheme.dark(
-                        primary: Color(0xFF00D67D),
+                        primary: AppColors.success,
                         onPrimary: Colors.white,
                         surface: Color(0xFF2D2D44),
                         onSurface: Colors.white,
                       ),
                       dialogTheme: const DialogThemeData(
-                        backgroundColor: Color(0xFF1A1A2E),
+                        backgroundColor: AppColors.splashDark1,
                       ),
                     ),
                     child: child!,
@@ -355,7 +356,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen>
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
                   color: _selectedBirthDate != null
-                      ? const Color(0xFF00D67D)
+                      ? AppColors.success
                       : Colors.white.withValues(alpha: 0.2),
                   width: _selectedBirthDate != null ? 2 : 1,
                 ),
@@ -365,7 +366,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen>
                   Icon(
                     Icons.calendar_today,
                     color: _selectedBirthDate != null
-                        ? const Color(0xFF00D67D)
+                        ? AppColors.success
                         : Colors.white54,
                     size: 24,
                   ),
@@ -393,7 +394,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen>
                           Text(
                             '${_calculateAge(_selectedBirthDate!)} years old',
                             style: const TextStyle(
-                              color: Color(0xFF00D67D),
+                              color: AppColors.success,
                               fontSize: 14,
                             ),
                           ),
@@ -610,12 +611,12 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen>
                 ),
                 decoration: BoxDecoration(
                   color: isSelected
-                      ? const Color(0xFF00D67D).withValues(alpha: 0.2)
+                      ? AppColors.success.withValues(alpha: 0.2)
                       : Colors.white.withValues(alpha: 0.05),
                   borderRadius: BorderRadius.circular(25),
                   border: Border.all(
                     color: isSelected
-                        ? const Color(0xFF00D67D)
+                        ? AppColors.success
                         : Colors.white.withValues(alpha: 0.2),
                     width: isSelected ? 2 : 1,
                   ),
@@ -627,7 +628,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen>
                       item['icon'] as IconData,
                       size: 18,
                       color: isSelected
-                          ? const Color(0xFF00D67D)
+                          ? AppColors.success
                           : Colors.white70,
                     ),
                     const SizedBox(width: 8),
@@ -635,7 +636,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen>
                       item['name'],
                       style: TextStyle(
                         color: isSelected
-                            ? const Color(0xFF00D67D)
+                            ? AppColors.success
                             : Colors.white,
                         fontSize: 14,
                         fontWeight: isSelected
@@ -648,7 +649,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen>
                       const Icon(
                         Icons.check_circle,
                         size: 16,
-                        color: Color(0xFF00D67D),
+                        color: AppColors.success,
                       ),
                     ],
                   ],
@@ -689,7 +690,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen>
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFF1A1A2E),
+        color: AppColors.splashDark1,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.3),
@@ -711,13 +712,13 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen>
                   const Icon(
                     Icons.check_circle,
                     size: 16,
-                    color: Color(0xFF00D67D),
+                    color: AppColors.success,
                   ),
                   const SizedBox(width: 8),
                   Text(
                     selectionText,
                     style: const TextStyle(
-                      color: Color(0xFF00D67D),
+                      color: AppColors.success,
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
                     ),
@@ -734,7 +735,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen>
               onPressed: _isLoading ? null : _nextStep,
               style: ElevatedButton.styleFrom(
                 backgroundColor: hasSelections
-                    ? const Color(0xFF00D67D)
+                    ? AppColors.success
                     : Colors.grey[700],
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
