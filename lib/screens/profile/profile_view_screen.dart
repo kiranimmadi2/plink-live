@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../models/post_model.dart';
 import '../../models/user_profile.dart';
+import '../../utils/photo_url_helper.dart';
 import '../../widgets/account_badges.dart';
 import '../enhanced_chat_screen.dart';
 
@@ -109,38 +111,107 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
     debugPrint('Profile Image URL: $profileImage');
     debugPrint('Post Images: $images');
 
-    final allImages = <String>[];
-
-    // Add profile image if it exists and is valid
-    if (profileImage != null && profileImage.isNotEmpty) {
-      allImages.add(profileImage);
-    }
-
-    // Add post images
-    allImages.addAll(images);
-
-    if (allImages.isEmpty) {
+    // Build the default fallback avatar widget
+    Widget buildDefaultAvatar() {
+      final initial = widget.userProfile.name.isNotEmpty
+          ? widget.userProfile.name[0].toUpperCase()
+          : '?';
       return Container(
         height: 400,
-        color: Colors.grey.shade300,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Theme.of(context).primaryColor.withValues(alpha: 0.3),
+              Theme.of(context).primaryColor.withValues(alpha: 0.1),
+            ],
+          ),
+        ),
         child: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.person, size: 100, color: Colors.grey.shade600),
-              const SizedBox(height: 16),
+              CircleAvatar(
+                radius: 60,
+                backgroundColor: Theme.of(context).primaryColor.withValues(alpha: 0.2),
+                child: Text(
+                  initial,
+                  style: TextStyle(
+                    fontSize: 56,
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).primaryColor,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
               Text(
                 widget.userProfile.name,
                 style: TextStyle(
-                  fontSize: 20,
+                  fontSize: 24,
                   fontWeight: FontWeight.bold,
-                  color: Colors.grey.shade700,
+                  color: Colors.grey.shade800,
                 ),
               ),
+              if (widget.userProfile.location != null) ...[
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.location_on, size: 16, color: Colors.grey.shade600),
+                    const SizedBox(width: 4),
+                    Text(
+                      widget.userProfile.location!,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ],
           ),
         ),
       );
+    }
+
+    // On Flutter Web, Google profile photos often fail due to CORS/rate limiting
+    // Check if all images are Google photos and skip loading if on web
+    bool hasNonGoogleImages = false;
+    final allImages = <String>[];
+
+    // Check profile image
+    if (profileImage != null && profileImage.isNotEmpty) {
+      if (!profileImage.contains('googleusercontent.com')) {
+        hasNonGoogleImages = true;
+      }
+      final fixedProfileImage = PhotoUrlHelper.fixGooglePhotoUrl(profileImage);
+      if (fixedProfileImage != null && fixedProfileImage.isNotEmpty) {
+        allImages.add(fixedProfileImage);
+      }
+    }
+
+    // Check post images
+    for (final img in images) {
+      if (!img.contains('googleusercontent.com')) {
+        hasNonGoogleImages = true;
+      }
+      final fixedImg = PhotoUrlHelper.fixGooglePhotoUrl(img);
+      if (fixedImg != null && fixedImg.isNotEmpty) {
+        allImages.add(fixedImg);
+      }
+    }
+
+    // On web, if all images are Google photos, just show fallback immediately
+    // to avoid CORS errors and rate limiting
+    if (kIsWeb && !hasNonGoogleImages) {
+      debugPrint('Skipping Google photo loading on web - showing fallback');
+      return buildDefaultAvatar();
+    }
+
+    if (allImages.isEmpty) {
+      return buildDefaultAvatar();
     }
 
     return SizedBox(
@@ -181,6 +252,71 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
                 );
               }
 
+              // Build fallback widget showing user initial
+              Widget buildFallbackAvatar() {
+                final initial = widget.userProfile.name.isNotEmpty
+                    ? widget.userProfile.name[0].toUpperCase()
+                    : '?';
+                return Container(
+                  color: Colors.grey.shade300,
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CircleAvatar(
+                          radius: 50,
+                          backgroundColor: Theme.of(context).primaryColor.withValues(alpha: 0.2),
+                          child: Text(
+                            initial,
+                            style: TextStyle(
+                              fontSize: 48,
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(context).primaryColor,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          widget.userProfile.name,
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey.shade700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+
+              // Use Image.network for Flutter Web to handle CORS better
+              // CachedNetworkImage uses CanvasKit which has stricter CORS
+              if (kIsWeb) {
+                return Image.network(
+                  imageUrl,
+                  fit: BoxFit.cover,
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return Container(
+                      color: Colors.grey.shade200,
+                      child: const Center(child: CircularProgressIndicator()),
+                    );
+                  },
+                  errorBuilder: (context, error, stackTrace) {
+                    debugPrint('Error loading image: $imageUrl');
+                    debugPrint('Error details: $error');
+                    // Check for rate limiting (429)
+                    if (error.toString().contains('429')) {
+                      PhotoUrlHelper.markAsRateLimited(imageUrl);
+                    } else {
+                      PhotoUrlHelper.markAsFailed(imageUrl);
+                    }
+                    return buildFallbackAvatar();
+                  },
+                );
+              }
+
               return CachedNetworkImage(
                 imageUrl: imageUrl,
                 fit: BoxFit.cover,
@@ -191,29 +327,13 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
                 errorWidget: (context, url, error) {
                   debugPrint('Error loading image: $url');
                   debugPrint('Error details: $error');
-                  return Container(
-                    color: Colors.grey.shade300,
-                    child: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            index == 0 ? Icons.person : Icons.broken_image,
-                            size: 60,
-                            color: Colors.grey.shade600,
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Failed to load',
-                            style: TextStyle(
-                              color: Colors.grey.shade600,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
+                  // Check for rate limiting (429)
+                  if (error.toString().contains('429')) {
+                    PhotoUrlHelper.markAsRateLimited(url);
+                  } else {
+                    PhotoUrlHelper.markAsFailed(url);
+                  }
+                  return buildFallbackAvatar();
                 },
               );
             },

@@ -31,7 +31,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   bool _isLoading = false;
   bool _allowCalls = true;
   String _selectedCurrency = 'INR';
-  List<String> _hashtags = [];
+  final List<String> _hashtags = [];
 
   final List<Map<String, String>> _currencies = [
     {'code': 'INR', 'symbol': '₹', 'name': 'Indian Rupee'},
@@ -457,7 +457,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                   },
                   child: Container(
                     padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
+                    decoration: const BoxDecoration(
                       color: Colors.black54,
                       shape: BoxShape.circle,
                     ),

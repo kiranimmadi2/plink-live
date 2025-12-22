@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 import '../providers/app_providers.dart';
+import '../utils/photo_url_helper.dart';
 import '../services/group_chat_service.dart';
 
 class CreateGroupScreen extends ConsumerStatefulWidget {
@@ -289,23 +290,45 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
                     return ListTile(
                       leading: Stack(
                         children: [
-                          CircleAvatar(
-                            radius: 24,
-                            backgroundImage: photoUrl != null
-                                ? CachedNetworkImageProvider(photoUrl)
-                                : null,
-                            backgroundColor: Theme.of(context)
-                                .primaryColor
-                                .withValues(alpha: 0.1),
-                            child: photoUrl == null
-                                ? Text(
-                                    name[0].toUpperCase(),
+                          Builder(
+                            builder: (context) {
+                              final fixedPhotoUrl = PhotoUrlHelper.fixGooglePhotoUrl(photoUrl);
+                              final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
+
+                              Widget buildFallback() {
+                                return CircleAvatar(
+                                  radius: 24,
+                                  backgroundColor: Theme.of(context).primaryColor.withValues(alpha: 0.1),
+                                  child: Text(
+                                    initial,
                                     style: TextStyle(
                                       color: Theme.of(context).primaryColor,
                                       fontWeight: FontWeight.bold,
                                     ),
-                                  )
-                                : null,
+                                  ),
+                                );
+                              }
+
+                              if (fixedPhotoUrl == null || fixedPhotoUrl.isEmpty) {
+                                return buildFallback();
+                              }
+
+                              return ClipOval(
+                                child: CachedNetworkImage(
+                                  imageUrl: fixedPhotoUrl,
+                                  width: 48,
+                                  height: 48,
+                                  fit: BoxFit.cover,
+                                  placeholder: (context, url) => buildFallback(),
+                                  errorWidget: (context, url, error) {
+                                    if (error.toString().contains('429')) {
+                                      PhotoUrlHelper.markAsRateLimited(url);
+                                    }
+                                    return buildFallback();
+                                  },
+                                ),
+                              );
+                            },
                           ),
                           if (isSelected)
                             Positioned(

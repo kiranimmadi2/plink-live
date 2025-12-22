@@ -14,14 +14,14 @@ Follow this checklist to complete the Live Connect deployment.
 - [ ] Select your project
 - [ ] Click **Firestore Database** in left sidebar
 - [ ] Click **Rules** tab at the top
-- [ ] Open file: `firestore_security_rules.txt`
+- [ ] Open file: `firestore.rules` (Contains the complete ruleset for the entire app)
 - [ ] Copy ALL content from the file
 - [ ] Paste into Firebase Rules editor
 - [ ] Click **"Publish"** button
 - [ ] Wait for "Rules published successfully" message
 
 **Why this is important:**
-Without security rules, your app will show "Permission Denied" errors.
+Without security rules, your app will show "Permission Denied" errors. Using `firestore.rules` ensures all app features (Chat, Posts, Business, etc.) are covered.
 
 ---
 
@@ -69,11 +69,11 @@ FAILED_PRECONDITION: The query requires an index.
 - [ ] When it says "Enabled", retry the operation in your app
 
 **Indexes you might need to create:**
-1. `conversations` by `participantIds` (array) + `lastMessageTime` (desc)
+1. `conversations` by `participants` (array) + `lastMessageTime` (desc)
 2. `users` by `interests` (array) + `city` (asc)
 3. `messages` by `timestamp` (desc)
 
-**Alternative:** Pre-create indexes manually using `firestore_indexes.json`
+**Alternative:** Pre-create indexes manually using `firestore.indexes.json` (the comprehensive index file).
 
 ---
 

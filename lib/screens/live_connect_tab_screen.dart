@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:ui';
 import 'dart:math';
 import 'package:flutter/material.dart';
@@ -11,6 +11,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supper/providers/theme_provider.dart';
 import '../widgets/user_avatar.dart';
+import '../utils/photo_url_helper.dart';
 import 'enhanced_chat_screen.dart';
 import '../models/user_profile.dart';
 import '../models/extended_user_profile.dart';
@@ -2896,8 +2897,13 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                   // Profile Image with gradient background
                   Stack(
                     children: [
-                      extendedProfile.photoUrl == null
-                          ? Container(
+                      Builder(
+                        builder: (context) {
+                          final fixedPhotoUrl = PhotoUrlHelper.fixGooglePhotoUrl(extendedProfile.photoUrl);
+                          final userInitial = userName.isNotEmpty ? userName[0].toUpperCase() : '?';
+
+                          Widget buildInitialAvatar() {
+                            return Container(
                               width: 64,
                               height: 64,
                               decoration: BoxDecoration(
@@ -2917,9 +2923,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                               ),
                               child: Center(
                                 child: Text(
-                                  userName.isNotEmpty
-                                      ? userName[0].toUpperCase()
-                                      : '?',
+                                  userInitial,
                                   style: const TextStyle(
                                     fontSize: 28,
                                     fontWeight: FontWeight.bold,
@@ -2927,27 +2931,80 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                   ),
                                 ),
                               ),
-                            )
-                          : Container(
-                              width: 64,
-                              height: 64,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: gradientColors[0].withValues(alpha: 0.3),
-                                    blurRadius: 12,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ],
-                              ),
-                              child: CircleAvatar(
-                                radius: 32,
-                                backgroundImage: CachedNetworkImageProvider(
-                                  extendedProfile.photoUrl!,
+                            );
+                          }
+
+                          if (fixedPhotoUrl == null || fixedPhotoUrl.isEmpty) {
+                            return buildInitialAvatar();
+                          }
+
+                          return Container(
+                            width: 64,
+                            height: 64,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: gradientColors[0].withValues(alpha: 0.3),
+                                  blurRadius: 12,
+                                  offset: const Offset(0, 4),
                                 ),
+                              ],
+                            ),
+                            child: ClipOval(
+                              child: CachedNetworkImage(
+                                imageUrl: fixedPhotoUrl,
+                                width: 64,
+                                height: 64,
+                                fit: BoxFit.cover,
+                                placeholder: (context, url) => Container(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: gradientColors,
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    ),
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      userInitial,
+                                      style: const TextStyle(
+                                        fontSize: 28,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                errorWidget: (context, url, error) {
+                                  if (error.toString().contains('429')) {
+                                    PhotoUrlHelper.markAsRateLimited(url);
+                                  }
+                                  return Container(
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: gradientColors,
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                      ),
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        userInitial,
+                                        style: const TextStyle(
+                                          fontSize: 28,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
                               ),
                             ),
+                          );
+                        },
+                      ),
                       if (extendedProfile.isOnline)
                         Positioned(
                           right: 0,

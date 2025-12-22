@@ -6,6 +6,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import '../../models/user_profile.dart';
+import '../../utils/photo_url_helper.dart';
 import 'messenger_chat_screen.dart';
 
 class MessageserScreen extends StatefulWidget {
@@ -524,24 +525,46 @@ class _MessageserScreenState extends State<MessageserScreen> {
                   ),
                   leading: Stack(
                     children: [
-                      CircleAvatar(
-                        radius: 28,
-                        backgroundColor: Colors.grey.shade700,
-                        backgroundImage: userPhoto != null
-                            ? CachedNetworkImageProvider(userPhoto)
-                            : null,
-                        child: userPhoto == null
-                            ? Text(
-                                userName.isNotEmpty
-                                    ? userName[0].toUpperCase()
-                                    : '?',
+                      Builder(
+                        builder: (context) {
+                          final fixedPhotoUrl = PhotoUrlHelper.fixGooglePhotoUrl(userPhoto);
+                          final initial = userName.isNotEmpty ? userName[0].toUpperCase() : '?';
+
+                          Widget buildFallback() {
+                            return CircleAvatar(
+                              radius: 28,
+                              backgroundColor: Colors.grey.shade700,
+                              child: Text(
+                                initial,
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 20,
                                   fontWeight: FontWeight.bold,
                                 ),
-                              )
-                            : null,
+                              ),
+                            );
+                          }
+
+                          if (fixedPhotoUrl == null || fixedPhotoUrl.isEmpty) {
+                            return buildFallback();
+                          }
+
+                          return ClipOval(
+                            child: CachedNetworkImage(
+                              imageUrl: fixedPhotoUrl,
+                              width: 56,
+                              height: 56,
+                              fit: BoxFit.cover,
+                              placeholder: (context, url) => buildFallback(),
+                              errorWidget: (context, url, error) {
+                                if (error.toString().contains('429')) {
+                                  PhotoUrlHelper.markAsRateLimited(url);
+                                }
+                                return buildFallback();
+                              },
+                            ),
+                          );
+                        },
                       ),
                       if (isOnline)
                         Positioned(

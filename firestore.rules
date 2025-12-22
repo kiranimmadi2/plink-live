@@ -2,9 +2,9 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ============================================
+    // ============================================================
     // HELPER FUNCTIONS
-    // ============================================
+    // ============================================================
 
     // Check if user is authenticated
     function isAuthenticated() {
@@ -20,7 +20,7 @@ service cloud.firestore {
     function isParticipant(conversationData) {
       return isAuthenticated() &&
         (request.auth.uid in conversationData.participants ||
-         request.auth.uid in conversationData.participantIds);
+         (conversationData.participantIds != null && request.auth.uid in conversationData.participantIds));
     }
 
     // Validate string length
@@ -28,31 +28,23 @@ service cloud.firestore {
       return str is string && str.size() >= minLen && str.size() <= maxLen;
     }
 
-    // Check if users are connected
-    function areConnected(userId1, userId2) {
-      return isAuthenticated() && (
-        exists(/databases/$(database)/documents/conversations/$(userId1 + '_' + userId2)) ||
-        exists(/databases/$(database)/documents/conversations/$(userId2 + '_' + userId1)) ||
-        exists(/databases/$(database)/documents/matches/$(userId1 + '_' + userId2)) ||
-        exists(/databases/$(database)/documents/matches/$(userId2 + '_' + userId1))
-      );
+    // Check if user is admin of a group
+    function isGroupAdmin(admins) {
+      return isAuthenticated() && admins != null && request.auth.uid in admins;
     }
 
-    // ============================================
+    // ============================================================
     // USERS COLLECTION
-    // ============================================
+    // ============================================================
     match /users/{userId} {
       // Anyone authenticated can read user profiles (for discovery)
       allow read: if isAuthenticated();
 
       // Only the user can create their own profile
-      allow create: if isOwner(userId) &&
-        request.resource.data.uid == userId;
+      allow create: if isOwner(userId);
 
       // Only the user can update their own profile
-      allow update: if isOwner(userId) &&
-        // Prevent changing uid
-        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['uid']));
+      allow update: if isOwner(userId);
 
       // Only owner can delete their profile
       allow delete: if isOwner(userId);
@@ -66,25 +58,29 @@ service cloud.firestore {
       match /blocked/{blockedUserId} {
         allow read, write: if isOwner(userId);
       }
+
+      // Security events subcollection
+      match /securityEvents/{eventId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId);
+        allow update, delete: if false; // Security events are immutable
+      }
     }
 
-    // ============================================
-    // POSTS COLLECTION (Single source of truth)
-    // ============================================
+    // ============================================================
+    // POSTS COLLECTION (Main data for matching - Single source of truth)
+    // ============================================================
     match /posts/{postId} {
       // Anyone authenticated can read active posts
       allow read: if isAuthenticated();
 
       // Only authenticated users can create posts with their own userId
       allow create: if isAuthenticated() &&
-        request.resource.data.userId == request.auth.uid &&
-        isValidString(request.resource.data.originalPrompt, 1, 5000);
+        request.resource.data.userId == request.auth.uid;
 
       // Only the owner can update their posts
       allow update: if isAuthenticated() &&
-        resource.data.userId == request.auth.uid &&
-        // Prevent changing ownership
-        request.resource.data.userId == resource.data.userId;
+        resource.data.userId == request.auth.uid;
 
       // Only the owner can delete their posts
       allow delete: if isAuthenticated() &&
@@ -106,14 +102,14 @@ service cloud.firestore {
       }
     }
 
-    // ============================================
-    // CONVERSATIONS COLLECTION
-    // ============================================
+    // ============================================================
+    // CONVERSATIONS COLLECTION (Chats & Groups)
+    // ============================================================
     match /conversations/{conversationId} {
       // Participants can read the conversation
-      // For list queries with where(participants, arrayContains), we check if user is in participants
       allow read: if isAuthenticated() &&
-        (request.auth.uid in resource.data.participants ||
+        (resource == null ||
+         request.auth.uid in resource.data.participants ||
          (resource.data.participantIds != null && request.auth.uid in resource.data.participantIds));
 
       // Any authenticated user can create a conversation they're part of
@@ -127,9 +123,11 @@ service cloud.firestore {
          (resource.data.participantIds != null && request.auth.uid in resource.data.participantIds));
 
       // Only participants can delete (archive) conversations
+      // For groups, only admins can delete
       allow delete: if isAuthenticated() &&
         (request.auth.uid in resource.data.participants ||
-         (resource.data.participantIds != null && request.auth.uid in resource.data.participantIds));
+         (resource.data.participantIds != null && request.auth.uid in resource.data.participantIds) ||
+         (resource.data.isGroup == true && isGroupAdmin(resource.data.admins)));
 
       // Messages subcollection
       match /messages/{messageId} {
@@ -146,7 +144,7 @@ service cloud.firestore {
         allow update: if isAuthenticated() &&
           isParticipant(get(/databases/$(database)/documents/conversations/$(conversationId)).data) &&
           (resource.data.senderId == request.auth.uid ||
-           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead', 'readAt', 'read', 'status']));
+           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead', 'readAt', 'read', 'status', 'reactions']));
 
         // Sender can delete their own messages
         allow delete: if isAuthenticated() &&
@@ -154,9 +152,33 @@ service cloud.firestore {
       }
     }
 
-    // ============================================
+    // ============================================================
+    // CALLS COLLECTION (Voice Calls)
+    // ============================================================
+    match /calls/{callId} {
+      // Caller and receiver can read the call
+      allow read: if isAuthenticated() &&
+        (resource.data.callerId == request.auth.uid ||
+         resource.data.receiverId == request.auth.uid);
+
+      // Authenticated users can create calls (must be the caller)
+      allow create: if isAuthenticated() &&
+        request.resource.data.callerId == request.auth.uid;
+
+      // Caller and receiver can update call state
+      allow update: if isAuthenticated() &&
+        (resource.data.callerId == request.auth.uid ||
+         resource.data.receiverId == request.auth.uid);
+
+      // Caller and receiver can delete call records
+      allow delete: if isAuthenticated() &&
+        (resource.data.callerId == request.auth.uid ||
+         resource.data.receiverId == request.auth.uid);
+    }
+
+    // ============================================================
     // CONNECTION REQUESTS COLLECTION
-    // ============================================
+    // ============================================================
     match /connection_requests/{requestId} {
       // Sender and receiver can read the request
       allow read: if isAuthenticated() &&
@@ -179,53 +201,176 @@ service cloud.firestore {
          resource.data.receiverId == request.auth.uid);
     }
 
-    // ============================================
-    // CALLS COLLECTION (Voice calling)
-    // ============================================
-    match /calls/{callId} {
-      // Caller and receiver can read the call
-      allow read: if isAuthenticated() &&
-        (resource.data.callerId == request.auth.uid ||
-         resource.data.receiverId == request.auth.uid);
-
-      // Authenticated users can create calls (must be the caller)
-      allow create: if isAuthenticated() &&
-        request.resource.data.callerId == request.auth.uid;
-
-      // Caller and receiver can update call state
-      allow update: if isAuthenticated() &&
-        (resource.data.callerId == request.auth.uid ||
-         resource.data.receiverId == request.auth.uid);
-
-      // Caller and receiver can delete call records
-      allow delete: if isAuthenticated() &&
-        (resource.data.callerId == request.auth.uid ||
-         resource.data.receiverId == request.auth.uid);
-    }
-
-    // ============================================
+    // ============================================================
     // MATCHES COLLECTION
-    // ============================================
+    // ============================================================
     match /matches/{matchId} {
       // Users can read their matches
       allow read: if isAuthenticated() &&
-        (resource.data.users[request.auth.uid] == true ||
-         request.auth.uid in resource.data.userIds);
+        (resource.data.user1Id == request.auth.uid ||
+         resource.data.user2Id == request.auth.uid ||
+         (resource.data.users != null && resource.data.users[request.auth.uid] == true) ||
+         (resource.data.userIds != null && request.auth.uid in resource.data.userIds));
 
       // Users can create matches they're part of
-      allow create: if isAuthenticated() &&
-        (request.resource.data.users[request.auth.uid] == true ||
-         request.auth.uid in request.resource.data.userIds);
+      allow create: if isAuthenticated();
 
       // Users can update their match status
       allow update: if isAuthenticated() &&
-        (resource.data.users[request.auth.uid] == true ||
-         request.auth.uid in resource.data.userIds);
+        (resource.data.user1Id == request.auth.uid ||
+         resource.data.user2Id == request.auth.uid ||
+         (resource.data.users != null && resource.data.users[request.auth.uid] == true) ||
+         (resource.data.userIds != null && request.auth.uid in resource.data.userIds));
+
+      allow delete: if isAuthenticated() &&
+        (resource.data.user1Id == request.auth.uid ||
+         resource.data.user2Id == request.auth.uid);
     }
 
-    // ============================================
+    // ============================================================
+    // BUSINESSES COLLECTION
+    // ============================================================
+    match /businesses/{businessId} {
+      // Anyone authenticated can read businesses
+      allow read: if isAuthenticated();
+
+      // Owner can create
+      allow create: if isAuthenticated() &&
+        request.resource.data.ownerId == request.auth.uid;
+
+      // Owner can update
+      allow update: if isAuthenticated() &&
+        resource.data.ownerId == request.auth.uid;
+
+      // Owner can delete
+      allow delete: if isAuthenticated() &&
+        resource.data.ownerId == request.auth.uid;
+    }
+
+    // ============================================================
+    // BUSINESS LISTINGS COLLECTION
+    // ============================================================
+    match /business_listings/{listingId} {
+      // Anyone authenticated can read listings
+      allow read: if isAuthenticated();
+
+      // Business owner can create
+      allow create: if isAuthenticated() &&
+        request.resource.data.businessOwnerId == request.auth.uid;
+
+      // Business owner can update
+      allow update: if isAuthenticated() &&
+        resource.data.businessOwnerId == request.auth.uid;
+
+      // Business owner can delete
+      allow delete: if isAuthenticated() &&
+        resource.data.businessOwnerId == request.auth.uid;
+    }
+
+    // ============================================================
+    // BUSINESS REVIEWS COLLECTION
+    // ============================================================
+    match /business_reviews/{reviewId} {
+      // Anyone authenticated can read reviews
+      allow read: if isAuthenticated();
+
+      // Users can create reviews
+      allow create: if isAuthenticated() &&
+        request.resource.data.reviewerId == request.auth.uid;
+
+      // Reviewer can update
+      allow update: if isAuthenticated() &&
+        resource.data.reviewerId == request.auth.uid;
+
+      // Reviewer can delete
+      allow delete: if isAuthenticated() &&
+        resource.data.reviewerId == request.auth.uid;
+    }
+
+    // ============================================================
+    // BUSINESS FOLLOWERS COLLECTION
+    // ============================================================
+    match /business_followers/{followId} {
+      allow read: if isAuthenticated();
+
+      allow create: if isAuthenticated() &&
+        request.resource.data.followerId == request.auth.uid;
+
+      allow delete: if isAuthenticated() &&
+        resource.data.followerId == request.auth.uid;
+    }
+
+    // ============================================================
+    // BLOCKS COLLECTION
+    // ============================================================
+    match /blocks/{blockId} {
+      // Only the blocker can read their blocks
+      allow read: if isAuthenticated() &&
+        resource.data.blockerId == request.auth.uid;
+
+      // Users can create blocks
+      allow create: if isAuthenticated() &&
+        request.resource.data.blockerId == request.auth.uid;
+
+      // Users can delete their blocks (unblock)
+      allow delete: if isAuthenticated() &&
+        resource.data.blockerId == request.auth.uid;
+
+      // Nested blocked_users subcollection (alternative structure)
+      match /blocked_users/{blockedId} {
+        allow read, write: if isAuthenticated() &&
+          blockId == request.auth.uid;
+      }
+    }
+
+    // ============================================================
+    // REPORTS COLLECTION
+    // ============================================================
+    match /reports/{reportId} {
+      // Only reporter can read their own reports
+      allow read: if isAuthenticated() &&
+        resource.data.reporterId == request.auth.uid;
+
+      // Any authenticated user can create a report
+      allow create: if isAuthenticated() &&
+        request.resource.data.reporterId == request.auth.uid;
+
+      // Reports cannot be updated or deleted by users
+      allow update, delete: if false;
+    }
+
+    // ============================================================
+    // FEEDBACK COLLECTION
+    // ============================================================
+    match /feedback/{feedbackId} {
+      // Only the submitter can read their feedback
+      allow read: if isAuthenticated() &&
+        resource.data.userId == request.auth.uid;
+
+      // Users can submit feedback
+      allow create: if isAuthenticated() &&
+        request.resource.data.userId == request.auth.uid;
+
+      // Feedback is immutable
+      allow update, delete: if false;
+    }
+
+    // ============================================================
+    // INTENT CLARIFICATIONS COLLECTION (Logging)
+    // ============================================================
+    match /intent_clarifications/{clarificationId} {
+      allow read: if isAuthenticated() &&
+        resource.data.userId == request.auth.uid;
+
+      allow create: if isAuthenticated() &&
+        request.resource.data.userId == request.auth.uid;
+
+      allow update, delete: if false; // Logs are immutable
+    }
+
+    // ============================================================
     // NOTIFICATIONS COLLECTION
-    // ============================================
+    // ============================================================
     match /notifications/{userId} {
       allow read: if isOwner(userId);
       allow write: if isAuthenticated();
@@ -237,152 +382,63 @@ service cloud.firestore {
       }
     }
 
-    // ============================================
+    // ============================================================
     // USER STATUS/PRESENCE
-    // ============================================
+    // ============================================================
     match /status/{userId} {
       allow read: if isAuthenticated();
       allow write: if isOwner(userId);
     }
 
-    // ============================================
-    // REPORTS COLLECTION
-    // ============================================
-    match /reports/{reportId} {
-      // Only admins can read reports
-      allow read: if false;
-
-      // Any authenticated user can create a report
-      allow create: if isAuthenticated() &&
-        request.resource.data.reporterId == request.auth.uid;
-
-      // Reports cannot be updated or deleted by users
-      allow update, delete: if false;
-    }
-
-    // ============================================
-    // BLOCKS COLLECTION
-    // ============================================
-    match /blocks/{userId} {
-      allow read: if isOwner(userId);
-      allow write: if isOwner(userId);
-
-      match /blocked_users/{blockedId} {
-        allow read: if isOwner(userId);
-        allow write: if isOwner(userId);
-      }
-    }
-
-    // ============================================
+    // ============================================================
     // SEARCH INDEX (Server-side only)
-    // ============================================
+    // ============================================================
     match /search_index/{document=**} {
       allow read: if isAuthenticated();
-      allow write: if false;
+      allow write: if false; // Server-side only
     }
 
-    // ============================================
+    // ============================================================
     // GLOBAL CONFIG (Read-only)
-    // ============================================
+    // ============================================================
     match /config/{document=**} {
       allow read: if isAuthenticated();
       allow write: if false;
     }
 
-    // ============================================
-    // PROFESSIONAL REVIEWS COLLECTION
-    // ============================================
-    match /reviews/{reviewId} {
-      // Anyone authenticated can read reviews
+    // ============================================================
+    // DEPRECATED COLLECTIONS (Allow read for migration, deny write)
+    // ============================================================
+
+    // Old intents collection - DEPRECATED
+    match /intents/{intentId} {
       allow read: if isAuthenticated();
-
-      // Users can create reviews (reviewer must be themselves)
-      allow create: if isAuthenticated() &&
-        request.resource.data.reviewerId == request.auth.uid;
-
-      // Only reviewer can update their review
-      allow update: if isAuthenticated() &&
-        (resource.data.reviewerId == request.auth.uid ||
-         // Professional can add response to their own reviews
-         resource.data.professionalId == request.auth.uid);
-
-      // Only reviewer can delete their review
-      allow delete: if isAuthenticated() &&
-        resource.data.reviewerId == request.auth.uid;
+      allow write: if false; // Deprecated - use posts collection
     }
 
-    // ============================================
-    // PROFESSIONAL INQUIRIES COLLECTION
-    // ============================================
-    match /inquiries/{inquiryId} {
-      // Client and professional can read the inquiry
-      allow read: if isAuthenticated() &&
-        (resource.data.clientId == request.auth.uid ||
-         resource.data.professionalId == request.auth.uid);
-
-      // Clients can create inquiries (must be themselves)
-      allow create: if isAuthenticated() &&
-        request.resource.data.clientId == request.auth.uid;
-
-      // Both client and professional can update (for status changes, messages)
-      allow update: if isAuthenticated() &&
-        (resource.data.clientId == request.auth.uid ||
-         resource.data.professionalId == request.auth.uid);
-
-      // Only client can delete/cancel their inquiry
-      allow delete: if isAuthenticated() &&
-        resource.data.clientId == request.auth.uid;
+    // Old user_intents collection - DEPRECATED
+    match /user_intents/{intentId} {
+      allow read: if isAuthenticated();
+      allow write: if false; // Deprecated - use posts collection
     }
 
-    // ============================================
-    // PROFESSIONAL STATS COLLECTION
-    // ============================================
-    match /professional_stats/{professionalId} {
-      // Anyone can read professional stats (for public profiles)
+    // Old processed_intents collection - DEPRECATED
+    match /processed_intents/{intentId} {
       allow read: if isAuthenticated();
-
-      // Only the professional can write their own stats
-      allow write: if isOwner(professionalId);
+      allow write: if false; // Deprecated - use posts collection
     }
 
-    // ============================================
-    // SERVICES COLLECTION (Professional services)
-    // ============================================
-    match /services/{serviceId} {
-      // Anyone authenticated can read services
+    // Old embeddings collection - DEPRECATED
+    match /embeddings/{embeddingId} {
       allow read: if isAuthenticated();
-
-      // Only the professional can create their services
-      allow create: if isAuthenticated() &&
-        request.resource.data.professionalId == request.auth.uid;
-
-      // Only the professional can update their services
-      allow update: if isAuthenticated() &&
-        resource.data.professionalId == request.auth.uid;
-
-      // Only the professional can delete their services
-      allow delete: if isAuthenticated() &&
-        resource.data.professionalId == request.auth.uid;
+      allow write: if false; // Deprecated - embeddings stored in posts
     }
 
-    // ============================================
-    // PORTFOLIO COLLECTION (Professional portfolio)
-    // ============================================
-    match /portfolio/{itemId} {
-      // Anyone authenticated can read portfolio items
-      allow read: if isAuthenticated();
-
-      // Only the professional can create their portfolio items
-      allow create: if isAuthenticated() &&
-        request.resource.data.professionalId == request.auth.uid;
-
-      // Only the professional can update their portfolio items
-      allow update: if isAuthenticated() &&
-        resource.data.professionalId == request.auth.uid;
-
-      // Only the professional can delete their portfolio items
-      allow delete: if isAuthenticated() &&
-        resource.data.professionalId == request.auth.uid;
+    // ============================================================
+    // TEMP COLLECTION (For generating IDs)
+    // ============================================================
+    match /temp/{docId} {
+      allow read, write: if isAuthenticated();
     }
   }
 }

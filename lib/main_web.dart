@@ -1,4 +1,4 @@
-// Web-specific entry point that avoids importing Agora
+
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:supper/screens/login/choose_account_type_screen.dart';

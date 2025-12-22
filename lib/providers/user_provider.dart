@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import './app_providers.dart';
 
 /// ============================================
@@ -52,13 +53,34 @@ class UserProfileState {
 class UserProfileNotifier extends StateNotifier<UserProfileState> {
   final String? userId;
 
-  UserProfileNotifier(this.userId) : super(const UserProfileState());
+  UserProfileNotifier(this.userId) : super(const UserProfileState(isLoading: true)) {
+    // Auto-load profile when notifier is created
+    if (userId != null) {
+      loadProfile();
+    }
+  }
 
   /// Load user profile from Firestore
   Future<void> loadProfile() async {
-    if (userId == null) return;
+    if (userId == null) {
+      state = state.copyWith(isLoading: false);
+      return;
+    }
 
     state = state.copyWith(isLoading: true, error: null);
+
+    // First, set basic info from Firebase Auth for immediate display
+    final authUser = FirebaseAuth.instance.currentUser;
+    if (authUser != null && state.profile == null) {
+      state = state.copyWith(
+        profile: {
+          'name': authUser.displayName ?? 'User',
+          'email': authUser.email,
+          'photoUrl': authUser.photoURL,
+        },
+        isLoading: true, // Still loading full profile
+      );
+    }
 
     try {
       final doc = await FirebaseFirestore.instance
@@ -72,9 +94,9 @@ class UserProfileNotifier extends StateNotifier<UserProfileState> {
           isLoading: false,
         );
       } else {
+        // If no Firestore doc, keep Auth data but mark as not loading
         state = state.copyWith(
           isLoading: false,
-          error: 'Profile not found',
         );
       }
     } catch (e) {
@@ -157,11 +179,22 @@ class SearchHistoryState {
 class SearchHistoryNotifier extends StateNotifier<SearchHistoryState> {
   final String? userId;
 
-  SearchHistoryNotifier(this.userId) : super(const SearchHistoryState());
+  SearchHistoryNotifier(this.userId) : super(const SearchHistoryState(isLoading: true)) {
+    // Auto-load history when notifier is created
+    if (userId != null) {
+      loadHistory();
+    } else {
+      // No user, set loading to false
+      state = state.copyWith(isLoading: false);
+    }
+  }
 
   /// Load search history from Firestore
   Future<void> loadHistory() async {
-    if (userId == null) return;
+    if (userId == null) {
+      state = state.copyWith(isLoading: false);
+      return;
+    }
 
     state = state.copyWith(isLoading: true, error: null);
 

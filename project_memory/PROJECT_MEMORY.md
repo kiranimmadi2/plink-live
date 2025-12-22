@@ -93,15 +93,6 @@ flutter build apk --release
    - Respect code that's already there
    - Keep working features intact
 
----
-
-## 📝 NOTES & DECISIONS
-
-### Why WebRTC Instead of ZEGOCLOUD?
-- Better control over connection
-- No dependency on third-party SDK
-- More reliable for web platform
-- Cost-effective (using Metered.ca for TURN)
 
 ### Call State Flow
 1. **Initiating**: Create Firestore doc → Navigate to WebRTCCallScreen

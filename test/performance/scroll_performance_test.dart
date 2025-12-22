@@ -1,14 +1,35 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supper/main.dart';
+import 'package:supper/firebase_options.dart';
+import '../test_helpers.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  setupFirebaseCoreMocks();
+  // Ensure SharedPreferences are also mocked if not fully covered by helper
+  SharedPreferences.setMockInitialValues({});
+
+  setUpAll(() async {
+    dotenv.testLoad(fileInput: '''
+FIREBASE_ANDROID_API_KEY=test_key
+FIREBASE_WEB_API_KEY=test_key
+FIREBASE_WEB_PROJECT_ID=test_project
+''');
+    
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  });
 
   group('Performance Tests', () {
     testWidgets('Chat list scroll performance', (tester) async {
-      await tester.pumpWidget(const MyApp());
+      await tester.pumpWidget(const ProviderScope(child: MyApp()));
       await tester.pumpAndSettle();
 
       // Find the chat list
@@ -35,7 +56,7 @@ void main() {
     });
 
     testWidgets('Message list rendering performance', (tester) async {
-      await tester.pumpWidget(const MyApp());
+      await tester.pumpWidget(const ProviderScope(child: MyApp()));
       await tester.pumpAndSettle();
 
       // Navigate to a chat if possible
@@ -65,7 +86,7 @@ void main() {
     });
 
     testWidgets('Navigation performance', (tester) async {
-      await tester.pumpWidget(const MyApp());
+      await tester.pumpWidget(const ProviderScope(child: MyApp()));
       await tester.pumpAndSettle();
 
       final stopwatch = Stopwatch()..start();
@@ -92,7 +113,7 @@ void main() {
     });
 
     testWidgets('Image loading performance', (tester) async {
-      await tester.pumpWidget(const MyApp());
+      await tester.pumpWidget(const ProviderScope(child: MyApp()));
       await tester.pumpAndSettle();
 
       // Count cached network images

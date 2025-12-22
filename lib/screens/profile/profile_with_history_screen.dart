@@ -62,14 +62,11 @@ class _ProfileWithHistoryScreenState
   void initState() {
     super.initState();
 
-    // Use addPostFrameCallback to load data after first frame
+    // Use addPostFrameCallback for additional setup after first frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        // Load profile and search history using providers
-        ref.read(userProfileProvider.notifier).loadProfile();
-        ref.read(searchHistoryProvider.notifier).loadHistory();
-
-        // Setup profile listener for real-time updates
+        // Profile and search history auto-load in their notifiers now
+        // Just setup profile listener for real-time updates
         _setupProfileListener();
 
         // Update location if needed
@@ -832,7 +829,8 @@ class _ProfileWithHistoryScreenState
             ),
           ],
 
-          profileState.isLoading
+          // Show loading only if no profile data available at all
+          profileState.profile == null
               ? const Center(child: CircularProgressIndicator())
               : profileState.error != null
               ? Center(

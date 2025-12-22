@@ -618,13 +618,14 @@ class _RecordingIndicatorState extends State<_RecordingIndicator>
 }
 
 /// Voice wave animation widget for listening mode
+// ignore: unused_element
 class _VoiceWaveSearchField extends StatefulWidget {
   final double borderRadius;
   final VoidCallback? onStop;
 
   const _VoiceWaveSearchField({
     required this.borderRadius,
-    this.onStop,
+    this.onStop, // ignore: unused_element_parameter
   });
 
   @override

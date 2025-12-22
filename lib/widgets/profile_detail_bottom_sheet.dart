@@ -1,6 +1,7 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../models/extended_user_profile.dart';
+import '../utils/photo_url_helper.dart';
 import 'dart:math' as math;
 
 class ProfileDetailBottomSheet extends StatefulWidget {
@@ -297,6 +298,30 @@ class _ProfileDetailBottomSheetState extends State<ProfileDetailBottomSheet>
   }
 
   Widget _buildProfilePhoto() {
+    final fixedUrl = PhotoUrlHelper.fixGooglePhotoUrl(widget.user.photoUrl);
+    final initial = widget.user.name.isNotEmpty ? widget.user.name[0].toUpperCase() : '?';
+
+    Widget buildInitialWidget() {
+      return Container(
+        width: 76,
+        height: 76,
+        decoration: const BoxDecoration(
+          shape: BoxShape.circle,
+          color: Color(0xFF2D2D44),
+        ),
+        child: Center(
+          child: Text(
+            initial,
+            style: const TextStyle(
+              fontSize: 32,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+        ),
+      );
+    }
+
     return Container(
       // Black border ring
       padding: const EdgeInsets.all(3),
@@ -304,25 +329,23 @@ class _ProfileDetailBottomSheetState extends State<ProfileDetailBottomSheet>
         shape: BoxShape.circle,
         color: Color(0xFF1A1A1A), // Dark black border
       ),
-      child: CircleAvatar(
-        radius: 38,
-        backgroundColor: const Color(0xFF2D2D44),
-        backgroundImage: widget.user.photoUrl != null
-            ? CachedNetworkImageProvider(widget.user.photoUrl!)
-            : null,
-        child: widget.user.photoUrl == null
-            ? Text(
-                widget.user.name.isNotEmpty
-                    ? widget.user.name[0].toUpperCase()
-                    : '?',
-                style: const TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              )
-            : null,
-      ),
+      child: fixedUrl != null && fixedUrl.isNotEmpty
+          ? ClipOval(
+              child: CachedNetworkImage(
+                imageUrl: fixedUrl,
+                width: 76,
+                height: 76,
+                fit: BoxFit.cover,
+                placeholder: (context, url) => buildInitialWidget(),
+                errorWidget: (context, url, error) {
+                  if (error.toString().contains('429')) {
+                    PhotoUrlHelper.markAsRateLimited(url);
+                  }
+                  return buildInitialWidget();
+                },
+              ),
+            )
+          : buildInitialWidget(),
     );
   }
 

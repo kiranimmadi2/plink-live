@@ -1,13 +1,10 @@
-﻿import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../screens/enhanced_chat_screen.dart';
 import '../screens/profile/profile_view_screen.dart';
-// REMOVED: Call feature imports (feature deleted)
-// import '../services/simple_call_service.dart';
 import '../models/user_profile.dart';
-// import '../models/call_model.dart';
+import 'safe_circle_avatar.dart';
 
 class MatchCardWithActions extends StatelessWidget {
   final Map<String, dynamic> match;
@@ -52,16 +49,10 @@ class MatchCardWithActions extends StatelessWidget {
                   // Avatar
                   Hero(
                     tag: 'avatar_${match['userId']}',
-                    child: CircleAvatar(
+                    child: SafeCircleAvatar(
+                      photoUrl: match['userProfile']?['photoUrl'] as String?,
+                      name: match['userName'] ?? 'User',
                       radius: 28,
-                      backgroundImage: match['userProfile']?['photoUrl'] != null
-                          ? CachedNetworkImageProvider(
-                              match['userProfile']['photoUrl'],
-                            )
-                          : null,
-                      child: match['userProfile']?['photoUrl'] == null
-                          ? const Icon(Icons.person, size: 28)
-                          : null,
                     ),
                   ),
                   const SizedBox(width: 12),

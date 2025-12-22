@@ -1322,8 +1322,9 @@ class _RecordingIndicatorState extends State<_RecordingIndicator> {
     );
   }
 }
-*/
 
+
+*/
 // Placeholder class to prevent import errors
 import 'package:flutter/material.dart';
 import '../../models/user_profile.dart';

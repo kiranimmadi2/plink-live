@@ -8,8 +8,3 @@ import 'package:web/web.dart' as web;
 
 // Export the platformViewRegistry for web platform
 final platformViewRegistry = ui_web.platformViewRegistry;
-
-// This is a workaround to fix the compilation issue with agora_rtc_engine on web
-void registerPlatformViewFactory(String viewType, web.Element Function(int viewId) viewFactory) {
-  // This is just a stub for web compilation
-}

@@ -390,21 +390,27 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
               !combinedText.contains('need') &&
               !combinedText.contains('want') &&
               !combinedText.contains('search') &&
-              !combinedText.contains('find')) return false;
+              !combinedText.contains('find')) {
+            return false;
+          }
         }
         if (_selectedCategory == 'Offering') {
           if (actionType != 'offering' &&
               !combinedText.contains('sell') &&
               !combinedText.contains('offer') &&
               !combinedText.contains('available') &&
-              !combinedText.contains('sale')) return false;
+              !combinedText.contains('sale')) {
+            return false;
+          }
         }
         if (_selectedCategory == 'Services') {
           if (!domain.contains('service') &&
               !combinedText.contains('service') &&
               !combinedText.contains('repair') &&
               !combinedText.contains('install') &&
-              !combinedText.contains('fix')) return false;
+              !combinedText.contains('fix')) {
+            return false;
+          }
         }
         if (_selectedCategory == 'Jobs') {
           if (!domain.contains('job') &&
@@ -412,11 +418,15 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
               !combinedText.contains('hiring') &&
               !combinedText.contains('work') &&
               !combinedText.contains('vacancy') &&
-              !combinedText.contains('career')) return false;
+              !combinedText.contains('career')) {
+            return false;
+          }
         }
         if (_selectedCategory == 'Buy/Sell') {
           if (!domain.contains('marketplace') &&
-              data['price'] == null) return false;
+              data['price'] == null) {
+            return false;
+          }
         }
       }
 
