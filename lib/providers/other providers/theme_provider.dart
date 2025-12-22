@@ -94,11 +94,11 @@ class ThemeNotifier extends StateNotifier<ThemeState> {
     useMaterial3: true,
     brightness: Brightness.light,
     primaryColor: AppColors.iosBlue,
-    colorScheme: ColorScheme.light(
+    colorScheme: const ColorScheme.light(
       primary: AppColors.iosBlue,
       secondary: AppColors.iosPurple,
       tertiary: AppColors.iosTeal,
-      surface: const Color(0xFFF5F5F7),
+      surface: Color(0xFFF5F5F7),
       error: AppColors.iosPink,
     ),
     scaffoldBackgroundColor: const Color(0xFFF5F5F7),
@@ -164,7 +164,7 @@ class ThemeNotifier extends StateNotifier<ThemeState> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: AppColors.iosBlue, width: 2),
+        borderSide: const BorderSide(color: AppColors.iosBlue, width: 2),
       ),
       labelStyle: TextStyle(
         color: Colors.black.withValues(alpha: 0.6),
@@ -178,56 +178,56 @@ class ThemeNotifier extends StateNotifier<ThemeState> {
       ),
     ),
     iconTheme: const IconThemeData(color: Colors.black87, size: 24),
-    textTheme: TextTheme(
-      displayLarge: const TextStyle(
+    textTheme: const TextTheme(
+      displayLarge: TextStyle(
         fontSize: 34,
         fontWeight: FontWeight.bold,
         letterSpacing: -1.5,
         color: Colors.black,
       ),
-      displayMedium: const TextStyle(
+      displayMedium: TextStyle(
         fontSize: 28,
         fontWeight: FontWeight.w700,
         letterSpacing: -1,
         color: Colors.black,
       ),
-      displaySmall: const TextStyle(
+      displaySmall: TextStyle(
         fontSize: 22,
         fontWeight: FontWeight.w600,
         letterSpacing: -0.5,
         color: Colors.black,
       ),
-      headlineLarge: const TextStyle(
+      headlineLarge: TextStyle(
         fontSize: 20,
         fontWeight: FontWeight.w600,
         letterSpacing: -0.5,
         color: Colors.black,
       ),
-      headlineMedium: const TextStyle(
+      headlineMedium: TextStyle(
         fontSize: 17,
         fontWeight: FontWeight.w600,
         letterSpacing: -0.5,
         color: Colors.black,
       ),
-      headlineSmall: const TextStyle(
+      headlineSmall: TextStyle(
         fontSize: 15,
         fontWeight: FontWeight.w600,
         letterSpacing: -0.5,
         color: Colors.black,
       ),
-      bodyLarge: const TextStyle(
+      bodyLarge: TextStyle(
         fontSize: 17,
         fontWeight: FontWeight.w400,
         letterSpacing: -0.5,
         color: Colors.black,
       ),
-      bodyMedium: const TextStyle(
+      bodyMedium: TextStyle(
         fontSize: 15,
         fontWeight: FontWeight.w400,
         letterSpacing: -0.5,
         color: Colors.black87,
       ),
-      bodySmall: const TextStyle(
+      bodySmall: TextStyle(
         fontSize: 13,
         fontWeight: FontWeight.w400,
         letterSpacing: -0.5,
@@ -239,13 +239,13 @@ class ThemeNotifier extends StateNotifier<ThemeState> {
         letterSpacing: -0.5,
         color: AppColors.iosBlue,
       ),
-      labelMedium: const TextStyle(
+      labelMedium: TextStyle(
         fontSize: 15,
         fontWeight: FontWeight.w500,
         letterSpacing: -0.5,
         color: Colors.black,
       ),
-      labelSmall: const TextStyle(
+      labelSmall: TextStyle(
         fontSize: 11,
         fontWeight: FontWeight.w500,
         letterSpacing: 0,
