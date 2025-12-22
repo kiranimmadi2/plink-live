@@ -563,9 +563,25 @@ class AuthService {
   // Store account type for phone login (set before OTP verification)
   String? _pendingAccountType;
 
+  // Store password for phone signup (used after OTP verification)
+  String? _pendingPassword;
+
   /// Set the account type for pending phone registration
   void setPendingAccountType(String? accountType) {
     _pendingAccountType = accountType;
+  }
+
+  /// Set the password for pending phone registration (for signup with password)
+  void setPendingPassword(String? password) {
+    _pendingPassword = password;
+  }
+
+  /// Get the pending password for phone signup
+  String? get pendingPassword => _pendingPassword;
+
+  /// Clear pending password after use
+  void clearPendingPassword() {
+    _pendingPassword = null;
   }
 
   /// Fire-and-forget: Update user profile on phone login (runs in background)
@@ -602,8 +618,9 @@ class AuthService {
         },
       }, SetOptions(merge: true));
 
-      // Clear pending account type after use
+      // Clear pending data after use
       _pendingAccountType = null;
+      _pendingPassword = null;
     } catch (e) {
       debugPrint('Error updating profile on phone login: $e');
     }

@@ -1,0 +1,635 @@
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
+import '../../res/utils/photo_url_helper.dart';
+
+class AuthService {
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  static final GoogleSignIn _googleSignIn = GoogleSignIn();
+
+  // Phone verification state
+  // ignore: unused_field
+  String? _verificationId;
+  int? _resendToken;
+
+  User? get currentUser => _auth.currentUser;
+
+  Stream<User?> get authStateChanges => _auth.authStateChanges();
+
+  Future<User?> signInWithEmail(String email, String password) async {
+    try {
+      final UserCredential result = await _auth.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+
+      // Update last seen in background (don't wait for it)
+      if (result.user != null) {
+        final user = result.user!;
+
+        // Fire and forget - update profile in background
+        _updateUserProfileOnLogin(user, email);
+      }
+
+      return result.user;
+    } on FirebaseAuthException catch (e) {
+      String message;
+      switch (e.code) {
+        case 'user-not-found':
+          message = 'No user found for that email.';
+          break;
+        case 'wrong-password':
+          message = 'Wrong password provided.';
+          break;
+        case 'invalid-email':
+          message = 'The email address is invalid.';
+          break;
+        case 'user-disabled':
+          message = 'This user account has been disabled.';
+          break;
+        case 'too-many-requests':
+          message = 'Too many login attempts. Please try again later.';
+          break;
+        default:
+          message = e.message ?? 'An error occurred during sign in.';
+      }
+      throw Exception(message);
+    } catch (e) {
+      throw Exception('An unexpected error occurred: ${e.toString()}');
+    }
+  }
+
+  Future<User?> signUpWithEmail(String email, String password) async {
+    try {
+      final UserCredential result = await _auth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+
+      // Create initial Firestore profile for email signup
+      if (result.user != null) {
+        final user = result.user!;
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+          'uid': user.uid,
+          'name': email.split('@')[0], // Use email prefix as initial name
+          'email': user.email ?? email,
+          'profileImageUrl': null,
+          'photoUrl': null, // Keep for backward compatibility
+          'lastSeen': FieldValue.serverTimestamp(),
+          'createdAt': FieldValue.serverTimestamp(),
+          'isOnline': true,
+          'discoveryModeEnabled':
+              true, // Enable Live Connect discovery by default
+          'interests': [], // Initialize empty interests
+          'connections': [], // Initialize empty connections
+          'connectionCount': 0,
+          'blockedUsers': [], // Initialize empty blocked users
+          'connectionTypes': [], // Initialize empty connection types
+          'activities': [], // Initialize empty activities
+        }, SetOptions(merge: true));
+      }
+
+      return result.user;
+    } on FirebaseAuthException catch (e) {
+      String message;
+      switch (e.code) {
+        case 'weak-password':
+          message = 'The password provided is too weak.';
+          break;
+        case 'email-already-in-use':
+          message = 'An account already exists for that email.';
+          break;
+        case 'invalid-email':
+          message = 'The email address is invalid.';
+          break;
+        case 'operation-not-allowed':
+          message = 'Email/password accounts are not enabled.';
+          break;
+        default:
+          message = e.message ?? 'An error occurred during sign up.';
+      }
+      throw Exception(message);
+    } catch (e) {
+      throw Exception('An unexpected error occurred: ${e.toString()}');
+    }
+  }
+
+  Future<User?> signInWithGoogle() async {
+    try {
+      // Check if already signed in
+      await _googleSignIn.signOut();
+
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+
+      if (googleUser == null) {
+        return null;
+      }
+
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
+
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      final UserCredential result = await _auth.signInWithCredential(
+        credential,
+      );
+
+      // Save Google profile photo URL to Firestore
+      if (result.user != null) {
+        final user = result.user!;
+
+        // Fix Google photo URL to get higher quality version
+        String? photoUrl = user.photoURL ?? googleUser.photoUrl;
+        photoUrl = PhotoUrlHelper.getHighQualityGooglePhoto(photoUrl);
+
+        // Check if this is a new user or existing user
+        final doc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+        final isNewUser = !doc.exists;
+
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+          'uid': user.uid,
+          'name': user.displayName ?? googleUser.displayName ?? '',
+          'email': user.email ?? googleUser.email,
+          'profileImageUrl': photoUrl,
+          'photoUrl': photoUrl, // Keep for backward compatibility
+          'lastSeen': FieldValue.serverTimestamp(),
+          if (isNewUser) 'createdAt': FieldValue.serverTimestamp(),
+          'isOnline': true,
+          // Only set these for new users to avoid overwriting existing values
+          if (isNewUser) ...{
+            'discoveryModeEnabled':
+                true, // Enable Live Connect discovery by default
+            'interests': [], // Initialize empty interests
+            'connections': [], // Initialize empty connections
+            'connectionCount': 0,
+            'blockedUsers': [], // Initialize empty blocked users
+            'connectionTypes': [], // Initialize empty connection types
+            'activities': [], // Initialize empty activities
+          },
+        }, SetOptions(merge: true));
+
+        // Also update the auth profile with fixed URL
+        if (photoUrl != null && photoUrl != user.photoURL) {
+          try {
+            await user.updatePhotoURL(photoUrl);
+          } catch (e) {
+            debugPrint('Could not update auth photo URL: $e');
+          }
+        }
+      }
+
+      return result.user;
+    } on FirebaseAuthException catch (e) {
+      String message;
+      switch (e.code) {
+        case 'account-exists-with-different-credential':
+          message = 'An account already exists with the same email address.';
+          break;
+        case 'invalid-credential':
+          message = 'The credential is invalid or has expired.';
+          break;
+        case 'operation-not-allowed':
+          message = 'Google sign-in is not enabled.';
+          break;
+        case 'user-disabled':
+          message = 'This user account has been disabled.';
+          break;
+        default:
+          message = e.message ?? 'An error occurred during Google sign-in.';
+      }
+      throw Exception(message);
+    } catch (e) {
+      throw Exception('Google sign-in failed: ${e.toString()}');
+    }
+  }
+
+  Future<void> signOut() async {
+    try {
+      // Fire and forget - update user's online status (don't wait for it)
+      final user = _auth.currentUser;
+      if (user != null) {
+        FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .update({
+              'isOnline': false,
+              'lastSeen': FieldValue.serverTimestamp(),
+            })
+            .catchError((e) {
+              debugPrint('Error updating status on logout: $e');
+            });
+      }
+
+      // Sign out from Firebase and Google immediately
+      await Future.wait([
+        _auth.signOut(),
+        _googleSignIn.signOut().catchError((e) {
+          debugPrint('Google sign out error (non-fatal): $e');
+          return null;
+        }),
+      ]);
+    } catch (e) {
+      // Even if there's an error, try to force sign out from Firebase
+      try {
+        await _auth.signOut();
+      } catch (_) {}
+      debugPrint('Sign out error: $e');
+    }
+  }
+
+  /// Send OTP to phone number
+  /// Returns a Map with 'success' and optionally 'error' message
+  Future<Map<String, dynamic>> sendPhoneOTP({
+    required String phoneNumber,
+    required Function(String verificationId) onCodeSent,
+    required Function(String error) onError,
+    Function(PhoneAuthCredential credential)? onAutoVerify,
+  }) async {
+    try {
+      await _auth.verifyPhoneNumber(
+        phoneNumber: phoneNumber,
+        timeout: const Duration(seconds: 60),
+        verificationCompleted: (PhoneAuthCredential credential) async {
+          // Auto-verification (Android only)
+          debugPrint('Phone auto-verified');
+          if (onAutoVerify != null) {
+            onAutoVerify(credential);
+          }
+        },
+        verificationFailed: (FirebaseAuthException e) {
+          debugPrint('Phone verification failed: ${e.code} - ${e.message}');
+          String message;
+          switch (e.code) {
+            case 'invalid-phone-number':
+              message = 'Invalid phone number format. Please use +91XXXXXXXXXX';
+              break;
+            case 'too-many-requests':
+              message = 'Too many requests. Please try again later.';
+              break;
+            case 'quota-exceeded':
+              message = 'SMS quota exceeded. Please try again tomorrow.';
+              break;
+            case 'app-not-authorized':
+              message =
+                  'App not authorized. Please check Firebase configuration.';
+              break;
+            case 'captcha-check-failed':
+              message = 'reCAPTCHA verification failed. Please try again.';
+              break;
+            case 'missing-client-identifier':
+              message = 'Missing app identifier. Please reinstall the app.';
+              break;
+            default:
+              message =
+                  e.message ?? 'Phone verification failed. Please try again.';
+          }
+          onError(message);
+        },
+        codeSent: (String verificationId, int? resendToken) {
+          debugPrint('OTP code sent to $phoneNumber');
+          _verificationId = verificationId;
+          _resendToken = resendToken;
+          onCodeSent(verificationId);
+        },
+        codeAutoRetrievalTimeout: (String verificationId) {
+          debugPrint('Auto retrieval timeout');
+          _verificationId = verificationId;
+        },
+        forceResendingToken: _resendToken,
+      );
+      return {'success': true};
+    } catch (e) {
+      debugPrint('sendPhoneOTP error: $e');
+      onError('Failed to send OTP: ${e.toString()}');
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
+  /// Verify OTP and sign in
+  Future<User?> verifyPhoneOTP({
+    required String verificationId,
+    required String otp,
+  }) async {
+    try {
+      final credential = PhoneAuthProvider.credential(
+        verificationId: verificationId,
+        smsCode: otp,
+      );
+
+      final UserCredential result = await _auth.signInWithCredential(
+        credential,
+      );
+
+      // Fire and forget - update profile in background for faster login
+      if (result.user != null) {
+        _updateUserProfileOnPhoneLogin(result.user!);
+      }
+
+      return result.user;
+    } on FirebaseAuthException catch (e) {
+      String message;
+      switch (e.code) {
+        case 'invalid-verification-code':
+          message = 'Invalid OTP. Please check and try again.';
+          break;
+        case 'invalid-verification-id':
+          message = 'Verification expired. Please request a new OTP.';
+          break;
+        case 'session-expired':
+          message = 'Session expired. Please request a new OTP.';
+          break;
+        case 'credential-already-in-use':
+          message = 'This phone number is already linked to another account.';
+          break;
+        default:
+          message = e.message ?? 'OTP verification failed.';
+      }
+      throw Exception(message);
+    } catch (e) {
+      throw Exception('OTP verification failed: ${e.toString()}');
+    }
+  }
+
+  /// Link phone number to existing account
+  Future<void> linkPhoneNumber({
+    required String verificationId,
+    required String otp,
+  }) async {
+    try {
+      final credential = PhoneAuthProvider.credential(
+        verificationId: verificationId,
+        smsCode: otp,
+      );
+
+      await currentUser?.linkWithCredential(credential);
+
+      // Update phone in Firestore
+      if (currentUser != null) {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(currentUser!.uid)
+            .update({'phone': currentUser!.phoneNumber});
+      }
+    } on FirebaseAuthException catch (e) {
+      String message;
+      switch (e.code) {
+        case 'provider-already-linked':
+          message = 'A phone number is already linked to this account.';
+          break;
+        case 'invalid-verification-code':
+          message = 'Invalid OTP. Please check and try again.';
+          break;
+        case 'credential-already-in-use':
+          message = 'This phone number is already used by another account.';
+          break;
+        default:
+          message = e.message ?? 'Failed to link phone number.';
+      }
+      throw Exception(message);
+    } catch (e) {
+      throw Exception('Failed to link phone number: ${e.toString()}');
+    }
+  }
+
+  Future<void> resetPassword(String email) async {
+    try {
+      await _auth.sendPasswordResetEmail(email: email);
+    } on FirebaseAuthException catch (e) {
+      String message;
+      switch (e.code) {
+        case 'invalid-email':
+          message = 'The email address is invalid.';
+          break;
+        case 'user-not-found':
+          message = 'No user found for that email.';
+          break;
+        default:
+          message = e.message ?? 'An error occurred sending password reset.';
+      }
+      throw Exception(message);
+    } catch (e) {
+      throw Exception('Password reset failed: ${e.toString()}');
+    }
+  }
+
+  Future<void> deleteAccount() async {
+    try {
+      await currentUser?.delete();
+    } on FirebaseAuthException catch (e) {
+      String message;
+      switch (e.code) {
+        case 'requires-recent-login':
+          message = 'Please sign in again before deleting your account.';
+          break;
+        default:
+          message = e.message ?? 'An error occurred deleting account.';
+      }
+      throw Exception(message);
+    } catch (e) {
+      throw Exception('Account deletion failed: ${e.toString()}');
+    }
+  }
+
+  Future<void> updateEmail(String newEmail) async {
+    try {
+      await currentUser?.verifyBeforeUpdateEmail(newEmail);
+    } on FirebaseAuthException catch (e) {
+      String message;
+      switch (e.code) {
+        case 'invalid-email':
+          message = 'The email address is invalid.';
+          break;
+        case 'email-already-in-use':
+          message = 'This email is already in use by another account.';
+          break;
+        case 'requires-recent-login':
+          message = 'Please sign in again before updating your email.';
+          break;
+        default:
+          message = e.message ?? 'An error occurred updating email.';
+      }
+      throw Exception(message);
+    } catch (e) {
+      throw Exception('Email update failed: ${e.toString()}');
+    }
+  }
+
+  /// Check if the current user has email/password authentication
+  bool hasPasswordProvider() {
+    final user = currentUser;
+    if (user == null) return false;
+
+    // Check if user has password provider
+    for (var provider in user.providerData) {
+      if (provider.providerId == 'password') {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// Get the primary sign-in method for the current user
+  String? getPrimarySignInMethod() {
+    final user = currentUser;
+    if (user == null || user.providerData.isEmpty) return null;
+    return user.providerData.first.providerId;
+  }
+
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    try {
+      final user = currentUser;
+      if (user == null || user.email == null) {
+        throw Exception('No user is currently signed in');
+      }
+
+      // Check if user has password authentication
+      if (!hasPasswordProvider()) {
+        final provider = getPrimarySignInMethod();
+        if (provider == 'google.com') {
+          throw Exception(
+            'You signed in with Google. Please use Google to manage your password.',
+          );
+        } else {
+          throw Exception(
+            'Password change is only available for email/password accounts.',
+          );
+        }
+      }
+
+      // Validate password length
+      if (newPassword.length < 6) {
+        throw Exception('Password must be at least 6 characters');
+      }
+
+      // Re-authenticate user with current password
+      final credential = EmailAuthProvider.credential(
+        email: user.email!,
+        password: currentPassword,
+      );
+
+      await user.reauthenticateWithCredential(credential);
+
+      // Update password in Firebase Auth
+      await user.updatePassword(newPassword);
+
+      // Store password change metadata in Firestore
+      await _recordPasswordChange(user.uid);
+    } on FirebaseAuthException catch (e) {
+      String message;
+      switch (e.code) {
+        case 'wrong-password':
+          message = 'Current password is incorrect';
+          break;
+        case 'weak-password':
+          message = 'The new password is too weak';
+          break;
+        case 'requires-recent-login':
+          message = 'Please log out and log in again to change password';
+          break;
+        default:
+          message = e.message ?? 'An error occurred changing password';
+      }
+      throw Exception(message);
+    } catch (e) {
+      if (e is Exception) {
+        rethrow;
+      }
+      throw Exception('Password change failed: ${e.toString()}');
+    }
+  }
+
+  /// Fire-and-forget: Update user profile on phone login (runs in background)
+  void _updateUserProfileOnPhoneLogin(User user) async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      final isNewUser = !doc.exists;
+
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+        'uid': user.uid,
+        'phone': user.phoneNumber,
+        'name': user.displayName ?? 'User',
+        'lastSeen': FieldValue.serverTimestamp(),
+        if (isNewUser) 'createdAt': FieldValue.serverTimestamp(),
+        'isOnline': true,
+        if (isNewUser) ...{
+          'discoveryModeEnabled': true,
+          'interests': [],
+          'connections': [],
+          'connectionCount': 0,
+          'blockedUsers': [],
+          'connectionTypes': [],
+          'activities': [],
+        },
+      }, SetOptions(merge: true));
+    } catch (e) {
+      debugPrint('Error updating profile on phone login: $e');
+    }
+  }
+
+  /// Fire-and-forget: Update user profile on email login (runs in background)
+  void _updateUserProfileOnLogin(User user, String email) async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      final isNewUser = !doc.exists;
+
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+        'uid': user.uid,
+        'email': user.email ?? email,
+        'lastSeen': FieldValue.serverTimestamp(),
+        if (isNewUser) 'createdAt': FieldValue.serverTimestamp(),
+        'isOnline': true,
+        if (isNewUser) ...{
+          'name': email.split('@')[0],
+          'discoveryModeEnabled': true,
+          'interests': [],
+          'connections': [],
+          'connectionCount': 0,
+          'blockedUsers': [],
+          'connectionTypes': [],
+          'activities': [],
+        },
+      }, SetOptions(merge: true));
+    } catch (e) {
+      debugPrint('Error updating profile on login: $e');
+    }
+  }
+
+  /// Record password change event in Firestore for security tracking
+  Future<void> _recordPasswordChange(String userId) async {
+    try {
+      final now = FieldValue.serverTimestamp();
+
+      // Update user document with last password change
+      await FirebaseFirestore.instance.collection('users').doc(userId).update({
+        'lastPasswordChange': now,
+        'passwordChangeCount': FieldValue.increment(1),
+      });
+
+      // Record security event
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .collection('securityEvents')
+          .add({'type': 'password_change', 'timestamp': now, 'success': true});
+    } catch (e) {
+      // Don't fail the password change if logging fails
+      debugPrint('Failed to record password change: $e');
+    }
+  }
+}

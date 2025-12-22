@@ -1,9 +1,10 @@
 import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:video_player/video_player.dart';
 import 'package:supper/screens/login/choose_account_type_screen.dart';
-import '../../services/video_preload_service.dart';
+import '../../res/config/app_colors.dart';
+import '../../res/config/app_assets.dart';
+import '../../res/config/app_text_styles.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -17,50 +18,49 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   late PageController _pageController;
   late AnimationController _zoomController;
   int _currentPage = 0;
-  final VideoPreloadService _videoService = VideoPreloadService();
 
   final List<OnboardingPage> _pages = [
     OnboardingPage(
       title: 'Welcome to Supper',
       subtitle:
           'Your ultimate campus marketplace for buying, selling, and connecting with students',
-      imagePath: 'assets/logo/Clogo.jpeg',
-      color: const Color.fromARGB(255, 208, 231, 250),
+      imagePath: AppAssets.logoPath,
+      color: AppColors.lightBlueTint,
       gradient: [
-        const Color.fromARGB(255, 208, 231, 250),
-        const Color.fromARGB(255, 61, 47, 63),
+        AppColors.lightBlueTint,
+        AppColors.splashDark2,
       ],
     ),
     OnboardingPage(
       title: 'Find Anything',
       subtitle:
           'From textbooks to bikes, rooms to part-time jobs - everything you need on campus',
-      imagePath: 'assets/logo/searchRequirementData.jpeg',
-      color: const Color.fromARGB(255, 166, 243, 169),
+      imagePath: AppAssets.searchRequirementImage,
+      color: AppColors.lightGreenTint,
       gradient: [
-        const Color.fromARGB(255, 166, 243, 169),
-        const Color.fromARGB(255, 35, 51, 49),
+        AppColors.lightGreenTint,
+        AppColors.splashDark2,
       ],
     ),
     OnboardingPage(
       title: 'Connect Instantly',
       subtitle:
           'Chat with verified students and make secure transactions in real-time',
-      imagePath: 'assets/logo/searchannaunceData.jpeg',
-      color: const Color.fromARGB(255, 235, 200, 152),
+      imagePath: AppAssets.searchAnnounceImage,
+      color: AppColors.lightOrangeTint,
       gradient: [
-        const Color.fromARGB(255, 235, 200, 152),
-        const Color.fromARGB(255, 77, 58, 57),
+        AppColors.lightOrangeTint,
+        AppColors.splashDark2,
       ],
     ),
     OnboardingPage(
       title: 'Get Started',
       subtitle: 'Join thousands of students already using Supper every day',
-      imagePath: 'assets/logo/searchData.jpeg',
-      color: const Color.fromARGB(255, 217, 166, 226),
+      imagePath: AppAssets.searchDataImage,
+      color: AppColors.lightPurpleTint,
       gradient: [
-        const Color.fromARGB(255, 217, 166, 226),
-        const Color.fromARGB(255, 44, 32, 36),
+        AppColors.lightPurpleTint,
+        AppColors.splashDark2,
       ],
     ),
   ];
@@ -75,27 +75,12 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       vsync: this,
       duration: const Duration(milliseconds: 1500),
     )..repeat(reverse: true);
-
-    // Setup video background
-    if (_videoService.isReady) {
-      _videoService.resume();
-    } else {
-      _videoService.addOnReadyCallback(_onVideoReady);
-      _videoService.preload();
-    }
-  }
-
-  void _onVideoReady() {
-    if (mounted) {
-      setState(() {});
-    }
   }
 
   @override
   void dispose() {
     _pageController.dispose();
     _zoomController.dispose();
-    _videoService.removeOnReadyCallback(_onVideoReady);
     super.dispose();
   }
 
@@ -117,42 +102,36 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
       child: Scaffold(
-        backgroundColor: Colors.black,
+        backgroundColor: AppColors.backgroundDark,
         body: Stack(
           children: [
             // Gradient Background - always visible immediately
             Positioned.fill(
               child: Container(
                 decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Color(0xFF1a1a2e),
-                      Color(0xFF16213e),
-                      Color(0xFF0f0f23),
-                    ],
-                  ),
+                  gradient: AppColors.splashGradient,
                 ),
               ),
             ),
 
-            // Video Background - layered on top when ready
-            if (_videoService.isReady && _videoService.controller != null && _videoService.controller!.value.size.width > 0)
-              Positioned.fill(
-                child: FittedBox(
-                  fit: BoxFit.cover,
-                  child: SizedBox(
-                    width: _videoService.controller!.value.size.width,
-                    height: _videoService.controller!.value.size.height,
-                    child: VideoPlayer(_videoService.controller!),
-                  ),
-                ),
+            // Image Background
+            Positioned.fill(
+              child: Image.asset(
+                AppAssets.homeBackgroundImage,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    decoration: const BoxDecoration(
+                      gradient: AppColors.splashGradient,
+                    ),
+                  );
+                },
               ),
+            ),
 
             // Dark overlay
             Positioned.fill(
-              child: Container(color: Colors.black.withValues(alpha: 0.5)),
+              child: Container(color: AppColors.darkOverlay(alpha: 0.5)),
             ),
 
             // Content
@@ -167,13 +146,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                       children: [
                         Text(
                           'Supper',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 24,
-                            fontWeight: FontWeight.w700,
+                          style: AppTextStyles.displaySmall.copyWith(
                             shadows: [
                               Shadow(
-                                color: Colors.black.withValues(alpha: 0.5),
+                                color: AppColors.darkOverlay(alpha: 0.5),
                                 blurRadius: 8,
                               ),
                             ],
@@ -190,22 +166,18 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                                   vertical: 8,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.15),
+                                  color: AppColors.glassBackgroundDark(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(20),
                                   border: Border.all(
-                                    color: Colors.white.withValues(alpha: 0.3),
+                                    color: AppColors.glassBorder(alpha: 0.3),
                                   ),
                                 ),
                                 child: GestureDetector(
                                   onTap: _getStarted,
                                   child: Text(
                                     'Skip',
-                                    style: TextStyle(
-                                      color: Colors.white.withValues(
-                                        alpha: 0.9,
-                                      ),
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w500,
+                                    style: AppTextStyles.labelLarge.copyWith(
+                                      color: AppColors.whiteAlpha(alpha: 0.9),
                                     ),
                                   ),
                                 ),
@@ -243,13 +215,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                           Text(
                             _pages[_currentPage].title,
                             textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 28,
-                              fontWeight: FontWeight.w700,
+                            style: AppTextStyles.displayMedium.copyWith(
                               shadows: [
                                 Shadow(
-                                  color: Colors.black.withValues(alpha: 0.5),
+                                  color: AppColors.darkOverlay(alpha: 0.5),
                                   blurRadius: 8,
                                 ),
                               ],
@@ -259,11 +228,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                           Text(
                             _pages[_currentPage].subtitle,
                             textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.8),
-                              fontSize: 16,
-                              fontWeight: FontWeight.w400,
-                              height: 1.5,
+                            style: AppTextStyles.bodyLargeReadable.copyWith(
+                              color: AppColors.whiteAlpha(alpha: 0.8),
                             ),
                           ),
                           const Spacer(),
@@ -329,7 +295,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                   ],
                 ),
                 border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.2),
+                  color: AppColors.glassBorder(alpha: 0.2),
                   width: 1.5,
                 ),
               ),
@@ -382,7 +348,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             height: size,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: Colors.white.withValues(alpha: 0.1),
+              color: AppColors.glassBackgroundDark(alpha: 0.1),
               border: Border.all(
                 color: color.withValues(alpha: 0.5),
                 width: 2.5,
@@ -415,14 +381,14 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             height: 8,
             decoration: BoxDecoration(
               color: _currentPage == index
-                  ? Colors.white
-                  : Colors.white.withValues(alpha: 0.3),
+                  ? AppColors.textPrimaryDark
+                  : AppColors.glassBorder(alpha: 0.3),
               borderRadius: BorderRadius.circular(4),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.5)),
+              border: Border.all(color: AppColors.glassBorder(alpha: 0.5)),
               boxShadow: _currentPage == index
                   ? [
                       BoxShadow(
-                        color: Colors.white.withValues(alpha: 0.5),
+                        color: AppColors.whiteAlpha(alpha: 0.5),
                         blurRadius: 8,
                       ),
                     ]
@@ -452,14 +418,14 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             height: 64,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: Colors.white.withValues(alpha: 0.15),
+              color: AppColors.glassBackgroundDark(alpha: 0.15),
               border: Border.all(
-                color: Colors.white.withValues(alpha: 0.3),
+                color: AppColors.glassBorder(alpha: 0.3),
                 width: 2,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.2),
+                  color: AppColors.darkOverlay(alpha: 0.2),
                   blurRadius: 12,
                   offset: const Offset(0, 4),
                 ),
@@ -467,7 +433,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             ),
             child: const Icon(
               Icons.arrow_forward,
-              color: Colors.white,
+              color: AppColors.textPrimaryDark,
               size: 28,
             ),
           ),
@@ -487,15 +453,15 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             width: double.infinity,
             height: 60,
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.15),
+              color: AppColors.glassBackgroundDark(alpha: 0.15),
               borderRadius: BorderRadius.circular(30),
               border: Border.all(
-                color: Colors.white.withValues(alpha: 0.3),
+                color: AppColors.glassBorder(alpha: 0.3),
                 width: 1.5,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.2),
+                  color: AppColors.darkOverlay(alpha: 0.2),
                   blurRadius: 12,
                   offset: const Offset(0, 4),
                 ),
@@ -506,20 +472,17 @@ class _OnboardingScreenState extends State<OnboardingScreen>
               children: [
                 Text(
                   'Get Started',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
+                  style: AppTextStyles.titleMedium.copyWith(
                     shadows: [
                       Shadow(
-                        color: Colors.black.withValues(alpha: 0.3),
+                        color: AppColors.darkOverlay(alpha: 0.3),
                         blurRadius: 4,
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(width: 10),
-                const Icon(Icons.rocket_launch, color: Colors.white, size: 20),
+                const Icon(Icons.rocket_launch, color: AppColors.textPrimaryDark, size: 20),
               ],
             ),
           ),

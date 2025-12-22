@@ -1,8 +1,9 @@
 import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
-import 'package:video_player/video_player.dart';
 import 'package:supper/screens/login/login_screen.dart';
-import '../../services/video_preload_service.dart';
+import '../../res/config/app_colors.dart';
+import '../../res/config/app_assets.dart';
+import '../../res/config/app_text_styles.dart';
 
 class ChooseAccountTypeScreen extends StatefulWidget {
   const ChooseAccountTypeScreen({super.key});
@@ -14,37 +15,11 @@ class ChooseAccountTypeScreen extends StatefulWidget {
 
 class _ChooseAccountTypeScreenState extends State<ChooseAccountTypeScreen> {
   int selectedIndex = -1;
-  final VideoPreloadService _videoService = VideoPreloadService();
 
   final List<String> accountTypes = [
     "Personal Account",
-    "Professional Account",
     "Business Account",
   ];
-
-  @override
-  void initState() {
-    super.initState();
-    // Setup video background
-    if (_videoService.isReady) {
-      _videoService.resume();
-    } else {
-      _videoService.addOnReadyCallback(_onVideoReady);
-      _videoService.preload();
-    }
-  }
-
-  void _onVideoReady() {
-    if (mounted) {
-      setState(() {});
-    }
-  }
-
-  @override
-  void dispose() {
-    _videoService.removeOnReadyCallback(_onVideoReady);
-    super.dispose();
-  }
 
   void _onCardTap(int index) {
     setState(() {
@@ -63,38 +38,31 @@ class _ChooseAccountTypeScreenState extends State<ChooseAccountTypeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: AppColors.backgroundDark,
+      extendBodyBehindAppBar: true,
       body: Stack(
+        fit: StackFit.expand,
         children: [
-          // Video Background
-          Positioned.fill(
-            child: _videoService.isReady && _videoService.controller != null
-                ? FittedBox(
-                    fit: BoxFit.cover,
-                    child: SizedBox(
-                      width: _videoService.controller!.value.size.width,
-                      height: _videoService.controller!.value.size.height,
-                      child: VideoPlayer(_videoService.controller!),
-                    ),
-                  )
-                : Container(
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Color(0xFF1a1a2e),
-                          Color(0xFF16213e),
-                          Color(0xFF0f0f23),
-                        ],
-                      ),
-                    ),
-                  ),
+          // Image Background - Full Screen
+          Image.asset(
+            AppAssets.homeBackgroundImage,
+            fit: BoxFit.cover,
+            width: double.infinity,
+            height: double.infinity,
+            errorBuilder: (context, error, stackTrace) {
+              return Container(
+                width: double.infinity,
+                height: double.infinity,
+                decoration: const BoxDecoration(
+                  gradient: AppColors.splashGradient,
+                ),
+              );
+            },
           ),
 
-          // Dark overlay
-          Positioned.fill(
-            child: Container(color: Colors.black.withValues(alpha: 0.5)),
+          // Dark overlay for better card visibility
+          Container(
+            color: AppColors.darkOverlay(),
           ),
 
           // Content
@@ -108,13 +76,10 @@ class _ChooseAccountTypeScreenState extends State<ChooseAccountTypeScreen> {
                   // Title with glassmorphism
                   Text(
                     "Choose Account Type",
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                    style: AppTextStyles.displayMedium.copyWith(
                       shadows: [
                         Shadow(
-                          color: Colors.black.withValues(alpha: 0.5),
+                          color: AppColors.darkOverlay(alpha: 0.5),
                           blurRadius: 8,
                         ),
                       ],
@@ -123,9 +88,8 @@ class _ChooseAccountTypeScreenState extends State<ChooseAccountTypeScreen> {
                   const SizedBox(height: 8),
                   Text(
                     "Select the account type that best suits your needs",
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.8),
-                      fontSize: 15,
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      color: AppColors.whiteAlpha(alpha: 0.8),
                     ),
                   ),
                   const SizedBox(height: 32),
@@ -151,25 +115,7 @@ class _ChooseAccountTypeScreenState extends State<ChooseAccountTypeScreen> {
                   GestureDetector(
                     onTap: () => _onCardTap(1),
                     child: AccountCard(
-                      icon: Icons.badge,
-                      title: "Professional Account",
-                      subtitle: "For freelancers and service providers",
-                      verificationLabel: "Verification Required",
-                      items: const [
-                        "Provide services",
-                        "Verified professional badge",
-                        "Portfolio showcase",
-                        "eKYC verification required",
-                      ],
-                      selected: selectedIndex == 1,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  GestureDetector(
-                    onTap: () => _onCardTap(2),
-                    child: AccountCard(
-                      icon: Icons.factory,
+                      icon: Icons.business,
                       title: "Business Account",
                       subtitle: "For businesses and organizations",
                       verificationLabel: "Verification Required",
@@ -179,7 +125,7 @@ class _ChooseAccountTypeScreenState extends State<ChooseAccountTypeScreen> {
                         "Advanced analytics",
                         "Priority support",
                       ],
-                      selected: selectedIndex == 2,
+                      selected: selectedIndex == 1,
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -223,18 +169,18 @@ class AccountCard extends StatelessWidget {
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             color: selected
-                ? Colors.white.withValues(alpha: 0.2)
-                : Colors.white.withValues(alpha: 0.1),
+                ? AppColors.glassBackgroundDark(alpha: 0.2)
+                : AppColors.glassBackgroundDark(alpha: 0.1),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: selected
-                  ? Colors.white.withValues(alpha: 0.6)
-                  : Colors.white.withValues(alpha: 0.2),
+                  ? AppColors.glassBorder(alpha: 0.6)
+                  : AppColors.glassBorder(alpha: 0.2),
               width: selected ? 2 : 1,
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.2),
+                color: AppColors.darkOverlay(alpha: 0.2),
                 blurRadius: 12,
                 offset: const Offset(0, 4),
               ),
@@ -249,13 +195,13 @@ class AccountCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.15),
+                      color: AppColors.glassBackgroundDark(alpha: 0.15),
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.3),
+                        color: AppColors.glassBorder(alpha: 0.3),
                       ),
                     ),
-                    child: Icon(icon, size: 22, color: Colors.white),
+                    child: Icon(icon, size: 22, color: AppColors.textPrimaryDark),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -264,17 +210,12 @@ class AccountCard extends StatelessWidget {
                       children: [
                         Text(
                           title,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
+                          style: AppTextStyles.titleSmall,
                         ),
                         Text(
                           subtitle,
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.7),
-                            fontSize: 12,
+                          style: AppTextStyles.caption.copyWith(
+                            color: AppColors.whiteAlpha(alpha: 0.7),
                           ),
                         ),
                       ],
@@ -287,17 +228,17 @@ class AccountCard extends StatelessWidget {
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: selected
-                          ? Colors.green.withValues(alpha: 0.3)
-                          : Colors.transparent,
+                          ? AppColors.success.withValues(alpha: 0.3)
+                          : AppColors.transparent,
                       border: Border.all(
                         color: selected
-                            ? Colors.green
-                            : Colors.white.withValues(alpha: 0.4),
+                            ? AppColors.success
+                            : AppColors.glassBorder(alpha: 0.4),
                         width: 2,
                       ),
                     ),
                     child: selected
-                        ? const Icon(Icons.check, size: 16, color: Colors.green)
+                        ? const Icon(Icons.check, size: 16, color: AppColors.success)
                         : null,
                   ),
                 ],
@@ -313,18 +254,16 @@ class AccountCard extends StatelessWidget {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.green.withValues(alpha: 0.3),
+                        color: AppColors.success.withValues(alpha: 0.3),
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                          color: Colors.green.withValues(alpha: 0.5),
+                          color: AppColors.success.withValues(alpha: 0.5),
                         ),
                       ),
-                      child: const Text(
+                      child: Text(
                         "Recommended",
-                        style: TextStyle(
-                          color: Colors.green,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
+                        style: AppTextStyles.labelMedium.copyWith(
+                          color: AppColors.success,
                         ),
                       ),
                     ),
@@ -335,18 +274,16 @@ class AccountCard extends StatelessWidget {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.orange.withValues(alpha: 0.3),
+                        color: AppColors.warning.withValues(alpha: 0.3),
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                          color: Colors.orange.withValues(alpha: 0.5),
+                          color: AppColors.warning.withValues(alpha: 0.5),
                         ),
                       ),
                       child: Text(
                         verificationLabel!,
-                        style: const TextStyle(
-                          color: Colors.orange,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
+                        style: AppTextStyles.labelMedium.copyWith(
+                          color: AppColors.warning,
                         ),
                       ),
                     ),
@@ -364,16 +301,15 @@ class AccountCard extends StatelessWidget {
                           children: [
                             Icon(
                               Icons.check_circle,
-                              color: Colors.white.withValues(alpha: 0.7),
+                              color: AppColors.whiteAlpha(alpha: 0.7),
                               size: 14,
                             ),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
                                 text,
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.9),
-                                  fontSize: 12,
+                                style: AppTextStyles.caption.copyWith(
+                                  color: AppColors.whiteAlpha(alpha: 0.9),
                                 ),
                               ),
                             ),

@@ -12,6 +12,7 @@ import 'conversations_screen.dart';
 import 'live_connect_tab_screen.dart';
 import '../profile/profile_with_history_screen.dart'; // Use provider-based version
 import 'messageser_screen.dart';
+import 'feed_screen.dart';
 
 // Professional & Business screens
 import '../professional/professional_dashboard_screen.dart';
@@ -20,7 +21,6 @@ import '../business/business_dashboard_screen.dart';
 // services
 import '../../services/location_service.dart';
 import '../../services/notification_service.dart';
-import '../../services/video_preload_service.dart';
 import '../../services/account_type_service.dart';
 import '../../models/user_profile.dart';
 
@@ -50,7 +50,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final LocationService _location = LocationService();
-  final VideoPreloadService _videoService = VideoPreloadService();
   final AccountTypeService _accountTypeService = AccountTypeService();
 
   // Animation controller
@@ -65,9 +64,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
       duration: const Duration(milliseconds: 300),
       vsync: this,
     );
-
-    // Preload video immediately so it's ready when HomeScreen opens
-    _videoService.preload();
 
     _listenUnread();
     _updateStatus(true);
@@ -323,6 +319,13 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
       case 6:
         // Business Dashboard
         return const BusinessDashboardScreen();
+      case 7:
+        // Feed Screen
+        return FeedScreen(
+          onBack: () {
+            setState(() => _currentIndex = 0);
+          },
+        );
       default:
         return const HomeScreen();
     }
@@ -548,6 +551,40 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
               ),
             ),
           ),
+
+          // Swipe gesture detectors - placed at the END so they're on top of everything
+          // HomeScreen -> FeedScreen (swipe from LEFT edge to RIGHT)
+          // 40% of screen height from top, 80px wide
+          if (_currentIndex == 0)
+            Positioned(
+              left: 0,
+              top: 0,
+              height: size.height * 0.4,
+              width: 80,
+              child: _SwipeDetector(
+                onSwipeRight: () {
+                  HapticFeedback.mediumImpact();
+                  setState(() => _currentIndex = 7);
+                },
+              ),
+            ),
+
+          // FeedScreen -> HomeScreen (swipe from RIGHT edge to LEFT)
+          // Starts at 120px from top to avoid header/profile icon overlap
+          // 40% of screen height, 80px wide
+          if (_currentIndex == 7)
+            Positioned(
+              right: 0,
+              top: 120,
+              height: size.height * 0.4,
+              width: 80,
+              child: _SwipeDetector(
+                onSwipeLeft: () {
+                  HapticFeedback.mediumImpact();
+                  setState(() => _currentIndex = 0);
+                },
+              ),
+            ),
         ],
       ),
     );
@@ -646,6 +683,61 @@ class _AnimatedMenuItemState extends State<_AnimatedMenuItem> {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ==================================================
+// SWIPE DETECTOR - Custom widget for edge swipe detection
+// ==================================================
+class _SwipeDetector extends StatefulWidget {
+  final VoidCallback? onSwipeLeft;
+  final VoidCallback? onSwipeRight;
+
+  const _SwipeDetector({
+    this.onSwipeLeft,
+    this.onSwipeRight,
+  });
+
+  @override
+  State<_SwipeDetector> createState() => _SwipeDetectorState();
+}
+
+class _SwipeDetectorState extends State<_SwipeDetector> {
+  double _startX = 0;
+  bool _hasTriggered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Listener(
+      behavior: HitTestBehavior.opaque,
+      onPointerDown: (event) {
+        _startX = event.position.dx;
+        _hasTriggered = false;
+      },
+      onPointerMove: (event) {
+        if (_hasTriggered) return;
+
+        final deltaX = event.position.dx - _startX;
+
+        // Left swipe: moved left by at least 10px (very sensitive)
+        if (widget.onSwipeLeft != null && deltaX < -10) {
+          _hasTriggered = true;
+          widget.onSwipeLeft!();
+        }
+
+        // Right swipe: moved right by at least 10px (very sensitive)
+        if (widget.onSwipeRight != null && deltaX > 10) {
+          _hasTriggered = true;
+          widget.onSwipeRight!();
+        }
+      },
+      onPointerUp: (_) {
+        _hasTriggered = false;
+      },
+      child: Container(
+        color: Colors.transparent,
       ),
     );
   }

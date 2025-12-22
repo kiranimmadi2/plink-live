@@ -306,8 +306,6 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
     }
   }
 
-
-
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
@@ -2377,12 +2375,8 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
     if (currentUserId == null) return;
 
     try {
-      // Step 1: Mark incoming messages as delivered (recipient opened chat)
-      // This updates sender's view: ✓ → ✓✓ (grey)
-      await _hybridChatService.markMessagesAsDelivered(_conversationId!);
-
-      // Step 2: Mark messages as read (recipient viewing messages)
-      // This updates sender's view: ✓✓ (grey) → ✓✓ (green/blue)
+      // Mark messages as read (recipient viewing messages)
+      // This updates sender's view: ✓ → ✓✓ (green/blue)
       await _hybridChatService.markMessagesAsRead(_conversationId!);
 
       // Check mounted again after async operation
@@ -2915,8 +2909,6 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
     );
   }
 
-
-
   // Search-related methods
   void _toggleSearch() {
     setState(() {
@@ -3116,6 +3108,4 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
 
     return RichText(text: TextSpan(children: spans));
   }
-
-
 }
