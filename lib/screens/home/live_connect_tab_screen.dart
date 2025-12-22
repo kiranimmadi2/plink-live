@@ -9,6 +9,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:supper/providers/theme_provider.dart';
 import '../../widgets/user_avatar.dart';
+import '../../widgets/app_background.dart';
 import '../enhanced_chat_screen.dart';
 import '../../models/user_profile.dart';
 import '../../models/extended_user_profile.dart';
@@ -2423,40 +2424,23 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
           ),
         ),
       ),
-      body: Stack(
-        children: [
-          // iOS 16 Glassmorphism gradient background
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: isGlass
-                    ? [
-                        const Color(0xFFE3F2FD).withValues(alpha: 0.8),
-                        const Color(0xFFF3E5F5).withValues(alpha: 0.6),
-                        const Color(0xFFE8F5E9).withValues(alpha: 0.4),
-                        const Color(0xFFFFF3E0).withValues(alpha: 0.3),
-                      ]
-                    : isDarkMode
-                    ? [Colors.black, const Color(0xFF1C1C1E)]
-                    : [const Color(0xFFF5F5F7), Colors.white],
-              ),
-            ),
-          ),
-
-          // Floating glass circles for depth
-          if (isGlass) ...[
-            Positioned(
-              top: 150,
-              right: -100,
-              child: Container(
-                width: 300,
-                height: 300,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    colors: [
+      body: AppBackground(
+        showParticles: true,
+        overlayOpacity: 0.4,
+        child: Stack(
+          children: [
+            // Floating glass circles for depth (kept for visual effect)
+            if (isGlass) ...[
+              Positioned(
+                top: 150,
+                right: -100,
+                child: Container(
+                  width: 300,
+                  height: 300,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [
                       AppColors.iosPurple.withValues(alpha: 0.2),
                       AppColors.iosPurple.withValues(alpha: 0.0),
                     ],
@@ -2890,6 +2874,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
             ),
           ),
         ],
+      ),
       ),
     );
   }

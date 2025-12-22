@@ -9,6 +9,7 @@ import '../../models/conversation_model.dart';
 import '../../models/user_profile.dart';
 import '../../utils/photo_url_helper.dart';
 import '../../widgets/chat_common.dart';
+import '../../widgets/app_background.dart';
 import '../enhanced_chat_screen.dart';
 import '../create_group_screen.dart';
 import '../group_chat_screen.dart';
@@ -102,29 +103,34 @@ class _ConversationsScreenState extends State<ConversationsScreen>
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDarkMode ? const Color(0xFF000000) : Colors.white,
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header with title and profile avatar
-            _buildHeader(isDarkMode),
-            // Search bar
-            _buildSearchBar(isDarkMode),
-            // Tab content
-            Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                children: [
-                  _buildChatsList(isDarkMode, isGroup: false),
-                  _buildChatsList(isDarkMode, isGroup: true),
-                  _buildCallsList(isDarkMode),
-                ],
+      extendBodyBehindAppBar: true,
+      backgroundColor: Colors.transparent,
+      body: AppBackground(
+        showParticles: true,
+        overlayOpacity: 0.4,
+        child: SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header with title and profile avatar
+              _buildHeader(isDarkMode),
+              // Search bar
+              _buildSearchBar(isDarkMode),
+              // Tab content
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _buildChatsList(isDarkMode, isGroup: false),
+                    _buildChatsList(isDarkMode, isGroup: true),
+                    _buildCallsList(isDarkMode),
+                  ],
+                ),
               ),
-            ),
-            // Bottom tab bar
-            _buildBottomTabBar(isDarkMode),
-          ],
+              // Bottom tab bar
+              _buildBottomTabBar(isDarkMode),
+            ],
+          ),
         ),
       ),
       floatingActionButton: Container(
@@ -163,12 +169,12 @@ class _ConversationsScreenState extends State<ConversationsScreen>
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
+          const Text(
             'Messages',
             style: TextStyle(
               fontSize: 32,
               fontWeight: FontWeight.bold,
-              color: isDarkMode ? Colors.white : Colors.black,
+              color: Colors.white,
             ),
           ),
           // Profile avatar

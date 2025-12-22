@@ -1,0 +1,896 @@
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:image_picker/image_picker.dart';
+import '../../res/config/app_assets.dart';
+import '../../res/config/app_colors.dart';
+import '../../res/config/app_text_styles.dart';
+
+class CreatePostScreen extends StatefulWidget {
+  const CreatePostScreen({super.key});
+
+  @override
+  State<CreatePostScreen> createState() => _CreatePostScreenState();
+}
+
+class _CreatePostScreenState extends State<CreatePostScreen> {
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseStorage _storage = FirebaseStorage.instance;
+  final ImagePicker _imagePicker = ImagePicker();
+
+  final TextEditingController _titleController = TextEditingController();
+  final TextEditingController _descriptionController = TextEditingController();
+  final TextEditingController _priceController = TextEditingController();
+  final TextEditingController _hashtagController = TextEditingController();
+
+  File? _selectedImage;
+  bool _isLoading = false;
+  bool _allowCalls = true;
+  String _selectedCurrency = 'INR';
+  List<String> _hashtags = [];
+
+  final List<Map<String, String>> _currencies = [
+    {'code': 'INR', 'symbol': '₹', 'name': 'Indian Rupee'},
+    {'code': 'USD', 'symbol': '\$', 'name': 'US Dollar'},
+    {'code': 'EUR', 'symbol': '€', 'name': 'Euro'},
+    {'code': 'GBP', 'symbol': '£', 'name': 'British Pound'},
+    {'code': 'AED', 'symbol': 'د.إ', 'name': 'UAE Dirham'},
+    {'code': 'SAR', 'symbol': '﷼', 'name': 'Saudi Riyal'},
+  ];
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _descriptionController.dispose();
+    _priceController.dispose();
+    _hashtagController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickImageFromCamera() async {
+    try {
+      final XFile? image = await _imagePicker.pickImage(
+        source: ImageSource.camera,
+        maxWidth: 1080,
+        maxHeight: 1080,
+        imageQuality: 85,
+      );
+      if (image != null && mounted) {
+        setState(() {
+          _selectedImage = File(image.path);
+        });
+      }
+    } catch (e) {
+      debugPrint('Error picking image from camera: $e');
+    }
+  }
+
+  Future<void> _pickImageFromGallery() async {
+    try {
+      final XFile? image = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1080,
+        maxHeight: 1080,
+        imageQuality: 85,
+      );
+      if (image != null && mounted) {
+        setState(() {
+          _selectedImage = File(image.path);
+        });
+      }
+    } catch (e) {
+      debugPrint('Error picking image from gallery: $e');
+    }
+  }
+
+  void _addHashtag() {
+    final tag = _hashtagController.text.trim();
+    if (tag.isEmpty) return;
+
+    // Max 10 hashtags allowed
+    if (_hashtags.length >= 10) {
+      _showSnackBar('Maximum 10 hashtags allowed', isError: true);
+      return;
+    }
+
+    if (!_hashtags.contains(tag) && !_hashtags.contains('#$tag')) {
+      setState(() {
+        _hashtags.add(tag.startsWith('#') ? tag : '#$tag');
+        _hashtagController.clear();
+      });
+    }
+  }
+
+  void _removeHashtag(String tag) {
+    setState(() {
+      _hashtags.remove(tag);
+    });
+  }
+
+  Future<String?> _uploadImage() async {
+    if (_selectedImage == null) return null;
+
+    try {
+      final userId = _auth.currentUser?.uid;
+      if (userId == null) return null;
+
+      final fileName = 'post_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final ref = _storage.ref().child('posts/$userId/$fileName');
+
+      await ref.putFile(_selectedImage!);
+      return await ref.getDownloadURL();
+    } catch (e) {
+      debugPrint('Error uploading image: $e');
+      return null;
+    }
+  }
+
+  Future<void> _createPost() async {
+    if (_titleController.text.trim().isEmpty) {
+      _showSnackBar('Please enter a title', isError: true);
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final currentUser = _auth.currentUser;
+      if (currentUser == null) {
+        _showSnackBar('Please login to create a post', isError: true);
+        return;
+      }
+
+      // Upload image if selected
+      String? imageUrl;
+      if (_selectedImage != null) {
+        imageUrl = await _uploadImage();
+      }
+
+      // Get user data
+      final userDoc = await _firestore.collection('users').doc(currentUser.uid).get();
+      final userData = userDoc.data() ?? {};
+
+      // Parse price
+      double? price;
+      if (_priceController.text.isNotEmpty) {
+        price = double.tryParse(_priceController.text);
+      }
+
+      // Create post data
+      final postData = <String, dynamic>{
+        'title': _titleController.text.trim(),
+        'description': _descriptionController.text.trim(),
+        'originalPrompt': _titleController.text.trim(),
+        'userId': currentUser.uid,
+        'userName': userData['name'] ?? userData['displayName'] ?? 'User',
+        'userPhoto': userData['photoUrl'] ?? userData['photoURL'] ?? userData['profileImageUrl'],
+        'isActive': true,
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+        'allowCalls': _allowCalls,
+        'currency': _selectedCurrency,
+        'hashtags': _hashtags,
+      };
+
+      if (imageUrl != null) {
+        postData['imageUrl'] = imageUrl;
+      }
+
+      if (price != null) {
+        postData['price'] = price;
+      }
+
+      await _firestore.collection('posts').add(postData);
+
+      if (mounted) {
+        _showSnackBar('Post created successfully!', isError: false);
+        Navigator.pop(context, true); // Return true to indicate success
+      }
+    } catch (e) {
+      debugPrint('Error creating post: $e');
+      if (mounted) {
+        _showSnackBar('Failed to create post', isError: true);
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  void _showSnackBar(String message, {required bool isError}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Colors.red : Colors.green,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.backgroundDark,
+      extendBodyBehindAppBar: true,
+      body: Stack(
+        children: [
+          // Background Image
+          Positioned.fill(
+            child: Image.asset(
+              AppAssets.homeBackgroundImage,
+              fit: BoxFit.cover,
+              width: double.infinity,
+              height: double.infinity,
+            ),
+          ),
+
+          // Dark overlay
+          Positioned.fill(
+            child: Container(color: AppColors.darkOverlay()),
+          ),
+
+          // Main content
+          SafeArea(
+            child: Column(
+              children: [
+                // Header
+                _buildHeader(),
+
+                // Form
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Title Field
+                        _buildGlassTextField(
+                          controller: _titleController,
+                          hintText: 'What are you posting?',
+                          prefixIcon: Icons.title_rounded,
+                          maxLines: 1,
+                        ),
+
+                        const SizedBox(height: 16),
+
+                        // Description Field
+                        _buildGlassTextField(
+                          controller: _descriptionController,
+                          hintText: 'Add more details...',
+                          prefixIcon: Icons.description_outlined,
+                          maxLines: 4,
+                        ),
+
+                        const SizedBox(height: 20),
+
+                        // Photo Upload Section
+                        _buildPhotoSection(),
+
+                        const SizedBox(height: 20),
+
+                        // Currency and Price Row
+                        _buildPriceSection(),
+
+                        const SizedBox(height: 20),
+
+                        // Allow Calls Toggle
+                        _buildCallToggle(),
+
+                        const SizedBox(height: 20),
+
+                        // Hashtags Section
+                        _buildHashtagSection(),
+
+                        const SizedBox(height: 32),
+
+                        // Create Button
+                        _buildCreateButton(),
+
+                        const SizedBox(height: 20),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Loading overlay
+          if (_isLoading)
+            Positioned.fill(
+              child: Container(
+                color: Colors.black54,
+                child: const Center(
+                  child: CircularProgressIndicator(color: Colors.white),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeader() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      child: Row(
+        children: [
+          // Back button
+          GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.glassBackgroundDark(alpha: 0.3),
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.glassBorder(alpha: 0.3)),
+              ),
+              child: const Icon(
+                Icons.arrow_back_ios_new_rounded,
+                color: Colors.white,
+                size: 18,
+              ),
+            ),
+          ),
+
+          const Expanded(
+            child: Center(
+              child: Text(
+                'Create Post',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+
+          // Placeholder for symmetry
+          const SizedBox(width: 40),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGlassTextField({
+    required TextEditingController controller,
+    required String hintText,
+    required IconData prefixIcon,
+    int maxLines = 1,
+    TextInputType? keyboardType,
+    String? prefixText,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(26),
+        color: Colors.white.withValues(alpha: 0.15),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.3),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.2),
+            blurRadius: 8,
+            spreadRadius: 1,
+          ),
+        ],
+      ),
+      child: TextField(
+        controller: controller,
+        maxLines: maxLines,
+        keyboardType: keyboardType,
+        cursorColor: Colors.white,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 16,
+          fontWeight: FontWeight.w400,
+        ),
+        decoration: InputDecoration(
+          hintText: hintText,
+          hintStyle: TextStyle(
+            color: Colors.grey[400],
+            fontSize: 15,
+            fontWeight: FontWeight.w400,
+          ),
+          prefixIcon: Icon(prefixIcon, color: Colors.grey[400], size: 22),
+          prefixText: prefixText,
+          prefixStyle: const TextStyle(color: Colors.white, fontSize: 16),
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(
+            vertical: 16,
+            horizontal: 16,
+          ),
+          isDense: true,
+          filled: true,
+          fillColor: Colors.transparent,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPhotoSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Add Photo',
+          style: AppTextStyles.bodyMedium.copyWith(
+            color: Colors.white70,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        // Selected image preview or upload buttons
+        if (_selectedImage != null)
+          Stack(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Image.file(
+                  _selectedImage!,
+                  width: double.infinity,
+                  height: 200,
+                  fit: BoxFit.cover,
+                ),
+              ),
+              Positioned(
+                top: 8,
+                right: 8,
+                child: GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _selectedImage = null;
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.close, color: Colors.white, size: 20),
+                  ),
+                ),
+              ),
+            ],
+          )
+        else
+          Row(
+            children: [
+              Expanded(
+                child: _buildPhotoButton(
+                  icon: Icons.camera_alt_rounded,
+                  label: 'Camera',
+                  onTap: _pickImageFromCamera,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildPhotoButton(
+                  icon: Icons.photo_library_rounded,
+                  label: 'Gallery',
+                  onTap: _pickImageFromGallery,
+                ),
+              ),
+            ],
+          ),
+      ],
+    );
+  }
+
+  Widget _buildPhotoButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        onTap();
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(26),
+          color: Colors.white.withValues(alpha: 0.15),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.3),
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.2),
+              blurRadius: 8,
+              spreadRadius: 1,
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: Colors.white, size: 32),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPriceSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Price (Optional)',
+          style: AppTextStyles.bodyMedium.copyWith(
+            color: Colors.white70,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        Row(
+          children: [
+            // Currency Dropdown
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(26),
+                color: Colors.white.withValues(alpha: 0.15),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.2),
+                    blurRadius: 8,
+                    spreadRadius: 1,
+                  ),
+                ],
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: _selectedCurrency,
+                  dropdownColor: Colors.black.withValues(alpha: 0.85),
+                  icon: Icon(Icons.arrow_drop_down, color: Colors.grey[400]),
+                  style: const TextStyle(color: Colors.white, fontSize: 16),
+                  borderRadius: BorderRadius.circular(16),
+                  menuMaxHeight: 300,
+                  items: _currencies.map((currency) {
+                    return DropdownMenuItem<String>(
+                      value: currency['code'],
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Text(
+                          '${currency['symbol']} ${currency['code']}',
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() {
+                        _selectedCurrency = value;
+                      });
+                    }
+                  },
+                ),
+              ),
+            ),
+
+            const SizedBox(width: 12),
+
+            // Price Field
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(26),
+                  color: Colors.white.withValues(alpha: 0.15),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.3),
+                    width: 1.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.2),
+                      blurRadius: 8,
+                      spreadRadius: 1,
+                    ),
+                  ],
+                ),
+                child: TextField(
+                  controller: _priceController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+                  ],
+                  cursorColor: Colors.white,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w400,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: 'Enter price',
+                    hintStyle: TextStyle(
+                      color: Colors.grey[400],
+                      fontSize: 15,
+                      fontWeight: FontWeight.w400,
+                    ),
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(
+                      vertical: 16,
+                      horizontal: 16,
+                    ),
+                    isDense: true,
+                    filled: true,
+                    fillColor: Colors.transparent,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCallToggle() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(26),
+        color: Colors.white.withValues(alpha: 0.15),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.3),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.2),
+            blurRadius: 8,
+            spreadRadius: 1,
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: _allowCalls
+                  ? AppColors.vibrantGreen.withValues(alpha: 0.2)
+                  : Colors.grey.withValues(alpha: 0.2),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.call_rounded,
+              color: _allowCalls ? AppColors.vibrantGreen : Colors.grey,
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Allow Calls',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Let people call you about this post',
+                  style: TextStyle(
+                    color: Colors.grey[400],
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Switch(
+            value: _allowCalls,
+            onChanged: (value) {
+              HapticFeedback.lightImpact();
+              setState(() {
+                _allowCalls = value;
+              });
+            },
+            activeThumbColor: AppColors.vibrantGreen,
+            activeTrackColor: AppColors.vibrantGreen.withValues(alpha: 0.3),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHashtagSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Hashtags',
+          style: AppTextStyles.bodyMedium.copyWith(
+            color: Colors.white70,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        // Hashtag input
+        Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(26),
+            color: Colors.white.withValues(alpha: 0.15),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.3),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.2),
+                blurRadius: 8,
+                spreadRadius: 1,
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _hashtagController,
+                  cursorColor: Colors.white,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w400,
+                  ),
+                  onSubmitted: (_) => _addHashtag(),
+                  decoration: InputDecoration(
+                    hintText: 'Add hashtag',
+                    hintStyle: TextStyle(
+                      color: Colors.grey[400],
+                      fontSize: 15,
+                      fontWeight: FontWeight.w400,
+                    ),
+                    prefixIcon: Icon(Icons.tag_rounded, color: Colors.grey[400], size: 22),
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(
+                      vertical: 16,
+                      horizontal: 16,
+                    ),
+                    isDense: true,
+                    filled: true,
+                    fillColor: Colors.transparent,
+                  ),
+                ),
+              ),
+              GestureDetector(
+                onTap: _addHashtag,
+                child: Container(
+                  margin: const EdgeInsets.only(right: 8),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [AppColors.iosBlue, Color(0xFF0051A8)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.iosBlue.withValues(alpha: 0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(Icons.add_rounded, color: Colors.white, size: 20),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // Hashtag chips
+        if (_hashtags.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _hashtags.map((tag) {
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.grey[800],
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      tag,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    GestureDetector(
+                      onTap: () => _removeHashtag(tag),
+                      child: const Icon(Icons.close_rounded, color: Colors.white70, size: 16),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildCreateButton() {
+    return GestureDetector(
+      onTap: _isLoading ? null : _createPost,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [AppColors.iosBlue, Color(0xFF0051A8)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.iosBlue.withValues(alpha: 0.3),
+              blurRadius: 12,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: const Center(
+          child: Text(
+            'Create Post',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

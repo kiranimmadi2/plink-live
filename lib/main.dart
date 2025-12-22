@@ -13,6 +13,8 @@ import 'package:supper/screens/login/onboarding_screen.dart';
 import 'firebase_options.dart';
 import 'screens/login/splash_screen.dart';
 import 'screens/home/main_navigation_screen.dart';
+import 'screens/chat/voice_call_screen.dart';
+import 'models/user_profile.dart';
 
 import 'services/auth_service.dart';
 import 'services/profile_service.dart';
@@ -185,6 +187,19 @@ class MyApp extends ConsumerWidget {
       ),
       debugShowCheckedModeBanner: false,
       home: const SplashScreen(),
+      onGenerateRoute: (settings) {
+        if (settings.name == '/voice-call') {
+          final args = settings.arguments as Map<String, dynamic>;
+          return MaterialPageRoute(
+            builder: (context) => VoiceCallScreen(
+              callId: args['callId'] as String,
+              otherUser: args['otherUser'] as UserProfile,
+              isOutgoing: args['isOutgoing'] as bool,
+            ),
+          );
+        }
+        return null;
+      },
       builder: (context, child) {
         return Container(
           color: const Color(0xFF0f0f23),

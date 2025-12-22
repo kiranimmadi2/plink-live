@@ -127,25 +127,34 @@ class AuthService {
 
   Future<User?> signInWithGoogle({String? accountType}) async {
     try {
+      debugPrint('🔐 Google Sign In: Starting...');
+
       // Check if already signed in
       await _googleSignIn.signOut();
+      debugPrint('🔐 Google Sign In: Signed out previous session');
 
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      debugPrint('🔐 Google Sign In: signIn() completed, user: ${googleUser?.email}');
 
       if (googleUser == null) {
+        debugPrint('🔐 Google Sign In: User cancelled or no account selected');
         return null;
       }
 
+      debugPrint('🔐 Google Sign In: Getting authentication tokens...');
       final GoogleSignInAuthentication googleAuth =
           await googleUser.authentication;
+      debugPrint('🔐 Google Sign In: Got tokens - accessToken: ${googleAuth.accessToken != null}, idToken: ${googleAuth.idToken != null}');
 
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
 
+      debugPrint('🔐 Google Sign In: Signing in to Firebase...');
       final UserCredential result =
           await _auth.signInWithCredential(credential);
+      debugPrint('🔐 Google Sign In: Firebase sign in successful - uid: ${result.user?.uid}');
 
       // Save Google profile photo URL to Firestore
       if (result.user != null) {
@@ -221,6 +230,8 @@ class AuthService {
       }
       throw Exception(message);
     } catch (e) {
+      debugPrint('🔐 Google Sign In ERROR: $e');
+      debugPrint('🔐 Google Sign In ERROR Type: ${e.runtimeType}');
       throw Exception('Google sign-in failed: ${e.toString()}');
     }
   }

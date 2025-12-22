@@ -329,6 +329,8 @@ class VoiceCallService {
 
           debugPrint('🎤 VoiceCallService: RECEIVER Step 5 - Starting ICE candidate listener...');
           _listenForIceCandidates(callId);
+          // Also listen for any signaling updates
+          _listenForSignaling(callId);
         } else {
           debugPrint('🎤 VoiceCallService: RECEIVER - No offer found after retries, starting listener...');
           // Only start listening for offer if not found yet

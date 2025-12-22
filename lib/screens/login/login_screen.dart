@@ -2,11 +2,11 @@ import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:video_player/video_player.dart';
 import '../../services/auth_service.dart';
-import '../../services/video_preload_service.dart';
 import '../../services/professional_service.dart';
 import '../../services/business_service.dart';
+import '../../res/config/app_colors.dart';
+import '../../res/config/app_assets.dart';
 import '../home/main_navigation_screen.dart';
 import '../professional/professional_setup_screen.dart';
 import '../business/business_setup_screen.dart';
@@ -27,15 +27,17 @@ class _LoginScreenState extends State<LoginScreen>
   final _emailOrPhoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final AuthService _authService = AuthService();
-  final VideoPreloadService _videoService = VideoPreloadService();
 
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _isSignUpMode = false;
-  bool _rememberMe = false;
   bool _acceptTerms = false;
   String _passwordStrength = ''; // ignore: unused_field, prefer_final_fields
   final Color _passwordStrengthColor = Colors.grey; // ignore: unused_field
+
+  // Store login data when switching to signup
+  String _savedLoginEmail = '';
+  String _savedLoginPassword = '';
 
   // Phone OTP verification state
   bool _isOtpSent = false;
@@ -115,20 +117,6 @@ class _LoginScreenState extends State<LoginScreen>
 
     _passwordController.addListener(_checkPasswordStrength);
     _emailOrPhoneController.addListener(_onInputChanged);
-
-    // Setup video background
-    if (_videoService.isReady) {
-      _videoService.resume();
-    } else {
-      _videoService.addOnReadyCallback(_onVideoReady);
-      _videoService.preload();
-    }
-  }
-
-  void _onVideoReady() {
-    if (mounted) {
-      setState(() {});
-    }
   }
 
   void _onInputChanged() {
@@ -138,7 +126,6 @@ class _LoginScreenState extends State<LoginScreen>
 
   @override
   void dispose() {
-    _videoService.removeOnReadyCallback(_onVideoReady);
     _emailOrPhoneController.dispose();
     _passwordController.dispose();
     _otpController.dispose();
@@ -172,12 +159,27 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   void _toggleSignUpMode() {
+    final wasSignUpMode = _isSignUpMode;
+
     setState(() {
       _isSignUpMode = !_isSignUpMode;
       _isOtpSent = false;
       _verificationId = null;
       _otpController.clear();
       _clearOtpBoxes();
+
+      if (!wasSignUpMode && _isSignUpMode) {
+        // Login -> SignUp: Save login data, then clear fields for fresh signup
+        _savedLoginEmail = _emailOrPhoneController.text;
+        _savedLoginPassword = _passwordController.text;
+        _emailOrPhoneController.clear();
+        _passwordController.clear();
+        _acceptTerms = false;
+      } else if (wasSignUpMode && !_isSignUpMode) {
+        // SignUp -> Login: Restore saved login data
+        _emailOrPhoneController.text = _savedLoginEmail;
+        _passwordController.text = _savedLoginPassword;
+      }
     });
     _animationController.reset();
     _animationController.forward();
@@ -340,8 +342,9 @@ class _LoginScreenState extends State<LoginScreen>
   Future<void> _handleAuth() async {
     final input = _emailOrPhoneController.text.trim();
 
-    // Check if it's a phone number - send OTP
-    if (_isPhoneNumber(input)) {
+    // In LOGIN mode with phone number - send OTP
+    // In SIGNUP mode - always use email+password flow (even for phone numbers as username)
+    if (_isPhoneNumber(input) && !_isSignUpMode) {
       // Set pending account type for phone registration
       _authService.setPendingAccountType(widget.accountType);
       await _sendPhoneOTP();
@@ -635,35 +638,26 @@ class _LoginScreenState extends State<LoginScreen>
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // Video Background
+          // Image Background (same as forgot password screen)
           Positioned.fill(
-            child: _videoService.isReady && _videoService.controller != null
-                ? FittedBox(
-                    fit: BoxFit.fill,
-                    child: SizedBox(
-                      width: _videoService.controller!.value.size.width,
-                      height: _videoService.controller!.value.size.height,
-                      child: VideoPlayer(_videoService.controller!),
-                    ),
-                  )
-                : Container(
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Color(0xFF1a1a2e),
-                          Color(0xFF16213e),
-                          Color(0xFF0f0f23),
-                        ],
-                      ),
-                    ),
+            child: Image.asset(
+              AppAssets.homeBackgroundImage,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                return Container(
+                  decoration: const BoxDecoration(
+                    gradient: AppColors.splashGradient,
                   ),
+                );
+              },
+            ),
           ),
 
           // Dark overlay
           Positioned.fill(
-            child: Container(color: Colors.black.withValues(alpha: 0.5)),
+            child: Container(
+              color: AppColors.darkOverlay(alpha: 0.5),
+            ),
           ),
 
           // Content
@@ -708,7 +702,7 @@ class _LoginScreenState extends State<LoginScreen>
                                 _buildOtpSection(),
                               ],
                               if (!_isOtpSent) ...[
-                                const SizedBox(height: 24),
+                                const SizedBox(height: 4),
                                 _buildRememberMeAndForgot(),
                               ],
                               const SizedBox(height: 24),
@@ -929,8 +923,9 @@ class _LoginScreenState extends State<LoginScreen>
             ],
           ),
 
-          // Password field - only show for email login (NOT phone, NOT OTP sent)
-          if (!_isOtpSent && !_isCurrentInputPhone) ...[
+          // Password field - show for email login OR signup mode (NOT when OTP sent)
+          // In signup mode, always show password field regardless of input type
+          if (!_isOtpSent && (_isSignUpMode || !_isCurrentInputPhone)) ...[
             const SizedBox(height: 16),
             TextFormField(
               controller: _passwordController,
@@ -1013,8 +1008,8 @@ class _LoginScreenState extends State<LoginScreen>
                 ),
               ),
               validator: (value) {
-                // Skip password validation for phone login
-                if (_isCurrentInputPhone) {
+                // Skip password validation for phone login (not signup)
+                if (_isCurrentInputPhone && !_isSignUpMode) {
                   return null;
                 }
                 if (value == null || value.isEmpty) {
@@ -1106,37 +1101,10 @@ class _LoginScreenState extends State<LoginScreen>
       );
     }
 
-    // Show remember me and forgot password for login mode
+    // Show only forgot password for login mode
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      mainAxisAlignment: MainAxisAlignment.end,
       children: [
-        Row(
-          children: [
-            SizedBox(
-              height: 24,
-              width: 24,
-              child: Checkbox(
-                value: _rememberMe,
-                onChanged: (value) {
-                  setState(() {
-                    _rememberMe = value ?? false;
-                  });
-                },
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            const Text(
-              'Remember me',
-              style: TextStyle(
-                color: Color.fromARGB(255, 240, 237, 237),
-                fontSize: 14,
-              ),
-            ),
-          ],
-        ),
         TextButton(
           onPressed: _forgotPassword,
           child: const Text(
@@ -1163,13 +1131,13 @@ class _LoginScreenState extends State<LoginScreen>
       buttonText = 'Verify OTP';
       onPressed = _isLoading ? null : _verifyPhoneOTP;
       showLoader = _isLoading;
-    } else if (_isCurrentInputPhone) {
-      // Phone number entered - show Send OTP button with loader
+    } else if (_isCurrentInputPhone && !_isSignUpMode) {
+      // Phone number entered in LOGIN mode - show Send OTP button
       buttonText = 'Send OTP';
       onPressed = _isLoading ? null : _sendPhoneOTP;
-      showLoader = _isLoading; // Loader shows here when sending OTP
+      showLoader = _isLoading;
     } else {
-      // Email entered - show Log In / Sign Up button
+      // Email entered OR Sign Up mode (with email or phone) - show Log In / Sign Up button
       buttonText = _isSignUpMode ? 'Sign Up' : 'Log In';
       onPressed = _isLoading ? null : _handleAuth;
       showLoader = _isLoading;
@@ -1524,28 +1492,52 @@ class _CountryCodePickerSheetState extends State<_CountryCodePickerSheet> {
   Widget build(BuildContext context) {
     return ClipRRect(
       borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-        child: Container(
-          height: MediaQuery.of(context).size.height * 0.7,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Colors.white.withValues(alpha: 0.15),
-                Colors.white.withValues(alpha: 0.05),
-              ],
-            ),
-            border: Border(
-              top: BorderSide(
-                color: Colors.white.withValues(alpha: 0.3),
-                width: 1,
+      child: SizedBox(
+        height: MediaQuery.of(context).size.height * 0.7,
+        child: Stack(
+          children: [
+            // Background Image
+            Positioned.fill(
+              child: Image.asset(
+                AppAssets.homeBackgroundImage,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    decoration: const BoxDecoration(
+                      gradient: AppColors.splashGradient,
+                    ),
+                  );
+                },
               ),
             ),
-          ),
-          child: Column(
+            // Dark overlay
+            Positioned.fill(
+              child: Container(
+                color: AppColors.darkOverlay(alpha: 0.5),
+              ),
+            ),
+            // Content with glassmorphism
+            BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      AppColors.glassBackgroundDark(alpha: 0.15),
+                      AppColors.glassBackgroundDark(alpha: 0.05),
+                    ],
+                  ),
+                  border: Border(
+                    top: BorderSide(
+                      color: AppColors.glassBorder(alpha: 0.3),
+                      width: 1,
+                    ),
+                  ),
+                ),
+                child: Column(
             children: [
               // Handle bar
               Container(
@@ -1710,7 +1702,10 @@ class _CountryCodePickerSheetState extends State<_CountryCodePickerSheet> {
                       ),
               ),
             ],
-          ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

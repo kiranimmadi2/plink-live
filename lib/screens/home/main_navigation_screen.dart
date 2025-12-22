@@ -13,6 +13,7 @@ import 'live_connect_tab_screen.dart';
 import 'profile_with_history_screen.dart';
 import 'messageser_screen.dart';
 import 'feed_screen.dart';
+import '../chat/incoming_call_screen.dart';
 
 // Professional & Business screens
 import '../professional/professional_dashboard_screen.dart';
@@ -46,6 +47,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
 
   // Stream subscription for cleanup
   StreamSubscription<QuerySnapshot>? _unreadSubscription;
+  StreamSubscription<QuerySnapshot>? _incomingCallSubscription;
+  bool _isShowingIncomingCall = false;
 
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -66,6 +69,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     );
 
     _listenUnread();
+    _listenForIncomingCalls();
     _updateStatus(true);
     _checkLocation();
     _loadAccountType();
@@ -96,9 +100,72 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _unreadSubscription?.cancel();
+    _incomingCallSubscription?.cancel();
     _accountTypeSubscription?.cancel();
     _menuController.dispose();
     super.dispose();
+  }
+
+  void _listenForIncomingCalls() {
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    _incomingCallSubscription?.cancel();
+    _incomingCallSubscription = _firestore
+        .collection('calls')
+        .where('receiverId', isEqualTo: user.uid)
+        .where('status', isEqualTo: 'calling')
+        .snapshots()
+        .listen((snapshot) {
+      if (!mounted || _isShowingIncomingCall) return;
+
+      for (var change in snapshot.docChanges) {
+        if (change.type == DocumentChangeType.added) {
+          final data = change.doc.data();
+          if (data == null) continue;
+
+          final callId = change.doc.id;
+          final callerName = data['callerName'] as String? ?? 'Unknown';
+          final callerPhoto = data['callerPhoto'] as String?;
+          final callerId = data['callerId'] as String? ?? '';
+
+          // Show incoming call screen
+          _showIncomingCall(
+            callId: callId,
+            callerName: callerName,
+            callerPhoto: callerPhoto,
+            callerId: callerId,
+          );
+          break; // Only show one call at a time
+        }
+      }
+    });
+  }
+
+  void _showIncomingCall({
+    required String callId,
+    required String callerName,
+    String? callerPhoto,
+    required String callerId,
+  }) {
+    if (_isShowingIncomingCall) return;
+
+    _isShowingIncomingCall = true;
+    HapticFeedback.heavyImpact();
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => IncomingCallScreen(
+          callId: callId,
+          callerName: callerName,
+          callerPhoto: callerPhoto,
+          callerId: callerId,
+        ),
+      ),
+    ).then((_) {
+      _isShowingIncomingCall = false;
+    });
   }
 
   @override
@@ -552,36 +619,18 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
             ),
           ),
 
-          // Swipe gesture detectors - placed at the END so they're on top of everything
-          // HomeScreen -> FeedScreen (swipe from LEFT edge to RIGHT)
-          // 40% of screen height from top, 80px wide
+          // Swipe gesture detector - HomeScreen -> FeedScreen (right swipe from left edge)
+          // Full screen height, left edge 100px wide for detecting right swipe
           if (_currentIndex == 0)
             Positioned(
               left: 0,
               top: 0,
-              height: size.height * 0.4,
-              width: 80,
+              height: size.height,
+              width: 100,
               child: _SwipeDetector(
                 onSwipeRight: () {
                   HapticFeedback.mediumImpact();
                   setState(() => _currentIndex = 7);
-                },
-              ),
-            ),
-
-          // FeedScreen -> HomeScreen (swipe from RIGHT edge to LEFT)
-          // Starts at 120px from top to avoid header/profile icon overlap
-          // 40% of screen height, 80px wide
-          if (_currentIndex == 7)
-            Positioned(
-              right: 0,
-              top: 120,
-              height: size.height * 0.4,
-              width: 80,
-              child: _SwipeDetector(
-                onSwipeLeft: () {
-                  HapticFeedback.mediumImpact();
-                  setState(() => _currentIndex = 0);
                 },
               ),
             ),
@@ -692,11 +741,9 @@ class _AnimatedMenuItemState extends State<_AnimatedMenuItem> {
 // SWIPE DETECTOR - Custom widget for edge swipe detection
 // ==================================================
 class _SwipeDetector extends StatefulWidget {
-  final VoidCallback? onSwipeLeft;
   final VoidCallback? onSwipeRight;
 
   const _SwipeDetector({
-    this.onSwipeLeft,
     this.onSwipeRight,
   });
 
@@ -721,14 +768,8 @@ class _SwipeDetectorState extends State<_SwipeDetector> {
 
         final deltaX = event.position.dx - _startX;
 
-        // Left swipe: moved left by at least 10px (very sensitive)
-        if (widget.onSwipeLeft != null && deltaX < -10) {
-          _hasTriggered = true;
-          widget.onSwipeLeft!();
-        }
-
-        // Right swipe: moved right by at least 10px (very sensitive)
-        if (widget.onSwipeRight != null && deltaX > 10) {
+        // Right swipe: moved right by at least 30px
+        if (widget.onSwipeRight != null && deltaX > 30) {
           _hasTriggered = true;
           widget.onSwipeRight!();
         }
