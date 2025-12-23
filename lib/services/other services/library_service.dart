@@ -17,7 +17,7 @@ class LibraryService {
 
   String? get _userId => _auth.currentUser?.uid;
 
-  // ==================== SAVED CHATS ====================
+  //    SAVED CHATS
 
   /// Get all saved chats for the current user
   Future<List<SavedChatItem>> getSavedChats() async {
@@ -31,7 +31,9 @@ class LibraryService {
           .orderBy('savedAt', descending: true)
           .get();
 
-      return snapshot.docs.map((doc) => SavedChatItem.fromFirestore(doc)).toList();
+      return snapshot.docs
+          .map((doc) => SavedChatItem.fromFirestore(doc))
+          .toList();
     } catch (e) {
       debugPrint('Error getting saved chats: $e');
       return [];
@@ -55,13 +57,13 @@ class LibraryService {
           .collection('saved_chats')
           .doc(conversationId)
           .set({
-        'conversationId': conversationId,
-        'title': title,
-        'lastMessage': lastMessage,
-        'otherUserName': otherUserName,
-        'otherUserPhoto': otherUserPhoto,
-        'savedAt': FieldValue.serverTimestamp(),
-      });
+            'conversationId': conversationId,
+            'title': title,
+            'lastMessage': lastMessage,
+            'otherUserName': otherUserName,
+            'otherUserPhoto': otherUserPhoto,
+            'savedAt': FieldValue.serverTimestamp(),
+          });
       return true;
     } catch (e) {
       debugPrint('Error saving chat: $e');
@@ -87,7 +89,7 @@ class LibraryService {
     }
   }
 
-  // ==================== FAVORITES ====================
+  //    FAVORITES
 
   /// Get all favorite items
   Future<List<FavoriteItem>> getFavorites() async {
@@ -101,7 +103,9 @@ class LibraryService {
           .orderBy('addedAt', descending: true)
           .get();
 
-      return snapshot.docs.map((doc) => FavoriteItem.fromFirestore(doc)).toList();
+      return snapshot.docs
+          .map((doc) => FavoriteItem.fromFirestore(doc))
+          .toList();
     } catch (e) {
       debugPrint('Error getting favorites: $e');
       return [];
@@ -125,13 +129,13 @@ class LibraryService {
           .collection('favorites')
           .doc(itemId)
           .set({
-        'itemId': itemId,
-        'type': type,
-        'title': title,
-        'content': content,
-        'imageUrl': imageUrl,
-        'addedAt': FieldValue.serverTimestamp(),
-      });
+            'itemId': itemId,
+            'type': type,
+            'title': title,
+            'content': content,
+            'imageUrl': imageUrl,
+            'addedAt': FieldValue.serverTimestamp(),
+          });
       return true;
     } catch (e) {
       debugPrint('Error adding to favorites: $e');
@@ -157,7 +161,7 @@ class LibraryService {
     }
   }
 
-  // ==================== ARCHIVED ====================
+  //    ARCHIVED
 
   /// Get all archived conversations
   Future<List<ArchivedItem>> getArchivedItems() async {
@@ -171,7 +175,9 @@ class LibraryService {
           .orderBy('archivedAt', descending: true)
           .get();
 
-      return snapshot.docs.map((doc) => ArchivedItem.fromFirestore(doc)).toList();
+      return snapshot.docs
+          .map((doc) => ArchivedItem.fromFirestore(doc))
+          .toList();
     } catch (e) {
       debugPrint('Error getting archived items: $e');
       return [];
@@ -194,12 +200,12 @@ class LibraryService {
           .collection('archived')
           .doc(itemId)
           .set({
-        'itemId': itemId,
-        'type': type,
-        'title': title,
-        'preview': preview,
-        'archivedAt': FieldValue.serverTimestamp(),
-      });
+            'itemId': itemId,
+            'type': type,
+            'title': title,
+            'preview': preview,
+            'archivedAt': FieldValue.serverTimestamp(),
+          });
       return true;
     } catch (e) {
       debugPrint('Error archiving item: $e');
@@ -225,7 +231,7 @@ class LibraryService {
     }
   }
 
-  // ==================== DOWNLOADS ====================
+  //    DOWNLOADS
 
   /// Get all downloaded files (stored locally)
   Future<List<DownloadedItem>> getDownloads() async {
@@ -325,7 +331,7 @@ class LibraryService {
     return downloadsDir.path;
   }
 
-  // ==================== IMAGES ====================
+  //    IMAGES
 
   /// Get all saved images from conversations
   Future<List<ImageItem>> getSavedImages() async {
@@ -352,13 +358,17 @@ class LibraryService {
           final data = msgDoc.data();
           final imageUrl = data['imageUrl'] as String?;
           if (imageUrl != null && imageUrl.isNotEmpty) {
-            images.add(ImageItem(
-              id: msgDoc.id,
-              imageUrl: imageUrl,
-              conversationId: convDoc.id,
-              senderId: data['senderId'] as String? ?? '',
-              timestamp: (data['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now(),
-            ));
+            images.add(
+              ImageItem(
+                id: msgDoc.id,
+                imageUrl: imageUrl,
+                conversationId: convDoc.id,
+                senderId: data['senderId'] as String? ?? '',
+                timestamp:
+                    (data['timestamp'] as Timestamp?)?.toDate() ??
+                    DateTime.now(),
+              ),
+            );
           }
         }
       }
@@ -372,7 +382,7 @@ class LibraryService {
     }
   }
 
-  // ==================== SHARED LINKS ====================
+  //    SHARED LINKS
 
   /// Get all shared links
   Future<List<SharedLinkItem>> getSharedLinks() async {
@@ -386,7 +396,9 @@ class LibraryService {
           .orderBy('sharedAt', descending: true)
           .get();
 
-      return snapshot.docs.map((doc) => SharedLinkItem.fromFirestore(doc)).toList();
+      return snapshot.docs
+          .map((doc) => SharedLinkItem.fromFirestore(doc))
+          .toList();
     } catch (e) {
       debugPrint('Error getting shared links: $e');
       return [];
@@ -408,12 +420,12 @@ class LibraryService {
           .doc(_userId)
           .collection('shared_links')
           .add({
-        'url': url,
-        'title': title ?? url,
-        'description': description,
-        'imageUrl': imageUrl,
-        'sharedAt': FieldValue.serverTimestamp(),
-      });
+            'url': url,
+            'title': title ?? url,
+            'description': description,
+            'imageUrl': imageUrl,
+            'sharedAt': FieldValue.serverTimestamp(),
+          });
       return true;
     } catch (e) {
       debugPrint('Error saving shared link: $e');
@@ -439,7 +451,7 @@ class LibraryService {
     }
   }
 
-  // ==================== ITEM COUNTS ====================
+  //    ITEM COUNTS
 
   /// Get counts for all library categories
   Future<Map<String, int>> getLibraryCounts() async {
@@ -456,12 +468,32 @@ class LibraryService {
 
     try {
       final results = await Future.wait([
-        _firestore.collection('users').doc(_userId).collection('saved_chats').count().get(),
-        _firestore.collection('users').doc(_userId).collection('favorites').count().get(),
-        _firestore.collection('users').doc(_userId).collection('archived').count().get(),
+        _firestore
+            .collection('users')
+            .doc(_userId)
+            .collection('saved_chats')
+            .count()
+            .get(),
+        _firestore
+            .collection('users')
+            .doc(_userId)
+            .collection('favorites')
+            .count()
+            .get(),
+        _firestore
+            .collection('users')
+            .doc(_userId)
+            .collection('archived')
+            .count()
+            .get(),
         getDownloads(),
         getSavedImages(),
-        _firestore.collection('users').doc(_userId).collection('shared_links').count().get(),
+        _firestore
+            .collection('users')
+            .doc(_userId)
+            .collection('shared_links')
+            .count()
+            .get(),
       ]);
 
       return {
@@ -486,7 +518,7 @@ class LibraryService {
   }
 }
 
-// ==================== DATA MODELS ====================
+//    DATA MODELS
 
 class SavedChatItem {
   final String id;
@@ -579,7 +611,8 @@ class ArchivedItem {
       type: data['type'] ?? 'unknown',
       title: data['title'] ?? 'Untitled',
       preview: data['preview'],
-      archivedAt: (data['archivedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      archivedAt:
+          (data['archivedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
   }
 }
@@ -608,7 +641,8 @@ class DownloadedItem {
       filePath: json['filePath'] ?? '',
       fileType: json['fileType'] ?? 'unknown',
       fileSize: json['fileSize'] ?? 0,
-      downloadedAt: DateTime.tryParse(json['downloadedAt'] ?? '') ?? DateTime.now(),
+      downloadedAt:
+          DateTime.tryParse(json['downloadedAt'] ?? '') ?? DateTime.now(),
     );
   }
 
@@ -625,7 +659,9 @@ class DownloadedItem {
 
   String get formattedSize {
     if (fileSize < 1024) return '$fileSize B';
-    if (fileSize < 1024 * 1024) return '${(fileSize / 1024).toStringAsFixed(1)} KB';
+    if (fileSize < 1024 * 1024) {
+      return '${(fileSize / 1024).toStringAsFixed(1)} KB';
+    }
     return '${(fileSize / (1024 * 1024)).toStringAsFixed(1)} MB';
   }
 }

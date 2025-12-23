@@ -10,6 +10,7 @@ import '../../res/config/app_assets.dart';
 import '../../res/utils/photo_url_helper.dart';
 import '../../res/utils/snackbar_helper.dart';
 import '../../widgets/other widgets/user_avatar.dart';
+import 'edit_post_screen.dart';
 
 class MyPostsScreen extends StatefulWidget {
   const MyPostsScreen({super.key});
@@ -31,7 +32,7 @@ class _MyPostsScreenState extends State<MyPostsScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _loadCurrentUserData();
   }
 
@@ -109,14 +110,15 @@ class _MyPostsScreenState extends State<MyPostsScreen>
               labelStyle: AppTextStyles.bodyMedium.copyWith(
                 fontWeight: FontWeight.w600,
               ),
+              labelPadding: const EdgeInsets.symmetric(horizontal: 8),
               tabs: const [
                 Tab(
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.bookmark_rounded, size: 20),
-                      SizedBox(width: 8),
-                      Text('Saved Posts'),
+                      Icon(Icons.post_add_rounded, size: 18),
+                      SizedBox(width: 4),
+                      Text('My Posts'),
                     ],
                   ),
                 ),
@@ -124,9 +126,19 @@ class _MyPostsScreenState extends State<MyPostsScreen>
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.article_rounded, size: 20),
-                      SizedBox(width: 8),
-                      Text('Delete Posts'),
+                      Icon(Icons.bookmark_rounded, size: 18),
+                      SizedBox(width: 4),
+                      Text('Saved'),
+                    ],
+                  ),
+                ),
+                Tab(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.delete_outline_rounded, size: 18),
+                      SizedBox(width: 4),
+                      Text('Delete'),
                     ],
                   ),
                 ),
@@ -154,7 +166,11 @@ class _MyPostsScreenState extends State<MyPostsScreen>
           SafeArea(
             child: TabBarView(
               controller: _tabController,
-              children: [_buildSavedPostsTab(), _buildMyPostsTab()],
+              children: [
+                _buildCreatedPostsTab(),
+                _buildSavedPostsTab(),
+                _buildDeletePostsTab(),
+              ],
             ),
           ),
         ],
@@ -225,8 +241,352 @@ class _MyPostsScreenState extends State<MyPostsScreen>
     );
   }
 
-  // My Posts Tab
-  Widget _buildMyPostsTab() {
+  // Created Posts Tab (View Only - no delete button)
+  Widget _buildCreatedPostsTab() {
+    final currentUserId = _auth.currentUser?.uid;
+    if (currentUserId == null) {
+      return _buildEmptyState(
+        icon: Icons.post_add_outlined,
+        title: 'Not Logged In',
+        subtitle: 'Please login to see your posts',
+      );
+    }
+
+    return StreamBuilder<QuerySnapshot>(
+      stream: _firestore
+          .collection('posts')
+          .where('userId', isEqualTo: currentUserId)
+          .orderBy('createdAt', descending: true)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(
+            child: CircularProgressIndicator(color: Colors.white),
+          );
+        }
+
+        if (snapshot.hasError) {
+          debugPrint('Error loading posts: ${snapshot.error}');
+          return _buildEmptyState(
+            icon: Icons.error_outline,
+            title: 'Error Loading Posts',
+            subtitle: 'Please try again later',
+          );
+        }
+
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return _buildEmptyState(
+            icon: Icons.post_add_outlined,
+            title: 'No Posts Yet',
+            subtitle: 'Create your first post to see it here',
+          );
+        }
+
+        final myPosts = snapshot.data!.docs;
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: myPosts.length,
+          itemBuilder: (context, index) {
+            final doc = myPosts[index];
+            final data = doc.data() as Map<String, dynamic>;
+            // Add current user data to post for display
+            final postWithUserData = Map<String, dynamic>.from(data);
+            postWithUserData['userName'] = _currentUserName.isNotEmpty
+                ? _currentUserName
+                : (data['userName'] ?? 'You');
+            postWithUserData['userPhoto'] =
+                _currentUserPhoto ?? data['userPhoto'];
+            return _buildViewOnlyPostCard(
+              postId: doc.id,
+              post: postWithUserData,
+              timestamp: data['createdAt'],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // View Only Post Card (for My Posts tab - no action buttons)
+  Widget _buildViewOnlyPostCard({
+    required String postId,
+    required Map<String, dynamic> post,
+    dynamic timestamp,
+  }) {
+    final title = post['title'] ?? post['originalPrompt'] ?? 'No Title';
+    final rawDescription = post['description']?.toString() ?? '';
+    final description =
+        (rawDescription == title || rawDescription == post['originalPrompt'])
+            ? ''
+            : rawDescription;
+    final images = post['images'] as List<dynamic>? ?? [];
+    final rawImageUrl = post['imageUrl'];
+    final imageUrl = (rawImageUrl != null && rawImageUrl.toString().isNotEmpty)
+        ? rawImageUrl.toString()
+        : (images.isNotEmpty &&
+                images[0] != null &&
+                images[0].toString().isNotEmpty)
+            ? images[0].toString()
+            : null;
+    final price = post['price'];
+    final userName = post['userName'] ?? 'User';
+    final userPhoto = post['userPhoto'];
+    final hashtags =
+        (post['hashtags'] as List<dynamic>?)?.cast<String>() ?? [];
+    final intentAnalysis = post['intentAnalysis'] as Map<String, dynamic>?;
+    final actionType = intentAnalysis?['action_type'] as String?;
+
+    // Get timestamp
+    DateTime? time;
+    if (timestamp != null && timestamp is Timestamp) {
+      time = timestamp.toDate();
+    }
+
+    final bool hasImage = imageUrl != null && imageUrl.isNotEmpty;
+    final bool hasDescription = description.isNotEmpty;
+    final bool hasPrice = price != null;
+
+    // Calculate content level
+    int contentLevel = 0;
+    if (hasImage) {
+      contentLevel = 3;
+    } else if (hasPrice && hasDescription) {
+      contentLevel = 2;
+    } else if (hasPrice || hasDescription) {
+      contentLevel = 1;
+    }
+
+    final screenHeight = MediaQuery.of(context).size.height;
+    final imageHeight = contentLevel == 3 ? screenHeight * 0.16 : 0.0;
+    final cardPadding = contentLevel >= 2 ? 14.0 : 12.0;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(contentLevel >= 2 ? 18 : 14),
+        color: Colors.black.withValues(alpha: 0.6),
+        border: Border.all(
+          color: AppColors.glassBorder(alpha: 0.4),
+          width: contentLevel >= 2 ? 1.5 : 1,
+        ),
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(cardPadding),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header with user info and action badge
+            Row(
+              children: [
+                UserAvatar(
+                  profileImageUrl: PhotoUrlHelper.fixGooglePhotoUrl(userPhoto),
+                  radius: contentLevel >= 2 ? 18 : 14,
+                  fallbackText: userName,
+                ),
+                SizedBox(width: contentLevel >= 2 ? 10 : 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        userName,
+                        style: AppTextStyles.caption.copyWith(
+                          fontWeight: FontWeight.w600,
+                          fontSize: contentLevel >= 2 ? 13 : 12,
+                          color: Colors.white,
+                        ),
+                      ),
+                      if (time != null)
+                        Text(
+                          timeago.format(time),
+                          style: AppTextStyles.caption.copyWith(
+                            color: Colors.white70,
+                            fontSize: 10,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                // Action type badge
+                if (actionType != null && actionType != 'neutral') ...[
+                  Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: contentLevel >= 2 ? 8 : 6,
+                      vertical: contentLevel >= 2 ? 4 : 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _getActionColor(actionType).withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color:
+                            _getActionColor(actionType).withValues(alpha: 0.5),
+                        width: 1,
+                      ),
+                    ),
+                    child: Text(
+                      actionType == 'seeking'
+                          ? 'Looking'
+                          : actionType == 'offering'
+                              ? 'Offering'
+                              : actionType,
+                      style: AppTextStyles.labelSmall.copyWith(
+                        color: _getActionColor(actionType),
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                ],
+                // Edit and Delete buttons in header row (like feed_screen)
+                _buildIconOnlyButton(
+                  icon: Icons.edit_outlined,
+                  color: Colors.white,
+                  onTap: () => _editPost(postId, post),
+                ),
+                const SizedBox(width: 10),
+                _buildIconOnlyButton(
+                  icon: Icons.delete_outline_rounded,
+                  color: Colors.white,
+                  onTap: () => _showDeleteConfirmation(postId),
+                ),
+              ],
+            ),
+
+            SizedBox(height: contentLevel >= 2 ? 12 : 8),
+
+            // Title
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+                height: 1.4,
+              ),
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+            ),
+
+            // Description
+            if (hasDescription) ...[
+              const SizedBox(height: 6),
+              Text(
+                description,
+                style: AppTextStyles.bodyMedium.copyWith(
+                  color: Colors.white70,
+                  height: 1.4,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+
+            // Price
+            if (hasPrice) ...[
+              SizedBox(height: contentLevel >= 2 ? 8 : 6),
+              Text(
+                '₹${price.toString()}',
+                style: TextStyle(
+                  fontSize: contentLevel >= 2 ? 16 : 14,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.vibrantGreen,
+                ),
+              ),
+            ],
+
+            // Hashtags
+            if (hashtags.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: hashtags.map((tag) {
+                  return Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.3),
+                        width: 1,
+                      ),
+                    ),
+                    child: Text(
+                      '#$tag',
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFFFFD700),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
+
+            // Post Image
+            if (imageUrl != null && imageUrl.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: CachedNetworkImage(
+                  imageUrl: imageUrl,
+                  width: double.infinity,
+                  height: imageHeight,
+                  fit: BoxFit.cover,
+                  placeholder: (context, url) => Container(
+                    height: imageHeight,
+                    decoration: BoxDecoration(
+                      color: AppColors.glassBackgroundDark(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Center(
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    ),
+                  ),
+                  errorWidget: (context, url, error) => Container(
+                    height: imageHeight,
+                    decoration: BoxDecoration(
+                      color: AppColors.glassBackgroundDark(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.image_not_supported_outlined,
+                      color: AppColors.textTertiaryDark,
+                      size: 32,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Edit post navigation
+  void _editPost(String postId, Map<String, dynamic> post) async {
+    HapticFeedback.mediumImpact();
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => EditPostScreen(postId: postId, postData: post),
+      ),
+    );
+  }
+
+  // Delete Posts Tab (with delete button)
+  Widget _buildDeletePostsTab() {
     final currentUserId = _auth.currentUser?.uid;
     if (currentUserId == null) {
       return _buildEmptyState(
@@ -355,21 +715,14 @@ class _MyPostsScreenState extends State<MyPostsScreen>
           width: contentLevel >= 2 ? 1.5 : 1,
         ),
       ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(contentLevel >= 2 ? 18 : 14),
-          onTap: () {
-            HapticFeedback.lightImpact();
-          },
-          child: Padding(
-            padding: EdgeInsets.all(cardPadding),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header with user info and action badge
-                Row(
+      child: Padding(
+        padding: EdgeInsets.all(cardPadding),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header with user info and action badge
+            Row(
                   children: [
                     UserAvatar(
                       profileImageUrl: PhotoUrlHelper.fixGooglePhotoUrl(
@@ -402,7 +755,8 @@ class _MyPostsScreenState extends State<MyPostsScreen>
                         ],
                       ),
                     ),
-                    if (actionType != null)
+                    // Action type badge
+                    if (actionType != null && actionType != 'neutral') ...[
                       Container(
                         padding: EdgeInsets.symmetric(
                           horizontal: contentLevel >= 2 ? 8 : 6,
@@ -433,6 +787,22 @@ class _MyPostsScreenState extends State<MyPostsScreen>
                           ),
                         ),
                       ),
+                      const SizedBox(width: 10),
+                    ],
+                    // Remove/Delete button in header row (like feed_screen)
+                    _buildIconOnlyButton(
+                      icon: isSaved
+                          ? Icons.bookmark_remove_rounded
+                          : Icons.delete_outline_rounded,
+                      color: Colors.white,
+                      onTap: () {
+                        if (isSaved) {
+                          _removeSavedPost(postId);
+                        } else {
+                          _showDeleteConfirmation(postId);
+                        }
+                      },
+                    ),
                   ],
                 ),
 
@@ -549,27 +919,7 @@ class _MyPostsScreenState extends State<MyPostsScreen>
                     ),
                   ),
                 ],
-
-                SizedBox(height: contentLevel >= 2 ? 10 : 8),
-
-                // Action button - Remove from Saved or Delete Post
-                _buildActionButton(
-                  icon: isSaved
-                      ? Icons.bookmark_remove_rounded
-                      : Icons.delete_outline_rounded,
-                  label: isSaved ? 'Remove from Saved' : 'Delete Post',
-                  color: AppColors.error,
-                  onTap: () {
-                    if (isSaved) {
-                      _removeSavedPost(postId);
-                    } else {
-                      _showDeleteConfirmation(postId);
-                    }
-                  },
-                ),
-              ],
-            ),
-          ),
+          ],
         ),
       ),
     );
@@ -586,37 +936,39 @@ class _MyPostsScreenState extends State<MyPostsScreen>
     }
   }
 
-  Widget _buildActionButton({
+  // Icon-only button style (matching feed_screen)
+  Widget _buildIconOnlyButton({
     required IconData icon,
-    required String label,
     required Color color,
     required VoidCallback onTap,
   }) {
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.lightImpact();
-        onTap();
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: color.withValues(alpha: 0.4)),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: color, size: 18),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: AppTextStyles.bodyMedium.copyWith(
-                color: color,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
+    // Fixed size matching feed_screen for consistent look
+    const double buttonSize = 32.0;
+    const double iconSize = 16.0;
+    const double borderRadius = 8.0;
+
+    // Wrap in Material to absorb InkWell splash from parent
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.lightImpact();
+          onTap();
+        },
+        borderRadius: BorderRadius.circular(borderRadius),
+        splashColor: color.withValues(alpha: 0.2),
+        highlightColor: color.withValues(alpha: 0.1),
+        child: Container(
+          width: buttonSize,
+          height: buttonSize,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(borderRadius),
+            border: Border.all(color: color.withValues(alpha: 0.3)),
+          ),
+          child: Center(
+            child: Icon(icon, color: color, size: iconSize),
+          ),
         ),
       ),
     );

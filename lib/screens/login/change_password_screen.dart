@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../../res/config/app_colors.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
   const ChangePasswordScreen({super.key});
@@ -278,25 +279,40 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
               const SizedBox(height: 32),
 
               // Change Password Button
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _changePassword,
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
+              GestureDetector(
+                onTap: _isLoading ? null : _changePassword,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  decoration: BoxDecoration(
+                    color: AppColors.buttonBackground(),
+                    borderRadius: BorderRadius.circular(AppColors.buttonBorderRadius),
+                    border: Border.all(
+                      color: AppColors.buttonBorder(),
+                      width: 1,
+                    ),
                   ),
-                  child: _isLoading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              Colors.white,
+                  child: Center(
+                    child: _isLoading
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.white,
+                              ),
+                            ),
+                          )
+                        : const Text(
+                            'Change Password',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
-                        )
-                      : const Text('Change Password'),
+                  ),
                 ),
               ),
               const SizedBox(height: 16),

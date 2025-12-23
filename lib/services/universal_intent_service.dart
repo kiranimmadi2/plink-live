@@ -98,11 +98,11 @@ class UniversalIntentService {
       }
 
       final postId = result['postId'];
-      debugPrint('✅ Post created: $postId');
+      debugPrint(' Post created: $postId');
 
       // Find matches using unified service
       final matches = await unifiedService.findMatches(postId);
-      debugPrint('🔍 Found ${matches.length} matches');
+      debugPrint(' Found ${matches.length} matches');
 
       // Convert matches to format expected by UI
       final matchesWithProfile = await _enrichMatchesWithProfiles(matches);
@@ -114,7 +114,7 @@ class UniversalIntentService {
         'matches': matchesWithProfile,
       };
     } catch (e) {
-      debugPrint('❌ Error processing intent: $e');
+      debugPrint(' Error processing intent: $e');
       return {'success': false, 'error': e.toString()};
     }
   }
@@ -529,7 +529,7 @@ Examples:
   // UPDATED: Get user's active posts (changed from user_intents to posts)
   Future<List<Map<String, dynamic>>> getUserIntents(String userId) async {
     try {
-      debugPrint('📋 Getting user posts from posts collection');
+      debugPrint(' Getting user posts from posts collection');
 
       final querySnapshot = await _firestore
           .collection('posts')
@@ -544,7 +544,7 @@ Examples:
         return data;
       }).toList();
     } catch (e) {
-      debugPrint('❌ Error getting user posts: $e');
+      debugPrint(' Error getting user posts: $e');
       return [];
     }
   }
@@ -552,31 +552,31 @@ Examples:
   // UPDATED: Deactivate a post (uses posts collection)
   Future<void> deactivateIntent(String intentId) async {
     try {
-      debugPrint('🗑️ Deactivating post: $intentId');
+      debugPrint(' Deactivating post: $intentId');
       final unifiedService = UnifiedPostService();
       await unifiedService.deactivatePost(intentId);
-      debugPrint('✅ Post deactivated');
+      debugPrint(' Post deactivated');
     } catch (e) {
-      debugPrint('❌ Error deactivating post: $e');
+      debugPrint(' Error deactivating post: $e');
     }
   }
 
   // UPDATED: Permanently delete a post (uses posts collection)
   Future<bool> deleteIntent(String intentId) async {
     try {
-      debugPrint('🗑️ Deleting post: $intentId');
+      debugPrint(' Deleting post: $intentId');
       final unifiedService = UnifiedPostService();
       final result = await unifiedService.deletePost(intentId);
 
       if (result) {
-        debugPrint('✅ Post deleted successfully');
+        debugPrint(' Post deleted successfully');
       } else {
-        debugPrint('⚠️ Post deletion failed');
+        debugPrint(' Post deletion failed');
       }
 
       return result;
     } catch (e) {
-      debugPrint('❌ Error deleting post: $e');
+      debugPrint(' Error deleting post: $e');
       return false;
     }
   }

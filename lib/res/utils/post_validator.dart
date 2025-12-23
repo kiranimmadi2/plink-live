@@ -1,16 +1,11 @@
 import 'package:flutter/foundation.dart';
 import '../../models/post_model.dart';
-import '../../services/other services/vector_service.dart';
-import '../../services/location services/gemini_service.dart';
 
 /// Post Validator
 ///
 /// Validates and auto-fixes posts before storage
 /// Ensures all required fields are present and valid
 class PostValidator {
-  static final VectorService _vectorService = VectorService();
-  // ignore: unused_field
-  static final GeminiService _geminiService = GeminiService();
 
   /// Validate a post model
   static ValidationResult validate(PostModel post) {
@@ -104,20 +99,19 @@ class PostValidator {
       // Auto-fix missing embedding
       List<double>? embedding = post.embedding;
       if (embedding == null || embedding.isEmpty) {
-        debugPrint(' Generating missing embedding...');
-        final embeddingText = _vectorService.createTextForEmbedding(
-          title: title,
-          description: description,
-          location: post.location,
-        );
-        embedding = await _vectorService.generateEmbedding(embeddingText);
-        debugPrint(' Embedding generated');
+        debugPrint(' Warning: Post has no embedding - matching may not work');
       }
 
       // Auto-fix missing keywords
       List<String>? keywords = post.keywords;
       if (keywords == null || keywords.isEmpty) {
-        keywords = _vectorService.extractKeywords('$title $description');
+        // Extract simple keywords from title and description
+        keywords = '$title $description'
+            .toLowerCase()
+            .split(RegExp(r'\s+'))
+            .where((word) => word.length > 3)
+            .take(10)
+            .toList();
         debugPrint(' Keywords extracted: ${keywords.join(', ')}');
       }
 

@@ -3,7 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:typed_data';
-import '../../services/profile services/profile_service.dart';
+import '../../services/profile_service.dart';
 
 class EditProfileBottomSheet extends StatefulWidget {
   final Map<String, dynamic> currentProfile;

@@ -1,7 +1,7 @@
 ﻿import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
-import '../chat services/connectivity_service.dart';
+import '../connectivity_service.dart';
 import '../../res/config/app_assets.dart';
 
 class GeocodingService {

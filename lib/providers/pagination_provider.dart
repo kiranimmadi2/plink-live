@@ -1,9 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-/// ============================================
 /// PAGINATION STATE
-/// ============================================
 
 /// Generic pagination state that can be used with any data type
 class PaginationState<T> {
@@ -37,7 +35,9 @@ class PaginationState<T> {
       isLoading: isLoading ?? this.isLoading,
       isLoadingMore: isLoadingMore ?? this.isLoadingMore,
       hasMore: hasMore ?? this.hasMore,
-      lastDocument: clearLastDocument ? null : (lastDocument ?? this.lastDocument),
+      lastDocument: clearLastDocument
+          ? null
+          : (lastDocument ?? this.lastDocument),
       error: error,
     );
   }
@@ -52,9 +52,7 @@ class PaginationState<T> {
   bool get isInitialLoading => isLoading && items.isEmpty;
 }
 
-/// ============================================
 /// PAGINATION NOTIFIER
-/// ============================================
 
 /// Generic pagination notifier for Firestore collections
 class PaginationNotifier<T> extends StateNotifier<PaginationState<T>> {
@@ -91,10 +89,7 @@ class PaginationNotifier<T> extends StateNotifier<PaginationState<T>> {
         lastDocument: snapshot.docs.isNotEmpty ? snapshot.docs.last : null,
       );
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: e.toString(),
-      );
+      state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
 
@@ -119,10 +114,7 @@ class PaginationNotifier<T> extends StateNotifier<PaginationState<T>> {
         lastDocument: snapshot.docs.isNotEmpty ? snapshot.docs.last : null,
       );
     } catch (e) {
-      state = state.copyWith(
-        isLoadingMore: false,
-        error: e.toString(),
-      );
+      state = state.copyWith(isLoadingMore: false, error: e.toString());
     }
   }
 
@@ -162,9 +154,7 @@ class PaginationNotifier<T> extends StateNotifier<PaginationState<T>> {
   }
 }
 
-/// ============================================
 /// STREAM PAGINATION STATE
-/// ============================================
 
 /// Pagination state for real-time streams
 class StreamPaginationState<T> {
@@ -199,13 +189,12 @@ class StreamPaginationState<T> {
   }
 }
 
-/// ============================================
 /// STREAM PAGINATION NOTIFIER
-/// ============================================
 
 /// Pagination notifier for real-time Firestore streams
 /// Increases limit to load more items while maintaining stream
-class StreamPaginationNotifier<T> extends StateNotifier<StreamPaginationState<T>> {
+class StreamPaginationNotifier<T>
+    extends StateNotifier<StreamPaginationState<T>> {
   final int initialLimit;
   final int loadMoreIncrement;
   final Query Function(int limit) queryBuilder;
@@ -258,16 +247,11 @@ class StreamPaginationNotifier<T> extends StateNotifier<StreamPaginationState<T>
   }
 }
 
-/// ============================================
 /// HELPER EXTENSIONS
-/// ============================================
 
 extension PaginationQueryExtension on Query {
   /// Apply pagination to a query
-  Query paginate({
-    required int limit,
-    DocumentSnapshot? startAfter,
-  }) {
+  Query paginate({required int limit, DocumentSnapshot? startAfter}) {
     Query query = this.limit(limit);
     if (startAfter != null) {
       query = query.startAfterDocument(startAfter);
@@ -276,18 +260,18 @@ extension PaginationQueryExtension on Query {
   }
 }
 
-/// ============================================
 /// FACTORY FUNCTIONS
-/// ============================================
 
 /// Create a pagination provider for a specific query
 StateNotifierProvider<PaginationNotifier<T>, PaginationState<T>>
-    createPaginationProvider<T>({
+createPaginationProvider<T>({
   required Query Function() queryBuilder,
   required T Function(DocumentSnapshot doc) fromDocument,
   int pageSize = 20,
 }) {
-  return StateNotifierProvider<PaginationNotifier<T>, PaginationState<T>>((ref) {
+  return StateNotifierProvider<PaginationNotifier<T>, PaginationState<T>>((
+    ref,
+  ) {
     return PaginationNotifier<T>(
       queryBuilder: queryBuilder,
       fromDocument: fromDocument,
@@ -298,18 +282,20 @@ StateNotifierProvider<PaginationNotifier<T>, PaginationState<T>>
 
 /// Create a family pagination provider (with parameter)
 StateNotifierProviderFamily<PaginationNotifier<T>, PaginationState<T>, String>
-    createPaginationProviderFamily<T>({
+createPaginationProviderFamily<T>({
   required Query Function(String param) queryBuilder,
   required T Function(DocumentSnapshot doc) fromDocument,
   int pageSize = 20,
 }) {
-  return StateNotifierProvider.family<PaginationNotifier<T>, PaginationState<T>, String>(
-    (ref, param) {
-      return PaginationNotifier<T>(
-        queryBuilder: () => queryBuilder(param),
-        fromDocument: fromDocument,
-        pageSize: pageSize,
-      );
-    },
-  );
+  return StateNotifierProvider.family<
+    PaginationNotifier<T>,
+    PaginationState<T>,
+    String
+  >((ref, param) {
+    return PaginationNotifier<T>(
+      queryBuilder: () => queryBuilder(param),
+      fromDocument: fromDocument,
+      pageSize: pageSize,
+    );
+  });
 }

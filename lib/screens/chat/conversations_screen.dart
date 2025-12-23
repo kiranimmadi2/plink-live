@@ -11,7 +11,7 @@ import '../../widgets/other widgets/glass_text_field.dart';
 import '../../models/conversation_model.dart';
 import '../../res/utils/photo_url_helper.dart';
 import '../../models/user_profile.dart';
-import '../../services/chat services/conversation_service.dart';
+import '../../services/conversation_service.dart';
 import 'enhanced_chat_screen.dart';
 import 'create_group_screen.dart';
 import 'group_chat_screen.dart';

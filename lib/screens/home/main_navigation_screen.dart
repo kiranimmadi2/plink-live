@@ -49,6 +49,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
   StreamSubscription<QuerySnapshot>? _unreadSubscription;
   StreamSubscription<QuerySnapshot>? _incomingCallSubscription;
   bool _isShowingIncomingCall = false;
+  final Set<String> _handledCallIds = {}; // Track calls we've already handled
 
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -111,35 +112,65 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     if (user == null) return;
 
     _incomingCallSubscription?.cancel();
+
+    // Only listen for calls created in the last 30 seconds to avoid old calls
+    final cutoffTime = DateTime.now().subtract(const Duration(seconds: 30));
+
     _incomingCallSubscription = _firestore
         .collection('calls')
         .where('receiverId', isEqualTo: user.uid)
         .where('status', isEqualTo: 'calling')
         .snapshots()
         .listen((snapshot) {
-      if (!mounted || _isShowingIncomingCall) return;
+          if (!mounted || _isShowingIncomingCall) return;
 
-      for (var change in snapshot.docChanges) {
-        if (change.type == DocumentChangeType.added) {
-          final data = change.doc.data();
-          if (data == null) continue;
+          for (var change in snapshot.docChanges) {
+            if (change.type == DocumentChangeType.added) {
+              final data = change.doc.data();
+              if (data == null) continue;
 
-          final callId = change.doc.id;
-          final callerName = data['callerName'] as String? ?? 'Unknown';
-          final callerPhoto = data['callerPhoto'] as String?;
-          final callerId = data['callerId'] as String? ?? '';
+              final callId = change.doc.id;
 
-          // Show incoming call screen
-          _showIncomingCall(
-            callId: callId,
-            callerName: callerName,
-            callerPhoto: callerPhoto,
-            callerId: callerId,
-          );
-          break; // Only show one call at a time
-        }
-      }
-    });
+              // Skip if we've already handled this call
+              if (_handledCallIds.contains(callId)) continue;
+
+              // Check call timestamp - ignore old calls
+              final timestamp = data['timestamp'];
+              if (timestamp != null) {
+                DateTime? callTime;
+                if (timestamp is Timestamp) {
+                  callTime = timestamp.toDate();
+                } else if (timestamp is String) {
+                  callTime = DateTime.tryParse(timestamp);
+                }
+
+                // Skip calls older than 30 seconds
+                if (callTime != null && callTime.isBefore(cutoffTime)) {
+                  _handledCallIds.add(
+                    callId,
+                  ); // Mark as handled so we don't check again
+                  continue;
+                }
+              }
+
+              // Mark this call as handled
+              _handledCallIds.add(callId);
+
+              final callerName = data['callerName'] as String? ?? 'Unknown';
+              final callerPhoto = data['callerPhoto'] as String?;
+              final callerId = data['callerId'] as String? ?? '';
+
+              // Show incoming call screen
+              _showIncomingCall(
+                callId: callId,
+                callerName: callerName,
+                callerPhoto: callerPhoto,
+                callerId: callerId,
+              );
+              break; // Only show one call at a time
+            }
+          }
+        });
   }
 
   void _showIncomingCall({
@@ -202,12 +233,16 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     if (uid == null) return;
 
     try {
-      _firestore.collection("users").doc(uid).update({
-        "isOnline": online,
-        "lastSeen": FieldValue.serverTimestamp(),
-      }).catchError((e) {
-        debugPrint('Error updating status: $e');
-      });
+      _firestore
+          .collection("users")
+          .doc(uid)
+          .update({
+            "isOnline": online,
+            "lastSeen": FieldValue.serverTimestamp(),
+          })
+          .catchError((e) {
+            debugPrint('Error updating status: $e');
+          });
     } catch (e) {
       debugPrint('Error updating status: $e');
     }
@@ -461,7 +496,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
                   // Half circle = 180 degrees = pi radians
                   // Spread buttons from top (-90°) to bottom (90°)
                   final angleStep = math.pi / (totalButtons - 1);
-                  final baseAngle = -math.pi / 2 + (angleStep * i); // -90° to +90°
+                  final baseAngle =
+                      -math.pi / 2 + (angleStep * i); // -90° to +90°
 
                   // Calculate x and y offsets
                   double xOffset;
@@ -640,9 +676,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
   }
 }
 
-// ==================================================
 // ANIMATED MENU ITEM
-// ==================================================
+
 class _AnimatedMenuItem extends StatefulWidget {
   final Map<String, dynamic> item;
   final int unread;
@@ -737,15 +772,12 @@ class _AnimatedMenuItemState extends State<_AnimatedMenuItem> {
   }
 }
 
-// ==================================================
 // SWIPE DETECTOR - Custom widget for edge swipe detection
-// ==================================================
+
 class _SwipeDetector extends StatefulWidget {
   final VoidCallback? onSwipeRight;
 
-  const _SwipeDetector({
-    this.onSwipeRight,
-  });
+  const _SwipeDetector({this.onSwipeRight});
 
   @override
   State<_SwipeDetector> createState() => _SwipeDetectorState();
@@ -777,9 +809,7 @@ class _SwipeDetectorState extends State<_SwipeDetector> {
       onPointerUp: (_) {
         _hasTriggered = false;
       },
-      child: Container(
-        color: Colors.transparent,
-      ),
+      child: Container(color: Colors.transparent),
     );
   }
 }

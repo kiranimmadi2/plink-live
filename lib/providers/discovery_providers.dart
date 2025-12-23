@@ -4,9 +4,7 @@ import '../services/universal_intent_service.dart';
 import '../services/photo_cache_service.dart';
 import './app_providers.dart';
 
-/// ============================================
 /// HOME SCREEN STATE
-/// ============================================
 
 /// State class for home screen processing
 class HomeProcessingState {
@@ -41,9 +39,7 @@ class HomeProcessingState {
   }
 }
 
-/// ============================================
 /// HOME PROCESSING NOTIFIER
-/// ============================================
 
 class HomeProcessingNotifier extends StateNotifier<HomeProcessingState> {
   HomeProcessingNotifier() : super(const HomeProcessingState());
@@ -76,12 +72,10 @@ class HomeProcessingNotifier extends StateNotifier<HomeProcessingState> {
 /// Provider for home processing state
 final homeProcessingProvider =
     StateNotifierProvider<HomeProcessingNotifier, HomeProcessingState>((ref) {
-  return HomeProcessingNotifier();
-});
+      return HomeProcessingNotifier();
+    });
 
-/// ============================================
 /// MATCHES STATE
-/// ============================================
 
 /// State class for matches
 class MatchesState {
@@ -111,16 +105,14 @@ class MatchesState {
   int get matchCount => matches.length;
 }
 
-/// ============================================
 /// MATCHES NOTIFIER
-/// ============================================
 
 class MatchesNotifier extends StateNotifier<MatchesState> {
   final UniversalIntentService _intentService;
   final PhotoCacheService _photoCache;
 
   MatchesNotifier(this._intentService, this._photoCache)
-      : super(const MatchesState());
+    : super(const MatchesState());
 
   /// Process intent and find matches
   Future<void> processIntent(String intent) async {
@@ -178,17 +170,13 @@ class MatchesNotifier extends StateNotifier<MatchesState> {
 }
 
 /// Provider for matches
-final matchesProvider =
-    StateNotifierProvider<MatchesNotifier, MatchesState>((ref) {
-  return MatchesNotifier(
-    UniversalIntentService(),
-    PhotoCacheService(),
-  );
+final matchesProvider = StateNotifierProvider<MatchesNotifier, MatchesState>((
+  ref,
+) {
+  return MatchesNotifier(UniversalIntentService(), PhotoCacheService());
 });
 
-/// ============================================
 /// CONVERSATION STATE
-/// ============================================
 
 /// Message model for conversation
 class ConversationMessage {
@@ -203,10 +191,10 @@ class ConversationMessage {
   });
 
   Map<String, dynamic> toMap() => {
-        'text': text,
-        'isUser': isUser,
-        'timestamp': timestamp,
-      };
+    'text': text,
+    'isUser': isUser,
+    'timestamp': timestamp,
+  };
 }
 
 /// State class for conversation
@@ -220,20 +208,22 @@ class ConversationState {
   }
 }
 
-/// ============================================
 /// CONVERSATION NOTIFIER
-/// ============================================
 
 class ConversationNotifier extends StateNotifier<ConversationState> {
   ConversationNotifier()
-      : super(ConversationState(messages: [
-          ConversationMessage(
-            text:
-                'Hi! I\'m your Supper assistant. What would you like to find today?',
-            isUser: false,
-            timestamp: DateTime.now(),
-          ),
-        ]));
+    : super(
+        ConversationState(
+          messages: [
+            ConversationMessage(
+              text:
+                  'Hi! I\'m your Supper assistant. What would you like to find today?',
+              isUser: false,
+              timestamp: DateTime.now(),
+            ),
+          ],
+        ),
+      );
 
   /// Add a user message
   void addUserMessage(String text) {
@@ -257,26 +247,26 @@ class ConversationNotifier extends StateNotifier<ConversationState> {
 
   /// Clear conversation
   void clear() {
-    state = ConversationState(messages: [
-      ConversationMessage(
-        text:
-            'Hi! I\'m your Supper assistant. What would you like to find today?',
-        isUser: false,
-        timestamp: DateTime.now(),
-      ),
-    ]);
+    state = ConversationState(
+      messages: [
+        ConversationMessage(
+          text:
+              'Hi! I\'m your Supper assistant. What would you like to find today?',
+          isUser: false,
+          timestamp: DateTime.now(),
+        ),
+      ],
+    );
   }
 }
 
 /// Provider for conversation
 final conversationProvider =
     StateNotifierProvider<ConversationNotifier, ConversationState>((ref) {
-  return ConversationNotifier();
-});
+      return ConversationNotifier();
+    });
 
-/// ============================================
 /// SUGGESTIONS PROVIDER
-/// ============================================
 
 /// Default suggestions list
 const List<String> _defaultSuggestions = [
@@ -288,12 +278,15 @@ const List<String> _defaultSuggestions = [
 ];
 
 /// Provider for search suggestions
-final suggestionsProvider =
-    StateProvider<List<String>>((ref) => _defaultSuggestions.take(3).toList());
+final suggestionsProvider = StateProvider<List<String>>(
+  (ref) => _defaultSuggestions.take(3).toList(),
+);
 
 /// Provider to filter suggestions based on query
-final filteredSuggestionsProvider =
-    Provider.family<List<String>, String>((ref, query) {
+final filteredSuggestionsProvider = Provider.family<List<String>, String>((
+  ref,
+  query,
+) {
   if (query.isEmpty) return _defaultSuggestions.take(3).toList();
 
   final filtered = _defaultSuggestions
@@ -307,12 +300,12 @@ final filteredSuggestionsProvider =
   return filtered.take(3).toList();
 });
 
-/// ============================================
 /// USER INTENTS PROVIDER
-/// ============================================
 
 /// Provider for user's intent history
-final userIntentsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
+final userIntentsProvider = FutureProvider<List<Map<String, dynamic>>>((
+  ref,
+) async {
   final userId = ref.watch(currentUserIdProvider);
   if (userId == null) return [];
 
@@ -324,9 +317,7 @@ final userIntentsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) asy
   }
 });
 
-/// ============================================
 /// CURRENT USER NAME PROVIDER
-/// ============================================
 
 /// Provider for current user's display name
 final currentUserNameProvider = FutureProvider<String>((ref) async {
@@ -348,9 +339,7 @@ final currentUserNameProvider = FutureProvider<String>((ref) async {
   }
 });
 
-/// ============================================
 /// AI RESPONSE GENERATOR
-/// ============================================
 
 /// Generate AI response based on user message
 String generateAIResponse(String userMessage, String userName) {

@@ -108,7 +108,7 @@ class _MessengerChatScreenState extends State<MessengerChatScreen> {
       if (_conversationId == null) {
         final docRef = await _firestore.collection('conversations').add({
           'participants': [currentUser.uid, widget.otherUser.uid],
-          'lastMessage': '🎤 Voice message',
+          'lastMessage': '  Voice message',
           'lastMessageTime': FieldValue.serverTimestamp(),
           'unreadCount': {
             currentUser.uid: 0,
@@ -135,7 +135,7 @@ class _MessengerChatScreenState extends State<MessengerChatScreen> {
 
       // Update conversation
       await _firestore.collection('conversations').doc(_conversationId).update({
-        'lastMessage': '🎤 Voice message',
+        'lastMessage': '  Voice message',
         'lastMessageTime': FieldValue.serverTimestamp(),
         'unreadCount.${widget.otherUser.uid}': FieldValue.increment(1),
       });
@@ -1333,11 +1333,7 @@ class MessengerChatScreen extends StatelessWidget {
   final UserProfile otherUser;
   final String? chatId;
 
-  const MessengerChatScreen({
-    super.key,
-    required this.otherUser,
-    this.chatId,
-  });
+  const MessengerChatScreen({super.key, required this.otherUser, this.chatId});
 
   @override
   Widget build(BuildContext context) {
@@ -1345,7 +1341,10 @@ class MessengerChatScreen extends StatelessWidget {
       backgroundColor: const Color(0xFF0f0f23),
       appBar: AppBar(
         backgroundColor: const Color(0xFF1a1a2e),
-        title: Text(otherUser.name, style: const TextStyle(color: Colors.white)),
+        title: Text(
+          otherUser.name,
+          style: const TextStyle(color: Colors.white),
+        ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),

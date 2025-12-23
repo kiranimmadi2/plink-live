@@ -2,7 +2,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'gemini_service.dart';
-import 'vector_service.dart';
 import '../models/post_model.dart';
 
 /// Unified Post Service - Single source of truth for all post operations
@@ -21,7 +20,6 @@ class UnifiedPostService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final GeminiService _geminiService = GeminiService();
-  final VectorService _vectorService = VectorService();
 
   /// Create a new post with automatic AI processing
   Future<Map<String, dynamic>> createPost({
@@ -66,7 +64,7 @@ class UnifiedPostService {
       final description = intentAnalysis['description'] ?? originalPrompt;
 
       // Step 3: Generate embedding for semantic matching
-      final embeddingText = _vectorService.createTextForEmbedding(
+      final embeddingText = _createTextForEmbedding(
         title: title,
         description: description,
         location: postLocation,
@@ -74,12 +72,12 @@ class UnifiedPostService {
         actionType: intentAnalysis['action_type'],
       );
 
-      final embedding = await _vectorService.generateEmbedding(embeddingText);
+      final embedding = await _geminiService.generateEmbedding(embeddingText);
 
       debugPrint('🔢 Embedding generated: ${embedding.length} dimensions');
 
       // Step 4: Extract keywords for search
-      final keywords = _vectorService.extractKeywords('$title $description');
+      final keywords = _extractKeywords('$title $description');
 
       // Step 5: Create PostModel
       final post = PostModel(
@@ -116,9 +114,11 @@ class UnifiedPostService {
       _validatePost(post);
 
       // Step 7: Store in posts collection ONLY
-      final docRef = await _firestore.collection('posts').add(post.toFirestore());
+      final docRef = await _firestore
+          .collection('posts')
+          .add(post.toFirestore());
 
-      debugPrint('✅ Post created successfully: ${docRef.id}');
+      debugPrint(' Post created successfully: ${docRef.id}');
 
       return {
         'success': true,
@@ -127,7 +127,7 @@ class UnifiedPostService {
         'message': 'Post created successfully',
       };
     } catch (e) {
-      debugPrint('❌ Error creating post: $e');
+      debugPrint(' Error creating post: $e');
       return {
         'success': false,
         'error': e.toString(),
@@ -142,7 +142,8 @@ class UnifiedPostService {
     Map<String, dynamic> clarificationAnswers,
   ) async {
     try {
-      final prompt = '''
+      final prompt =
+          '''
 Analyze this user request and extract intent information:
 "$userInput"
 
@@ -195,11 +196,17 @@ Examples:
       jsonStr = jsonStr.replaceAll(RegExp(r'\s+'), ' ');
 
       // Extract fields manually (safer than json.decode for AI output)
-      final primaryIntentMatch = RegExp(r'"primary_intent":\s*"([^"]+)"').firstMatch(jsonStr);
-      final actionTypeMatch = RegExp(r'"action_type":\s*"([^"]+)"').firstMatch(jsonStr);
+      final primaryIntentMatch = RegExp(
+        r'"primary_intent":\s*"([^"]+)"',
+      ).firstMatch(jsonStr);
+      final actionTypeMatch = RegExp(
+        r'"action_type":\s*"([^"]+)"',
+      ).firstMatch(jsonStr);
       final domainMatch = RegExp(r'"domain":\s*"([^"]+)"').firstMatch(jsonStr);
       final titleMatch = RegExp(r'"title":\s*"([^"]+)"').firstMatch(jsonStr);
-      final descriptionMatch = RegExp(r'"description":\s*"([^"]+)"').firstMatch(jsonStr);
+      final descriptionMatch = RegExp(
+        r'"description":\s*"([^"]+)"',
+      ).firstMatch(jsonStr);
 
       return {
         'primary_intent': primaryIntentMatch?.group(1) ?? 'general',
@@ -223,7 +230,9 @@ Examples:
       'primary_intent': userInput,
       'action_type': 'neutral',
       'domain': 'general',
-      'title': userInput.length > 50 ? '${userInput.substring(0, 47)}...' : userInput,
+      'title': userInput.length > 50
+          ? '${userInput.substring(0, 47)}...'
+          : userInput,
       'description': userInput,
       'entities': {},
       'search_keywords': userInput.toLowerCase().split(' '),
@@ -235,6 +244,53 @@ Examples:
   String _generateTitle(String prompt) {
     if (prompt.length <= 50) return prompt;
     return '${prompt.substring(0, 47)}...';
+  }
+
+  /// Create text for embedding generation
+  String _createTextForEmbedding({
+    required String title,
+    required String description,
+    String? location,
+    String? domain,
+    String? actionType,
+  }) {
+    final parts = <String>[title, description];
+    if (location != null && location.isNotEmpty) {
+      parts.add('Location: $location');
+    }
+    if (domain != null && domain.isNotEmpty) {
+      parts.add('Domain: $domain');
+    }
+    if (actionType != null && actionType.isNotEmpty) {
+      parts.add('Action: $actionType');
+    }
+    return parts.join(' ');
+  }
+
+  /// Extract keywords from text
+  List<String> _extractKeywords(String text) {
+    final stopWords = {'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been',
+                       'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will',
+                       'would', 'could', 'should', 'may', 'might', 'must', 'shall',
+                       'can', 'need', 'dare', 'ought', 'used', 'to', 'of', 'in',
+                       'for', 'on', 'with', 'at', 'by', 'from', 'as', 'into',
+                       'through', 'during', 'before', 'after', 'above', 'below',
+                       'between', 'under', 'again', 'further', 'then', 'once',
+                       'and', 'but', 'or', 'nor', 'so', 'yet', 'both', 'either',
+                       'neither', 'not', 'only', 'own', 'same', 'than', 'too',
+                       'very', 'just', 'i', 'me', 'my', 'myself', 'we', 'our',
+                       'ours', 'you', 'your', 'he', 'him', 'his', 'she', 'her',
+                       'it', 'its', 'they', 'them', 'their', 'what', 'which',
+                       'who', 'whom', 'this', 'that', 'these', 'those', 'am'};
+
+    return text
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^\w\s]'), '')
+        .split(RegExp(r'\s+'))
+        .where((word) => word.length > 2 && !stopWords.contains(word))
+        .toSet()
+        .take(20)
+        .toList();
   }
 
   /// Validate post before storing
@@ -268,12 +324,14 @@ Examples:
       if (sourceEmbedding.isEmpty) {
         debugPrint('⚠️ Source post has no embedding, regenerating...');
         // Regenerate embedding
-        final embeddingText = _vectorService.createTextForEmbedding(
+        final embeddingText = _createTextForEmbedding(
           title: sourcePost.title,
           description: sourcePost.description,
           location: sourcePost.location,
         );
-        final newEmbedding = await _vectorService.generateEmbedding(embeddingText);
+        final newEmbedding = await _geminiService.generateEmbedding(
+          embeddingText,
+        );
 
         await postDoc.reference.update({
           'embedding': newEmbedding,
@@ -318,27 +376,30 @@ Examples:
         final priceMatch = sourcePost.matchesPrice(candidatePost);
 
         // Calculate final match score
-        final matchScore = (similarity * 0.6) +
-                          (intentMatch ? 0.3 : 0.0) +
-                          (priceMatch ? 0.1 : 0.0);
+        final matchScore =
+            (similarity * 0.6) +
+            (intentMatch ? 0.3 : 0.0) +
+            (priceMatch ? 0.1 : 0.0);
 
         // Only include good matches (score > 0.65)
         if (matchScore > 0.65) {
-          matches.add(candidatePost.copyWith(
-            similarityScore: matchScore,
-          ));
-          debugPrint('✅ Match found: ${candidatePost.title} (score: ${matchScore.toStringAsFixed(2)})');
+          matches.add(candidatePost.copyWith(similarityScore: matchScore));
+          debugPrint(
+            ' Match found: ${candidatePost.title} (score: ${matchScore.toStringAsFixed(2)})',
+          );
         }
       }
 
       // Sort by match score
-      matches.sort((a, b) => (b.similarityScore ?? 0).compareTo(a.similarityScore ?? 0));
+      matches.sort(
+        (a, b) => (b.similarityScore ?? 0).compareTo(a.similarityScore ?? 0),
+      );
 
-      debugPrint('📊 Total matches found: ${matches.length}');
+      debugPrint(' Total matches found: ${matches.length}');
 
       return matches.take(20).toList();
     } catch (e) {
-      debugPrint('❌ Error finding matches: $e');
+      debugPrint(' Error finding matches: $e');
       return [];
     }
   }
@@ -396,10 +457,10 @@ Examples:
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs
-          .map((doc) => PostModel.fromFirestore(doc))
-          .toList();
-    });
+          return snapshot.docs
+              .map((doc) => PostModel.fromFirestore(doc))
+              .toList();
+        });
   }
 
   /// Increment view count

@@ -13,7 +13,7 @@ class ProjectService {
 
   String? get _userId => _auth.currentUser?.uid;
 
-  // ==================== PROJECTS ====================
+  //    PROJECTS
 
   /// Get all projects for the current user
   Future<List<ProjectItem>> getProjects() async {
@@ -27,7 +27,9 @@ class ProjectService {
           .orderBy('updatedAt', descending: true)
           .get();
 
-      return snapshot.docs.map((doc) => ProjectItem.fromFirestore(doc)).toList();
+      return snapshot.docs
+          .map((doc) => ProjectItem.fromFirestore(doc))
+          .toList();
     } catch (e) {
       debugPrint('Error getting projects: $e');
       return [];
@@ -71,16 +73,16 @@ class ProjectService {
           .doc(_userId)
           .collection('projects')
           .add({
-        'name': name,
-        'description': description ?? '',
-        'iconName': iconName,
-        'colorHex': colorHex,
-        'chatCount': 0,
-        'taskCount': 0,
-        'completedTasks': 0,
-        'createdAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+            'name': name,
+            'description': description ?? '',
+            'iconName': iconName,
+            'colorHex': colorHex,
+            'chatCount': 0,
+            'taskCount': 0,
+            'completedTasks': 0,
+            'createdAt': FieldValue.serverTimestamp(),
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
       return docRef.id;
     } catch (e) {
       debugPrint('Error creating project: $e');
@@ -167,7 +169,7 @@ class ProjectService {
     }
   }
 
-  // ==================== PROJECT TASKS ====================
+  //    PROJECT TASKS
 
   /// Get all tasks for a project
   Future<List<ProjectTask>> getProjectTasks(String projectId) async {
@@ -183,7 +185,9 @@ class ProjectService {
           .orderBy('createdAt', descending: true)
           .get();
 
-      return snapshot.docs.map((doc) => ProjectTask.fromFirestore(doc)).toList();
+      return snapshot.docs
+          .map((doc) => ProjectTask.fromFirestore(doc))
+          .toList();
     } catch (e) {
       debugPrint('Error getting project tasks: $e');
       return [];
@@ -208,13 +212,13 @@ class ProjectService {
           .doc(projectId)
           .collection('tasks')
           .add({
-        'title': title,
-        'description': description ?? '',
-        'priority': priority ?? 'medium',
-        'isCompleted': false,
-        'dueDate': dueDate != null ? Timestamp.fromDate(dueDate) : null,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+            'title': title,
+            'description': description ?? '',
+            'priority': priority ?? 'medium',
+            'isCompleted': false,
+            'dueDate': dueDate != null ? Timestamp.fromDate(dueDate) : null,
+            'createdAt': FieldValue.serverTimestamp(),
+          });
 
       // Update task count
       await _firestore
@@ -223,9 +227,9 @@ class ProjectService {
           .collection('projects')
           .doc(projectId)
           .update({
-        'taskCount': FieldValue.increment(1),
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+            'taskCount': FieldValue.increment(1),
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
 
       return docRef.id;
     } catch (e) {
@@ -235,7 +239,11 @@ class ProjectService {
   }
 
   /// Toggle task completion
-  Future<bool> toggleTaskCompletion(String projectId, String taskId, bool isCompleted) async {
+  Future<bool> toggleTaskCompletion(
+    String projectId,
+    String taskId,
+    bool isCompleted,
+  ) async {
     if (_userId == null) return false;
 
     try {
@@ -255,9 +263,9 @@ class ProjectService {
           .collection('projects')
           .doc(projectId)
           .update({
-        'completedTasks': FieldValue.increment(isCompleted ? 1 : -1),
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+            'completedTasks': FieldValue.increment(isCompleted ? 1 : -1),
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
 
       return true;
     } catch (e) {
@@ -309,7 +317,7 @@ class ProjectService {
     }
   }
 
-  // ==================== PROJECT CHATS ====================
+  //    PROJECT CHATS
 
   /// Get all chats linked to a project
   Future<List<ProjectChat>> getProjectChats(String projectId) async {
@@ -325,7 +333,9 @@ class ProjectService {
           .orderBy('addedAt', descending: true)
           .get();
 
-      return snapshot.docs.map((doc) => ProjectChat.fromFirestore(doc)).toList();
+      return snapshot.docs
+          .map((doc) => ProjectChat.fromFirestore(doc))
+          .toList();
     } catch (e) {
       debugPrint('Error getting project chats: $e');
       return [];
@@ -351,12 +361,12 @@ class ProjectService {
           .collection('chats')
           .doc(conversationId)
           .set({
-        'conversationId': conversationId,
-        'chatTitle': chatTitle,
-        'otherUserName': otherUserName,
-        'otherUserPhoto': otherUserPhoto,
-        'addedAt': FieldValue.serverTimestamp(),
-      });
+            'conversationId': conversationId,
+            'chatTitle': chatTitle,
+            'otherUserName': otherUserName,
+            'otherUserPhoto': otherUserPhoto,
+            'addedAt': FieldValue.serverTimestamp(),
+          });
 
       // Update chat count
       await _firestore
@@ -365,9 +375,9 @@ class ProjectService {
           .collection('projects')
           .doc(projectId)
           .update({
-        'chatCount': FieldValue.increment(1),
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+            'chatCount': FieldValue.increment(1),
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
 
       return true;
     } catch (e) {
@@ -377,7 +387,10 @@ class ProjectService {
   }
 
   /// Unlink a chat from a project
-  Future<bool> unlinkChatFromProject(String projectId, String conversationId) async {
+  Future<bool> unlinkChatFromProject(
+    String projectId,
+    String conversationId,
+  ) async {
     if (_userId == null) return false;
 
     try {
@@ -397,9 +410,9 @@ class ProjectService {
           .collection('projects')
           .doc(projectId)
           .update({
-        'chatCount': FieldValue.increment(-1),
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+            'chatCount': FieldValue.increment(-1),
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
 
       return true;
     } catch (e) {
@@ -408,7 +421,7 @@ class ProjectService {
     }
   }
 
-  // ==================== DEFAULT PROJECTS ====================
+  //    DEFAULT PROJECTS
 
   /// Create default projects for new users
   Future<void> createDefaultProjects() async {
@@ -427,10 +440,30 @@ class ProjectService {
 
       // Create default projects
       final defaults = [
-        {'name': 'Shopping Assistant', 'description': 'Track products & deals', 'iconName': 'shopping_bag', 'colorHex': '#E91E63'},
-        {'name': 'Job Search', 'description': 'Find opportunities', 'iconName': 'work', 'colorHex': '#2196F3'},
-        {'name': 'Home Renovation', 'description': 'Ideas & contractors', 'iconName': 'home_repair_service', 'colorHex': '#FF9800'},
-        {'name': 'Travel Planning', 'description': 'Destinations & bookings', 'iconName': 'flight', 'colorHex': '#009688'},
+        {
+          'name': 'Shopping Assistant',
+          'description': 'Track products & deals',
+          'iconName': 'shopping_bag',
+          'colorHex': '#E91E63',
+        },
+        {
+          'name': 'Job Search',
+          'description': 'Find opportunities',
+          'iconName': 'work',
+          'colorHex': '#2196F3',
+        },
+        {
+          'name': 'Home Renovation',
+          'description': 'Ideas & contractors',
+          'iconName': 'home_repair_service',
+          'colorHex': '#FF9800',
+        },
+        {
+          'name': 'Travel Planning',
+          'description': 'Destinations & bookings',
+          'iconName': 'flight',
+          'colorHex': '#009688',
+        },
       ];
 
       for (final project in defaults) {
@@ -447,7 +480,7 @@ class ProjectService {
   }
 }
 
-// ==================== DATA MODELS ====================
+//    DATA MODELS
 
 class ProjectItem {
   final String id;

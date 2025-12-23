@@ -15,9 +15,7 @@ class ReviewService {
 
   String? get _currentUserId => _auth.currentUser?.uid;
 
-  // ============================================
   // REVIEW CRUD OPERATIONS
-  // ============================================
 
   /// Create a new review
   Future<String?> createReview({
@@ -33,8 +31,10 @@ class ReviewService {
 
     try {
       // Get reviewer info
-      final userDoc =
-          await _firestore.collection('users').doc(_currentUserId).get();
+      final userDoc = await _firestore
+          .collection('users')
+          .doc(_currentUserId)
+          .get();
       final userData = userDoc.data() ?? {};
 
       final review = ReviewModel(
@@ -53,8 +53,7 @@ class ReviewService {
       );
 
       // Add review
-      final docRef =
-          await _firestore.collection('reviews').add(review.toMap());
+      final docRef = await _firestore.collection('reviews').add(review.toMap());
 
       // Update professional's rating summary
       await _updateRatingSummary(professionalId);
@@ -74,7 +73,8 @@ class ReviewService {
   }
 
   /// Update a review
-  Future<bool> updateReview(String reviewId, {
+  Future<bool> updateReview(
+    String reviewId, {
     double? rating,
     String? reviewText,
     Map<String, double>? categoryRatings,
@@ -144,7 +144,9 @@ class ReviewService {
       if (!doc.exists) return false;
 
       final review = ReviewModel.fromFirestore(doc);
-      if (review.professionalId != _currentUserId) return false; // Not the professional
+      if (review.professionalId != _currentUserId) {
+        return false; // Not the professional
+      }
 
       await _firestore.collection('reviews').doc(reviewId).update({
         'professionalResponse': response,
@@ -158,9 +160,7 @@ class ReviewService {
     }
   }
 
-  // ============================================
   // REVIEW QUERIES
-  // ============================================
 
   /// Get reviews for a professional
   Future<List<ReviewModel>> getReviewsForProfessional(
@@ -181,7 +181,9 @@ class ReviewService {
       }
 
       final snapshot = await query.get();
-      return snapshot.docs.map((doc) => ReviewModel.fromFirestore(doc)).toList();
+      return snapshot.docs
+          .map((doc) => ReviewModel.fromFirestore(doc))
+          .toList();
     } catch (e) {
       debugPrint('Error getting reviews: $e');
       return [];
@@ -197,8 +199,11 @@ class ReviewService {
         .orderBy('createdAt', descending: true)
         .limit(50)
         .snapshots()
-        .map((snapshot) =>
-            snapshot.docs.map((doc) => ReviewModel.fromFirestore(doc)).toList());
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => ReviewModel.fromFirestore(doc))
+              .toList(),
+        );
   }
 
   /// Get reviews for a service
@@ -212,7 +217,9 @@ class ReviewService {
           .limit(50)
           .get();
 
-      return snapshot.docs.map((doc) => ReviewModel.fromFirestore(doc)).toList();
+      return snapshot.docs
+          .map((doc) => ReviewModel.fromFirestore(doc))
+          .toList();
     } catch (e) {
       debugPrint('Error getting service reviews: $e');
       return [];
@@ -220,7 +227,10 @@ class ReviewService {
   }
 
   /// Check if user has already reviewed
-  Future<bool> hasUserReviewed(String professionalId, {String? serviceId}) async {
+  Future<bool> hasUserReviewed(
+    String professionalId, {
+    String? serviceId,
+  }) async {
     if (_currentUserId == null) return false;
 
     try {
@@ -261,9 +271,7 @@ class ReviewService {
     }
   }
 
-  // ============================================
   // RATING SUMMARY
-  // ============================================
 
   /// Get rating summary for a professional
   Future<RatingSummary> getRatingSummary(String professionalId) async {
@@ -298,13 +306,14 @@ class ReviewService {
             .collection('professional_stats')
             .doc(professionalId)
             .set({
-          'ratingSummary': RatingSummary.empty().toMap(),
-        }, SetOptions(merge: true));
+              'ratingSummary': RatingSummary.empty().toMap(),
+            }, SetOptions(merge: true));
         return;
       }
 
-      final reviews =
-          snapshot.docs.map((doc) => ReviewModel.fromFirestore(doc)).toList();
+      final reviews = snapshot.docs
+          .map((doc) => ReviewModel.fromFirestore(doc))
+          .toList();
 
       // Calculate distribution
       final distribution = <int, int>{5: 0, 4: 0, 3: 0, 2: 0, 1: 0};
@@ -324,13 +333,13 @@ class ReviewService {
         distribution: distribution,
       );
 
-      await _firestore
-          .collection('professional_stats')
-          .doc(professionalId)
-          .set({
-        'ratingSummary': summary.toMap(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+      await _firestore.collection('professional_stats').doc(professionalId).set(
+        {
+          'ratingSummary': summary.toMap(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        },
+        SetOptions(merge: true),
+      );
 
       // Also update user document
       await _firestore.collection('users').doc(professionalId).update({
@@ -342,9 +351,7 @@ class ReviewService {
     }
   }
 
-  // ============================================
   // MODERATION
-  // ============================================
 
   /// Flag a review for moderation
   Future<bool> flagReview(String reviewId, String reason) async {

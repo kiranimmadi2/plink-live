@@ -1,16 +1,11 @@
 import 'package:flutter/foundation.dart';
 import '../models/post_model.dart';
-import '../services/vector_service.dart';
-import '../services/gemini_service.dart';
 
 /// Post Validator
 ///
 /// Validates and auto-fixes posts before storage
 /// Ensures all required fields are present and valid
 class PostValidator {
-  static final VectorService _vectorService = VectorService();
-  // ignore: unused_field
-  static final GeminiService _geminiService = GeminiService();
 
   /// Validate a post model
   static ValidationResult validate(PostModel post) {
@@ -38,7 +33,9 @@ class PostValidator {
     if (post.embedding == null || post.embedding!.isEmpty) {
       errors.add('Post must have an embedding for matching');
     } else if (post.embedding!.length != 768) {
-      warnings.add('Embedding dimension is ${post.embedding!.length}, expected 768');
+      warnings.add(
+        'Embedding dimension is ${post.embedding!.length}, expected 768',
+      );
     }
 
     // Check keywords
@@ -81,7 +78,7 @@ class PostValidator {
   /// Ensure a post is valid, auto-fixing where possible
   static Future<PostModel> ensureValid(PostModel post) async {
     try {
-      debugPrint('🔍 Validating post...');
+      debugPrint(' Validating post...');
 
       // Auto-fix missing title
       String title = post.title;
@@ -89,34 +86,33 @@ class PostValidator {
         title = post.originalPrompt.length > 50
             ? '${post.originalPrompt.substring(0, 47)}...'
             : post.originalPrompt;
-        debugPrint('✅ Auto-generated title');
+        debugPrint(' Auto-generated title');
       }
 
       // Auto-fix missing description
       String description = post.description;
       if (description.isEmpty && post.originalPrompt.isNotEmpty) {
         description = post.originalPrompt;
-        debugPrint('✅ Auto-generated description');
+        debugPrint(' Auto-generated description');
       }
 
       // Auto-fix missing embedding
       List<double>? embedding = post.embedding;
       if (embedding == null || embedding.isEmpty) {
-        debugPrint('⚠️ Generating missing embedding...');
-        final embeddingText = _vectorService.createTextForEmbedding(
-          title: title,
-          description: description,
-          location: post.location,
-        );
-        embedding = await _vectorService.generateEmbedding(embeddingText);
-        debugPrint('✅ Embedding generated');
+        debugPrint(' Warning: Post has no embedding - matching may not work');
       }
 
       // Auto-fix missing keywords
       List<String>? keywords = post.keywords;
       if (keywords == null || keywords.isEmpty) {
-        keywords = _vectorService.extractKeywords('$title $description');
-        debugPrint('✅ Keywords extracted: ${keywords.join(', ')}');
+        // Extract simple keywords from title and description
+        keywords = '$title $description'
+            .toLowerCase()
+            .split(RegExp(r'\s+'))
+            .where((word) => word.length > 3)
+            .take(10)
+            .toList();
+        debugPrint(' Keywords extracted: ${keywords.join(', ')}');
       }
 
       // Auto-fix missing intentAnalysis
@@ -128,14 +124,14 @@ class PostValidator {
           'domain': 'general',
           'confidence': 0.5,
         };
-        debugPrint('✅ Default intentAnalysis added');
+        debugPrint(' Default intentAnalysis added');
       }
 
       // Auto-fix expiration date
       DateTime? expiresAt = post.expiresAt;
       if (expiresAt == null || expiresAt.isBefore(DateTime.now())) {
         expiresAt = DateTime.now().add(const Duration(days: 30));
-        debugPrint('✅ Expiration date set to 30 days from now');
+        debugPrint(' Expiration date set to 30 days from now');
       }
 
       // Create fixed post
@@ -174,18 +170,18 @@ class PostValidator {
       final validation = validate(fixedPost);
 
       if (!validation.isValid) {
-        debugPrint('❌ Post validation failed: ${validation.errors.join(', ')}');
+        debugPrint(' Post validation failed: ${validation.errors.join(', ')}');
         throw ValidationException(validation.errors.join('; '));
       }
 
       if (validation.warnings.isNotEmpty) {
-        debugPrint('⚠️ Post warnings: ${validation.warnings.join(', ')}');
+        debugPrint(' Post warnings: ${validation.warnings.join(', ')}');
       }
 
-      debugPrint('✅ Post validation successful');
+      debugPrint(' Post validation successful');
       return fixedPost;
     } catch (e) {
-      debugPrint('❌ Error ensuring post validity: $e');
+      debugPrint(' Error ensuring post validity: $e');
       rethrow;
     }
   }
@@ -200,7 +196,8 @@ class PostValidator {
       errors.add('userId is required');
     }
 
-    if (data['originalPrompt'] == null || data['originalPrompt'].toString().isEmpty) {
+    if (data['originalPrompt'] == null ||
+        data['originalPrompt'].toString().isEmpty) {
       errors.add('originalPrompt is required');
     }
 
@@ -212,7 +209,8 @@ class PostValidator {
       warnings.add('title is missing');
     }
 
-    if (data['intentAnalysis'] == null || (data['intentAnalysis'] as Map).isEmpty) {
+    if (data['intentAnalysis'] == null ||
+        (data['intentAnalysis'] as Map).isEmpty) {
       warnings.add('intentAnalysis is missing');
     }
 

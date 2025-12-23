@@ -3,7 +3,7 @@
 class AppAssets {
   AppAssets._(); // Private constructor to prevent instantiation
 
-  // ============ LOCAL ASSET PATHS ============
+  //    LOCAL ASSET PATHS
   static const String logoPath = 'assets/logo/Clogo.jpeg';
   static const String searchRequirementImage =
       'assets/logo/searchRequirementData.jpeg';
@@ -12,11 +12,18 @@ class AppAssets {
   static const String searchDataImage = 'assets/logo/searchData.jpeg';
   static const String homeBackgroundImage = 'assets/logo/home_background.webp';
 
-  // ============ EXTERNAL SERVICE ICONS ============
+  //    AUDIO ASSET PATHS
+  /// Ringtone for incoming calls (used with audioplayers AssetSource)
+  static const String ringtoneAudio = 'audio/ringtone.mp3';
+
+  /// Calling tone for outgoing calls (used with audioplayers AssetSource)
+  static const String callingToneAudio = 'audio/calling_tone.mp3';
+
+  //    EXTERNAL SERVICE ICONS
   static const String googleAuthIcon =
       'https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg';
 
-  // ============ DEMO VIDEO URLs ============
+  //    DEMO VIDEO URLs
   static const String demoBeeVideo =
       'https://flutter.github.io/assets-for-api-docs/assets/videos/bee.mp4';
   static const String demoButterflyVideo =
@@ -34,7 +41,7 @@ class AppAssets {
     demoButterflyVideo,
   ];
 
-  // ============ DEMO FOOD/MARKETPLACE IMAGES (Unsplash) ============
+  //    DEMO FOOD/MARKETPLACE IMAGES (Unsplash)
 
   // User Profile Placeholder
   static const String demoUserAvatar =
@@ -130,7 +137,7 @@ class AppAssets {
   static const String imgMediterranean =
       'https://images.unsplash.com/photo-1544025162-d76694265947?w=400';
 
-  // ============ PLACEHOLDER IMAGES ============
+  //    PLACEHOLDER IMAGES
   static const String placeholderUser =
       'https://images.unsplash.com/photo-1511367461989-f85a21fda167?w=200';
   static const String placeholderFood =
@@ -138,7 +145,7 @@ class AppAssets {
   static const String placeholderRestaurant =
       'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400';
 
-  // ============ POST PLACEHOLDER IMAGES ============
+  //    POST PLACEHOLDER IMAGES
   static const List<String> demoPostImages = [
     'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600', // Watch
     'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=600', // Headphones
@@ -157,7 +164,7 @@ class AppAssets {
     return demoPostImages[index % demoPostImages.length];
   }
 
-  // ============ API ENDPOINTS ============
+  //    API ENDPOINTS
   static const String geminiApiBaseUrl =
       'https://generativelanguage.googleapis.com';
   static const String osmReverseGeocode =
@@ -171,10 +178,10 @@ class AppAssets {
       'https://api.opencagedata.com/geocode/v1/json';
   static const String ipApiGeocode = 'https://ipapi.co/json/';
 
-  // ============ APP LINKS ============
+  //    APP LINKS
   static const String appDownloadLink = 'https://supper.app/download';
 
-  // ============ HELPER METHODS ============
+  //    HELPER METHODS
 
   /// Get Unsplash image URL with custom width
   static String unsplashImage(String photoId, {int width = 400}) {

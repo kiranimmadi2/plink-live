@@ -76,23 +76,23 @@ class VoiceCallService {
   /// Initialize the WebRTC service
   Future<bool> initialize() async {
     if (_isInitialized) {
-      debugPrint('🎤 VoiceCallService: Already initialized');
+      debugPrint('  VoiceCallService: Already initialized');
       return true;
     }
 
     try {
       final micPermission = await Permission.microphone.request();
       if (!micPermission.isGranted) {
-        debugPrint('🎤 VoiceCallService: Microphone permission denied');
+        debugPrint('  VoiceCallService: Microphone permission denied');
         onError?.call('Microphone permission required');
         return false;
       }
 
       _isInitialized = true;
-      debugPrint('🎤 VoiceCallService: Initialized successfully');
+      debugPrint('  VoiceCallService: Initialized successfully');
       return true;
     } catch (e) {
-      debugPrint('🎤 VoiceCallService: Initialization error - $e');
+      debugPrint('  VoiceCallService: Initialization error - $e');
       onError?.call('Failed to initialize: $e');
       return false;
     }
@@ -100,7 +100,7 @@ class VoiceCallService {
 
   /// Create peer connection with proper audio handling
   Future<void> _createPeerConnection() async {
-    debugPrint('🎤 VoiceCallService: Creating peer connection...');
+    debugPrint('  VoiceCallService: Creating peer connection...');
 
     _peerConnection = await createPeerConnection(_configuration);
     _remoteDescriptionSet = false;
@@ -109,7 +109,7 @@ class VoiceCallService {
     // Handle ICE candidates
     _peerConnection!.onIceCandidate = (RTCIceCandidate candidate) {
       if (candidate.candidate != null && candidate.candidate!.isNotEmpty) {
-        debugPrint('🎤 VoiceCallService: ICE candidate generated');
+        debugPrint(' VoiceCallService: ICE candidate generated');
         if (_currentCallId != null) {
           _sendIceCandidate(candidate);
         }
@@ -118,43 +118,52 @@ class VoiceCallService {
 
     // Handle ICE connection state
     _peerConnection!.onIceConnectionState = (RTCIceConnectionState state) {
-      debugPrint('🎤 VoiceCallService: ICE connection state: $state');
+      debugPrint(' VoiceCallService: ICE connection state: $state');
       if (state == RTCIceConnectionState.RTCIceConnectionStateConnected ||
           state == RTCIceConnectionState.RTCIceConnectionStateCompleted) {
-        debugPrint('🎤 VoiceCallService: ✅ ICE Connected - Audio should work now!');
+        debugPrint(
+          ' VoiceCallService:  ICE Connected - Audio should work now!',
+        );
         onUserJoined?.call(1);
-      } else if (state == RTCIceConnectionState.RTCIceConnectionStateDisconnected ||
-                 state == RTCIceConnectionState.RTCIceConnectionStateFailed) {
-        debugPrint('🎤 VoiceCallService: ❌ ICE Disconnected/Failed');
+      } else if (state ==
+              RTCIceConnectionState.RTCIceConnectionStateDisconnected ||
+          state == RTCIceConnectionState.RTCIceConnectionStateFailed) {
+        debugPrint(' VoiceCallService:  ICE Disconnected/Failed');
         onUserOffline?.call(1);
       }
     };
 
     // Handle ICE gathering state
     _peerConnection!.onIceGatheringState = (RTCIceGatheringState state) {
-      debugPrint('🎤 VoiceCallService: ICE gathering state: $state');
+      debugPrint(' VoiceCallService: ICE gathering state: $state');
     };
 
     // Handle connection state changes
     _peerConnection!.onConnectionState = (RTCPeerConnectionState state) {
-      debugPrint('🎤 VoiceCallService: Connection state: $state');
+      debugPrint(' VoiceCallService: Connection state: $state');
       if (state == RTCPeerConnectionState.RTCPeerConnectionStateConnected) {
-        debugPrint('🎤 VoiceCallService: ✅ Peer connection established!');
+        debugPrint(' VoiceCallService:  Peer connection established!');
       }
     };
 
     // CRITICAL: Handle remote audio track - this makes audio play
     _peerConnection!.onTrack = (RTCTrackEvent event) {
-      debugPrint('🎤 VoiceCallService: 🔊 Remote track received: ${event.track.kind}, enabled: ${event.track.enabled}');
+      debugPrint(
+        '  VoiceCallService:  Remote track received: ${event.track.kind}, enabled: ${event.track.enabled}',
+      );
       if (event.track.kind == 'audio') {
         if (event.streams.isNotEmpty) {
           _remoteStream = event.streams[0];
-          debugPrint('🎤 VoiceCallService: ✅ Remote audio stream set! Stream ID: ${_remoteStream?.id}');
+          debugPrint(
+            '  VoiceCallService:  Remote audio stream set! Stream ID: ${_remoteStream?.id}',
+          );
 
           // Ensure audio track is enabled
           for (var track in _remoteStream!.getAudioTracks()) {
             track.enabled = true;
-            debugPrint('🎤 VoiceCallService: Remote audio track enabled: ${track.id}');
+            debugPrint(
+              '  VoiceCallService: Remote audio track enabled: ${track.id}',
+            );
           }
         }
       }
@@ -162,20 +171,22 @@ class VoiceCallService {
 
     // Also handle onAddStream for older WebRTC implementations
     _peerConnection!.onAddStream = (MediaStream stream) {
-      debugPrint('🎤 VoiceCallService: 🔊 Remote stream added via onAddStream');
+      debugPrint('  VoiceCallService:  Remote stream added via onAddStream');
       _remoteStream = stream;
       for (var track in stream.getAudioTracks()) {
         track.enabled = true;
-        debugPrint('🎤 VoiceCallService: Remote audio track enabled: ${track.id}');
+        debugPrint(
+          '  VoiceCallService: Remote audio track enabled: ${track.id}',
+        );
       }
     };
 
-    debugPrint('🎤 VoiceCallService: ✅ Peer connection created successfully');
+    debugPrint('  VoiceCallService:  Peer connection created successfully');
   }
 
   /// Get local audio stream
   Future<void> _getLocalStream() async {
-    debugPrint('🎤 VoiceCallService: Getting local audio stream...');
+    debugPrint('  VoiceCallService: Getting local audio stream...');
 
     final mediaConstraints = {
       'audio': {
@@ -187,31 +198,35 @@ class VoiceCallService {
     };
 
     _localStream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
-    debugPrint('🎤 VoiceCallService: ✅ Local audio stream obtained, ID: ${_localStream?.id}');
+    debugPrint(
+      ' VoiceCallService:  Local audio stream obtained, ID: ${_localStream?.id}',
+    );
 
     // Add tracks to peer connection
     for (var track in _localStream!.getAudioTracks()) {
       track.enabled = true;
       await _peerConnection!.addTrack(track, _localStream!);
-      debugPrint('🎤 VoiceCallService: Added local audio track: ${track.id}');
+      debugPrint(' VoiceCallService: Added local audio track: ${track.id}');
     }
 
     // Enable speaker by default
     try {
       await Helper.setSpeakerphoneOn(true);
       _isSpeakerOn = true;
-      debugPrint('🎤 VoiceCallService: Speaker enabled');
+      debugPrint(' VoiceCallService: Speaker enabled');
     } catch (e) {
-      debugPrint('🎤 VoiceCallService: Could not set speaker: $e');
+      debugPrint(' VoiceCallService: Could not set speaker: $e');
     }
   }
 
   /// Join a voice call - called by both caller and receiver
   Future<bool> joinCall(String callId, {bool isCaller = false}) async {
-    debugPrint('🎤 ════════════════════════════════════════════════════════');
-    debugPrint('🎤 VoiceCallService: Joining call $callId as ${isCaller ? "CALLER" : "RECEIVER"}');
-    debugPrint('🎤 VoiceCallService: Current state - isInCall: $_isInCall, currentCallId: $_currentCallId');
-    debugPrint('🎤 ════════════════════════════════════════════════════════');
+    debugPrint(
+      ' VoiceCallService: Joining call $callId as ${isCaller ? "CALLER" : "RECEIVER"}',
+    );
+    debugPrint(
+      ' VoiceCallService: Current state - isInCall: $_isInCall, currentCallId: $_currentCallId',
+    );
 
     if (!_isInitialized) {
       final success = await initialize();
@@ -219,16 +234,16 @@ class VoiceCallService {
     }
 
     // ALWAYS clean up previous state first
-    debugPrint('🎤 VoiceCallService: Cleaning up previous state...');
+    debugPrint(' VoiceCallService: Cleaning up previous state...');
     await _cancelSubscriptions();
 
     // Close existing peer connection if any
     if (_peerConnection != null) {
-      debugPrint('🎤 VoiceCallService: Closing existing peer connection...');
+      debugPrint(' VoiceCallService: Closing existing peer connection...');
       try {
         await _peerConnection!.close();
       } catch (e) {
-        debugPrint('🎤 VoiceCallService: Error closing peer connection: $e');
+        debugPrint(' VoiceCallService: Error closing peer connection: $e');
       }
       _peerConnection = null;
     }
@@ -241,7 +256,7 @@ class VoiceCallService {
         }
         await _localStream!.dispose();
       } catch (e) {
-        debugPrint('🎤 VoiceCallService: Error disposing local stream: $e');
+        debugPrint(' VoiceCallService: Error disposing local stream: $e');
       }
       _localStream = null;
     }
@@ -250,7 +265,7 @@ class VoiceCallService {
       try {
         await _remoteStream!.dispose();
       } catch (e) {
-        debugPrint('🎤 VoiceCallService: Error disposing remote stream: $e');
+        debugPrint(' VoiceCallService: Error disposing remote stream: $e');
       }
       _remoteStream = null;
     }
@@ -262,7 +277,7 @@ class VoiceCallService {
     _remoteDescriptionSet = false;
     _pendingIceCandidates.clear();
 
-    debugPrint('🎤 VoiceCallService: Previous state cleaned up');
+    debugPrint(' VoiceCallService: Previous state cleaned up');
 
     try {
       _currentCallId = callId;
@@ -273,14 +288,16 @@ class VoiceCallService {
       _pendingIceCandidates.clear();
 
       // Step 1: Create peer connection FIRST
-      debugPrint('🎤 VoiceCallService: Step 1 - Creating peer connection...');
+      debugPrint(' VoiceCallService: Step 1 - Creating peer connection...');
       await _createPeerConnection();
-      debugPrint('🎤 VoiceCallService: Step 1 DONE - Peer connection created, state: ${_peerConnection?.signalingState}');
+      debugPrint(
+        ' VoiceCallService: Step 1 DONE - Peer connection created, state: ${_peerConnection?.signalingState}',
+      );
 
       // Step 2: Get local audio
-      debugPrint('🎤 VoiceCallService: Step 2 - Getting local audio...');
+      debugPrint(' VoiceCallService: Step 2 - Getting local audio...');
       await _getLocalStream();
-      debugPrint('🎤 VoiceCallService: Step 2 DONE - Local audio ready');
+      debugPrint(' VoiceCallService: Step 2 DONE - Local audio ready');
 
       _isInCall = true;
 
@@ -289,11 +306,15 @@ class VoiceCallService {
         // 1. Create offer and set local description
         // 2. Send offer to Firestore
         // 3. Start listening for answer
-        debugPrint('🎤 VoiceCallService: CALLER Step 3 - Creating and sending offer...');
+        debugPrint(
+          ' VoiceCallService: CALLER Step 3 - Creating and sending offer...',
+        );
         await _createOffer();
-        debugPrint('🎤 VoiceCallService: CALLER Step 3 DONE - Offer sent');
+        debugPrint(' VoiceCallService: CALLER Step 3 DONE - Offer sent');
 
-        debugPrint('🎤 VoiceCallService: CALLER Step 4 - Starting signaling listener...');
+        debugPrint(
+          ' VoiceCallService: CALLER Step 4 - Starting signaling listener...',
+        );
         _listenForSignaling(callId);
         _listenForIceCandidates(callId);
       } else {
@@ -303,36 +324,53 @@ class VoiceCallService {
         // 3. Create answer and set local description
         // 4. Send answer to Firestore
         // 5. Start listening for ICE candidates
-        debugPrint('🎤 VoiceCallService: RECEIVER Step 3 - Waiting for offer from Firestore...');
+        debugPrint(
+          ' VoiceCallService: RECEIVER Step 3 - Waiting for offer from Firestore...',
+        );
 
         // Try to fetch offer with retries (caller might not have created it yet)
         Map<String, dynamic>? offerData;
         for (int attempt = 0; attempt < 10; attempt++) {
-          final callDoc = await _firestore.collection('calls').doc(callId).get();
+          final callDoc = await _firestore
+              .collection('calls')
+              .doc(callId)
+              .get();
           final callData = callDoc.data();
 
           if (callData != null && callData['offer'] != null) {
             offerData = Map<String, dynamic>.from(callData['offer']);
-            debugPrint('🎤 VoiceCallService: RECEIVER - Found offer on attempt ${attempt + 1}');
+            debugPrint(
+              ' VoiceCallService: RECEIVER - Found offer on attempt ${attempt + 1}',
+            );
             break;
           }
 
-          debugPrint('🎤 VoiceCallService: RECEIVER - No offer yet (attempt ${attempt + 1}/10), waiting 500ms...');
+          debugPrint(
+            ' VoiceCallService: RECEIVER - No offer yet (attempt ${attempt + 1}/10), waiting 500ms...',
+          );
           await Future.delayed(const Duration(milliseconds: 500));
         }
 
         if (offerData != null) {
-          debugPrint('🎤 VoiceCallService: RECEIVER Step 4 - Found offer, handling it NOW...');
+          debugPrint(
+            ' VoiceCallService: RECEIVER Step 4 - Found offer, handling it NOW...',
+          );
           _offerHandled = true;
           await _handleOffer(offerData);
-          debugPrint('🎤 VoiceCallService: RECEIVER Step 4 DONE - Offer handled and answer sent');
+          debugPrint(
+            ' VoiceCallService: RECEIVER Step 4 DONE - Offer handled and answer sent',
+          );
 
-          debugPrint('🎤 VoiceCallService: RECEIVER Step 5 - Starting ICE candidate listener...');
+          debugPrint(
+            ' VoiceCallService: RECEIVER Step 5 - Starting ICE candidate listener...',
+          );
           _listenForIceCandidates(callId);
           // Also listen for any signaling updates
           _listenForSignaling(callId);
         } else {
-          debugPrint('🎤 VoiceCallService: RECEIVER - No offer found after retries, starting listener...');
+          debugPrint(
+            ' VoiceCallService: RECEIVER - No offer found after retries, starting listener...',
+          );
           // Only start listening for offer if not found yet
           _listenForSignaling(callId);
           _listenForIceCandidates(callId);
@@ -340,10 +378,10 @@ class VoiceCallService {
       }
 
       onJoinChannelSuccess?.call();
-      debugPrint('🎤 VoiceCallService: ✅ Joined call successfully');
+      debugPrint(' VoiceCallService:  Joined call successfully');
       return true;
     } catch (e) {
-      debugPrint('🎤 VoiceCallService: ❌ Join call error - $e');
+      debugPrint(' VoiceCallService:  Join call error - $e');
       onError?.call('Failed to join call: $e');
       return false;
     }
@@ -351,25 +389,27 @@ class VoiceCallService {
 
   /// Cancel existing subscriptions
   Future<void> _cancelSubscriptions() async {
-    debugPrint('🎤 VoiceCallService: Cancelling existing subscriptions...');
+    debugPrint(' VoiceCallService: Cancelling existing subscriptions...');
     try {
       if (_signalingSubscription != null) {
         await _signalingSubscription!.cancel();
         _signalingSubscription = null;
-        debugPrint('🎤 VoiceCallService: ✅ Cancelled signaling subscription');
+        debugPrint(' VoiceCallService:  Cancelled signaling subscription');
       }
     } catch (e) {
-      debugPrint('🎤 VoiceCallService: Error cancelling signaling subscription: $e');
+      debugPrint(
+        ' VoiceCallService: Error cancelling signaling subscription: $e',
+      );
       _signalingSubscription = null;
     }
     try {
       if (_iceCandidateSubscription != null) {
         await _iceCandidateSubscription!.cancel();
         _iceCandidateSubscription = null;
-        debugPrint('🎤 VoiceCallService: ✅ Cancelled ICE subscription');
+        debugPrint(' VoiceCallService:  Cancelled ICE subscription');
       }
     } catch (e) {
-      debugPrint('🎤 VoiceCallService: Error cancelling ICE subscription: $e');
+      debugPrint(' VoiceCallService: Error cancelling ICE subscription: $e');
       _iceCandidateSubscription = null;
     }
   }
@@ -377,95 +417,93 @@ class VoiceCallService {
   /// Create and send offer (caller only)
   Future<void> _createOffer() async {
     try {
-      debugPrint('🎤 VoiceCallService: Creating offer...');
+      debugPrint(' VoiceCallService: Creating offer...');
 
       final offer = await _peerConnection!.createOffer({
         'offerToReceiveAudio': true,
         'offerToReceiveVideo': false,
       });
 
-      debugPrint('🎤 VoiceCallService: Setting local description (offer)...');
+      debugPrint(' VoiceCallService: Setting local description (offer)...');
       await _peerConnection!.setLocalDescription(offer);
 
       // Send offer via Firestore
-      debugPrint('🎤 VoiceCallService: Sending offer to Firestore...');
+      debugPrint(' VoiceCallService: Sending offer to Firestore...');
       await _firestore.collection('calls').doc(_currentCallId).update({
-        'offer': {
-          'sdp': offer.sdp,
-          'type': offer.type,
-        },
+        'offer': {'sdp': offer.sdp, 'type': offer.type},
         'offerCreatedAt': FieldValue.serverTimestamp(),
       });
 
-      debugPrint('🎤 VoiceCallService: ✅ Offer created and sent successfully');
+      debugPrint(' VoiceCallService:  Offer created and sent successfully');
     } catch (e) {
-      debugPrint('🎤 VoiceCallService: ❌ Create offer error - $e');
+      debugPrint(' VoiceCallService:  Create offer error - $e');
     }
   }
 
   /// Handle received offer and create answer (receiver only)
   Future<void> _handleOffer(Map<String, dynamic> offerData) async {
     if (_peerConnection == null) {
-      debugPrint('🎤 VoiceCallService: ❌ Cannot handle offer - peer connection is null');
+      debugPrint(
+        ' VoiceCallService:  Cannot handle offer - peer connection is null',
+      );
       return;
     }
 
     try {
-      debugPrint('🎤 VoiceCallService: Handling offer...');
+      debugPrint(' VoiceCallService: Handling offer...');
 
       final offer = RTCSessionDescription(
         offerData['sdp'] as String,
         offerData['type'] as String,
       );
 
-      debugPrint('🎤 VoiceCallService: Setting remote description (offer)...');
+      debugPrint(' VoiceCallService: Setting remote description (offer)...');
       await _peerConnection!.setRemoteDescription(offer);
       _remoteDescriptionSet = true;
-      debugPrint('🎤 VoiceCallService: ✅ Remote description set');
+      debugPrint(' VoiceCallService:  Remote description set');
 
       // Process any pending ICE candidates
       await _processPendingIceCandidates();
 
       // Create answer
-      debugPrint('🎤 VoiceCallService: Creating answer...');
+      debugPrint(' VoiceCallService: Creating answer...');
       final answer = await _peerConnection!.createAnswer({
         'offerToReceiveAudio': true,
         'offerToReceiveVideo': false,
       });
 
-      debugPrint('🎤 VoiceCallService: Setting local description (answer)...');
+      debugPrint(' VoiceCallService: Setting local description (answer)...');
       await _peerConnection!.setLocalDescription(answer);
 
       // Send answer via Firestore
-      debugPrint('🎤 VoiceCallService: Sending answer to Firestore...');
+      debugPrint(' VoiceCallService: Sending answer to Firestore...');
       await _firestore.collection('calls').doc(_currentCallId).update({
-        'answer': {
-          'sdp': answer.sdp,
-          'type': answer.type,
-        },
+        'answer': {'sdp': answer.sdp, 'type': answer.type},
         'answerCreatedAt': FieldValue.serverTimestamp(),
       });
 
-      debugPrint('🎤 VoiceCallService: ✅ Answer created and sent successfully');
+      debugPrint(' VoiceCallService:  Answer created and sent successfully');
     } catch (e) {
-      debugPrint('🎤 VoiceCallService: ❌ Handle offer error - $e');
+      debugPrint(' VoiceCallService:  Handle offer error - $e');
     }
   }
 
   /// Handle received answer (caller only)
   Future<void> _handleAnswer(Map<String, dynamic> answerData) async {
     if (_answerHandled) {
-      debugPrint('🎤 VoiceCallService: Answer already handled, skipping...');
+      debugPrint(' VoiceCallService: Answer already handled, skipping...');
       return;
     }
 
     if (_peerConnection == null) {
-      debugPrint('🎤 VoiceCallService: ❌ Cannot handle answer - peer connection is null');
+      debugPrint(
+        ' VoiceCallService:  Cannot handle answer - peer connection is null',
+      );
       return;
     }
 
     try {
-      debugPrint('🎤 VoiceCallService: Handling answer...');
+      debugPrint(' VoiceCallService: Handling answer...');
 
       _answerHandled = true;
 
@@ -474,15 +512,15 @@ class VoiceCallService {
         answerData['type'] as String,
       );
 
-      debugPrint('🎤 VoiceCallService: Setting remote description (answer)...');
+      debugPrint(' VoiceCallService: Setting remote description (answer)...');
       await _peerConnection!.setRemoteDescription(answer);
       _remoteDescriptionSet = true;
-      debugPrint('🎤 VoiceCallService: ✅ Remote description (answer) set');
+      debugPrint(' VoiceCallService:  Remote description (answer) set');
 
       // Process any pending ICE candidates
       await _processPendingIceCandidates();
     } catch (e) {
-      debugPrint('🎤 VoiceCallService: ❌ Handle answer error - $e');
+      debugPrint(' VoiceCallService:  Handle answer error - $e');
       _answerHandled = false;
     }
   }
@@ -491,19 +529,21 @@ class VoiceCallService {
   Future<void> _processPendingIceCandidates() async {
     if (_pendingIceCandidates.isEmpty) return;
 
-    debugPrint('🎤 VoiceCallService: Processing ${_pendingIceCandidates.length} pending ICE candidates...');
+    debugPrint(
+      ' VoiceCallService: Processing ${_pendingIceCandidates.length} pending ICE candidates...',
+    );
 
     for (var candidate in _pendingIceCandidates) {
       try {
         await _peerConnection?.addCandidate(candidate);
-        debugPrint('🎤 VoiceCallService: Added pending ICE candidate');
+        debugPrint(' VoiceCallService: Added pending ICE candidate');
       } catch (e) {
-        debugPrint('🎤 VoiceCallService: Error adding pending candidate: $e');
+        debugPrint(' VoiceCallService: Error adding pending candidate: $e');
       }
     }
 
     _pendingIceCandidates.clear();
-    debugPrint('🎤 VoiceCallService: ✅ All pending ICE candidates processed');
+    debugPrint(' VoiceCallService:  All pending ICE candidates processed');
   }
 
   /// Send ICE candidate via Firestore (separated by role)
@@ -518,60 +558,75 @@ class VoiceCallService {
           .doc(_currentCallId)
           .collection(collection)
           .add({
-        'candidate': candidate.candidate,
-        'sdpMid': candidate.sdpMid,
-        'sdpMLineIndex': candidate.sdpMLineIndex,
-        'timestamp': FieldValue.serverTimestamp(),
-      });
+            'candidate': candidate.candidate,
+            'sdpMid': candidate.sdpMid,
+            'sdpMLineIndex': candidate.sdpMLineIndex,
+            'timestamp': FieldValue.serverTimestamp(),
+          });
 
-      debugPrint('🎤 VoiceCallService: ICE candidate sent to $collection');
+      debugPrint(' VoiceCallService: ICE candidate sent to $collection');
     } catch (e) {
-      debugPrint('🎤 VoiceCallService: Send ICE candidate error - $e');
+      debugPrint(' VoiceCallService: Send ICE candidate error - $e');
     }
   }
 
   /// Listen for signaling messages from Firestore (offer/answer only)
   void _listenForSignaling(String callId) {
-    debugPrint('🎤 VoiceCallService: Starting signaling listener for call: $callId');
-    debugPrint('🎤 VoiceCallService: Current call ID: $_currentCallId, isCaller: $_isCaller');
+    debugPrint(
+      ' VoiceCallService: Starting signaling listener for call: $callId',
+    );
+    debugPrint(
+      ' VoiceCallService: Current call ID: $_currentCallId, isCaller: $_isCaller',
+    );
 
     // Listen for offer/answer updates
-    _signalingSubscription = _firestore
-        .collection('calls')
-        .doc(callId)
-        .snapshots()
-        .listen((snapshot) async {
+    _signalingSubscription = _firestore.collection('calls').doc(callId).snapshots().listen((
+      snapshot,
+    ) async {
       final data = snapshot.data();
       if (data == null) return;
 
       // Skip if this is not our current call
       if (_currentCallId != callId) {
-        debugPrint('🎤 VoiceCallService: Call ID mismatch, ignoring (expected: $_currentCallId, got: $callId)');
+        debugPrint(
+          ' VoiceCallService: Call ID mismatch, ignoring (expected: $_currentCallId, got: $callId)',
+        );
         return;
       }
 
       // Skip if peer connection is not ready
       if (_peerConnection == null) {
-        debugPrint('🎤 VoiceCallService: Peer connection not ready, ignoring signaling event for call: $callId');
+        debugPrint(
+          ' VoiceCallService: Peer connection not ready, ignoring signaling event for call: $callId',
+        );
         return;
       }
 
       // Caller waits for answer
       if (_isCaller && data['answer'] != null && !_answerHandled) {
-        debugPrint('🎤 VoiceCallService: CALLER - Received answer from Firestore for call: $callId');
+        debugPrint(
+          ' VoiceCallService: CALLER - Received answer from Firestore for call: $callId',
+        );
         final signalingState = _peerConnection?.signalingState;
-        debugPrint('🎤 VoiceCallService: Current signaling state: $signalingState');
+        debugPrint(
+          ' VoiceCallService: Current signaling state: $signalingState',
+        );
 
-        if (signalingState == RTCSignalingState.RTCSignalingStateHaveLocalOffer) {
+        if (signalingState ==
+            RTCSignalingState.RTCSignalingStateHaveLocalOffer) {
           await _handleAnswer(Map<String, dynamic>.from(data['answer']));
         }
       }
 
       // Receiver waits for offer (if not already handled)
       if (!_isCaller && data['offer'] != null && !_offerHandled) {
-        debugPrint('🎤 VoiceCallService: RECEIVER - Received offer from Firestore for call: $callId');
+        debugPrint(
+          ' VoiceCallService: RECEIVER - Received offer from Firestore for call: $callId',
+        );
         final signalingState = _peerConnection?.signalingState;
-        debugPrint('🎤 VoiceCallService: Current signaling state: $signalingState');
+        debugPrint(
+          ' VoiceCallService: Current signaling state: $signalingState',
+        );
 
         if (signalingState == RTCSignalingState.RTCSignalingStateStable) {
           _offerHandled = true;
@@ -583,8 +638,12 @@ class VoiceCallService {
 
   /// Listen for ICE candidates from the other party
   void _listenForIceCandidates(String callId) {
-    final otherCandidatesCollection = _isCaller ? 'receiverCandidates' : 'callerCandidates';
-    debugPrint('🎤 VoiceCallService: Starting ICE candidate listener on: $otherCandidatesCollection');
+    final otherCandidatesCollection = _isCaller
+        ? 'receiverCandidates'
+        : 'callerCandidates';
+    debugPrint(
+      ' VoiceCallService: Starting ICE candidate listener on: $otherCandidatesCollection',
+    );
 
     _iceCandidateSubscription = _firestore
         .collection('calls')
@@ -592,44 +651,50 @@ class VoiceCallService {
         .collection(otherCandidatesCollection)
         .snapshots()
         .listen((snapshot) async {
-      // Skip if peer connection is not ready
-      if (_peerConnection == null) {
-        debugPrint('🎤 VoiceCallService: ICE - Peer connection null, skipping');
-        return;
-      }
-
-      for (var change in snapshot.docChanges) {
-        if (change.type == DocumentChangeType.added) {
-          final data = change.doc.data();
-          if (data != null && data['candidate'] != null) {
-            final candidate = RTCIceCandidate(
-              data['candidate'] as String?,
-              data['sdpMid'] as String?,
-              data['sdpMLineIndex'] as int?,
+          // Skip if peer connection is not ready
+          if (_peerConnection == null) {
+            debugPrint(
+              ' VoiceCallService: ICE - Peer connection null, skipping',
             );
+            return;
+          }
 
-            // Only add ICE candidate if remote description is set
-            if (_remoteDescriptionSet && _peerConnection != null) {
-              try {
-                await _peerConnection!.addCandidate(candidate);
-                debugPrint('🎤 VoiceCallService: ✅ Added ICE candidate from $otherCandidatesCollection');
-              } catch (e) {
-                debugPrint('🎤 VoiceCallService: Error adding candidate: $e');
+          for (var change in snapshot.docChanges) {
+            if (change.type == DocumentChangeType.added) {
+              final data = change.doc.data();
+              if (data != null && data['candidate'] != null) {
+                final candidate = RTCIceCandidate(
+                  data['candidate'] as String?,
+                  data['sdpMid'] as String?,
+                  data['sdpMLineIndex'] as int?,
+                );
+
+                // Only add ICE candidate if remote description is set
+                if (_remoteDescriptionSet && _peerConnection != null) {
+                  try {
+                    await _peerConnection!.addCandidate(candidate);
+                    debugPrint(
+                      ' VoiceCallService:  Added ICE candidate from $otherCandidatesCollection',
+                    );
+                  } catch (e) {
+                    debugPrint(' VoiceCallService: Error adding candidate: $e');
+                  }
+                } else {
+                  // Queue the candidate for later
+                  _pendingIceCandidates.add(candidate);
+                  debugPrint(
+                    ' VoiceCallService: Queued ICE candidate (remote desc not set yet, count: ${_pendingIceCandidates.length})',
+                  );
+                }
               }
-            } else {
-              // Queue the candidate for later
-              _pendingIceCandidates.add(candidate);
-              debugPrint('🎤 VoiceCallService: Queued ICE candidate (remote desc not set yet, count: ${_pendingIceCandidates.length})');
             }
           }
-        }
-      }
-    });
+        });
   }
 
   /// Leave the current call
   Future<void> leaveCall() async {
-    debugPrint('🎤 VoiceCallService: Leaving call...');
+    debugPrint(' VoiceCallService: Leaving call...');
 
     try {
       await _cancelSubscriptions();
@@ -665,9 +730,9 @@ class VoiceCallService {
       _pendingIceCandidates.clear();
 
       onLeaveChannel?.call();
-      debugPrint('🎤 VoiceCallService: ✅ Left call successfully');
+      debugPrint(' VoiceCallService:  Left call successfully');
     } catch (e) {
-      debugPrint('🎤 VoiceCallService: Leave call error - $e');
+      debugPrint(' VoiceCallService: Leave call error - $e');
     }
   }
 
@@ -679,7 +744,7 @@ class VoiceCallService {
     for (var track in _localStream!.getAudioTracks()) {
       track.enabled = !_isMuted;
     }
-    debugPrint('🎤 VoiceCallService: Mute: $_isMuted');
+    debugPrint(' VoiceCallService: Mute: $_isMuted');
   }
 
   /// Set mute state
@@ -690,7 +755,7 @@ class VoiceCallService {
     for (var track in _localStream!.getAudioTracks()) {
       track.enabled = !muted;
     }
-    debugPrint('🎤 VoiceCallService: Mute set to $muted');
+    debugPrint(' VoiceCallService: Mute set to $muted');
   }
 
   /// Toggle speaker
@@ -698,9 +763,9 @@ class VoiceCallService {
     _isSpeakerOn = !_isSpeakerOn;
     try {
       await Helper.setSpeakerphoneOn(_isSpeakerOn);
-      debugPrint('🎤 VoiceCallService: Speaker: $_isSpeakerOn');
+      debugPrint(' VoiceCallService: Speaker: $_isSpeakerOn');
     } catch (e) {
-      debugPrint('🎤 VoiceCallService: Toggle speaker error - $e');
+      debugPrint(' VoiceCallService: Toggle speaker error - $e');
     }
   }
 
@@ -709,15 +774,15 @@ class VoiceCallService {
     _isSpeakerOn = enabled;
     try {
       await Helper.setSpeakerphoneOn(enabled);
-      debugPrint('🎤 VoiceCallService: Speaker set to $enabled');
+      debugPrint(' VoiceCallService: Speaker set to $enabled');
     } catch (e) {
-      debugPrint('🎤 VoiceCallService: Set speaker error - $e');
+      debugPrint(' VoiceCallService: Set speaker error - $e');
     }
   }
 
   /// Dispose the service
   Future<void> dispose() async {
-    debugPrint('🎤 VoiceCallService: Disposing');
+    debugPrint(' VoiceCallService: Disposing');
     await leaveCall();
     _isInitialized = false;
   }

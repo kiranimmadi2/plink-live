@@ -15,9 +15,7 @@ class InquiryService {
 
   String? get _currentUserId => _auth.currentUser?.uid;
 
-  // ============================================
   // INQUIRY CRUD OPERATIONS
-  // ============================================
 
   /// Send an inquiry to a professional
   Future<String?> sendInquiry({
@@ -34,13 +32,17 @@ class InquiryService {
 
     try {
       // Get client info
-      final clientDoc =
-          await _firestore.collection('users').doc(_currentUserId).get();
+      final clientDoc = await _firestore
+          .collection('users')
+          .doc(_currentUserId)
+          .get();
       final clientData = clientDoc.data() ?? {};
 
       // Get professional info
-      final proDoc =
-          await _firestore.collection('users').doc(professionalId).get();
+      final proDoc = await _firestore
+          .collection('users')
+          .doc(professionalId)
+          .get();
       final proData = proDoc.data() ?? {};
 
       final inquiry = InquiryModel(
@@ -50,7 +52,10 @@ class InquiryService {
         clientPhoto: clientData['profileImageUrl'] ?? clientData['photoUrl'],
         clientEmail: clientData['email'],
         professionalId: professionalId,
-        professionalName: proData['name'] ?? proData['professionalProfile']?['businessName'] ?? 'Professional',
+        professionalName:
+            proData['name'] ??
+            proData['professionalProfile']?['businessName'] ??
+            'Professional',
         serviceId: serviceId,
         serviceName: serviceName,
         message: message,
@@ -61,18 +66,19 @@ class InquiryService {
       );
 
       // Add inquiry
-      final docRef =
-          await _firestore.collection('inquiries').add(inquiry.toMap());
+      final docRef = await _firestore
+          .collection('inquiries')
+          .add(inquiry.toMap());
 
       // Update professional's inquiry count
       await _firestore
           .collection('professional_stats')
           .doc(professionalId)
           .set({
-        'totalInquiries': FieldValue.increment(1),
-        'pendingInquiries': FieldValue.increment(1),
-        'lastInquiryAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+            'totalInquiries': FieldValue.increment(1),
+            'pendingInquiries': FieldValue.increment(1),
+            'lastInquiryAt': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
 
       // Update service inquiry count if applicable
       if (serviceId != null) {
@@ -108,8 +114,10 @@ class InquiryService {
       if (inquiry.professionalId != _currentUserId) return false;
 
       // Create response message
-      final userDoc =
-          await _firestore.collection('users').doc(_currentUserId).get();
+      final userDoc = await _firestore
+          .collection('users')
+          .doc(_currentUserId)
+          .get();
       final userData = userDoc.data() ?? {};
 
       final newMessage = InquiryMessage(
@@ -134,9 +142,7 @@ class InquiryService {
         await _firestore
             .collection('professional_stats')
             .doc(_currentUserId)
-            .update({
-          'pendingInquiries': FieldValue.increment(-1),
-        });
+            .update({'pendingInquiries': FieldValue.increment(-1)});
       }
 
       // TODO: Send push notification to client
@@ -149,7 +155,11 @@ class InquiryService {
   }
 
   /// Add a message to inquiry thread
-  Future<bool> addMessage(String inquiryId, String message, {List<String>? attachments}) async {
+  Future<bool> addMessage(
+    String inquiryId,
+    String message, {
+    List<String>? attachments,
+  }) async {
     if (_currentUserId == null) return false;
 
     try {
@@ -163,8 +173,10 @@ class InquiryService {
         return false; // Not a participant
       }
 
-      final userDoc =
-          await _firestore.collection('users').doc(_currentUserId).get();
+      final userDoc = await _firestore
+          .collection('users')
+          .doc(_currentUserId)
+          .get();
       final userData = userDoc.data() ?? {};
 
       final newMessage = InquiryMessage(
@@ -217,7 +229,8 @@ class InquiryService {
       if (inquiry.professionalId == _currentUserId) {
         final statsUpdates = <String, dynamic>{};
 
-        if (inquiry.status == InquiryStatus.pending && status != InquiryStatus.pending) {
+        if (inquiry.status == InquiryStatus.pending &&
+            status != InquiryStatus.pending) {
           statsUpdates['pendingInquiries'] = FieldValue.increment(-1);
         }
 
@@ -270,9 +283,7 @@ class InquiryService {
     }
   }
 
-  // ============================================
   // INQUIRY QUERIES
-  // ============================================
 
   /// Get inquiries for professional (received)
   Future<List<InquiryModel>> getReceivedInquiries({
@@ -298,7 +309,9 @@ class InquiryService {
       query = query.orderBy('lastActivityAt', descending: true).limit(limit);
 
       final snapshot = await query.get();
-      return snapshot.docs.map((doc) => InquiryModel.fromFirestore(doc)).toList();
+      return snapshot.docs
+          .map((doc) => InquiryModel.fromFirestore(doc))
+          .toList();
     } catch (e) {
       debugPrint('Error getting received inquiries: $e');
       return [];
@@ -306,7 +319,9 @@ class InquiryService {
   }
 
   /// Stream received inquiries
-  Stream<List<InquiryModel>> watchReceivedInquiries({bool includeArchived = false}) {
+  Stream<List<InquiryModel>> watchReceivedInquiries({
+    bool includeArchived = false,
+  }) {
     if (_currentUserId == null) return Stream.value([]);
 
     Query<Map<String, dynamic>> query = _firestore
@@ -321,8 +336,11 @@ class InquiryService {
         .orderBy('lastActivityAt', descending: true)
         .limit(50)
         .snapshots()
-        .map((snapshot) =>
-            snapshot.docs.map((doc) => InquiryModel.fromFirestore(doc)).toList());
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => InquiryModel.fromFirestore(doc))
+              .toList(),
+        );
   }
 
   /// Get inquiries sent by client
@@ -337,7 +355,9 @@ class InquiryService {
           .limit(limit)
           .get();
 
-      return snapshot.docs.map((doc) => InquiryModel.fromFirestore(doc)).toList();
+      return snapshot.docs
+          .map((doc) => InquiryModel.fromFirestore(doc))
+          .toList();
     } catch (e) {
       debugPrint('Error getting sent inquiries: $e');
       return [];
@@ -354,8 +374,11 @@ class InquiryService {
         .orderBy('createdAt', descending: true)
         .limit(50)
         .snapshots()
-        .map((snapshot) =>
-            snapshot.docs.map((doc) => InquiryModel.fromFirestore(doc)).toList());
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => InquiryModel.fromFirestore(doc))
+              .toList(),
+        );
   }
 
   /// Get single inquiry

@@ -1,10 +1,11 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
-import '../../services/firebase_storage_service.dart';
+import '../../res/config/app_colors.dart';
 import '../../services/auth_service.dart';
 import '../../services/user_manager.dart';
 import '../../services/location_service.dart';
@@ -20,8 +21,8 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   final AuthService _authService = AuthService();
   final UserManager _userManager = UserManager();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseStorage _storage = FirebaseStorage.instance;
   final LocationService _locationService = LocationService();
-  final FirebaseStorageService _storageService = FirebaseStorageService();
   final ImagePicker _imagePicker = ImagePicker();
 
   final _formKey = GlobalKey<FormState>();
@@ -231,15 +232,14 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
 
       if (_selectedImage != null) {
         debugPrint('Uploading new profile image...');
-        final uploadedUrl = await _storageService.uploadProfileImage(
-          _selectedImage!,
-          user!.uid,
-        );
-        if (uploadedUrl != null) {
+        try {
+          final ref = _storage.ref().child('profile_images/${user!.uid}.jpg');
+          await ref.putFile(_selectedImage!);
+          final uploadedUrl = await ref.getDownloadURL();
           photoUrl = uploadedUrl;
           debugPrint('New profile image uploaded: $uploadedUrl');
-        } else {
-          debugPrint('Failed to upload profile image');
+        } catch (e) {
+          debugPrint('Failed to upload profile image: $e');
         }
       }
 
@@ -759,23 +759,40 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                     const SizedBox(height: 24),
 
                     // Update Button
-                    SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: ElevatedButton(
-                        onPressed: _isUpdating ? null : _updateProfile,
-                        child: _isUpdating
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    Colors.white,
+                    GestureDetector(
+                      onTap: _isUpdating ? null : _updateProfile,
+                      child: Container(
+                        width: double.infinity,
+                        height: 50,
+                        decoration: BoxDecoration(
+                          color: AppColors.buttonBackground(),
+                          borderRadius: BorderRadius.circular(AppColors.buttonBorderRadius),
+                          border: Border.all(
+                            color: AppColors.buttonBorder(),
+                            width: 1,
+                          ),
+                        ),
+                        child: Center(
+                          child: _isUpdating
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white,
+                                    ),
+                                  ),
+                                )
+                              : const Text(
+                                  'Update Profile',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
-                              )
-                            : const Text('Update Profile'),
+                        ),
                       ),
                     ),
                   ],

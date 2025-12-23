@@ -3,9 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import './app_providers.dart';
 
-/// ============================================
 /// USER PROFILE STATE
-/// ============================================
 
 /// State class for user profile
 class UserProfileState {
@@ -42,18 +40,19 @@ class UserProfileState {
   String? get city => profile?['city'];
   String? get aboutMe => profile?['aboutMe'];
   List<String> get interests => List<String>.from(profile?['interests'] ?? []);
-  List<String> get activities => List<String>.from(profile?['activities'] ?? []);
-  List<String> get connectionTypes => List<String>.from(profile?['connectionTypes'] ?? []);
+  List<String> get activities =>
+      List<String>.from(profile?['activities'] ?? []);
+  List<String> get connectionTypes =>
+      List<String>.from(profile?['connectionTypes'] ?? []);
 }
 
-/// ============================================
 /// USER PROFILE NOTIFIER
-/// ============================================
 
 class UserProfileNotifier extends StateNotifier<UserProfileState> {
   final String? userId;
 
-  UserProfileNotifier(this.userId) : super(const UserProfileState(isLoading: true)) {
+  UserProfileNotifier(this.userId)
+    : super(const UserProfileState(isLoading: true)) {
     // Auto-load profile when notifier is created
     if (userId != null) {
       loadProfile();
@@ -89,15 +88,10 @@ class UserProfileNotifier extends StateNotifier<UserProfileState> {
           .get();
 
       if (doc.exists) {
-        state = state.copyWith(
-          profile: doc.data(),
-          isLoading: false,
-        );
+        state = state.copyWith(profile: doc.data(), isLoading: false);
       } else {
         // If no Firestore doc, keep Auth data but mark as not loading
-        state = state.copyWith(
-          isLoading: false,
-        );
+        state = state.copyWith(isLoading: false);
       }
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
@@ -143,13 +137,11 @@ class UserProfileNotifier extends StateNotifier<UserProfileState> {
 /// Provider for user profile
 final userProfileProvider =
     StateNotifierProvider<UserProfileNotifier, UserProfileState>((ref) {
-  final userId = ref.watch(currentUserIdProvider);
-  return UserProfileNotifier(userId);
-});
+      final userId = ref.watch(currentUserIdProvider);
+      return UserProfileNotifier(userId);
+    });
 
-/// ============================================
 /// SEARCH HISTORY STATE
-/// ============================================
 
 /// State for user's search/intent history
 class SearchHistoryState {
@@ -179,7 +171,8 @@ class SearchHistoryState {
 class SearchHistoryNotifier extends StateNotifier<SearchHistoryState> {
   final String? userId;
 
-  SearchHistoryNotifier(this.userId) : super(const SearchHistoryState(isLoading: true)) {
+  SearchHistoryNotifier(this.userId)
+    : super(const SearchHistoryState(isLoading: true)) {
     // Auto-load history when notifier is created
     if (userId != null) {
       loadHistory();
@@ -240,13 +233,11 @@ class SearchHistoryNotifier extends StateNotifier<SearchHistoryState> {
 /// Provider for search history
 final searchHistoryProvider =
     StateNotifierProvider<SearchHistoryNotifier, SearchHistoryState>((ref) {
-  final userId = ref.watch(currentUserIdProvider);
-  return SearchHistoryNotifier(userId);
-});
+      final userId = ref.watch(currentUserIdProvider);
+      return SearchHistoryNotifier(userId);
+    });
 
-/// ============================================
 /// USER POSTS PROVIDER
-/// ============================================
 
 /// Stream provider for user's active posts
 final userPostsProvider = StreamProvider<List<Map<String, dynamic>>>((ref) {
@@ -261,17 +252,15 @@ final userPostsProvider = StreamProvider<List<Map<String, dynamic>>>((ref) {
       .limit(20)
       .snapshots()
       .map((snapshot) {
-    return snapshot.docs.map((doc) {
-      final data = doc.data();
-      data['id'] = doc.id;
-      return data;
-    }).toList();
-  });
+        return snapshot.docs.map((doc) {
+          final data = doc.data();
+          data['id'] = doc.id;
+          return data;
+        }).toList();
+      });
 });
 
-/// ============================================
 /// PROFILE EDIT STATE
-/// ============================================
 
 /// State for profile editing form
 class ProfileEditState {
@@ -294,7 +283,8 @@ class ProfileEditState {
     bool? isSaving,
   }) {
     return ProfileEditState(
-      selectedConnectionTypes: selectedConnectionTypes ?? this.selectedConnectionTypes,
+      selectedConnectionTypes:
+          selectedConnectionTypes ?? this.selectedConnectionTypes,
       selectedActivities: selectedActivities ?? this.selectedActivities,
       aboutMe: aboutMe ?? this.aboutMe,
       isSaving: isSaving ?? this.isSaving,
@@ -345,7 +335,9 @@ class ProfileEditNotifier extends StateNotifier<ProfileEditState> {
     if (profile == null) return;
 
     state = ProfileEditState(
-      selectedConnectionTypes: List<String>.from(profile['connectionTypes'] ?? []),
+      selectedConnectionTypes: List<String>.from(
+        profile['connectionTypes'] ?? [],
+      ),
       selectedActivities: List<String>.from(profile['activities'] ?? []),
       aboutMe: profile['aboutMe'] ?? '',
     );
@@ -359,5 +351,5 @@ class ProfileEditNotifier extends StateNotifier<ProfileEditState> {
 /// Provider for profile edit form state
 final profileEditProvider =
     StateNotifierProvider<ProfileEditNotifier, ProfileEditState>((ref) {
-  return ProfileEditNotifier();
-});
+      return ProfileEditNotifier();
+    });

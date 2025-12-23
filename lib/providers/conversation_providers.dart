@@ -3,9 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/conversation_model.dart';
 import './app_providers.dart';
 
-/// ============================================
 /// CONVERSATIONS SCREEN STATE
-/// ============================================
 
 /// State class for conversations screen UI
 class ConversationsScreenState {
@@ -32,11 +30,10 @@ class ConversationsScreenState {
   }
 }
 
-/// ============================================
 /// CONVERSATIONS SCREEN NOTIFIER
-/// ============================================
 
-class ConversationsScreenNotifier extends StateNotifier<ConversationsScreenState> {
+class ConversationsScreenNotifier
+    extends StateNotifier<ConversationsScreenState> {
   ConversationsScreenNotifier() : super(const ConversationsScreenState());
 
   void setSearching(bool value) {
@@ -69,16 +66,19 @@ class ConversationsScreenNotifier extends StateNotifier<ConversationsScreenState
 
 /// Provider for conversations screen UI state
 final conversationsScreenProvider =
-    StateNotifierProvider<ConversationsScreenNotifier, ConversationsScreenState>((ref) {
-  return ConversationsScreenNotifier();
-});
+    StateNotifierProvider<
+      ConversationsScreenNotifier,
+      ConversationsScreenState
+    >((ref) {
+      return ConversationsScreenNotifier();
+    });
 
-/// ============================================
 /// CONVERSATIONS STREAM PROVIDER
-/// ============================================
 
 /// Stream provider for user's conversations
-final conversationsStreamProvider = StreamProvider<List<ConversationModel>>((ref) {
+final conversationsStreamProvider = StreamProvider<List<ConversationModel>>((
+  ref,
+) {
   final userId = ref.watch(currentUserIdProvider);
   if (userId == null) return Stream.value([]);
 
@@ -87,93 +87,86 @@ final conversationsStreamProvider = StreamProvider<List<ConversationModel>>((ref
       .where('participants', arrayContains: userId)
       .snapshots()
       .map((snapshot) {
-    final conversations = <ConversationModel>[];
+        final conversations = <ConversationModel>[];
 
-    for (var doc in snapshot.docs) {
-      try {
-        final conv = ConversationModel.fromFirestore(doc);
-        conversations.add(conv);
-      } catch (e) {
-        // Skip invalid conversations
-      }
-    }
+        for (var doc in snapshot.docs) {
+          try {
+            final conv = ConversationModel.fromFirestore(doc);
+            conversations.add(conv);
+          } catch (e) {
+            // Skip invalid conversations
+          }
+        }
 
-    // Sort by lastMessageTime (most recent first)
-    conversations.sort((a, b) {
-      if (a.lastMessageTime == null) return 1;
-      if (b.lastMessageTime == null) return -1;
-      return b.lastMessageTime!.compareTo(a.lastMessageTime!);
-    });
+        // Sort by lastMessageTime (most recent first)
+        conversations.sort((a, b) {
+          if (a.lastMessageTime == null) return 1;
+          if (b.lastMessageTime == null) return -1;
+          return b.lastMessageTime!.compareTo(a.lastMessageTime!);
+        });
 
-    return conversations;
-  });
+        return conversations;
+      });
 });
 
-/// ============================================
 /// FILTERED CONVERSATIONS PROVIDER
-/// ============================================
 
 /// Provider that filters conversations based on search query
-final filteredConversationsProvider = Provider<AsyncValue<List<ConversationModel>>>((ref) {
-  final conversationsAsync = ref.watch(conversationsStreamProvider);
-  final screenState = ref.watch(conversationsScreenProvider);
-  final userId = ref.watch(currentUserIdProvider);
+final filteredConversationsProvider =
+    Provider<AsyncValue<List<ConversationModel>>>((ref) {
+      final conversationsAsync = ref.watch(conversationsStreamProvider);
+      final screenState = ref.watch(conversationsScreenProvider);
+      final userId = ref.watch(currentUserIdProvider);
 
-  return conversationsAsync.whenData((conversations) {
-    if (screenState.searchQuery.isEmpty) {
-      return conversations;
-    }
+      return conversationsAsync.whenData((conversations) {
+        if (screenState.searchQuery.isEmpty) {
+          return conversations;
+        }
 
-    return conversations.where((conv) {
-      final displayName = conv.getDisplayName(userId ?? '');
-      return displayName.toLowerCase().contains(screenState.searchQuery);
-    }).toList();
-  });
-});
+        return conversations.where((conv) {
+          final displayName = conv.getDisplayName(userId ?? '');
+          return displayName.toLowerCase().contains(screenState.searchQuery);
+        }).toList();
+      });
+    });
 
-/// ============================================
 /// USER ONLINE STATUS PROVIDER
-/// ============================================
 
 /// Stream provider for a user's online status
-final userOnlineStatusStreamProvider = StreamProvider.family<Map<String, dynamic>, String>((ref, userId) {
-  if (userId.isEmpty) {
-    return Stream.value({'isOnline': false, 'lastSeen': null});
-  }
+final userOnlineStatusStreamProvider =
+    StreamProvider.family<Map<String, dynamic>, String>((ref, userId) {
+      if (userId.isEmpty) {
+        return Stream.value({'isOnline': false, 'lastSeen': null});
+      }
 
-  return FirebaseFirestore.instance
-      .collection('users')
-      .doc(userId)
-      .snapshots()
-      .map((snapshot) {
-    if (!snapshot.exists) {
-      return {'isOnline': false, 'lastSeen': null};
-    }
+      return FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .snapshots()
+          .map((snapshot) {
+            if (!snapshot.exists) {
+              return {'isOnline': false, 'lastSeen': null};
+            }
 
-    final data = snapshot.data()!;
-    return {
-      'isOnline': data['isOnline'] ?? false,
-      'showOnlineStatus': data['showOnlineStatus'] ?? true,
-      'lastSeen': data['lastSeen'],
-      'name': data['name'],
-      'photoUrl': data['photoUrl'],
-    };
-  });
-});
+            final data = snapshot.data()!;
+            return {
+              'isOnline': data['isOnline'] ?? false,
+              'showOnlineStatus': data['showOnlineStatus'] ?? true,
+              'lastSeen': data['lastSeen'],
+              'name': data['name'],
+              'photoUrl': data['photoUrl'],
+            };
+          });
+    });
 
-/// ============================================
 /// CONVERSATION PARTICIPANT CACHE
-/// ============================================
 
 /// Cache for participant data to avoid repeated Firestore queries
 class ParticipantCacheState {
   final Map<String, Map<String, dynamic>> cache;
   final bool isLoading;
 
-  const ParticipantCacheState({
-    this.cache = const {},
-    this.isLoading = false,
-  });
+  const ParticipantCacheState({this.cache = const {}, this.isLoading = false});
 
   ParticipantCacheState copyWith({
     Map<String, Map<String, dynamic>>? cache,
@@ -190,9 +183,7 @@ class ParticipantCacheNotifier extends StateNotifier<ParticipantCacheState> {
   ParticipantCacheNotifier() : super(const ParticipantCacheState());
 
   void cacheParticipant(String odlalud, Map<String, dynamic> data) {
-    state = state.copyWith(
-      cache: {...state.cache, odlalud: data},
-    );
+    state = state.copyWith(cache: {...state.cache, odlalud: data});
   }
 
   Map<String, dynamic>? getParticipant(String userId) {
@@ -230,13 +221,13 @@ class ParticipantCacheNotifier extends StateNotifier<ParticipantCacheState> {
 
 /// Provider for participant data cache
 final participantCacheProvider =
-    StateNotifierProvider<ParticipantCacheNotifier, ParticipantCacheState>((ref) {
-  return ParticipantCacheNotifier();
-});
+    StateNotifierProvider<ParticipantCacheNotifier, ParticipantCacheState>((
+      ref,
+    ) {
+      return ParticipantCacheNotifier();
+    });
 
-/// ============================================
 /// UNREAD COUNT PROVIDER
-/// ============================================
 
 /// Provider for total unread message count
 final totalUnreadCountProvider = Provider<int>((ref) {
@@ -257,9 +248,7 @@ final totalUnreadCountProvider = Provider<int>((ref) {
   );
 });
 
-/// ============================================
 /// HELPER FUNCTIONS
-/// ============================================
 
 /// Format last seen timestamp to human-readable string
 String formatLastSeen(dynamic lastSeen) {

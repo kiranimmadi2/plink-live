@@ -6,9 +6,7 @@ import 'app_colors.dart';
 class AppTextStyles {
   AppTextStyles._(); // Private constructor to prevent instantiation
 
-  // ============================================
   // DISPLAY STYLES (Large Headings 28-34px)
-  // ============================================
 
   /// Display Large - 34px, Bold
   /// Use for: Splash screen titles, hero text
@@ -67,9 +65,7 @@ class AppTextStyles {
     color: AppColors.textPrimaryLight,
   );
 
-  // ============================================
   // HEADLINE STYLES (20-22px)
-  // ============================================
 
   /// Headline Large - 22px, w600
   /// Use for: Screen titles, important headings
@@ -128,9 +124,7 @@ class AppTextStyles {
     color: AppColors.textPrimaryLight,
   );
 
-  // ============================================
   // TITLE STYLES (17-18px)
-  // ============================================
 
   /// Title Large - 18px, Bold
   /// Use for: List item titles, section headers
@@ -189,9 +183,7 @@ class AppTextStyles {
     color: AppColors.textPrimaryLight,
   );
 
-  // ============================================
   // BODY STYLES (14-16px)
-  // ============================================
 
   /// Body Large - 16px, Normal
   /// Use for: Main content text, descriptions
@@ -292,9 +284,7 @@ class AppTextStyles {
     color: AppColors.textPrimaryLight,
   );
 
-  // ============================================
   // LABEL STYLES (11-13px)
-  // ============================================
 
   /// Label Large - 13px, w500
   /// Use for: Form labels, chip text
@@ -353,9 +343,7 @@ class AppTextStyles {
     color: AppColors.textPrimaryLight,
   );
 
-  // ============================================
   // CAPTION STYLES (10-12px)
-  // ============================================
 
   /// Caption - 12px, Normal
   /// Use for: Timestamps, secondary info
@@ -395,9 +383,7 @@ class AppTextStyles {
     color: AppColors.textSecondaryLight,
   );
 
-  // ============================================
   // BUTTON TEXT STYLES
-  // ============================================
 
   /// Button Large - 17px, w600
   /// Use for: Primary buttons, elevated buttons
@@ -429,9 +415,7 @@ class AppTextStyles {
     color: AppColors.textPrimaryDark,
   );
 
-  // ============================================
   // SEMANTIC TEXT STYLES
-  // ============================================
 
   /// Error Text - 14px, Normal, Red
   /// Use for: Error messages, validation errors
@@ -493,9 +477,7 @@ class AppTextStyles {
     color: AppColors.error,
   );
 
-  // ============================================
   // HINT/PLACEHOLDER STYLES
-  // ============================================
 
   /// Hint Text - 14px, Normal, Grey
   /// Use for: Input hints, placeholders
@@ -527,9 +509,7 @@ class AppTextStyles {
     color: AppColors.iosGray,
   );
 
-  // ============================================
   // SPECIAL STYLES
-  // ============================================
 
   /// Emoji Large - 32px
   /// Use for: Large emoji display, reactions
@@ -602,9 +582,7 @@ class AppTextStyles {
     color: AppColors.textSecondaryDark,
   );
 
-  // ============================================
   // HELPER METHODS
-  // ============================================
 
   /// Get text style with custom color
   static TextStyle withColor(TextStyle style, Color color) {
@@ -612,7 +590,11 @@ class AppTextStyles {
   }
 
   /// Get text style for dark/light mode
-  static TextStyle forMode(TextStyle darkStyle, TextStyle lightStyle, bool isDarkMode) {
+  static TextStyle forMode(
+    TextStyle darkStyle,
+    TextStyle lightStyle,
+    bool isDarkMode,
+  ) {
     return isDarkMode ? darkStyle : lightStyle;
   }
 

@@ -15,9 +15,9 @@ import '../../widgets/other widgets/glass_text_field.dart';
 import '../../models/user_profile.dart';
 import '../../res/utils/photo_url_helper.dart';
 import '../../models/message_model.dart';
-import '../../services/profile services/notification_service.dart';
-import '../../services/chat services/conversation_service.dart';
-import '../../services/chat services/hybrid_chat_service.dart';
+import '../../services/notification_service.dart';
+import '../../services/conversation_service.dart';
+import '../../services/hybrid_chat_service.dart';
 import '../../providers/other providers/app_providers.dart';
 import '../profile/profile_view_screen.dart';
 
@@ -1986,11 +1986,12 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
           .valueOrNull;
       final currentUserName = currentUserProfile?.name ?? 'Someone';
 
-      NotificationService().sendMessageNotification(
-        recipientToken: widget.otherUser.fcmToken ?? '',
-        senderName: currentUserName,
-        message: text,
-        conversationId: _conversationId,
+      NotificationService().sendNotificationToUser(
+        userId: widget.otherUser.uid,
+        title: 'New Message from $currentUserName',
+        body: text,
+        type: 'message',
+        data: {'conversationId': _conversationId},
       );
     } catch (e) {
       if (!mounted) return;

@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import '../../services/chat services/connectivity_service.dart';
+import '../../services/connectivity_service.dart';
 
 /// A widget that shows an offline indicator banner when there's no internet connection
 class OfflineIndicator extends StatefulWidget {

@@ -1,12 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../../services/chat services/connectivity_service.dart';
+import '../../services/connectivity_service.dart';
 import '../../models/user_profile.dart';
 
-/// ============================================
 /// AUTH STATE PROVIDER
-/// ============================================
+
 /// Streams the current Firebase auth state
 final authStateProvider = StreamProvider<User?>((ref) {
   return FirebaseAuth.instance.authStateChanges();
@@ -18,9 +17,8 @@ final currentUserIdProvider = Provider<String?>((ref) {
   return authState.whenData((user) => user?.uid).value;
 });
 
-/// ============================================
 /// CURRENT USER PROFILE PROVIDER
-/// ============================================
+
 /// Fetches the current user's profile from Firestore
 final currentUserProfileProvider = FutureProvider<UserProfile?>((ref) async {
   final userId = ref.watch(currentUserIdProvider);
@@ -55,9 +53,8 @@ final currentUserProfileStreamProvider = StreamProvider<UserProfile?>((ref) {
       });
 });
 
-/// ============================================
 /// CONNECTIVITY PROVIDER
-/// ============================================
+
 /// Streams the network connectivity status
 final connectivityProvider = StreamProvider<bool>((ref) {
   return ConnectivityService().connectionChange;
@@ -69,9 +66,8 @@ final isOnlineProvider = Provider<bool>((ref) {
   return connectivity.whenData((isOnline) => isOnline).value ?? true;
 });
 
-/// ============================================
 /// USER ONLINE STATUS PROVIDER
-/// ============================================
+
 /// Streams a specific user's online status
 final userOnlineStatusProvider = StreamProvider.family<bool, String>((
   ref,
@@ -88,9 +84,8 @@ final userOnlineStatusProvider = StreamProvider.family<bool, String>((
       });
 });
 
-/// ============================================
 /// USER PROFILE BY ID PROVIDER
-/// ============================================
+
 /// Fetches any user's profile by their ID
 final userProfileByIdProvider = FutureProvider.family<UserProfile?, String>((
   ref,
@@ -123,9 +118,8 @@ final userProfileStreamByIdProvider =
           });
     });
 
-/// ============================================
 /// FIREBASE INSTANCES (for dependency injection)
-/// ============================================
+
 final firebaseAuthProvider = Provider<FirebaseAuth>((ref) {
   return FirebaseAuth.instance;
 });

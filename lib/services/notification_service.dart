@@ -9,16 +9,15 @@ import 'package:flutter/material.dart';
 
 import '../models/user_profile.dart';
 import '../screens/home/messenger_chat_screen.dart';
+import '../screens/chat/incoming_call_screen.dart';
 
 /// Global navigator key for notification navigation
 /// Set this in main.dart MaterialApp
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 /// Callback type for handling notification navigation
-typedef NotificationNavigationCallback = void Function(
-  String type,
-  Map<String, dynamic> data,
-);
+typedef NotificationNavigationCallback =
+    void Function(String type, Map<String, dynamic> data);
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
@@ -89,9 +88,10 @@ class NotificationService {
 
     try {
       if (Platform.isAndroid) {
-        final androidPlugin =
-            _localNotifications.resolvePlatformSpecificImplementation<
-                AndroidFlutterLocalNotificationsPlugin>();
+        final androidPlugin = _localNotifications
+            .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin
+            >();
 
         if (androidPlugin != null) {
           // Chat messages channel
@@ -194,9 +194,9 @@ class NotificationService {
               .collection('users')
               .doc(_auth.currentUser!.uid)
               .update({
-            'fcmToken': newToken,
-            'lastTokenUpdate': FieldValue.serverTimestamp(),
-          });
+                'fcmToken': newToken,
+                'lastTokenUpdate': FieldValue.serverTimestamp(),
+              });
           debugPrint('FCM token refreshed successfully');
         }
       } catch (e) {
@@ -212,6 +212,12 @@ class NotificationService {
 
     final data = message.data;
     final type = data['type'] as String?;
+
+    // For call notifications, navigate directly to incoming call screen
+    if (type == 'call') {
+      _navigateToCall(data);
+      return;
+    }
 
     // Don't show notification for messages in the current chat
     // This would require checking if user is currently viewing that conversation
@@ -252,7 +258,9 @@ class NotificationService {
   }
 
   /// Navigate to appropriate screen based on notification type
-  Future<void> _navigateBasedOnNotificationType(Map<String, dynamic> data) async {
+  Future<void> _navigateBasedOnNotificationType(
+    Map<String, dynamic> data,
+  ) async {
     final type = data['type'] as String?;
 
     // If custom callback is set, use it
@@ -316,11 +324,33 @@ class NotificationService {
     }
   }
 
-  /// Navigate to call screen (placeholder - implement when call feature is ready)
+  /// Navigate to incoming call screen
   Future<void> _navigateToCall(Map<String, dynamic> data) async {
     final callId = data['callId'] as String?;
+    final callerId = data['callerId'] as String?;
+    final callerName = data['callerName'] as String? ?? 'Unknown';
+    final callerPhoto = data['callerPhoto'] as String?;
+
     debugPrint('Navigate to call: $callId');
-    // TODO: Navigate to call screen when WebRTC is implemented
+
+    if (callId == null || callerId == null) {
+      debugPrint('Missing callId or callerId for call navigation');
+      return;
+    }
+
+    // Navigate using global navigator key
+    if (navigatorKey.currentState != null) {
+      navigatorKey.currentState!.push(
+        MaterialPageRoute(
+          builder: (context) => IncomingCallScreen(
+            callId: callId,
+            callerName: callerName,
+            callerPhoto: callerPhoto,
+            callerId: callerId,
+          ),
+        ),
+      );
+    }
   }
 
   /// Navigate to inquiries screen (for professionals)
@@ -346,10 +376,10 @@ class NotificationService {
       channelId == 'chat_messages'
           ? 'Chat Messages'
           : channelId == 'calls'
-              ? 'Incoming Calls'
-              : channelId == 'inquiries'
-                  ? 'Service Inquiries'
-                  : 'Notifications',
+          ? 'Incoming Calls'
+          : channelId == 'inquiries'
+          ? 'Service Inquiries'
+          : 'Notifications',
       channelDescription: 'Notification channel',
       importance: channelId == 'calls' ? Importance.max : Importance.high,
       priority: channelId == 'calls' ? Priority.max : Priority.high,
@@ -425,9 +455,9 @@ class NotificationService {
         'createdAt': FieldValue.serverTimestamp(),
       });
 
-      debugPrint('✅ Notification sent to user: $userId');
+      debugPrint('Notification sent to user: $userId');
     } catch (e) {
-      debugPrint('❌ Error sending notification to user: $e');
+      debugPrint(' Error sending notification to user: $e');
     }
   }
 
@@ -444,24 +474,24 @@ class NotificationService {
         .limit(50)
         .snapshots()
         .map((snapshot) {
-      final notifications = snapshot.docs.map((doc) {
-        final data = doc.data();
-        data['id'] = doc.id;
-        return data;
-      }).toList();
+          final notifications = snapshot.docs.map((doc) {
+            final data = doc.data();
+            data['id'] = doc.id;
+            return data;
+          }).toList();
 
-      // Sort locally instead of in query (avoids index requirement)
-      notifications.sort((a, b) {
-        final aTime = a['createdAt'] as Timestamp?;
-        final bTime = b['createdAt'] as Timestamp?;
-        if (aTime == null && bTime == null) return 0;
-        if (aTime == null) return 1;
-        if (bTime == null) return -1;
-        return bTime.compareTo(aTime);
-      });
+          // Sort locally instead of in query (avoids index requirement)
+          notifications.sort((a, b) {
+            final aTime = a['createdAt'] as Timestamp?;
+            final bTime = b['createdAt'] as Timestamp?;
+            if (aTime == null && bTime == null) return 0;
+            if (aTime == null) return 1;
+            if (bTime == null) return -1;
+            return bTime.compareTo(aTime);
+          });
 
-      return notifications;
-    });
+          return notifications;
+        });
   }
 
   /// Mark notification as read
@@ -499,12 +529,13 @@ class NotificationService {
   Future<void> clearFcmToken() async {
     try {
       if (_auth.currentUser != null) {
-        await _firestore.collection('users').doc(_auth.currentUser!.uid).update(
-          {
-            'fcmToken': FieldValue.delete(),
-            'lastTokenUpdate': FieldValue.serverTimestamp(),
-          },
-        );
+        await _firestore
+            .collection('users')
+            .doc(_auth.currentUser!.uid)
+            .update({
+              'fcmToken': FieldValue.delete(),
+              'lastTokenUpdate': FieldValue.serverTimestamp(),
+            });
       }
       await _fcm.deleteToken();
       _fcmToken = null;
@@ -521,7 +552,8 @@ class NotificationService {
       if (Platform.isIOS) {
         await _localNotifications
             .resolvePlatformSpecificImplementation<
-                IOSFlutterLocalNotificationsPlugin>()
+              IOSFlutterLocalNotificationsPlugin
+            >()
             ?.requestPermissions(badge: true);
       }
     } catch (e) {

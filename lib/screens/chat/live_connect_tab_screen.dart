@@ -17,8 +17,8 @@ import '../../models/user_profile.dart';
 import '../../models/extended_user_profile.dart';
 import '../../widgets/profile widgets/profile_detail_bottom_sheet.dart';
 import '../../widgets/profile widgets/edit_profile_bottom_sheet.dart';
-import '../../services/chat services/connection_service.dart';
-import '../../services/location services/location_service.dart';
+import '../../services/connection_service.dart';
+import '../../services/location_service.dart';
 import 'my_connections_screen.dart';
 import '../../res/utils/photo_url_helper.dart';
 

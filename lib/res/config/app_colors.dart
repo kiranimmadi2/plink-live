@@ -5,13 +5,13 @@ import 'package:flutter/material.dart';
 class AppColors {
   AppColors._(); // Private constructor to prevent instantiation
 
-  // ============ PRIMARY THEME COLORS ============
+  //    PRIMARY THEME COLORS
   static const Color primary = Color(0xFF6366F1); // Indigo
   static const Color secondary = Color(0xFF8B5CF6); // Purple
   static const Color accent = Color(0xFFEC4899); // Pink
   static const Color tertiary = Color(0xFF06B6D4); // Cyan
 
-  // ============ iOS SYSTEM COLORS ============
+  //    iOS SYSTEM COLORS
   static const Color iosBlue = Color(0xFF007AFF);
   static const Color iosPurple = Color(0xFF5856D6);
   static const Color iosPink = Color(0xFFFF2D55);
@@ -28,28 +28,28 @@ class AppColors {
   static const Color iosGrayTertiary = Color(0xFFE9E9EB);
   static const Color iosSystemGray = Color(0xFFF6F6F6);
 
-  // ============ TRANSPARENT ============
+  //    TRANSPARENT
   static const Color transparent = Colors.transparent;
 
-  // ============ ACTION TYPE COLORS ============
+  //    ACTION TYPE COLORS
   static const Color seeking = Color(0xFF60A5FA); // Light blue
   static const Color offering = Color(0xFF34D399); // Light green
   static const Color neutral = Colors.white;
 
-  // ============ STATUS COLORS ============
+  //    STATUS COLORS
   static const Color success = Color(0xFF10B981); // Emerald
   static const Color warning = Color(0xFFF59E0B); // Amber
   static const Color error = Color(0xFFEF4444); // Red
   static const Color info = Color(0xFF0EA5E9); // Sky blue
 
-  // ============ CONNECTION TYPE COLORS ============
+  //    CONNECTION TYPE COLORS
   static const Color professional = Color(0xFF4A90E2); // Medium blue
   static const Color activityPartner = Color(0xFF00D67D); // Vibrant green
   static const Color eventCompanion = Color(0xFFFFB800); // Vibrant yellow
   static const Color friendship = Color(0xFFFF6B9D); // Vibrant pink
   static const Color dating = Color(0xFFFF4444); // Bright red
 
-  // ============ VIBRANT ACCENT COLORS ============
+  //    VIBRANT ACCENT COLORS
   static const Color vibrantGreen = Color(0xFF00D67D);
   static const Color vibrantOrange = Color(0xFFFF6B35);
   static const Color vibrantPurple = Color(0xFF9B59B6);
@@ -72,7 +72,7 @@ class AppColors {
   static const Color lightOrangeTint = Color(0xFFFFF3E0);
   static const Color lightGrayTint = Color(0xFFF2F2F7);
 
-  // ============ BACKGROUND COLORS ============
+  //    BACKGROUND COLORS
   static const Color backgroundDark = Color(0xFF000000);
   static const Color backgroundDarkSecondary = Color(0xFF1C1C1E);
   static const Color backgroundDarkTertiary = Color(0xFF2C2C2E);
@@ -84,7 +84,7 @@ class AppColors {
   static const Color darkCard = Color(0xFF1A1A1A);
   static const Color darkCardSecondary = Color(0xFF2A2A2A);
 
-  // ============ CHAT THEME GRADIENTS ============
+  //    CHAT THEME GRADIENTS
   static const Map<String, List<Color>> chatThemeGradients = {
     'default': [Color(0xFF007AFF), Color(0xFF5856D6)], // iOS Blue-Purple
     'sunset': [Color(0xFFFF6B6B), Color(0xFFFF8E53)], // Red-Orange
@@ -96,13 +96,13 @@ class AppColors {
     'golden': [Color(0xFFF7971E), Color(0xFFFFD200)], // Orange-Gold
   };
 
-  // ============ SURFACE COLORS ============
+  //    SURFACE COLORS
   static const Color surfaceDark = Color(0xFF1C1C1E);
   static const Color surfaceLight = Color(0xFFFFFFFF);
   static const Color cardDark = Color(0xFF1C1C1E);
   static const Color cardLight = Color(0xFFFFFFFF);
 
-  // ============ TEXT COLORS ============
+  //    TEXT COLORS
   static const Color textPrimaryDark = Colors.white;
   static const Color textSecondaryDark = Color(0xB3FFFFFF); // 70% white
   static const Color textTertiaryDark = Color(0x8AFFFFFF); // 54% white
@@ -110,13 +110,13 @@ class AppColors {
   static const Color textSecondaryLight = Color(0xB3000000); // 70% black
   static const Color textTertiaryLight = Color(0x8A000000); // 54% black
 
-  // ============ VOICE ORB STATE COLORS ============
+  //    VOICE ORB STATE COLORS
   static const Color voiceListening = Color(0xFF8B5CF6); // Purple
   static const Color voiceProcessing = Color(0xFF0EA5E9); // Sky blue
   static const Color voiceSpeaking = Color(0xFFFFAA00); // Orange
   static const Color voiceConnected = Color(0xFF10B981); // Green
 
-  // ============ RAINBOW/ANIMATION COLORS ============
+  //    RAINBOW/ANIMATION COLORS
   static const Color rainbowBlue = Color(0xFF2196F3);
   static const Color rainbowPurple = Color(0xFF9C27B0);
   static const Color rainbowPink = Color(0xFFFF69B4);
@@ -127,12 +127,12 @@ class AppColors {
   static const Color rainbowGreen = Color(0xFF4CAF50);
   static const Color rainbowTeal = Color(0xFF00BCD4);
 
-  // ============ SPLASH/LOGIN COLORS ============
+  //    SPLASH/LOGIN COLORS
   static const Color splashDark1 = Color(0xFF1A1A2E);
   static const Color splashDark2 = Color(0xFF16213E);
   static const Color splashDark3 = Color(0xFF0F0F23);
 
-  // ============ AURORA BACKGROUND COLORS ============
+  //    AURORA BACKGROUND COLORS
   static const Color auroraDark1 = Color(0xFF0F0F1E);
   static const Color auroraDark2 = Color(0xFF1A1A2E);
   static const Color auroraDark3 = Color(0xFF16213E);
@@ -140,7 +140,7 @@ class AppColors {
   static const Color auroraLight2 = Color(0xFFE8F0FF);
   static const Color auroraLight3 = Color(0xFFD6E8FF);
 
-  // ============ GRADIENTS ============
+  //    GRADIENTS
 
   /// Primary gradient (Indigo → Purple → Pink)
   static const LinearGradient primaryGradient = LinearGradient(
@@ -177,7 +177,7 @@ class AppColors {
     colors: [auroraLight1, auroraLight2, auroraLight3],
   );
 
-  // ============ CATEGORY GRADIENTS ============
+  //    CATEGORY GRADIENTS
 
   static const List<Color> categoryAllGradient = [
     Color(0xFFBBBCFA), // Indigo
@@ -215,7 +215,7 @@ class AppColors {
     Color(0xFFDAA48C), // Orange
   ];
 
-  // ============ BADGE GRADIENTS ============
+  //    BADGE GRADIENTS
 
   static const List<Color> connectedBadgeGradient = [
     Color(0xFF10B981),
@@ -266,7 +266,7 @@ class AppColors {
 
   static const List<Color> skyGradient = [Color(0xFF0EA5E9), Color(0xFF38BDF8)];
 
-  // ============ GLASSMORPHISM COLORS ============
+  //    GLASSMORPHISM COLORS
 
   /// Glass background color (dark mode)
   static Color glassBackgroundDark({double alpha = 0.15}) =>
@@ -280,6 +280,23 @@ class AppColors {
   static Color glassBorder({double alpha = 0.2}) =>
       Colors.white.withValues(alpha: alpha);
 
+  // ============ STANDARD BUTTON COLORS ============
+  // Consistent glassmorphism button style used across the app (matching login button)
+
+  /// Standard button background color
+  static Color buttonBackground({double alpha = 0.4}) =>
+      Colors.blue.withValues(alpha: alpha);
+
+  /// Standard button border color
+  static Color buttonBorder({double alpha = 0.5}) =>
+      Colors.blue.withValues(alpha: alpha);
+
+  /// Standard button foreground color
+  static const Color buttonForeground = Colors.white;
+
+  /// Standard button border radius
+  static const double buttonBorderRadius = 16.0;
+
   /// Dark overlay
   static Color darkOverlay({double alpha = 0.4}) =>
       Colors.black.withValues(alpha: alpha);
@@ -288,7 +305,7 @@ class AppColors {
   static Color lightOverlay({double alpha = 0.1}) =>
       Colors.white.withValues(alpha: alpha);
 
-  // ============ SHADOW COLORS ============
+  //    SHADOW COLORS
 
   static Color primaryShadow({double alpha = 0.4}) =>
       primary.withValues(alpha: alpha);
@@ -348,7 +365,7 @@ class AppColors {
   static Color blackAlpha({double alpha = 0.5}) =>
       Colors.black.withValues(alpha: alpha);
 
-  // ============ HELPER METHODS ============
+  //    HELPER METHODS
 
   /// Get action type color
   static Color getActionColor(String actionType) {

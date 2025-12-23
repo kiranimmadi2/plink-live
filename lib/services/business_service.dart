@@ -18,22 +18,24 @@ class BusinessService {
 
   String? get _currentUserId => _auth.currentUser?.uid;
 
-  // ============================================
   // BUSINESS PROFILE OPERATIONS
-  // ============================================
 
   /// Create a new business profile
   Future<String?> createBusiness(BusinessModel business) async {
     if (_currentUserId == null) return null;
 
     try {
-      final docRef = await _firestore.collection('businesses').add(
-        business.copyWith(
-          userId: _currentUserId,
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-        ).toMap(),
-      );
+      final docRef = await _firestore
+          .collection('businesses')
+          .add(
+            business
+                .copyWith(
+                  userId: _currentUserId,
+                  createdAt: DateTime.now(),
+                  updatedAt: DateTime.now(),
+                )
+                .toMap(),
+          );
 
       // Update user's business flag
       await _firestore.collection('users').doc(_currentUserId).update({
@@ -53,9 +55,10 @@ class BusinessService {
     if (_currentUserId == null) return false;
 
     try {
-      await _firestore.collection('businesses').doc(businessId).update(
-        business.copyWith(updatedAt: DateTime.now()).toMap(),
-      );
+      await _firestore
+          .collection('businesses')
+          .doc(businessId)
+          .update(business.copyWith(updatedAt: DateTime.now()).toMap());
       return true;
     } catch (e) {
       debugPrint('Error updating business: $e');
@@ -66,7 +69,10 @@ class BusinessService {
   /// Get business by ID
   Future<BusinessModel?> getBusiness(String businessId) async {
     try {
-      final doc = await _firestore.collection('businesses').doc(businessId).get();
+      final doc = await _firestore
+          .collection('businesses')
+          .doc(businessId)
+          .get();
       if (!doc.exists) return null;
       return BusinessModel.fromFirestore(doc);
     } catch (e) {
@@ -116,7 +122,10 @@ class BusinessService {
     if (_currentUserId == null) return false;
 
     try {
-      final doc = await _firestore.collection('users').doc(_currentUserId).get();
+      final doc = await _firestore
+          .collection('users')
+          .doc(_currentUserId)
+          .get();
       return doc.data()?['businessSetupComplete'] ?? false;
     } catch (e) {
       return false;
@@ -157,18 +166,16 @@ class BusinessService {
     }
   }
 
-  // ============================================
   // LISTING OPERATIONS (Products & Services)
-  // ============================================
 
   /// Create a new listing
   Future<String?> createListing(BusinessListing listing) async {
     if (_currentUserId == null) return null;
 
     try {
-      final docRef = await _firestore.collection('business_listings').add(
-        listing.toMap(),
-      );
+      final docRef = await _firestore
+          .collection('business_listings')
+          .add(listing.toMap());
       return docRef.id;
     } catch (e) {
       debugPrint('Error creating listing: $e');
@@ -179,9 +186,10 @@ class BusinessService {
   /// Update listing
   Future<bool> updateListing(String listingId, BusinessListing listing) async {
     try {
-      await _firestore.collection('business_listings').doc(listingId).update(
-        listing.toMap(),
-      );
+      await _firestore
+          .collection('business_listings')
+          .doc(listingId)
+          .update(listing.toMap());
       return true;
     } catch (e) {
       debugPrint('Error updating listing: $e');
@@ -225,13 +233,18 @@ class BusinessService {
         .where('businessId', isEqualTo: businessId)
         .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => BusinessListing.fromFirestore(doc))
-            .toList());
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => BusinessListing.fromFirestore(doc))
+              .toList(),
+        );
   }
 
   /// Toggle listing availability
-  Future<bool> toggleListingAvailability(String listingId, bool isAvailable) async {
+  Future<bool> toggleListingAvailability(
+    String listingId,
+    bool isAvailable,
+  ) async {
     try {
       await _firestore.collection('business_listings').doc(listingId).update({
         'isAvailable': isAvailable,
@@ -243,18 +256,16 @@ class BusinessService {
     }
   }
 
-  // ============================================
   // REVIEW OPERATIONS
-  // ============================================
 
   /// Add a review
   Future<String?> addReview(BusinessReview review) async {
     if (_currentUserId == null) return null;
 
     try {
-      final docRef = await _firestore.collection('business_reviews').add(
-        review.toMap(),
-      );
+      final docRef = await _firestore
+          .collection('business_reviews')
+          .add(review.toMap());
 
       // Update business rating
       await _updateBusinessRating(review.businessId);
@@ -305,9 +316,11 @@ class BusinessService {
         .where('businessId', isEqualTo: businessId)
         .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => BusinessReview.fromFirestore(doc))
-            .toList());
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => BusinessReview.fromFirestore(doc))
+              .toList(),
+        );
   }
 
   /// Update business rating based on reviews
@@ -316,7 +329,10 @@ class BusinessService {
       final reviews = await getBusinessReviews(businessId);
       if (reviews.isEmpty) return;
 
-      final totalRating = reviews.fold<double>(0, (total, r) => total + r.rating);
+      final totalRating = reviews.fold<double>(
+        0,
+        (total, r) => total + r.rating,
+      );
       final avgRating = totalRating / reviews.length;
 
       await _firestore.collection('businesses').doc(businessId).update({
@@ -328,9 +344,7 @@ class BusinessService {
     }
   }
 
-  // ============================================
   // SEARCH & DISCOVERY
-  // ============================================
 
   /// Search businesses
   Future<List<BusinessModel>> searchBusinesses({
@@ -365,12 +379,16 @@ class BusinessService {
       // Client-side search if query provided
       if (query != null && query.isNotEmpty) {
         final lowerQuery = query.toLowerCase();
-        businesses = businesses.where((b) =>
-            b.businessName.toLowerCase().contains(lowerQuery) ||
-            (b.description?.toLowerCase().contains(lowerQuery) ?? false) ||
-            b.services.any((s) => s.toLowerCase().contains(lowerQuery)) ||
-            b.products.any((p) => p.toLowerCase().contains(lowerQuery))
-        ).toList();
+        businesses = businesses
+            .where(
+              (b) =>
+                  b.businessName.toLowerCase().contains(lowerQuery) ||
+                  (b.description?.toLowerCase().contains(lowerQuery) ??
+                      false) ||
+                  b.services.any((s) => s.toLowerCase().contains(lowerQuery)) ||
+                  b.products.any((p) => p.toLowerCase().contains(lowerQuery)),
+            )
+            .toList();
       }
 
       // TODO: Add geo filtering if nearLat/nearLng provided
@@ -428,9 +446,7 @@ class BusinessService {
     }
   }
 
-  // ============================================
   // IMAGE UPLOAD
-  // ============================================
 
   /// Upload business logo
   Future<String?> uploadLogo(File imageFile) async {
@@ -456,7 +472,8 @@ class BusinessService {
     if (_currentUserId == null) return null;
 
     try {
-      final fileName = '${DateTime.now().millisecondsSinceEpoch}_${imageFile.path.split('/').last}';
+      final fileName =
+          '${DateTime.now().millisecondsSinceEpoch}_${imageFile.path.split('/').last}';
       final ref = _storage.ref().child('$folder/$_currentUserId/$fileName');
 
       final uploadTask = await ref.putFile(
@@ -471,9 +488,7 @@ class BusinessService {
     }
   }
 
-  // ============================================
   // STATISTICS
-  // ============================================
 
   /// Get business statistics
   Future<Map<String, dynamic>> getBusinessStats(String businessId) async {
@@ -491,7 +506,8 @@ class BusinessService {
         'reviews': reviews.length,
         'avgRating': reviews.isEmpty
             ? 0.0
-            : reviews.fold<double>(0, (total, r) => total + r.rating) / reviews.length,
+            : reviews.fold<double>(0, (total, r) => total + r.rating) /
+                  reviews.length,
       };
     } catch (e) {
       debugPrint('Error getting stats: $e');
@@ -516,9 +532,7 @@ class BusinessService {
     }
   }
 
-  // ============================================
   // FOLLOW OPERATIONS
-  // ============================================
 
   /// Follow a business
   Future<bool> followBusiness(String businessId) async {

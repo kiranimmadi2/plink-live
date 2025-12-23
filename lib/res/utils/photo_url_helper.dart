@@ -2,14 +2,28 @@ class PhotoUrlHelper {
   // Cache for rate-limited URLs to avoid repeated requests
   static final Map<String, DateTime> _rateLimitedUrls = {};
   static const Duration _rateLimitDuration = Duration(minutes: 5);
-  
+
+  // Track base URLs that have been rate-limited (to catch all size variants)
+  static final Set<String> _rateLimitedBaseUrls = {};
+
+  // Cache for failed URLs to avoid repeated loading attempts
+  static final Set<String> _failedUrls = {};
+
   /// Fix and validate Google photo URLs
   static String? fixGooglePhotoUrl(String? url) {
     if (url == null || url.isEmpty) return null;
-    
+
     // Remove any trailing whitespace or special characters
     url = url.trim();
-    
+
+    // Extract base URL for rate-limit checking
+    String baseUrl = url.split('=s')[0];
+
+    // Check if this base URL was rate-limited
+    if (_rateLimitedBaseUrls.contains(baseUrl)) {
+      return null;
+    }
+
     // Check if URL was recently rate-limited
     if (_rateLimitedUrls.containsKey(url)) {
       final limitTime = _rateLimitedUrls[url]!;
@@ -21,24 +35,34 @@ class PhotoUrlHelper {
         _rateLimitedUrls.remove(url);
       }
     }
-    
+
+    // Check if this URL has previously failed
+    if (_failedUrls.contains(url) || _failedUrls.contains(baseUrl)) {
+      return null;
+    }
+
     // Check if it's a Google user content URL
     if (url.contains('googleusercontent.com')) {
-      // Remove any existing size parameters
-      final baseUrl = url.split('=s')[0];
-      
       // Use a moderate size to reduce server load
       // Avoid s400-c which seems to cause issues, use s200 instead
       return '$baseUrl=s200';
     }
-    
+
     // For other URLs, validate they have proper scheme and host
     if (!isValidUrl(url)) {
       return null;
     }
     return url;
   }
-  
+
+  /// Mark a URL as failed (won't be attempted again in this session)
+  static void markAsFailed(String url) {
+    _failedUrls.add(url);
+    // Also mark the base URL to prevent other size variants
+    final baseUrl = url.split('=s')[0];
+    _failedUrls.add(baseUrl);
+  }
+
   /// Mark a URL as rate-limited
   static void markAsRateLimited(String url) {
     _rateLimitedUrls[url] = DateTime.now();

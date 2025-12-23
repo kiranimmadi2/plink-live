@@ -4,9 +4,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/connectivity_service.dart';
 import '../models/user_profile.dart';
 
-/// ============================================
 /// AUTH STATE PROVIDER
-/// ============================================
+
 /// Streams the current Firebase auth state
 final authStateProvider = StreamProvider<User?>((ref) {
   return FirebaseAuth.instance.authStateChanges();
@@ -18,9 +17,8 @@ final currentUserIdProvider = Provider<String?>((ref) {
   return authState.whenData((user) => user?.uid).value;
 });
 
-/// ============================================
 /// CURRENT USER PROFILE PROVIDER
-/// ============================================
+
 /// Fetches the current user's profile from Firestore
 final currentUserProfileProvider = FutureProvider<UserProfile?>((ref) async {
   final userId = ref.watch(currentUserIdProvider);
@@ -50,14 +48,13 @@ final currentUserProfileStreamProvider = StreamProvider<UserProfile?>((ref) {
       .doc(userId)
       .snapshots()
       .map((doc) {
-    if (!doc.exists) return null;
-    return UserProfile.fromFirestore(doc);
-  });
+        if (!doc.exists) return null;
+        return UserProfile.fromFirestore(doc);
+      });
 });
 
-/// ============================================
 /// CONNECTIVITY PROVIDER
-/// ============================================
+
 /// Streams the network connectivity status
 final connectivityProvider = StreamProvider<bool>((ref) {
   return ConnectivityService().connectionChange;
@@ -69,27 +66,31 @@ final isOnlineProvider = Provider<bool>((ref) {
   return connectivity.whenData((isOnline) => isOnline).value ?? true;
 });
 
-/// ============================================
 /// USER ONLINE STATUS PROVIDER
-/// ============================================
+
 /// Streams a specific user's online status
-final userOnlineStatusProvider = StreamProvider.family<bool, String>((ref, userId) {
+final userOnlineStatusProvider = StreamProvider.family<bool, String>((
+  ref,
+  userId,
+) {
   return FirebaseFirestore.instance
       .collection('users')
       .doc(userId)
       .snapshots()
       .map((doc) {
-    if (!doc.exists) return false;
-    final data = doc.data();
-    return data?['isOnline'] ?? false;
-  });
+        if (!doc.exists) return false;
+        final data = doc.data();
+        return data?['isOnline'] ?? false;
+      });
 });
 
-/// ============================================
 /// USER PROFILE BY ID PROVIDER
-/// ============================================
+
 /// Fetches any user's profile by their ID
-final userProfileByIdProvider = FutureProvider.family<UserProfile?, String>((ref, userId) async {
+final userProfileByIdProvider = FutureProvider.family<UserProfile?, String>((
+  ref,
+  userId,
+) async {
   try {
     final doc = await FirebaseFirestore.instance
         .collection('users')
@@ -105,20 +106,20 @@ final userProfileByIdProvider = FutureProvider.family<UserProfile?, String>((ref
 });
 
 /// Streams any user's profile by their ID
-final userProfileStreamByIdProvider = StreamProvider.family<UserProfile?, String>((ref, userId) {
-  return FirebaseFirestore.instance
-      .collection('users')
-      .doc(userId)
-      .snapshots()
-      .map((doc) {
-    if (!doc.exists) return null;
-    return UserProfile.fromFirestore(doc);
-  });
-});
+final userProfileStreamByIdProvider =
+    StreamProvider.family<UserProfile?, String>((ref, userId) {
+      return FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .snapshots()
+          .map((doc) {
+            if (!doc.exists) return null;
+            return UserProfile.fromFirestore(doc);
+          });
+    });
 
-/// ============================================
 /// FIREBASE INSTANCES (for dependency injection)
-/// ============================================
+
 final firebaseAuthProvider = Provider<FirebaseAuth>((ref) {
   return FirebaseAuth.instance;
 });

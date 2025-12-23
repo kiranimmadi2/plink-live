@@ -20,9 +20,7 @@ class ProfessionalService {
 
   String? get _currentUserId => _auth.currentUser?.uid;
 
-  // ============================================
   // PROFESSIONAL PROFILE OPERATIONS
-  // ============================================
 
   /// Update professional profile information
   Future<bool> updateProfessionalProfile({
@@ -81,29 +79,34 @@ class ProfessionalService {
     if (_currentUserId == null) return false;
 
     try {
-      final doc = await _firestore.collection('users').doc(_currentUserId).get();
+      final doc = await _firestore
+          .collection('users')
+          .doc(_currentUserId)
+          .get();
       return doc.data()?['professionalSetupComplete'] ?? false;
     } catch (e) {
       return false;
     }
   }
 
-  // ============================================
   // SERVICE OPERATIONS
-  // ============================================
 
   /// Create a new service
   Future<String?> createService(ServiceModel service) async {
     if (_currentUserId == null) return null;
 
     try {
-      final docRef = await _firestore.collection('services').add(
-        service.copyWith(
-          userId: _currentUserId,
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-        ).toMap(),
-      );
+      final docRef = await _firestore
+          .collection('services')
+          .add(
+            service
+                .copyWith(
+                  userId: _currentUserId,
+                  createdAt: DateTime.now(),
+                  updatedAt: DateTime.now(),
+                )
+                .toMap(),
+          );
 
       // Update user's service count
       await _firestore.collection('users').doc(_currentUserId).update({
@@ -122,9 +125,10 @@ class ProfessionalService {
     if (_currentUserId == null) return false;
 
     try {
-      await _firestore.collection('services').doc(serviceId).update(
-        service.copyWith(updatedAt: DateTime.now()).toMap(),
-      );
+      await _firestore
+          .collection('services')
+          .doc(serviceId)
+          .update(service.copyWith(updatedAt: DateTime.now()).toMap());
       return true;
     } catch (e) {
       debugPrint('Error updating service: $e');
@@ -193,9 +197,11 @@ class ProfessionalService {
         .where('userId', isEqualTo: userId)
         .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => ServiceModel.fromFirestore(doc))
-            .toList());
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => ServiceModel.fromFirestore(doc))
+              .toList(),
+        );
   }
 
   /// Stream current user's services
@@ -237,7 +243,10 @@ class ProfessionalService {
       }
 
       if (maxPrice != null) {
-        servicesQuery = servicesQuery.where('price', isLessThanOrEqualTo: maxPrice);
+        servicesQuery = servicesQuery.where(
+          'price',
+          isLessThanOrEqualTo: maxPrice,
+        );
       }
 
       servicesQuery = servicesQuery.limit(limit);
@@ -250,11 +259,14 @@ class ProfessionalService {
       // Client-side search if query provided
       if (query != null && query.isNotEmpty) {
         final lowerQuery = query.toLowerCase();
-        services = services.where((s) =>
-            s.title.toLowerCase().contains(lowerQuery) ||
-            s.description.toLowerCase().contains(lowerQuery) ||
-            s.tags.any((tag) => tag.toLowerCase().contains(lowerQuery))
-        ).toList();
+        services = services
+            .where(
+              (s) =>
+                  s.title.toLowerCase().contains(lowerQuery) ||
+                  s.description.toLowerCase().contains(lowerQuery) ||
+                  s.tags.any((tag) => tag.toLowerCase().contains(lowerQuery)),
+            )
+            .toList();
       }
 
       return services;
@@ -264,9 +276,7 @@ class ProfessionalService {
     }
   }
 
-  // ============================================
   // PORTFOLIO OPERATIONS
-  // ============================================
 
   /// Create a new portfolio item
   Future<String?> createPortfolioItem(PortfolioItemModel item) async {
@@ -280,14 +290,18 @@ class ProfessionalService {
           .count()
           .get();
 
-      final docRef = await _firestore.collection('portfolio').add(
-        item.copyWith(
-          userId: _currentUserId,
-          order: count.count ?? 0,
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-        ).toMap(),
-      );
+      final docRef = await _firestore
+          .collection('portfolio')
+          .add(
+            item
+                .copyWith(
+                  userId: _currentUserId,
+                  order: count.count ?? 0,
+                  createdAt: DateTime.now(),
+                  updatedAt: DateTime.now(),
+                )
+                .toMap(),
+          );
 
       // Update user's portfolio count
       await _firestore.collection('users').doc(_currentUserId).update({
@@ -302,13 +316,17 @@ class ProfessionalService {
   }
 
   /// Update a portfolio item
-  Future<bool> updatePortfolioItem(String itemId, PortfolioItemModel item) async {
+  Future<bool> updatePortfolioItem(
+    String itemId,
+    PortfolioItemModel item,
+  ) async {
     if (_currentUserId == null) return false;
 
     try {
-      await _firestore.collection('portfolio').doc(itemId).update(
-        item.copyWith(updatedAt: DateTime.now()).toMap(),
-      );
+      await _firestore
+          .collection('portfolio')
+          .doc(itemId)
+          .update(item.copyWith(updatedAt: DateTime.now()).toMap());
       return true;
     } catch (e) {
       debugPrint('Error updating portfolio item: $e');
@@ -392,9 +410,11 @@ class ProfessionalService {
         .where('userId', isEqualTo: userId)
         .orderBy('order')
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => PortfolioItemModel.fromFirestore(doc))
-            .toList());
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => PortfolioItemModel.fromFirestore(doc))
+              .toList(),
+        );
   }
 
   /// Stream current user's portfolio
@@ -413,10 +433,9 @@ class ProfessionalService {
       final batch = _firestore.batch();
 
       for (int i = 0; i < itemIds.length; i++) {
-        batch.update(
-          _firestore.collection('portfolio').doc(itemIds[i]),
-          {'order': i},
-        );
+        batch.update(_firestore.collection('portfolio').doc(itemIds[i]), {
+          'order': i,
+        });
       }
 
       await batch.commit();
@@ -427,16 +446,15 @@ class ProfessionalService {
     }
   }
 
-  // ============================================
   // IMAGE UPLOAD OPERATIONS
-  // ============================================
 
   /// Upload image to Firebase Storage
   Future<String?> uploadImage(File imageFile, String folder) async {
     if (_currentUserId == null) return null;
 
     try {
-      final fileName = '${DateTime.now().millisecondsSinceEpoch}_${imageFile.path.split('/').last}';
+      final fileName =
+          '${DateTime.now().millisecondsSinceEpoch}_${imageFile.path.split('/').last}';
       final ref = _storage.ref().child('$folder/$_currentUserId/$fileName');
 
       final uploadTask = await ref.putFile(
@@ -471,9 +489,7 @@ class ProfessionalService {
     }
   }
 
-  // ============================================
   // STATISTICS
-  // ============================================
 
   /// Get professional statistics
   Future<Map<String, dynamic>> getProfessionalStats() async {

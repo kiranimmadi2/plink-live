@@ -8,7 +8,6 @@ import 'package:timeago/timeago.dart' as timeago;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../services/universal_intent_service.dart';
 import '../../services/location_service.dart';
-import '../../services/activity_migration_service.dart';
 import '../../widgets/user_avatar.dart';
 import '../../widgets/account_badges.dart';
 import '../../providers/theme_provider.dart';
@@ -34,7 +33,6 @@ class _ProfileWithHistoryScreenState
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final UniversalIntentService _intentService = UniversalIntentService();
   final LocationService _locationService = LocationService();
-  final ActivityMigrationService _migrationService = ActivityMigrationService();
 
   // Local state that doesn't need to be in providers
   List<Map<String, dynamic>> _nearbyPeople = [];
@@ -1765,85 +1763,23 @@ class _ProfileWithHistoryScreenState
   }
 
   Future<void> _migrateActivities() async {
-    // Show loading dialog
+    // Migration no longer needed - show info message
     showDialog(
       context: context,
-      barrierDismissible: false,
-      builder: (context) => const AlertDialog(
-        content: Row(
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(width: 20),
-            Text('Migrating activities...'),
-          ],
+      builder: (context) => AlertDialog(
+        title: const Text('Migration Complete'),
+        content: const Text(
+          'Activity migration has already been completed.\n\n'
+          'Your activities are up to date.',
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
       ),
     );
-
-    try {
-      final result = await _migrationService.migrateCurrentUserActivities();
-
-      if (mounted) {
-        // ignore: use_build_context_synchronously
-        Navigator.pop(context); // Close loading dialog
-
-        if (result['success']) {
-          // Reload profile data
-          await _loadUserData();
-
-          if (!mounted) return;
-          showDialog( // ignore: use_build_context_synchronously
-            context: context,
-            builder: (context) => AlertDialog(
-              title: const Text('Migration Complete'),
-              content: Text(
-                'Successfully migrated ${result['migrated']} activities.\n\n'
-                'Activities are now in the new format without level information.\n\n'
-                'Please restart the app to see the changes.',
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('OK'),
-                ),
-              ],
-            ),
-          );
-        } else {
-          showDialog(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: const Text('Migration Failed'),
-              content: Text(result['message']),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('OK'),
-                ),
-              ],
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        Navigator.pop(context); // Close loading dialog
-
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Error'),
-            content: Text('Failed to migrate activities: $e'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('OK'),
-              ),
-            ],
-          ),
-        );
-      }
-    }
   }
 
   Color _getConnectionTypeColor(String type) {

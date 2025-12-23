@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 import '../../providers/other providers/app_providers.dart';
-import '../../services/chat services/group_chat_service.dart';
+import '../../services/group_chat_service.dart';
 import '../../res/utils/photo_url_helper.dart';
 import '../../widgets/other widgets/glass_text_field.dart';
 

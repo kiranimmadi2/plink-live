@@ -3,9 +3,10 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter_ringtone_player/flutter_ringtone_player.dart';
 import '../../models/user_profile.dart';
 import '../../res/config/app_colors.dart';
+import '../../res/config/app_text_styles.dart';
 import 'voice_call_screen.dart';
 
 class IncomingCallScreen extends StatefulWidget {
@@ -29,7 +30,6 @@ class IncomingCallScreen extends StatefulWidget {
 class _IncomingCallScreenState extends State<IncomingCallScreen>
     with SingleTickerProviderStateMixin {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final AudioPlayer _audioPlayer = AudioPlayer();
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
   StreamSubscription? _callStatusSubscription;
@@ -76,12 +76,13 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
     _startVibration();
 
     try {
-      await _audioPlayer.setReleaseMode(ReleaseMode.loop);
-      // Use a reliable free ringtone URL
-      await _audioPlayer.play(
-        UrlSource('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'),
+      // Play native ringtone instantly (no download needed)
+      FlutterRingtonePlayer().playRingtone(
+        looping: true,
         volume: 1.0,
+        asAlarm: false,
       );
+      debugPrint('🔔 Ringtone started playing (native)');
     } catch (e) {
       debugPrint('Error playing ringtone: $e');
     }
@@ -100,7 +101,8 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
     _vibrationTimer?.cancel();
     _vibrationTimer = null;
     try {
-      await _audioPlayer.stop();
+      await FlutterRingtonePlayer().stop();
+      debugPrint('🔔 Ringtone stopped');
     } catch (e) {
       debugPrint('Error stopping ringtone: $e');
     }
@@ -131,7 +133,6 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
   @override
   void dispose() {
     _stopRingtone();
-    _audioPlayer.dispose();
     _pulseController.dispose();
     _callStatusSubscription?.cancel();
     super.dispose();
@@ -208,7 +209,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Failed to accept call'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.error,
           ),
         );
       }
@@ -245,15 +246,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
           // Background gradient
           Container(
             decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Color(0xFF1a1a2e),
-                  Color(0xFF16213e),
-                  Color(0xFF0f0f23),
-                ],
-              ),
+              gradient: AppColors.splashGradient,
             ),
           ),
 
@@ -262,7 +255,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
               child: Container(
-                color: Colors.black.withValues(alpha: 0.3),
+                color: AppColors.blackAlpha(alpha: 0.3),
               ),
             ),
           ),
@@ -274,11 +267,10 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
                 const SizedBox(height: 80),
 
                 // Incoming call text
-                const Text(
+                Text(
                   'Incoming Call',
-                  style: TextStyle(
-                    fontSize: 18,
-                    color: Colors.white70,
+                  style: AppTextStyles.titleLarge.copyWith(
+                    color: AppColors.textSecondaryDark,
                     letterSpacing: 1.2,
                   ),
                 ),
@@ -311,7 +303,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
                         ),
                         child: CircleAvatar(
                           radius: 70,
-                          backgroundColor: Colors.grey[800],
+                          backgroundColor: AppColors.backgroundDarkTertiary,
                           backgroundImage: widget.callerPhoto != null
                               ? NetworkImage(widget.callerPhoto!)
                               : null,
@@ -320,10 +312,8 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
                                   widget.callerName.isNotEmpty
                                       ? widget.callerName[0].toUpperCase()
                                       : 'U',
-                                  style: const TextStyle(
+                                  style: AppTextStyles.displayLarge.copyWith(
                                     fontSize: 56,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
                                   ),
                                 )
                               : null,
@@ -338,21 +328,18 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
                 // Caller name
                 Text(
                   widget.callerName,
-                  style: const TextStyle(
+                  style: AppTextStyles.displayMedium.copyWith(
                     fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
                   ),
                 ),
 
                 const SizedBox(height: 8),
 
                 // Call type
-                const Text(
+                Text(
                   'Voice Call',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.white70,
+                  style: AppTextStyles.bodyLarge.copyWith(
+                    color: AppColors.textSecondaryDark,
                   ),
                 ),
 
@@ -367,7 +354,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
                       // Reject button
                       _buildActionButton(
                         icon: Icons.call_end_rounded,
-                        color: Colors.red,
+                        color: AppColors.error,
                         label: 'Decline',
                         onTap: _rejectCall,
                       ),
@@ -425,23 +412,22 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
                       width: 30,
                       height: 30,
                       child: CircularProgressIndicator(
-                        color: Colors.white,
+                        color: AppColors.textPrimaryDark,
                         strokeWidth: 3,
                       ),
                     ),
                   )
                 : Icon(
                     icon,
-                    color: Colors.white,
+                    color: AppColors.textPrimaryDark,
                     size: 32,
                   ),
           ),
           const SizedBox(height: 12),
           Text(
             label,
-            style: const TextStyle(
-              color: Colors.white70,
-              fontSize: 14,
+            style: AppTextStyles.bodySmall.copyWith(
+              color: AppColors.textSecondaryDark,
             ),
           ),
         ],

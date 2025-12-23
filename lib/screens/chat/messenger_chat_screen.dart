@@ -104,7 +104,7 @@ class _MessengerChatScreenState extends State<MessengerChatScreen> {
       if (_conversationId == null) {
         final docRef = await _firestore.collection('conversations').add({
           'participants': [currentUser.uid, widget.otherUser.uid],
-          'lastMessage': '🎤 Voice message',
+          'lastMessage': '  Voice message',
           'lastMessageTime': FieldValue.serverTimestamp(),
           'unreadCount': {currentUser.uid: 0, widget.otherUser.uid: 1},
           'createdAt': FieldValue.serverTimestamp(),
@@ -128,7 +128,7 @@ class _MessengerChatScreenState extends State<MessengerChatScreen> {
 
       // Update conversation
       await _firestore.collection('conversations').doc(_conversationId).update({
-        'lastMessage': '🎤 Voice message',
+        'lastMessage': '  Voice message',
         'lastMessageTime': FieldValue.serverTimestamp(),
         'unreadCount.${widget.otherUser.uid}': FieldValue.increment(1),
       });

@@ -13,7 +13,7 @@ class ConnectionService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final NotificationService _notificationService = NotificationService();
 
-  // ==================== CONNECTION REQUEST ====================
+  //    CONNECTION REQUEST
 
   /// Send a connection request to another user
   Future<Map<String, dynamic>> sendConnectionRequest({
@@ -33,7 +33,10 @@ class ConnectionService {
       // Check if already connected
       final isConnected = await areUsersConnected(senderId, receiverId);
       if (isConnected) {
-        return {'success': false, 'message': 'Already connected with this user'};
+        return {
+          'success': false,
+          'message': 'Already connected with this user',
+        };
       }
 
       // Check if request already exists
@@ -50,21 +53,26 @@ class ConnectionService {
       }
 
       // Get sender info
-      final senderDoc = await _firestore.collection('users').doc(senderId).get();
+      final senderDoc = await _firestore
+          .collection('users')
+          .doc(senderId)
+          .get();
       final senderData = senderDoc.data() ?? {};
       final senderName = senderData['name'] ?? 'Someone';
 
       // Create connection request
-      final requestRef = await _firestore.collection('connection_requests').add({
-        'senderId': senderId,
-        'senderName': senderName,
-        'senderPhoto': senderData['photoUrl'],
-        'receiverId': receiverId,
-        'message': message,
-        'status': 'pending', // pending, accepted, rejected
-        'createdAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+      final requestRef = await _firestore.collection('connection_requests').add(
+        {
+          'senderId': senderId,
+          'senderName': senderName,
+          'senderPhoto': senderData['photoUrl'],
+          'receiverId': receiverId,
+          'message': message,
+          'status': 'pending', // pending, accepted, rejected
+          'createdAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        },
+      );
 
       // Send notification to receiver
       await _sendConnectionNotification(
@@ -73,14 +81,14 @@ class ConnectionService {
         requestId: requestRef.id,
       );
 
-      debugPrint('✅ Connection request sent to $receiverId');
+      debugPrint(' Connection request sent to $receiverId');
       return {
         'success': true,
         'message': 'Connection request sent successfully',
         'requestId': requestRef.id,
       };
     } catch (e) {
-      debugPrint('❌ Error sending connection request: $e');
+      debugPrint(' Error sending connection request: $e');
       return {'success': false, 'message': 'Failed to send request: $e'};
     }
   }
@@ -122,7 +130,10 @@ class ConnectionService {
       await _createConnection(senderId, receiverId);
 
       // Get current user's name (the one who accepted)
-      final currentUserDoc = await _firestore.collection('users').doc(currentUserId).get();
+      final currentUserDoc = await _firestore
+          .collection('users')
+          .doc(currentUserId)
+          .get();
       final currentUserName = currentUserDoc.data()?['name'] ?? 'Someone';
 
       // Send notification to the SENDER (the person who sent the request)
@@ -134,10 +145,10 @@ class ConnectionService {
         data: {'connectionUserId': currentUserId},
       );
 
-      debugPrint('✅ Connection request accepted: $requestId');
+      debugPrint(' Connection request accepted: $requestId');
       return {'success': true, 'message': 'Connection accepted'};
     } catch (e) {
-      debugPrint('❌ Error accepting connection request: $e');
+      debugPrint(' Error accepting connection request: $e');
       return {'success': false, 'message': 'Failed to accept request: $e'};
     }
   }
@@ -174,10 +185,10 @@ class ConnectionService {
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
-      debugPrint('✅ Connection request rejected: $requestId');
+      debugPrint(' Connection request rejected: $requestId');
       return {'success': true, 'message': 'Connection request rejected'};
     } catch (e) {
-      debugPrint('❌ Error rejecting connection request: $e');
+      debugPrint(' Error rejecting connection request: $e');
       return {'success': false, 'message': 'Failed to reject request: $e'};
     }
   }
@@ -211,15 +222,15 @@ class ConnectionService {
       // Delete request
       await requestDoc.reference.delete();
 
-      debugPrint('✅ Connection request cancelled: $requestId');
+      debugPrint(' Connection request cancelled: $requestId');
       return {'success': true, 'message': 'Connection request cancelled'};
     } catch (e) {
-      debugPrint('❌ Error cancelling connection request: $e');
+      debugPrint(' Error cancelling connection request: $e');
       return {'success': false, 'message': 'Failed to cancel request: $e'};
     }
   }
 
-  // ==================== CONNECTIONS MANAGEMENT ====================
+  //    CONNECTIONS MANAGEMENT
 
   /// Create a connection between two users
   Future<void> _createConnection(String user1Id, String user2Id) async {
@@ -264,10 +275,10 @@ class ConnectionService {
 
       await batch.commit();
 
-      debugPrint('✅ Connection removed with user $userId');
+      debugPrint(' Connection removed with user $userId');
       return {'success': true, 'message': 'Connection removed'};
     } catch (e) {
-      debugPrint('❌ Error removing connection: $e');
+      debugPrint(' Error removing connection: $e');
       return {'success': false, 'message': 'Failed to remove connection: $e'};
     }
   }
@@ -276,7 +287,9 @@ class ConnectionService {
   Future<bool> areUsersConnected(String user1Id, String user2Id) async {
     try {
       final userDoc = await _firestore.collection('users').doc(user1Id).get();
-      final connections = List<String>.from(userDoc.data()?['connections'] ?? []);
+      final connections = List<String>.from(
+        userDoc.data()?['connections'] ?? [],
+      );
       return connections.contains(user2Id);
     } catch (e) {
       debugPrint('❌ Error checking connection status: $e');
@@ -290,7 +303,10 @@ class ConnectionService {
     if (currentUserId == null) return [];
 
     try {
-      final userDoc = await _firestore.collection('users').doc(currentUserId).get();
+      final userDoc = await _firestore
+          .collection('users')
+          .doc(currentUserId)
+          .get();
       return List<String>.from(userDoc.data()?['connections'] ?? []);
     } catch (e) {
       debugPrint('❌ Error getting connections: $e');
@@ -304,7 +320,10 @@ class ConnectionService {
     if (currentUserId == null) return 0;
 
     try {
-      final userDoc = await _firestore.collection('users').doc(currentUserId).get();
+      final userDoc = await _firestore
+          .collection('users')
+          .doc(currentUserId)
+          .get();
       return userDoc.data()?['connectionCount'] ?? 0;
     } catch (e) {
       debugPrint('❌ Error getting connection count: $e');
@@ -312,7 +331,7 @@ class ConnectionService {
     }
   }
 
-  // ==================== REQUESTS QUERIES ====================
+  //    REQUESTS QUERIES
 
   /// Get pending connection requests (received)
   Stream<List<Map<String, dynamic>>> getPendingRequestsStream() {
@@ -326,12 +345,12 @@ class ConnectionService {
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs.map((doc) {
-        final data = doc.data();
-        data['id'] = doc.id;
-        return data;
-      }).toList();
-    });
+          return snapshot.docs.map((doc) {
+            final data = doc.data();
+            data['id'] = doc.id;
+            return data;
+          }).toList();
+        });
   }
 
   /// Get sent connection requests
@@ -346,12 +365,12 @@ class ConnectionService {
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs.map((doc) {
-        final data = doc.data();
-        data['id'] = doc.id;
-        return data;
-      }).toList();
-    });
+          return snapshot.docs.map((doc) {
+            final data = doc.data();
+            data['id'] = doc.id;
+            return data;
+          }).toList();
+        });
   }
 
   /// Get pending requests count
@@ -393,12 +412,10 @@ class ConnectionService {
 
       return null;
     } catch (e) {
-      debugPrint('❌ Error checking request status: $e');
+      debugPrint(' Error checking request status: $e');
       return null;
     }
   }
-
-  // ==================== NOTIFICATIONS ====================
 
   /// Send connection request notification to the RECEIVER
   Future<void> _sendConnectionNotification({

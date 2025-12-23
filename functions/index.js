@@ -219,7 +219,7 @@ exports.onMessageCreated = onDocumentCreated(
  * CALL NOTIFICATION
  *
  * Triggers when a new call document is created.
- * Sends notification ONLY to the callee (User B), NOT to the caller (User A).
+ * Sends notification ONLY to the receiver (User B), NOT to the caller (User A).
  *
  * Path: calls/{callId}
  */
@@ -228,14 +228,15 @@ exports.onCallCreated = onDocumentCreated("calls/{callId}", async (event) => {
   const callId = event.params.callId;
 
   logger.info(`New call created: ${callId}`);
+  logger.info(`Call data:`, JSON.stringify(callData));
 
-  // Get caller and callee IDs
+  // Get caller and receiver IDs (support both field names)
   const callerId = callData.callerId;
-  const calleeId = callData.calleeId;
+  const receiverId = callData.receiverId || callData.calleeId;
 
-  // CRITICAL: Only send notification to callee (User B), NOT caller (User A)
-  if (!calleeId || calleeId === callerId) {
-    logger.warn("No valid callee or caller is callee, skipping");
+  // CRITICAL: Only send notification to receiver (User B), NOT caller (User A)
+  if (!receiverId || receiverId === callerId) {
+    logger.warn("No valid receiver or caller is receiver, skipping");
     return null;
   }
 
@@ -246,36 +247,79 @@ exports.onCallCreated = onDocumentCreated("calls/{callId}", async (event) => {
     return null;
   }
 
-  // Get callee's FCM token
-  const calleeToken = await getUserFcmToken(calleeId);
-  if (!calleeToken) {
-    logger.warn(`No FCM token for callee ${calleeId}`);
+  // Get receiver's FCM token
+  const receiverToken = await getUserFcmToken(receiverId);
+  if (!receiverToken) {
+    logger.warn(`No FCM token for receiver ${receiverId}`);
     return null;
   }
 
-  // Get caller's name and photo for notification
-  const callerName = await getUserName(callerId);
-  const callerPhotoUrl = await getUserPhotoUrl(callerId);
+  // Get caller's name and photo - use from call data or fetch from user doc
+  const callerName = callData.callerName || await getUserName(callerId);
+  const callerPhotoUrl = callData.callerPhoto || await getUserPhotoUrl(callerId);
 
-  // Send high-priority notification to callee ONLY
-  await sendNotification(
-    calleeToken,
-    {
-      title: "Incoming Call",
-      body: `${callerName} is calling you`,
-    },
-    {
-      type: "call",
-      callId: callId,
-      callerId: callerId,
-      callerName: callerName,
-      callerPhotoUrl: callerPhotoUrl || "",
-      callType: callData.callType || "voice",
-      click_action: "FLUTTER_NOTIFICATION_CLICK",
+  // Send HIGH PRIORITY notification to receiver ONLY (for background/killed app)
+  try {
+    const message = {
+      token: receiverToken,
+      notification: {
+        title: "Incoming Call",
+        body: `${callerName} is calling you`,
+      },
+      data: {
+        type: "call",
+        callId: callId,
+        callerId: callerId,
+        callerName: callerName,
+        callerPhoto: callerPhotoUrl || "",
+        click_action: "FLUTTER_NOTIFICATION_CLICK",
+      },
+      android: {
+        priority: "high",
+        ttl: 60000, // 60 seconds - call expires
+        notification: {
+          channelId: "calls",
+          priority: "max",
+          defaultSound: true,
+          defaultVibrateTimings: true,
+          visibility: "public",
+          icon: "@mipmap/ic_launcher",
+        },
+      },
+      apns: {
+        headers: {
+          "apns-priority": "10", // High priority for iOS
+          "apns-push-type": "alert",
+        },
+        payload: {
+          aps: {
+            alert: {
+              title: "Incoming Call",
+              body: `${callerName} is calling you`,
+            },
+            sound: "default",
+            badge: 1,
+            "content-available": 1,
+            "mutable-content": 1,
+            category: "INCOMING_CALL",
+          },
+        },
+      },
+    };
+
+    const response = await messaging.send(message);
+    logger.info(`Call notification sent successfully: ${response}`);
+  } catch (error) {
+    logger.error("Error sending call notification:", error);
+    if (
+      error.code === "messaging/invalid-registration-token" ||
+      error.code === "messaging/registration-token-not-registered"
+    ) {
+      logger.warn(`Invalid FCM token for receiver ${receiverId}`);
     }
-  );
+  }
 
-  logger.info(`Call notification sent to ${calleeId} from ${callerId}`);
+  logger.info(`Call notification sent to ${receiverId} from ${callerId}`);
   return null;
 });
 

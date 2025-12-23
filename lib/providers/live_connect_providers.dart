@@ -2,9 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import './app_providers.dart';
 
-/// ============================================
 /// LIVE CONNECT FILTER STATE
-/// ============================================
 
 /// State class for Live Connect filters
 class LiveConnectFilterState {
@@ -55,12 +53,13 @@ class LiveConnectFilterState {
   }
 
   bool get hasActiveFilters =>
-      filterByInterests || filterByGender || filterByAge || searchQuery.isNotEmpty;
+      filterByInterests ||
+      filterByGender ||
+      filterByAge ||
+      searchQuery.isNotEmpty;
 }
 
-/// ============================================
 /// LIVE CONNECT FILTER NOTIFIER
-/// ============================================
 
 class LiveConnectFilterNotifier extends StateNotifier<LiveConnectFilterState> {
   LiveConnectFilterNotifier() : super(const LiveConnectFilterState());
@@ -118,13 +117,13 @@ class LiveConnectFilterNotifier extends StateNotifier<LiveConnectFilterState> {
 
 /// Provider for Live Connect filters
 final liveConnectFilterProvider =
-    StateNotifierProvider<LiveConnectFilterNotifier, LiveConnectFilterState>((ref) {
-  return LiveConnectFilterNotifier();
-});
+    StateNotifierProvider<LiveConnectFilterNotifier, LiveConnectFilterState>((
+      ref,
+    ) {
+      return LiveConnectFilterNotifier();
+    });
 
-/// ============================================
 /// NEARBY PEOPLE STATE
-/// ============================================
 
 /// State class for nearby people list
 class NearbyPeopleState {
@@ -158,15 +157,15 @@ class NearbyPeopleState {
       isLoading: isLoading ?? this.isLoading,
       isLoadingMore: isLoadingMore ?? this.isLoadingMore,
       hasMore: hasMore ?? this.hasMore,
-      lastDocument: clearLastDocument ? null : (lastDocument ?? this.lastDocument),
+      lastDocument: clearLastDocument
+          ? null
+          : (lastDocument ?? this.lastDocument),
       error: error,
     );
   }
 }
 
-/// ============================================
 /// NEARBY PEOPLE NOTIFIER
-/// ============================================
 
 class NearbyPeopleNotifier extends StateNotifier<NearbyPeopleState> {
   final String? currentUserId;
@@ -178,7 +177,11 @@ class NearbyPeopleNotifier extends StateNotifier<NearbyPeopleState> {
   Future<void> loadInitial() async {
     if (currentUserId == null || state.isLoading) return;
 
-    state = state.copyWith(isLoading: true, error: null, clearLastDocument: true);
+    state = state.copyWith(
+      isLoading: true,
+      error: null,
+      clearLastDocument: true,
+    );
 
     try {
       final query = FirebaseFirestore.instance
@@ -268,13 +271,11 @@ class NearbyPeopleNotifier extends StateNotifier<NearbyPeopleState> {
 /// Provider for nearby people
 final nearbyPeopleProvider =
     StateNotifierProvider<NearbyPeopleNotifier, NearbyPeopleState>((ref) {
-  final userId = ref.watch(currentUserIdProvider);
-  return NearbyPeopleNotifier(userId);
-});
+      final userId = ref.watch(currentUserIdProvider);
+      return NearbyPeopleNotifier(userId);
+    });
 
-/// ============================================
 /// CONNECTION STATUS CACHE
-/// ============================================
 
 /// State for connection status caching
 class ConnectionStatusCacheState {
@@ -301,13 +302,12 @@ class ConnectionStatusCacheState {
   }
 }
 
-class ConnectionStatusCacheNotifier extends StateNotifier<ConnectionStatusCacheState> {
+class ConnectionStatusCacheNotifier
+    extends StateNotifier<ConnectionStatusCacheState> {
   ConnectionStatusCacheNotifier() : super(const ConnectionStatusCacheState());
 
   void setConnected(String userId, bool value) {
-    state = state.copyWith(
-      isConnected: {...state.isConnected, userId: value},
-    );
+    state = state.copyWith(isConnected: {...state.isConnected, userId: value});
   }
 
   void setRequestStatus(String userId, String? status) {
@@ -351,20 +351,19 @@ class ConnectionStatusCacheNotifier extends StateNotifier<ConnectionStatusCacheS
 
 /// Provider for connection status cache
 final connectionStatusCacheProvider =
-    StateNotifierProvider<ConnectionStatusCacheNotifier, ConnectionStatusCacheState>((ref) {
-  return ConnectionStatusCacheNotifier();
-});
+    StateNotifierProvider<
+      ConnectionStatusCacheNotifier,
+      ConnectionStatusCacheState
+    >((ref) {
+      return ConnectionStatusCacheNotifier();
+    });
 
-/// ============================================
 /// SELECTED INTERESTS PROVIDER
-/// ============================================
 
 /// Provider for user's selected interests
 final selectedInterestsProvider = StateProvider<List<String>>((ref) => []);
 
-/// ============================================
 /// AVAILABLE INTERESTS
-/// ============================================
 
 /// List of available interests
 const List<String> availableInterests = [

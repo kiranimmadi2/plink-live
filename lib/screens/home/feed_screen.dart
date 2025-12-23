@@ -16,6 +16,7 @@ import '../../widgets/other widgets/glass_text_field.dart';
 import '../../widgets/other widgets/user_avatar.dart';
 import '../../models/user_profile.dart';
 import '../chat/enhanced_chat_screen.dart';
+import '../../services/notification_service.dart';
 import 'my_posts_screen.dart';
 import 'create_post_screen.dart';
 import 'edit_post_screen.dart';
@@ -232,7 +233,10 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _toggleSavePost(String postId, Map<String, dynamic> postData) async {
+  Future<void> _toggleSavePost(
+    String postId,
+    Map<String, dynamic> postData,
+  ) async {
     final currentUserId = _auth.currentUser?.uid;
     if (currentUserId == null) return;
 
@@ -363,9 +367,14 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
 
   List<DocumentSnapshot> get _filteredPosts {
     final searchQuery = _searchController.text.toLowerCase().trim();
+    final currentUserId = _auth.currentUser?.uid;
 
     return _posts.where((doc) {
       final data = doc.data() as Map<String, dynamic>;
+
+      // Filter out current user's own posts (they can see them in My Posts tab)
+      final postUserId = data['userId'] as String?;
+      if (postUserId == currentUserId) return false;
 
       // Filter out inactive posts
       if (data['isActive'] == false) return false;
@@ -374,14 +383,22 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
       if (_selectedCategory != 'All') {
         final intentAnalysis = data['intentAnalysis'] as Map<String, dynamic>?;
         // Check actionType from multiple possible locations
-        final actionType = (data['actionType'] ??
-                           intentAnalysis?['action_type'] ??
-                           data['type'] ?? '')
-                           .toString().toLowerCase();
-        final domain = (intentAnalysis?['domain'] ?? '').toString().toLowerCase();
+        final actionType =
+            (data['actionType'] ??
+                    intentAnalysis?['action_type'] ??
+                    data['type'] ??
+                    '')
+                .toString()
+                .toLowerCase();
+        final domain = (intentAnalysis?['domain'] ?? '')
+            .toString()
+            .toLowerCase();
         final title = (data['title'] ?? '').toString().toLowerCase();
-        final description = (data['description'] ?? '').toString().toLowerCase();
-        final hashtags = (data['hashtags'] as List<dynamic>?)?.join(' ').toLowerCase() ?? '';
+        final description = (data['description'] ?? '')
+            .toString()
+            .toLowerCase();
+        final hashtags =
+            (data['hashtags'] as List<dynamic>?)?.join(' ').toLowerCase() ?? '';
         final combinedText = '$title $description $hashtags';
 
         if (_selectedCategory == 'Seeking') {
@@ -423,8 +440,7 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
           }
         }
         if (_selectedCategory == 'Buy/Sell') {
-          if (!domain.contains('marketplace') &&
-              data['price'] == null) {
+          if (!domain.contains('marketplace') && data['price'] == null) {
             return false;
           }
         }
@@ -433,10 +449,13 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
       // Search filter
       if (searchQuery.isNotEmpty) {
         final title = (data['title'] ?? '').toString().toLowerCase();
-        final description = (data['description'] ?? '').toString().toLowerCase();
+        final description = (data['description'] ?? '')
+            .toString()
+            .toLowerCase();
         final prompt = (data['originalPrompt'] ?? '').toString().toLowerCase();
         final userName = (data['userName'] ?? '').toString().toLowerCase();
-        final hashtags = (data['hashtags'] as List<dynamic>?)?.join(' ').toLowerCase() ?? '';
+        final hashtags =
+            (data['hashtags'] as List<dynamic>?)?.join(' ').toLowerCase() ?? '';
 
         return title.contains(searchQuery) ||
             description.contains(searchQuery) ||
@@ -467,9 +486,7 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
           ),
 
           // Dark overlay
-          Positioned.fill(
-            child: Container(color: AppColors.darkOverlay()),
-          ),
+          Positioned.fill(child: Container(color: AppColors.darkOverlay())),
 
           // Main content
           SafeArea(
@@ -491,38 +508,39 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
                           child: CircularProgressIndicator(color: Colors.white),
                         )
                       : _filteredPosts.isEmpty
-                          ? _buildEmptyState()
-                          : RefreshIndicator(
-                              onRefresh: _loadFeedPosts,
-                              color: Colors.white,
-                              backgroundColor: AppColors.backgroundDark,
-                              child: ListView.builder(
-                                controller: _scrollController,
-                                padding: const EdgeInsets.all(16),
-                                itemCount: _filteredPosts.length + (_hasMore ? 1 : 0),
-                                itemBuilder: (context, index) {
-                                  if (index == _filteredPosts.length) {
-                                    return const Padding(
-                                      padding: EdgeInsets.all(16),
-                                      child: Center(
-                                        child: CircularProgressIndicator(
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                    );
-                                  }
+                      ? _buildEmptyState()
+                      : RefreshIndicator(
+                          onRefresh: _loadFeedPosts,
+                          color: Colors.white,
+                          backgroundColor: AppColors.backgroundDark,
+                          child: ListView.builder(
+                            controller: _scrollController,
+                            padding: const EdgeInsets.all(16),
+                            itemCount:
+                                _filteredPosts.length + (_hasMore ? 1 : 0),
+                            itemBuilder: (context, index) {
+                              if (index == _filteredPosts.length) {
+                                return const Padding(
+                                  padding: EdgeInsets.all(16),
+                                  child: Center(
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                );
+                              }
 
-                                  final doc = _filteredPosts[index];
-                                  final data = doc.data() as Map<String, dynamic>;
+                              final doc = _filteredPosts[index];
+                              final data = doc.data() as Map<String, dynamic>;
 
-                                  return _buildPostCard(
-                                    postId: doc.id,
-                                    post: data,
-                                    isSaved: _savedPostIds.contains(doc.id),
-                                  );
-                                },
-                              ),
-                            ),
+                              return _buildPostCard(
+                                postId: doc.id,
+                                post: data,
+                                isSaved: _savedPostIds.contains(doc.id),
+                              );
+                            },
+                          ),
+                        ),
                 ),
               ],
             ),
@@ -535,6 +553,7 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
             child: FloatingActionButton(
               onPressed: _showCreatePostDialog,
               backgroundColor: AppColors.iosBlue,
+              shape: const CircleBorder(),
               child: const Icon(Icons.add, color: Colors.white, size: 28),
             ),
           ),
@@ -582,7 +601,7 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
           const Expanded(
             child: Center(
               child: Text(
-                'Feed',
+                "Supper Feed",
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
@@ -669,11 +688,11 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(14),
                 color: isSelected
-                    ? const Color(0xFF0051A8)
+                    ? AppColors.buttonBackground()
                     : AppColors.backgroundDark.withValues(alpha: 0.5),
                 border: Border.all(
                   color: isSelected
-                      ? Colors.white.withValues(alpha: 0.5)
+                      ? AppColors.buttonBorder()
                       : AppColors.glassBorder(alpha: 0.3),
                   width: 1,
                 ),
@@ -701,7 +720,9 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
                     category['name'],
                     style: AppTextStyles.bodySmall.copyWith(
                       color: Colors.white,
-                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                      fontWeight: isSelected
+                          ? FontWeight.w600
+                          : FontWeight.normal,
                     ),
                   ),
                 ],
@@ -724,21 +745,22 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
 
     final title = post['title'] ?? post['originalPrompt'] ?? 'No Title';
     final rawDescription = post['description']?.toString() ?? '';
-    final description = (rawDescription == title || rawDescription == post['originalPrompt'])
+    final description =
+        (rawDescription == title || rawDescription == post['originalPrompt'])
         ? ''
         : rawDescription;
     final images = post['images'] as List<dynamic>? ?? [];
     final rawImageUrl = post['imageUrl'];
     final imageUrl = (rawImageUrl != null && rawImageUrl.toString().isNotEmpty)
         ? rawImageUrl.toString()
-        : (images.isNotEmpty && images[0] != null && images[0].toString().isNotEmpty)
-            ? images[0].toString()
-            : null;
+        : (images.isNotEmpty &&
+              images[0] != null &&
+              images[0].toString().isNotEmpty)
+        ? images[0].toString()
+        : null;
     final price = post['price'];
     final userName = post['userName'] ?? 'User';
     final userPhoto = post['userPhoto'];
-    final intentAnalysis = post['intentAnalysis'] as Map<String, dynamic>?;
-    final actionType = intentAnalysis?['action_type'] as String?;
     final createdAt = post['createdAt'];
 
     DateTime? time;
@@ -791,7 +813,9 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
                 Row(
                   children: [
                     UserAvatar(
-                      profileImageUrl: PhotoUrlHelper.fixGooglePhotoUrl(userPhoto),
+                      profileImageUrl: PhotoUrlHelper.fixGooglePhotoUrl(
+                        userPhoto,
+                      ),
                       radius: contentLevel >= 2 ? 18 : 14,
                       fallbackText: userName,
                     ),
@@ -819,33 +843,50 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
                         ],
                       ),
                     ),
-                    if (actionType != null)
-                      Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: contentLevel >= 2 ? 8 : 6,
-                          vertical: contentLevel >= 2 ? 4 : 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: _getActionColor(actionType).withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(
-                            color: _getActionColor(actionType).withValues(alpha: 0.5),
-                            width: 1,
-                          ),
-                        ),
-                        child: Text(
-                          actionType == 'seeking'
-                              ? 'Looking'
-                              : actionType == 'offering'
-                                  ? 'Offering'
-                                  : actionType,
-                          style: AppTextStyles.labelSmall.copyWith(
-                            color: _getActionColor(actionType),
-                            fontWeight: FontWeight.w600,
-                            fontSize: 12,
-                          ),
-                        ),
+                    // Action buttons
+                    // For own posts: Edit and Delete
+                    if (isOwnPost) ...[
+                      _buildIconOnlyButton(
+                        icon: Icons.edit_outlined,
+                        color: Colors.white,
+                        onTap: () => _editPost(postId, post),
+                        contentLevel: contentLevel,
                       ),
+                      const SizedBox(width: 10),
+                      _buildIconOnlyButton(
+                        icon: Icons.delete_outline_rounded,
+                        color: Colors.white,
+                        onTap: () => _showDeleteConfirmation(postId),
+                        contentLevel: contentLevel,
+                      ),
+                    ],
+                    // For other's posts: Chat, Call, Save
+                    if (!isOwnPost) ...[
+                      _buildIconOnlyButton(
+                        icon: Icons.chat_bubble_outline_rounded,
+                        color: Colors.white,
+                        onTap: () => _openUserChat(post),
+                        contentLevel: contentLevel,
+                      ),
+                      if (post['allowCalls'] ?? true) ...[
+                        const SizedBox(width: 10),
+                        _buildIconOnlyButton(
+                          icon: Icons.call_outlined,
+                          color: Colors.white,
+                          onTap: () => _makeVoiceCall(post),
+                          contentLevel: contentLevel,
+                        ),
+                      ],
+                      const SizedBox(width: 10),
+                      _buildIconOnlyButton(
+                        icon: _savedPostIds.contains(postId)
+                            ? Icons.bookmark_rounded
+                            : Icons.bookmark_border_rounded,
+                        color: Colors.white,
+                        onTap: () => _toggleSavePost(postId, post),
+                        contentLevel: contentLevel,
+                      ),
+                    ],
                   ],
                 ),
 
@@ -942,92 +983,50 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildActionButtons(String postId, Map<String, dynamic> post, bool isOwnPost, bool isSaved) {
-    final allowCalls = post['allowCalls'] ?? true; // Default to true if not set
-
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: [
-        // Chat button (only for other's posts)
-        if (!isOwnPost)
-          _buildActionButton(
-            icon: Icons.chat_bubble_outline_rounded,
-            label: 'Chat',
-            color: AppColors.iosBlue,
-            onTap: () => _openUserChat(post),
-          ),
-
-        // Call button (only for other's posts and if allowCalls is true)
-        if (!isOwnPost && allowCalls)
-          _buildActionButton(
-            icon: Icons.call_outlined,
-            label: 'Call',
-            color: AppColors.vibrantGreen,
-            onTap: () => _makeVoiceCall(post),
-          ),
-
-        // Save button (only for other's posts)
-        if (!isOwnPost)
-          _buildActionButton(
-            icon: isSaved ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
-            label: isSaved ? 'Saved' : 'Save',
-            color: isSaved ? AppColors.iosBlue : Colors.white70,
-            onTap: () => _toggleSavePost(postId, post),
-          ),
-
-        // Edit button (only for own posts)
-        if (isOwnPost)
-          _buildActionButton(
-            icon: Icons.edit_outlined,
-            label: 'Edit',
-            color: Colors.amber,
-            onTap: () => _editPost(postId, post),
-          ),
-
-        // Delete button (only for own posts)
-        if (isOwnPost)
-          _buildActionButton(
-            icon: Icons.delete_outline_rounded,
-            label: 'Delete',
-            color: AppColors.error,
-            onTap: () => _showDeleteConfirmation(postId),
-          ),
-      ],
-    );
+  Widget _buildActionButtons(
+    String postId,
+    Map<String, dynamic> post,
+    bool isOwnPost,
+    bool isSaved,
+  ) {
+    // All action buttons are now in the header row, so return empty
+    return const SizedBox.shrink();
   }
 
-  Widget _buildActionButton({
+  // Icon button with border and background - fixed size for all posts
+  Widget _buildIconOnlyButton({
     required IconData icon,
-    required String label,
     required Color color,
     required VoidCallback onTap,
+    int contentLevel = 2,
   }) {
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.lightImpact();
-        onTap();
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: color.withValues(alpha: 0.3)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: color, size: 18),
-            const SizedBox(width: 4),
-            Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
+    // Fixed size for all posts - consistent look
+    const double buttonSize = 32.0;
+    const double iconSize = 16.0;
+    const double borderRadius = 8.0;
+
+    // Wrap in Material to absorb InkWell splash from parent
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.lightImpact();
+          onTap();
+        },
+        borderRadius: BorderRadius.circular(borderRadius),
+        splashColor: color.withValues(alpha: 0.2),
+        highlightColor: color.withValues(alpha: 0.1),
+        child: Container(
+          width: buttonSize,
+          height: buttonSize,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(borderRadius),
+            border: Border.all(color: color.withValues(alpha: 0.3)),
+          ),
+          child: Center(
+            child: Icon(icon, color: color, size: iconSize),
+          ),
         ),
       ),
     );
@@ -1058,7 +1057,7 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(20),
-                color: Colors.black.withValues(alpha: 0.6),
+                color: AppColors.glassBackgroundDark(alpha: 0.2),
                 border: Border.all(
                   color: Colors.white.withValues(alpha: 0.3),
                   width: 1,
@@ -1076,7 +1075,9 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           border: Border.all(
-                            color: AppColors.vibrantGreen.withValues(alpha: 0.5),
+                            color: AppColors.vibrantGreen.withValues(
+                              alpha: 0.5,
+                            ),
                             width: 2,
                           ),
                         ),
@@ -1088,7 +1089,9 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
                               : null,
                           child: userPhoto == null
                               ? Text(
-                                  userName.isNotEmpty ? userName[0].toUpperCase() : 'U',
+                                  userName.isNotEmpty
+                                      ? userName[0].toUpperCase()
+                                      : 'U',
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 28,
@@ -1125,10 +1128,7 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
                   const Text(
                     'You are about to start a voice call.',
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 13,
-                    ),
+                    style: TextStyle(color: Colors.white70, fontSize: 13),
                   ),
                   const SizedBox(height: 20),
                   Row(
@@ -1161,8 +1161,13 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
                       const SizedBox(width: 10),
                       Expanded(
                         child: GestureDetector(
-                          onTap: () {
+                          onTap: () async {
                             Navigator.pop(context);
+                            // Wait for dialog to close before navigating
+                            await Future.delayed(
+                              const Duration(milliseconds: 100),
+                            );
+                            if (!mounted) return;
                             _initiateCall(post);
                           },
                           child: Container(
@@ -1174,11 +1179,7 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
                             child: const Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(
-                                  Icons.call,
-                                  color: Colors.white,
-                                  size: 18,
-                                ),
+                                Icon(Icons.call, color: Colors.white, size: 18),
                                 SizedBox(width: 6),
                                 Text(
                                   'Call',
@@ -1204,7 +1205,7 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
     );
   }
 
-  void _initiateCall(Map<String, dynamic> post) async {
+  Future<void> _initiateCall(Map<String, dynamic> post) async {
     final postUserId = post['userId'] as String?;
     final currentUser = _auth.currentUser;
 
@@ -1215,10 +1216,21 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
 
     try {
       // Get current user's profile for proper name
-      final callerDoc = await _firestore.collection('users').doc(currentUser.uid).get();
+      final callerDoc = await _firestore
+          .collection('users')
+          .doc(currentUser.uid)
+          .get();
       final callerData = callerDoc.data();
-      final callerName = callerData?['name'] ?? callerData?['displayName'] ?? currentUser.displayName ?? 'Unknown';
-      final callerPhoto = callerData?['photoUrl'] ?? callerData?['photoURL'] ?? callerData?['profileImageUrl'] ?? currentUser.photoURL;
+      final callerName =
+          callerData?['name'] ??
+          callerData?['displayName'] ??
+          currentUser.displayName ??
+          'Unknown';
+      final callerPhoto =
+          callerData?['photoUrl'] ??
+          callerData?['photoURL'] ??
+          callerData?['profileImageUrl'] ??
+          currentUser.photoURL;
 
       // Create call record in Firestore
       final callDoc = await _firestore.collection('calls').add({
@@ -1234,10 +1246,27 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
         'timestamp': FieldValue.serverTimestamp(),
       });
 
+      // Send push notification to receiver for incoming call
+      await NotificationService().sendNotificationToUser(
+        userId: postUserId,
+        title: 'Incoming Call',
+        body: '$callerName is calling you',
+        type: 'call',
+        data: {
+          'callId': callDoc.id,
+          'callerId': currentUser.uid,
+          'callerName': callerName,
+          'callerPhoto': callerPhoto,
+        },
+      );
+
       if (!mounted) return;
 
       // Fetch full user profile for chat navigation
-      final userDoc = await _firestore.collection('users').doc(postUserId).get();
+      final userDoc = await _firestore
+          .collection('users')
+          .doc(postUserId)
+          .get();
 
       if (!userDoc.exists) {
         if (mounted) {
@@ -1259,10 +1288,15 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
         id: postUserId,
         name: userData['name'] ?? userData['displayName'] ?? userName,
         email: userData['email'] ?? '',
-        profileImageUrl: userData['photoUrl'] ?? userData['photoURL'] ?? userData['profileImageUrl'] ?? userPhoto,
+        profileImageUrl:
+            userData['photoUrl'] ??
+            userData['photoURL'] ??
+            userData['profileImageUrl'] ??
+            userPhoto,
         bio: userData['bio'] ?? '',
         location: userData['location'],
-        interests: (userData['interests'] as List<dynamic>?)?.cast<String>() ?? [],
+        interests:
+            (userData['interests'] as List<dynamic>?)?.cast<String>() ?? [],
         createdAt: DateTime.now(),
         lastSeen: DateTime.now(),
       );
@@ -1320,7 +1354,7 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(20),
-                color: Colors.black.withValues(alpha: 0.6),
+                color: AppColors.glassBackgroundDark(alpha: 0.2),
                 border: Border.all(
                   color: Colors.white.withValues(alpha: 0.3),
                   width: 1,
@@ -1355,10 +1389,7 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
                   const Text(
                     'Are you sure? This cannot be undone.',
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 13,
-                    ),
+                    style: TextStyle(color: Colors.white70, fontSize: 13),
                   ),
                   const SizedBox(height: 20),
                   Row(
@@ -1431,7 +1462,10 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Post deleted successfully'), backgroundColor: Colors.green),
+          const SnackBar(
+            content: Text('Post deleted successfully'),
+            backgroundColor: Colors.green,
+          ),
         );
         _loadFeedPosts(); // Refresh
       }
@@ -1439,20 +1473,12 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
       debugPrint('Error deleting post: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to delete post'), backgroundColor: Colors.red),
+          const SnackBar(
+            content: Text('Failed to delete post'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
-    }
-  }
-
-  Color _getActionColor(String actionType) {
-    switch (actionType.toLowerCase()) {
-      case 'seeking':
-        return AppColors.iosBlue;
-      case 'offering':
-        return AppColors.vibrantGreen;
-      default:
-        return Colors.grey;
     }
   }
 
@@ -1463,7 +1489,10 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
     if (postUserId == null || postUserId == currentUserId) return;
 
     try {
-      final userDoc = await _firestore.collection('users').doc(postUserId).get();
+      final userDoc = await _firestore
+          .collection('users')
+          .doc(postUserId)
+          .get();
 
       if (!userDoc.exists || !mounted) return;
 
@@ -1473,10 +1502,14 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
         id: postUserId,
         name: userData['name'] ?? userData['displayName'] ?? 'User',
         email: userData['email'] ?? '',
-        profileImageUrl: userData['photoUrl'] ?? userData['photoURL'] ?? userData['profileImageUrl'],
+        profileImageUrl:
+            userData['photoUrl'] ??
+            userData['photoURL'] ??
+            userData['profileImageUrl'],
         bio: userData['bio'] ?? '',
         location: userData['location'],
-        interests: (userData['interests'] as List<dynamic>?)?.cast<String>() ?? [],
+        interests:
+            (userData['interests'] as List<dynamic>?)?.cast<String>() ?? [],
         createdAt: DateTime.now(),
         lastSeen: DateTime.now(),
       );

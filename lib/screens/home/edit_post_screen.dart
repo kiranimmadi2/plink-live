@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../../res/config/app_assets.dart';
 import '../../res/config/app_colors.dart';
 import '../../res/config/app_text_styles.dart';
@@ -42,6 +43,12 @@ class _EditPostScreenState extends State<EditPostScreen> {
   String _selectedCurrency = 'INR';
   List<String> _hashtags = [];
 
+  // Speech to text
+  final stt.SpeechToText _speech = stt.SpeechToText();
+  bool _isListening = false;
+  bool _speechEnabled = false;
+  String _fullSpeechText = '';
+
   final List<Map<String, String>> _currencies = [
     {'code': 'INR', 'symbol': '₹', 'name': 'Indian Rupee'},
     {'code': 'USD', 'symbol': '\$', 'name': 'US Dollar'},
@@ -55,6 +62,7 @@ class _EditPostScreenState extends State<EditPostScreen> {
   void initState() {
     super.initState();
     _loadPostData();
+    _initSpeech();
   }
 
   void _loadPostData() {
@@ -70,11 +78,185 @@ class _EditPostScreenState extends State<EditPostScreen> {
 
   @override
   void dispose() {
+    _speech.stop();
     _titleController.dispose();
     _descriptionController.dispose();
     _priceController.dispose();
     _hashtagController.dispose();
     super.dispose();
+  }
+
+  // Initialize speech recognition
+  Future<void> _initSpeech() async {
+    try {
+      _speechEnabled = await _speech.initialize(
+        onStatus: (status) {
+          debugPrint('Speech status: $status');
+          if (status == 'done' || status == 'notListening') {
+            if (mounted) {
+              setState(() {
+                _isListening = false;
+              });
+            }
+          }
+        },
+        onError: (error) {
+          debugPrint('Speech error: $error');
+          if (mounted) {
+            setState(() {
+              _isListening = false;
+            });
+            _showSnackBar('Speech recognition error', isError: true);
+          }
+        },
+      );
+      if (mounted) {
+        setState(() {});
+      }
+    } catch (e) {
+      debugPrint('Error initializing speech: $e');
+    }
+  }
+
+  // Start listening for full voice input
+  Future<void> _startVoiceInput() async {
+    if (!_speechEnabled) {
+      _showSnackBar('Speech recognition not available', isError: true);
+      return;
+    }
+
+    HapticFeedback.mediumImpact();
+    setState(() {
+      _isListening = true;
+      _fullSpeechText = '';
+    });
+
+    await _speech.listen(
+      onResult: (result) {
+        if (mounted && result.recognizedWords.isNotEmpty) {
+          setState(() {
+            _fullSpeechText = result.recognizedWords;
+          });
+          // Parse when speech is final
+          if (result.finalResult) {
+            _parseVoiceInput(_fullSpeechText);
+          }
+        }
+      },
+      listenFor: const Duration(seconds: 60),
+      pauseFor: const Duration(seconds: 4),
+      localeId: 'en_IN',
+      listenOptions: stt.SpeechListenOptions(
+        partialResults: true,
+        cancelOnError: false,
+      ),
+    );
+  }
+
+  // Stop listening and parse
+  Future<void> _stopVoiceInput() async {
+    HapticFeedback.lightImpact();
+    await _speech.stop();
+    if (_fullSpeechText.isNotEmpty) {
+      _parseVoiceInput(_fullSpeechText);
+    }
+    setState(() {
+      _isListening = false;
+    });
+  }
+
+  // Parse voice input into fields
+  void _parseVoiceInput(String text) {
+    if (text.isEmpty) return;
+
+    String lowerText = text.toLowerCase();
+    String remainingText = text;
+
+    // Extract price
+    final pricePatterns = [
+      RegExp(r'(?:price|cost|amount|rupees|rs|₹|inr|\$|dollar|usd)\s*[:\s]*(\d+(?:\.\d{1,2})?)', caseSensitive: false),
+      RegExp(r'(\d+(?:\.\d{1,2})?)\s*(?:rupees|rs|₹|inr|dollar|\$|usd)', caseSensitive: false),
+      RegExp(r'for\s+(\d+(?:\.\d{1,2})?)', caseSensitive: false),
+    ];
+
+    for (final pattern in pricePatterns) {
+      final priceMatch = pattern.firstMatch(lowerText);
+      if (priceMatch != null) {
+        final priceValue = priceMatch.group(1);
+        if (priceValue != null) {
+          _priceController.text = priceValue;
+          remainingText = remainingText.replaceFirst(priceMatch.group(0)!, '').trim();
+          break;
+        }
+      }
+    }
+
+    // Extract hashtags
+    final hashtagPattern = RegExp(r'#(\w+)', caseSensitive: false);
+    final hashtagMatches = hashtagPattern.allMatches(remainingText);
+    for (final match in hashtagMatches) {
+      final tag = match.group(1);
+      if (tag != null && !_hashtags.contains('#$tag') && _hashtags.length < 10) {
+        _hashtags.add('#$tag');
+      }
+      remainingText = remainingText.replaceFirst(match.group(0)!, '').trim();
+    }
+
+    // Check for "hashtag" keyword
+    final hashtagKeywordPattern = RegExp(r'hashtag[s]?\s+(\w+(?:\s+\w+)*)', caseSensitive: false);
+    final keywordMatch = hashtagKeywordPattern.firstMatch(remainingText);
+    if (keywordMatch != null) {
+      final hashtagWords = keywordMatch.group(1)?.split(RegExp(r'\s+'));
+      if (hashtagWords != null) {
+        for (final word in hashtagWords) {
+          if (word.isNotEmpty && !_hashtags.contains('#$word') && _hashtags.length < 10) {
+            _hashtags.add('#$word');
+          }
+        }
+      }
+      remainingText = remainingText.replaceFirst(keywordMatch.group(0)!, '').trim();
+    }
+
+    // Clean up remaining text
+    remainingText = remainingText
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .replaceAll(RegExp(r'[,\.]+\s*$'), '')
+        .trim();
+
+    // Split into title and description
+    if (remainingText.isNotEmpty) {
+      final sentenceEnd = RegExp(r'[.!?]').firstMatch(remainingText);
+      String title;
+      String description = '';
+
+      if (sentenceEnd != null && sentenceEnd.start < 80) {
+        title = remainingText.substring(0, sentenceEnd.start + 1).trim();
+        description = remainingText.substring(sentenceEnd.start + 1).trim();
+      } else if (remainingText.length <= 60) {
+        title = remainingText;
+      } else {
+        int breakPoint = 60;
+        for (int i = 59; i > 20; i--) {
+          if (remainingText[i] == ' ') {
+            breakPoint = i;
+            break;
+          }
+        }
+        title = remainingText.substring(0, breakPoint).trim();
+        description = remainingText.substring(breakPoint).trim();
+      }
+
+      _titleController.text = title;
+      if (description.isNotEmpty) {
+        _descriptionController.text = description;
+      }
+    }
+
+    setState(() {});
+
+    if (_titleController.text.isNotEmpty) {
+      _showSnackBar('Voice input parsed successfully!', isError: false);
+    }
   }
 
   Future<void> _pickImageFromCamera() async {
@@ -283,6 +465,11 @@ class _EditPostScreenState extends State<EditPostScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // Voice Input Button - Single mic for all fields
+                        _buildVoiceInputSection(),
+
+                        const SizedBox(height: 20),
+
                         // Title Field
                         _buildGlassTextField(
                           controller: _titleController,
@@ -389,6 +576,107 @@ class _EditPostScreenState extends State<EditPostScreen> {
           // Placeholder for symmetry
           const SizedBox(width: 40),
         ],
+      ),
+    );
+  }
+
+  // Voice Input Section - Single mic button for all fields
+  Widget _buildVoiceInputSection() {
+    return GestureDetector(
+      onTap: () {
+        if (_isListening) {
+          _stopVoiceInput();
+        } else {
+          _startVoiceInput();
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(AppColors.buttonBorderRadius),
+          color: _isListening
+              ? AppColors.error.withValues(alpha: 0.4)
+              : AppColors.buttonBackground(),
+          border: Border.all(
+            color: _isListening
+                ? AppColors.error.withValues(alpha: 0.5)
+                : AppColors.buttonBorder(),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            // Mic Icon on left
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: _isListening ? AppColors.error : AppColors.iosBlue,
+              ),
+              child: Icon(
+                _isListening ? Icons.stop_rounded : Icons.mic_rounded,
+                color: Colors.white,
+                size: 24,
+              ),
+            ),
+
+            const SizedBox(width: 16),
+
+            // Text instructions on right
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        _isListening ? 'Listening...' : 'Tap to speak',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      // Recording indicator
+                      if (_isListening) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          width: 10,
+                          height: 10,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: AppColors.error,
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.error.withValues(alpha: 0.6),
+                                blurRadius: 6,
+                                spreadRadius: 1,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _isListening
+                        ? (_fullSpeechText.isNotEmpty
+                            ? _fullSpeechText
+                            : 'Say title, description, price, hashtags...')
+                        : 'Speak everything at once - title, price, hashtags',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.7),
+                      fontSize: 12,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -902,19 +1190,12 @@ class _EditPostScreenState extends State<EditPostScreen> {
                   margin: const EdgeInsets.only(right: 8),
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [AppColors.iosBlue, Color(0xFF0051A8)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
+                    color: AppColors.buttonBackground(),
                     shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.iosBlue.withValues(alpha: 0.3),
-                        blurRadius: 8,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
+                    border: Border.all(
+                      color: AppColors.buttonBorder(),
+                      width: 1,
+                    ),
                   ),
                   child: const Icon(Icons.add_rounded, color: Colors.white, size: 20),
                 ),
@@ -970,25 +1251,18 @@ class _EditPostScreenState extends State<EditPostScreen> {
         width: double.infinity,
         padding: const EdgeInsets.symmetric(vertical: 16),
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [AppColors.iosBlue, Color(0xFF0051A8)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+          color: AppColors.buttonBackground(),
+          borderRadius: BorderRadius.circular(AppColors.buttonBorderRadius),
+          border: Border.all(
+            color: AppColors.buttonBorder(),
+            width: 1,
           ),
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.iosBlue.withValues(alpha: 0.3),
-              blurRadius: 12,
-              offset: const Offset(0, 6),
-            ),
-          ],
         ),
         child: const Center(
           child: Text(
             'Update Post',
             style: TextStyle(
-              color: Colors.white,
+              color: AppColors.buttonForeground,
               fontSize: 18,
               fontWeight: FontWeight.bold,
             ),

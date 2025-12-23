@@ -53,9 +53,9 @@ class UnifiedMatchingService {
       );
 
       _initialized = true;
-      debugPrint('✅ UnifiedMatchingService initialized successfully');
+      debugPrint(' UnifiedMatchingService initialized successfully');
     } catch (e) {
-      debugPrint('❌ Error initializing UnifiedMatchingService: $e');
+      debugPrint(' Error initializing UnifiedMatchingService: $e');
       throw Exception('Failed to initialize matching service: $e');
     }
   }
@@ -67,7 +67,7 @@ class UnifiedMatchingService {
     }
   }
 
-  // ==================== INTENT ANALYSIS ====================
+  //    INTENT ANALYSIS
 
   /// Analyze user intent from their input using AI
   Future<IntentAnalysis> analyzeIntent(String userInput) async {
@@ -173,7 +173,7 @@ Return ONLY valid JSON (no markdown, no backticks):
     }
   }
 
-  // ==================== EMBEDDING GENERATION ====================
+  //    EMBEDDING GENERATION
 
   /// Generate embedding for text with caching
   Future<List<double>> generateEmbedding(String text) async {
@@ -217,7 +217,7 @@ Return ONLY valid JSON (no markdown, no backticks):
     return embeddings;
   }
 
-  // ==================== MATCHING ALGORITHM ====================
+  //    MATCHING ALGORITHM
 
   /// Find best matches for a user's intent
   Future<List<MatchResult>> findMatches({
@@ -537,7 +537,7 @@ Return ONLY valid JSON (no markdown, no backticks):
 
   double _toRadians(double degrees) => degrees * pi / 180;
 
-  // ==================== POST MANAGEMENT ====================
+  //    POST MANAGEMENT
 
   /// Create a new post with AI analysis
   Future<String> createPost({
@@ -582,14 +582,14 @@ Return ONLY valid JSON (no markdown, no backticks):
           .collection(ApiConfig.postsCollection)
           .add(postData);
 
-      debugPrint('✅ Post created: ${docRef.id}');
+      debugPrint(' Post created: ${docRef.id}');
 
       // Trigger real-time matching
       _triggerRealTimeMatching(docRef.id, intent, embedding);
 
       return docRef.id;
     } catch (e) {
-      debugPrint('❌ Error creating post: $e');
+      debugPrint(' Error creating post: $e');
       throw Exception('Failed to create post: $e');
     }
   }
@@ -651,7 +651,7 @@ Return ONLY valid JSON (no markdown, no backticks):
     }
   }
 
-  // ==================== UTILITY METHODS ====================
+  //    UTILITY METHODS
 
   /// Clean text before processing
   String _cleanText(String text) {
@@ -677,7 +677,7 @@ Return ONLY valid JSON (no markdown, no backticks):
   void clearCache() => _cache.clearAll();
 }
 
-// ==================== DATA CLASSES ====================
+//    DATA CLASSES
 
 /// Intent analysis result
 class IntentAnalysis {

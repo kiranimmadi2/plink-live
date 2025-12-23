@@ -16,9 +16,7 @@ import '../services/hybrid_chat_service.dart';
 import '../services/group_chat_service.dart';
 import '../services/error_tracking_service.dart';
 
-/// ============================================
 /// AI & MATCHING SERVICES
-/// ============================================
 
 /// Gemini AI service for embeddings and intent analysis
 final geminiServiceProvider = Provider<GeminiService>((ref) {
@@ -40,27 +38,21 @@ final unifiedPostServiceProvider = Provider<UnifiedPostService>((ref) {
   return UnifiedPostService();
 });
 
-/// ============================================
 /// LOCATION SERVICES
-/// ============================================
 
 /// Location service for GPS and location updates
 final locationServiceProvider = Provider<LocationService>((ref) {
   return LocationService();
 });
 
-/// ============================================
 /// CONNECTION & SOCIAL SERVICES
-/// ============================================
 
 /// Connection service for managing user connections
 final connectionServiceProvider = Provider<ConnectionService>((ref) {
   return ConnectionService();
 });
 
-/// ============================================
 /// MESSAGING SERVICES
-/// ============================================
 
 /// Conversation service for chat conversations
 final conversationServiceProvider = Provider<ConversationService>((ref) {
@@ -77,9 +69,7 @@ final groupChatServiceProvider = Provider<GroupChatService>((ref) {
   return GroupChatService();
 });
 
-/// ============================================
 /// NOTIFICATION & ANALYTICS SERVICES
-/// ============================================
 
 /// Notification service for push notifications
 final notificationServiceProvider = Provider<NotificationService>((ref) {
@@ -96,9 +86,7 @@ final errorTrackingServiceProvider = Provider<ErrorTrackingService>((ref) {
   return ErrorTrackingService();
 });
 
-/// ============================================
 /// UTILITY SERVICES
-/// ============================================
 
 /// Connectivity service for network status
 final connectivityServiceProvider = Provider<ConnectivityService>((ref) {
@@ -110,9 +98,7 @@ final photoCacheServiceProvider = Provider<PhotoCacheService>((ref) {
   return PhotoCacheService();
 });
 
-/// ============================================
 /// SERVICE INITIALIZATION
-/// ============================================
 
 /// Initialize all services that need startup initialization
 Future<void> initializeServices(ProviderContainer container) async {

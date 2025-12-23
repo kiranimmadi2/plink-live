@@ -8,6 +8,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:supper/screens/login/onboarding_screen.dart';
 
 import 'firebase_options.dart';
@@ -23,8 +24,6 @@ import 'services/notification_service.dart';
 import 'services/conversation_service.dart';
 import 'services/location_service.dart';
 import 'services/connectivity_service.dart';
-import 'services/user_migration_service.dart';
-import 'services/conversation_migration_service.dart';
 import 'services/analytics_service.dart';
 import 'services/error_tracking_service.dart';
 import 'providers/theme_provider.dart';
@@ -35,6 +34,72 @@ import 'utils/memory_manager.dart';
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   debugPrint('Background FCM message: ${message.messageId}');
+  debugPrint('Background FCM data: ${message.data}');
+
+  final data = message.data;
+  final type = data['type'] as String?;
+
+  // For call notifications, show high-priority notification
+  if (type == 'call') {
+    final callerName = data['callerName'] as String? ?? 'Someone';
+    await _showCallNotification(
+      title: 'Incoming Call',
+      body: '$callerName is calling you',
+      payload: message.data,
+    );
+  }
+}
+
+// Show call notification in background
+Future<void> _showCallNotification({
+  required String title,
+  required String body,
+  required Map<String, dynamic> payload,
+}) async {
+  final FlutterLocalNotificationsPlugin localNotifications =
+      FlutterLocalNotificationsPlugin();
+
+  const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+  const iosSettings = DarwinInitializationSettings();
+  const initSettings = InitializationSettings(
+    android: androidSettings,
+    iOS: iosSettings,
+  );
+
+  await localNotifications.initialize(initSettings);
+
+  const androidDetails = AndroidNotificationDetails(
+    'calls',
+    'Incoming Calls',
+    channelDescription: 'Notifications for incoming voice calls',
+    importance: Importance.max,
+    priority: Priority.max,
+    showWhen: true,
+    enableVibration: true,
+    playSound: true,
+    fullScreenIntent: true,
+    category: AndroidNotificationCategory.call,
+  );
+
+  const iosDetails = DarwinNotificationDetails(
+    presentAlert: true,
+    presentBadge: true,
+    presentSound: true,
+    interruptionLevel: InterruptionLevel.timeSensitive,
+  );
+
+  const details = NotificationDetails(
+    android: androidDetails,
+    iOS: iosDetails,
+  );
+
+  await localNotifications.show(
+    DateTime.now().millisecondsSinceEpoch ~/ 1000,
+    title,
+    body,
+    details,
+    payload: payload.toString(),
+  );
 }
 
 /// Validate that Firebase configuration is loaded from .env
@@ -422,24 +487,7 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
   }
 
   void _runMigrationsInBackground() {
-    Future.delayed(const Duration(milliseconds: 300), () async {
-      try {
-        final userMigration = UserMigrationService();
-        await userMigration.checkAndRunMigration();
-      } catch (e) {
-        debugPrint('User migration failed (non-fatal): $e');
-      }
-
-      try {
-        final conversationMigration = ConversationMigrationService();
-        final isCompleted = await conversationMigration.isMigrationCompleted();
-        if (!isCompleted) {
-          final result = await conversationMigration.runMigration();
-          debugPrint('Conversation migration result: $result');
-        }
-      } catch (e) {
-        debugPrint('Conversation migration failed (non-fatal): $e');
-      }
-    });
+    // Migration services removed - no longer needed
+    debugPrint('✓ Migrations check skipped (already completed)');
   }
 }

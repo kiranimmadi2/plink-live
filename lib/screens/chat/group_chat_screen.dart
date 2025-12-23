@@ -11,7 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../res/config/app_colors.dart';
 import '../../widgets/other widgets/glass_text_field.dart';
-import '../../services/chat services/group_chat_service.dart';
+import '../../services/group_chat_service.dart';
 import '../../providers/other providers/app_providers.dart';
 import '../../res/utils/photo_url_helper.dart';
 

@@ -51,7 +51,7 @@ class RealtimeMatchingService {
           }
         });
 
-    debugPrint('✅ Listening for new posts in real-time');
+    debugPrint(' Listening for new posts in real-time');
   }
 
   // ignore: unused_element
@@ -144,9 +144,9 @@ class RealtimeMatchingService {
             'embeddingUpdatedAt': FieldValue.serverTimestamp(),
           });
 
-          debugPrint('✅ Embedding generated and saved for ${newPost.id}');
+          debugPrint(' Embedding generated and saved for ${newPost.id}');
         } catch (e) {
-          debugPrint('❌ Failed to generate embedding: $e');
+          debugPrint(' Failed to generate embedding: $e');
           return; // Skip this post if embedding generation fails
         }
       }
@@ -158,7 +158,7 @@ class RealtimeMatchingService {
         // UPDATED: Generate embedding if missing for user's post too
         if (userEmbedding.isEmpty) {
           debugPrint(
-            '⚠️ User post ${userPost.id} missing embedding, generating...',
+            ' User post ${userPost.id} missing embedding, generating...',
           );
           try {
             final text =
@@ -170,9 +170,9 @@ class RealtimeMatchingService {
               'embeddingUpdatedAt': FieldValue.serverTimestamp(),
             });
 
-            debugPrint('✅ Embedding generated for user post ${userPost.id}');
+            debugPrint(' Embedding generated for user post ${userPost.id}');
           } catch (e) {
-            debugPrint('❌ Failed to generate embedding: $e');
+            debugPrint(' Failed to generate embedding: $e');
             continue; // Skip this comparison
           }
         }
@@ -196,7 +196,7 @@ class RealtimeMatchingService {
         }
       }
     } catch (e) {
-      debugPrint('❌ Error checking post match: $e');
+      debugPrint(' Error checking post match: $e');
     }
   }
 

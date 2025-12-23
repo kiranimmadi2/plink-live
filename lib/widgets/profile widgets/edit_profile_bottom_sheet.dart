@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
-import '../../services/profile services/profile_service.dart';
+import '../../services/profile_service.dart';
 import '../other widgets/glass_text_field.dart';
 
 class EditProfileBottomSheet extends StatefulWidget {

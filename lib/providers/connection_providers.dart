@@ -2,12 +2,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import './app_providers.dart';
 
-/// ============================================
 /// PENDING REQUESTS PROVIDER
-/// ============================================
 
 /// Stream provider for pending connection requests (received)
-final pendingRequestsProvider = StreamProvider<List<Map<String, dynamic>>>((ref) {
+final pendingRequestsProvider = StreamProvider<List<Map<String, dynamic>>>((
+  ref,
+) {
   final userId = ref.watch(currentUserIdProvider);
   if (userId == null) return Stream.value([]);
 
@@ -18,12 +18,12 @@ final pendingRequestsProvider = StreamProvider<List<Map<String, dynamic>>>((ref)
       .orderBy('createdAt', descending: true)
       .snapshots()
       .map((snapshot) {
-    return snapshot.docs.map((doc) {
-      final data = doc.data();
-      data['id'] = doc.id;
-      return data;
-    }).toList();
-  });
+        return snapshot.docs.map((doc) {
+          final data = doc.data();
+          data['id'] = doc.id;
+          return data;
+        }).toList();
+      });
 });
 
 /// Stream provider for pending requests count
@@ -36,9 +36,7 @@ final pendingRequestsCountProvider = Provider<int>((ref) {
   );
 });
 
-/// ============================================
 /// SENT REQUESTS PROVIDER
-/// ============================================
 
 /// Stream provider for sent connection requests
 final sentRequestsProvider = StreamProvider<List<Map<String, dynamic>>>((ref) {
@@ -52,17 +50,15 @@ final sentRequestsProvider = StreamProvider<List<Map<String, dynamic>>>((ref) {
       .orderBy('createdAt', descending: true)
       .snapshots()
       .map((snapshot) {
-    return snapshot.docs.map((doc) {
-      final data = doc.data();
-      data['id'] = doc.id;
-      return data;
-    }).toList();
-  });
+        return snapshot.docs.map((doc) {
+          final data = doc.data();
+          data['id'] = doc.id;
+          return data;
+        }).toList();
+      });
 });
 
-/// ============================================
 /// MY CONNECTIONS PROVIDER
-/// ============================================
 
 /// State class for connections
 class MyConnectionsState {
@@ -111,7 +107,9 @@ class MyConnectionsNotifier extends StateNotifier<MyConnectionsState> {
           .doc(userId)
           .get();
 
-      final connectionIds = List<String>.from(userDoc.data()?['connections'] ?? []);
+      final connectionIds = List<String>.from(
+        userDoc.data()?['connections'] ?? [],
+      );
 
       if (connectionIds.isEmpty) {
         state = state.copyWith(
@@ -161,8 +159,12 @@ class MyConnectionsNotifier extends StateNotifier<MyConnectionsState> {
   /// Remove a connection
   void removeConnection(String connectionId) {
     state = state.copyWith(
-      connectionIds: state.connectionIds.where((id) => id != connectionId).toList(),
-      connections: state.connections.where((c) => c['uid'] != connectionId).toList(),
+      connectionIds: state.connectionIds
+          .where((id) => id != connectionId)
+          .toList(),
+      connections: state.connections
+          .where((c) => c['uid'] != connectionId)
+          .toList(),
     );
   }
 
@@ -181,33 +183,25 @@ class MyConnectionsNotifier extends StateNotifier<MyConnectionsState> {
 /// Provider for my connections
 final myConnectionsProvider =
     StateNotifierProvider<MyConnectionsNotifier, MyConnectionsState>((ref) {
-  final userId = ref.watch(currentUserIdProvider);
-  return MyConnectionsNotifier(userId);
-});
+      final userId = ref.watch(currentUserIdProvider);
+      return MyConnectionsNotifier(userId);
+    });
 
 /// Provider for connections count
 final connectionsCountProvider = Provider<int>((ref) {
   return ref.watch(myConnectionsProvider).connectionIds.length;
 });
 
-/// ============================================
 /// CONNECTION REQUEST ACTIONS
-/// ============================================
 
 /// State for request processing
 class RequestActionState {
   final Set<String> processingIds;
   final String? error;
 
-  const RequestActionState({
-    this.processingIds = const {},
-    this.error,
-  });
+  const RequestActionState({this.processingIds = const {}, this.error});
 
-  RequestActionState copyWith({
-    Set<String>? processingIds,
-    String? error,
-  }) {
+  RequestActionState copyWith({Set<String>? processingIds, String? error}) {
     return RequestActionState(
       processingIds: processingIds ?? this.processingIds,
       error: error,
@@ -221,9 +215,7 @@ class RequestActionNotifier extends StateNotifier<RequestActionState> {
   RequestActionNotifier() : super(const RequestActionState());
 
   void startProcessing(String requestId) {
-    state = state.copyWith(
-      processingIds: {...state.processingIds, requestId},
-    );
+    state = state.copyWith(processingIds: {...state.processingIds, requestId});
   }
 
   void stopProcessing(String requestId) {
@@ -244,5 +236,5 @@ class RequestActionNotifier extends StateNotifier<RequestActionState> {
 /// Provider for request action state
 final requestActionProvider =
     StateNotifierProvider<RequestActionNotifier, RequestActionState>((ref) {
-  return RequestActionNotifier();
-});
+      return RequestActionNotifier();
+    });
