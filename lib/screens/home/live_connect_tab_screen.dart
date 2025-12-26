@@ -54,7 +54,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
   bool _filterByGender = false;
   bool _filterByConnectionTypes = false;
   bool _filterByActivities = false;
-  double _distanceFilter = 50.0; // Distance in km
+  double _distanceFilter = 100.0; // Distance in km (increased for more results)
   String _locationFilter =
       'Worldwide'; // 'Near me', 'City', 'Country', 'Worldwide'
   final List<String> _selectedGenders = [];
@@ -320,13 +320,16 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
           _userProfile = userData;
           // Load user's saved interests
           _selectedInterests = List<String>.from(userData?['interests'] ?? []);
+          // Use profile location immediately for fast loading
+          _currentUserLat = userData?['latitude']?.toDouble();
+          _currentUserLon = userData?['longitude']?.toDouble();
         });
 
-        // Fetch fresh location in background before loading people
-        await _fetchCurrentLocation();
-
-        // Always load nearby people (filters can be applied via filter dialog)
+        // Load nearby people IMMEDIATELY with profile location
         _loadNearbyPeople();
+
+        // Fetch fresh GPS location in BACKGROUND (don't wait)
+        _fetchCurrentLocationInBackground();
       }
     } catch (e) {
       debugPrint('Error loading user profile: $e');
@@ -413,6 +416,45 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
     }
   }
 
+  /// Fetch GPS location in background without blocking UI
+  /// Updates location and refreshes list when ready
+  void _fetchCurrentLocationInBackground() {
+    _locationService.getCurrentLocation(silent: true).then((position) {
+      if (position != null && mounted) {
+        final oldLat = _currentUserLat;
+        final oldLon = _currentUserLon;
+
+        setState(() {
+          _currentUserLat = position.latitude;
+          _currentUserLon = position.longitude;
+        });
+
+        // If location changed significantly (>100m), refresh the list
+        if (oldLat != null && oldLon != null) {
+          final distance = _calculateDistance(
+            oldLat,
+            oldLon,
+            position.latitude,
+            position.longitude,
+          );
+          if (distance > 0.1) {
+            // More than 100 meters
+            debugPrint(
+              'LiveConnect: Location updated significantly, refreshing list',
+            );
+            _loadNearbyPeople();
+          }
+        }
+
+        debugPrint(
+          'LiveConnect: Background location updated: ${position.latitude}, ${position.longitude}',
+        );
+      }
+    }).catchError((e) {
+      debugPrint('LiveConnect: Background location fetch failed: $e');
+    });
+  }
+
   /// Refresh Live Connect - fetches fresh location and reloads people
   /// Called by pull-to-refresh
   Future<void> _refreshLiveConnect() async {
@@ -453,31 +495,25 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
 
       final userCity = _userProfile?['city'];
 
-      // If location not already fetched, fetch it now
-      // This ensures distance is always calculated correctly
+      // Use existing location - don't block waiting for GPS
+      // If no location, try quick fetch from last known position
       if (_currentUserLat == null || _currentUserLon == null) {
-        await _fetchCurrentLocation();
-      }
-
-      // For "Near me" filter, always get fresh location for accuracy
-      if (_locationFilter == 'Near me') {
-        final position = await _locationService.getCurrentLocation(
-          silent: true,
-          highAccuracy: true, // Use high accuracy for Near Me filter
-        );
-        if (position != null && mounted) {
-          setState(() {
-            _currentUserLat = position.latitude;
-            _currentUserLon = position.longitude;
-          });
-          debugPrint(
-            'LiveConnect: Fresh location for Near Me: ${position.latitude}, ${position.longitude}',
-          );
+        // Try profile location first (instant)
+        final profileLat = _userProfile?['latitude']?.toDouble();
+        final profileLon = _userProfile?['longitude']?.toDouble();
+        if (profileLat != null && profileLon != null) {
+          _currentUserLat = profileLat;
+          _currentUserLon = profileLon;
         }
       }
 
       final userLat = _currentUserLat;
       final userLon = _currentUserLon;
+
+      // For "Near me" filter, fetch fresh location in BACKGROUND (don't block)
+      if (_locationFilter == 'Near me') {
+        _fetchCurrentLocationInBackground();
+      }
 
       debugPrint('LiveConnect: Using location lat=$userLat, lon=$userLon for distance calculation');
 
@@ -3056,6 +3092,94 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
     );
   }
 
+  /// Build skeleton loading card for better UX while loading
+  Widget _buildSkeletonCard(bool isDarkMode) {
+    final shimmerBase = isDarkMode ? Colors.grey[800]! : Colors.grey[300]!;
+    final shimmerHighlight = isDarkMode ? Colors.grey[700]! : Colors.grey[100]!;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDarkMode ? Colors.grey[900] : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          // Avatar skeleton
+          Container(
+            width: 70,
+            height: 70,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                colors: [shimmerBase, shimmerHighlight, shimmerBase],
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          // Content skeleton
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Name skeleton
+                Container(
+                  height: 18,
+                  width: 120,
+                  decoration: BoxDecoration(
+                    color: shimmerBase,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                // Location skeleton
+                Container(
+                  height: 14,
+                  width: 80,
+                  decoration: BoxDecoration(
+                    color: shimmerBase,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // Interests skeleton
+                Row(
+                  children: [
+                    Container(
+                      height: 24,
+                      width: 60,
+                      decoration: BoxDecoration(
+                        color: shimmerBase,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      height: 24,
+                      width: 50,
+                      decoration: BoxDecoration(
+                        color: shimmerBase,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildContent(bool isDarkMode, bool isGlass) {
     // Show empty state only if interest filter is on AND no interests selected
     if (_filterByInterests && _selectedInterests.isEmpty) {
@@ -3124,7 +3248,14 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
     }
 
     if (_isLoadingPeople) {
-      return const Center(child: CircularProgressIndicator());
+      // Show skeleton loading cards for better UX
+      return ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: 6, // Show 6 skeleton cards
+        itemBuilder: (context, index) {
+          return _buildSkeletonCard(isDarkMode);
+        },
+      );
     }
 
     if (_filteredPeople.isEmpty &&
@@ -3228,20 +3359,19 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
       IconData icon = Icons.search_off;
 
       if (_locationFilter == 'Near me' &&
-          (_userProfile?['latitude'] == null ||
-              _userProfile?['longitude'] == null)) {
+          (_currentUserLat == null || _currentUserLon == null)) {
         title = 'Location not available';
         subtitle = 'Enable location permissions to find nearby users';
         icon = Icons.location_off;
+      } else if (_locationFilter == 'Near me') {
+        title = 'No users nearby';
+        subtitle =
+            'Try increasing the distance (currently ${_distanceFilter.round()} km) or switch to Worldwide';
+        icon = Icons.radar;
       } else if (_filterByInterests && _selectedInterests.isEmpty) {
         title = 'No interests selected';
         subtitle = 'Select at least one interest to find matches';
         icon = Icons.favorite_border;
-      } else if (_locationFilter == 'Near me' && _distanceFilter < 10) {
-        title = 'Search radius too small';
-        subtitle =
-            'Try expanding your distance to ${(_distanceFilter * 2).round()} km or more';
-        icon = Icons.radar;
       } else if (_locationFilter == 'City' &&
           (_userProfile?['city'] == null ||
               (_userProfile?['city'] as String).isEmpty)) {
