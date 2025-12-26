@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -10,14 +9,13 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'home_screen.dart';
 import 'conversations_screen.dart';
 import 'live_connect_tab_screen.dart';
-import '../profile/profile_with_history_screen.dart'; // Use provider-based version
-import 'messageser_screen.dart';
+import '../profile/profile_with_history_screen.dart';
 import 'feed_screen.dart';
 import '../chat/incoming_call_screen.dart';
 
 // Professional & Business screens
 import '../professional/professional_dashboard_screen.dart';
-import '../business/business_dashboard_screen.dart';
+import '../business/universal_business_dashboard.dart';
 
 // services
 import '../../services/location_service.dart';
@@ -26,7 +24,9 @@ import '../../services/account_type_service.dart';
 import '../../models/user_profile.dart';
 
 class MainNavigationScreen extends StatefulWidget {
-  const MainNavigationScreen({super.key});
+  final int? initialIndex;
+
+  const MainNavigationScreen({super.key, this.initialIndex});
 
   @override
   State<MainNavigationScreen> createState() => _MainNavigationScreenState();
@@ -49,7 +49,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
   StreamSubscription<QuerySnapshot>? _unreadSubscription;
   StreamSubscription<QuerySnapshot>? _incomingCallSubscription;
   bool _isShowingIncomingCall = false;
-  final Set<String> _handledCallIds = {}; // Track calls we've already handled
+  final Set<String> _handledCallIds = {};
 
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -64,29 +64,58 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
 
+    if (widget.initialIndex != null) {
+      _currentIndex = widget.initialIndex!;
+    }
+
     _menuController = AnimationController(
-      duration: const Duration(milliseconds: 300),
+      duration: const Duration(milliseconds: 350),
       vsync: this,
     );
 
-    _listenUnread();
-    _listenForIncomingCalls();
-    _updateStatus(true);
-    _checkLocation();
-    _loadAccountType();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeAsync();
+    });
+  }
+
+  void _initializeAsync() {
+    Future.microtask(() => _loadAccountType());
+
+    Future.delayed(const Duration(milliseconds: 50), () {
+      if (mounted) _listenUnread();
+    });
+
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (mounted) _listenForIncomingCalls();
+    });
+
+    Future.delayed(const Duration(milliseconds: 150), () {
+      if (mounted) _updateStatus(true);
+    });
+
+    Future.delayed(const Duration(milliseconds: 200), () {
+      if (mounted) _checkLocation();
+    });
   }
 
   void _loadAccountType() async {
     final user = _auth.currentUser;
     if (user == null) return;
 
-    // Initial load
     final accountType = await _accountTypeService.getCurrentAccountType();
     if (mounted) {
-      setState(() => _accountType = accountType);
+      setState(() {
+        _accountType = accountType;
+        if (_currentIndex == 0 && widget.initialIndex == null) {
+          if (accountType == AccountType.professional) {
+            _currentIndex = 5;
+          } else if (accountType == AccountType.business) {
+            _currentIndex = 6;
+          }
+        }
+      });
     }
 
-    // Listen for changes
     _accountTypeSubscription?.cancel();
     _accountTypeSubscription = _accountTypeService
         .watchAccountType(user.uid)
@@ -112,8 +141,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     if (user == null) return;
 
     _incomingCallSubscription?.cancel();
-
-    // Only listen for calls created in the last 30 seconds to avoid old calls
     final cutoffTime = DateTime.now().subtract(const Duration(seconds: 30));
 
     _incomingCallSubscription = _firestore
@@ -130,11 +157,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
               if (data == null) continue;
 
               final callId = change.doc.id;
-
-              // Skip if we've already handled this call
               if (_handledCallIds.contains(callId)) continue;
 
-              // Check call timestamp - ignore old calls
               final timestamp = data['timestamp'];
               if (timestamp != null) {
                 DateTime? callTime;
@@ -144,30 +168,25 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
                   callTime = DateTime.tryParse(timestamp);
                 }
 
-                // Skip calls older than 30 seconds
                 if (callTime != null && callTime.isBefore(cutoffTime)) {
-                  _handledCallIds.add(
-                    callId,
-                  ); // Mark as handled so we don't check again
+                  _handledCallIds.add(callId);
                   continue;
                 }
               }
 
-              // Mark this call as handled
               _handledCallIds.add(callId);
 
               final callerName = data['callerName'] as String? ?? 'Unknown';
               final callerPhoto = data['callerPhoto'] as String?;
               final callerId = data['callerId'] as String? ?? '';
 
-              // Show incoming call screen
               _showIncomingCall(
                 callId: callId,
                 callerName: callerName,
                 callerPhoto: callerPhoto,
                 callerId: callerId,
               );
-              break; // Only show one call at a time
+              break;
             }
           }
         });
@@ -204,7 +223,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     super.didChangeDependencies();
     if (!_initialPosSet) {
       final size = MediaQuery.of(context).size;
-      // FAB starts on right side, vertically centered
       _fabPosition = Offset(size.width - 80, size.height / 2 - 32);
       _initialPosSet = true;
       setState(() {});
@@ -280,7 +298,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
   void _navigate(int index) {
     HapticFeedback.mediumImpact();
     _closeMenu();
-    Future.delayed(const Duration(milliseconds: 200), () {
+    Future.delayed(const Duration(milliseconds: 250), () {
       if (mounted) {
         setState(() {
           _currentIndex = index;
@@ -312,7 +330,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
   }
 
   void _onDragUpdate(DragUpdateDetails d) {
-    // Calculate new position - allow free movement during drag
     final newX = _fabPosition.dx + d.delta.dx;
     final newY = _fabPosition.dy + d.delta.dy;
 
@@ -323,11 +340,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
 
   void _onDragEnd(DragEndDetails d) {
     final size = MediaQuery.of(context).size;
-
-    // Snap X to left (10) or right (size.width - 80) edge based on position
     final snappedX = _fabPosition.dx > size.width / 2 ? size.width - 80 : 10.0;
 
-    // Clamp Y: 200 from top, 200 from bottom
     const minY = 200.0;
     const maxY = 200.0;
     final clampedY = _fabPosition.dy.clamp(minY, size.height - maxY);
@@ -340,69 +354,58 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
   void _resetFAB() {
     final size = MediaQuery.of(context).size;
     setState(() {
-      // Reset to right side, vertically centered
       _fabPosition = Offset(size.width - 80, size.height / 2 - 32);
     });
   }
 
-  // MENU ITEMS - Built dynamically based on account type
-  List<Map<String, dynamic>> get menuItems {
-    final items = <Map<String, dynamic>>[
-      {
-        "label": "Discover",
-        "icon": Icons.explore_outlined,
-        "index": 0,
-        "color": Colors.blue,
-      },
-      {
-        "label": "Messages",
-        "icon": Icons.message_outlined,
-        "index": 1,
-        "color": Colors.green,
-      },
-      {
-        "label": "Live",
-        "icon": Icons.people_outline,
-        "index": 2,
-        "color": Colors.orange,
-      },
-      {
-        "label": "Profile",
-        "icon": Icons.person_outline,
-        "index": 3,
-        "color": Colors.purple,
-      },
+  // Menu items with modern design
+  List<_MenuItemData> get menuItems {
+    final items = <_MenuItemData>[
+      const _MenuItemData(
+        label: "Discover",
+        icon: Icons.explore_rounded,
+        index: 0,
+        gradient: [Color(0xFF667EEA), Color(0xFF764BA2)],
+      ),
+      const _MenuItemData(
+        label: "Messages",
+        icon: Icons.chat_bubble_rounded,
+        index: 1,
+        gradient: [Color(0xFF11998E), Color(0xFF38EF7D)],
+      ),
+      const _MenuItemData(
+        label: "Live",
+        icon: Icons.people_rounded,
+        index: 2,
+        gradient: [Color(0xFFFF6B6B), Color(0xFFFFE66D)],
+      ),
+      const _MenuItemData(
+        label: "Profile",
+        icon: Icons.person_rounded,
+        index: 3,
+        gradient: [Color(0xFF4FACFE), Color(0xFF00F2FE)],
+      ),
     ];
 
-    // Add Dashboard for Professional/Business accounts
     if (_accountType == AccountType.professional) {
-      items.add({
-        "label": "Dashboard",
-        "icon": Icons.dashboard_outlined,
-        "index": 5,
-        "color": const Color(0xFF9C27B0), // Purple for professional
-      });
+      items.add(const _MenuItemData(
+        label: "Dashboard",
+        icon: Icons.dashboard_rounded,
+        index: 5,
+        gradient: [Color(0xFF9C27B0), Color(0xFFE040FB)],
+      ));
     } else if (_accountType == AccountType.business) {
-      items.add({
-        "label": "Dashboard",
-        "icon": Icons.business_center_outlined,
-        "index": 6,
-        "color": const Color(0xFFFF9800), // Orange for business
-      });
+      items.add(const _MenuItemData(
+        label: "Business",
+        icon: Icons.business_center_rounded,
+        index: 6,
+        gradient: [Color(0xFFFF9800), Color(0xFFFFEB3B)],
+      ));
     }
-
-    // Add Messageser at the end
-    items.add({
-      "label": "Messageser",
-      "icon": Icons.message_rounded,
-      "index": 4,
-      "color": Colors.teal,
-    });
 
     return items;
   }
 
-  // SCREENS
   Widget _buildScreen() {
     switch (_currentIndex) {
       case 0:
@@ -413,16 +416,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
         return const LiveConnectTabScreen();
       case 3:
         return const ProfileWithHistoryScreen();
-      case 4:
-        return const MessageserScreen();
       case 5:
-        // Professional Dashboard
         return const ProfessionalDashboardScreen();
       case 6:
-        // Business Dashboard
-        return const BusinessDashboardScreen();
+        return const UniversalBusinessDashboard();
       case 7:
-        // Feed Screen
         return FeedScreen(
           onBack: () {
             setState(() => _currentIndex = 0);
@@ -437,11 +435,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
 
-    // Safe area boundaries - FAB must stay within bounds
     const minX = 10.0;
-    final maxX = size.width - 74; // 64 FAB width + 10 margin
-    const minY = 200.0; // 200 from top
-    final maxY = size.height - 200.0; // 200 from bottom
+    final maxX = size.width - 74;
+    const minY = 200.0;
+    final maxY = size.height - 200.0;
 
     final fabX = _fabPosition.dx.clamp(minX, maxX);
     final fabY = _fabPosition.dy.clamp(minY, maxY);
@@ -449,10 +446,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     return Scaffold(
       body: Stack(
         children: [
-          // Main screen
           _buildScreen(),
 
-          // Dark overlay when menu is open
+          // Blur overlay when menu is open
           if (_fabMenuOpen)
             AnimatedBuilder(
               animation: _menuController,
@@ -460,61 +456,51 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
                 return GestureDetector(
                   onTap: _closeMenu,
                   child: Container(
-                    color: Colors.black.withValues(
-                      alpha: 0.4 * _menuController.value,
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(
+                        alpha: 0.6 * _menuController.value,
+                      ),
                     ),
                   ),
                 );
               },
             ),
 
-          // Animated menu buttons - half circle arc (left or right based on FAB position)
+          // Menu items with modern card design
           if (_fabMenuOpen)
             ...List.generate(menuItems.length, (i) {
-              // Determine if FAB is on left or right side
               final bool isOnRight = fabX > size.width / 2;
 
               return AnimatedBuilder(
                 animation: _menuController,
                 builder: (context, child) {
-                  // Staggered animation
-                  final delay = i * 0.06;
+                  final delay = i * 0.08;
                   final progress =
                       ((_menuController.value - delay) / (1 - delay)).clamp(
                         0.0,
                         1.0,
                       );
 
-                  // Curved animation
                   final curvedProgress = Curves.easeOutBack.transform(progress);
 
-                  // Half circle arc parameters
-                  const radius = 95.0;
+                  const radius = 110.0;
                   final totalButtons = menuItems.length;
-                  const buttonSize = 56.0;
 
-                  // Half circle = 180 degrees = pi radians
-                  // Spread buttons from top (-90°) to bottom (90°)
                   final angleStep = math.pi / (totalButtons - 1);
-                  final baseAngle =
-                      -math.pi / 2 + (angleStep * i); // -90° to +90°
+                  final baseAngle = -math.pi / 2 + (angleStep * i);
 
-                  // Calculate x and y offsets
                   double xOffset;
                   double yOffset;
 
                   if (isOnRight) {
-                    // FAB is on RIGHT → Arc opens to LEFT
                     xOffset = -radius * math.cos(baseAngle) * curvedProgress;
                     yOffset = radius * math.sin(baseAngle) * curvedProgress;
                   } else {
-                    // FAB is on LEFT → Arc opens to RIGHT
                     xOffset = radius * math.cos(baseAngle) * curvedProgress;
                     yOffset = radius * math.sin(baseAngle) * curvedProgress;
                   }
 
-                  // Center button on FAB
-                  const centerOffset = (64 - buttonSize) / 2;
+                  const centerOffset = (64 - 52) / 2;
 
                   return Positioned(
                     left: fabX + xOffset + centerOffset,
@@ -523,11 +509,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
                       scale: curvedProgress,
                       child: Opacity(
                         opacity: curvedProgress.clamp(0.0, 1.0),
-                        child: _AnimatedMenuItem(
-                          item: menuItems[i],
+                        child: _ModernMenuItem(
+                          data: menuItems[i],
                           unread: _unreadMessageCount,
-                          delay: delay,
-                          onTap: () => _navigate(menuItems[i]["index"] as int),
+                          onTap: () => _navigate(menuItems[i].index),
+                          isOnRight: isOnRight,
                         ),
                       ),
                     ),
@@ -536,127 +522,30 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
               );
             }),
 
-          // Main FAB button
+          // Main FAB button - Modern design
           Positioned(
             left: fabX,
             top: fabY,
             child: GestureDetector(
               behavior: HitTestBehavior.translucent,
               onPanUpdate: _onDragUpdate,
-              onPanEnd: _onDragEnd, // Snap to edge when released
+              onPanEnd: _onDragEnd,
               onDoubleTap: _resetFAB,
               child: AnimatedBuilder(
                 animation: _menuController,
                 builder: (context, child) {
-                  return Stack(
-                    alignment: Alignment.center,
-                    clipBehavior: Clip.none,
-                    children: [
-                      // Pulse ring animation
-                      Container(
-                        width: 64 + 30 * _menuController.value,
-                        height: 64 + 30 * _menuController.value,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: Colors.blue.withValues(
-                              alpha: 0.3 * _menuController.value,
-                            ),
-                            width: 2,
-                          ),
-                        ),
-                      ),
-
-                      // Main FAB with glassmorphism effect
-                      ClipOval(
-                        child: BackdropFilter(
-                          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                          child: Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              onTap: _toggleMenu,
-                              borderRadius: BorderRadius.circular(32),
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 200),
-                                width: 64,
-                                height: 64,
-                                decoration: BoxDecoration(
-                                  color: _fabMenuOpen
-                                      ? Colors.red.withValues(alpha: 0.3)
-                                      : Colors.white.withValues(alpha: 0.15),
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: Colors.white.withValues(alpha: 0.3),
-                                    width: 1.5,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withValues(
-                                        alpha: 0.2,
-                                      ),
-                                      blurRadius: 12,
-                                      spreadRadius: 2,
-                                      offset: const Offset(0, 4),
-                                    ),
-                                  ],
-                                ),
-                                child: Stack(
-                                  children: [
-                                    Center(
-                                      child: AnimatedRotation(
-                                        turns: _fabMenuOpen ? 0.125 : 0,
-                                        duration: const Duration(
-                                          milliseconds: 200,
-                                        ),
-                                        child: Icon(
-                                          _fabMenuOpen
-                                              ? Icons.close
-                                              : Icons.apps,
-                                          size: 28,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                    ),
-                                    if (_unreadMessageCount > 0 &&
-                                        !_fabMenuOpen)
-                                      Positioned(
-                                        right: 4,
-                                        top: 4,
-                                        child: Container(
-                                          padding: const EdgeInsets.all(4),
-                                          decoration: const BoxDecoration(
-                                            color: Colors.red,
-                                            shape: BoxShape.circle,
-                                          ),
-                                          child: Text(
-                                            _unreadMessageCount > 99
-                                                ? "99+"
-                                                : _unreadMessageCount
-                                                      .toString(),
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 9,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                  return _ModernFAB(
+                    isOpen: _fabMenuOpen,
+                    animationValue: _menuController.value,
+                    unreadCount: _unreadMessageCount,
+                    onTap: _toggleMenu,
                   );
                 },
               ),
             ),
           ),
 
-          // Swipe gesture detector - HomeScreen -> FeedScreen (right swipe from left edge)
-          // Full screen height, left edge 100px wide for detecting right swipe
+          // Swipe gesture detector
           if (_currentIndex == 0)
             Positioned(
               left: 0,
@@ -676,88 +565,241 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
   }
 }
 
-// ANIMATED MENU ITEM
+// Data class for menu items
+class _MenuItemData {
+  final String label;
+  final IconData icon;
+  final int index;
+  final List<Color> gradient;
 
-class _AnimatedMenuItem extends StatefulWidget {
-  final Map<String, dynamic> item;
-  final int unread;
-  final double delay;
+  const _MenuItemData({
+    required this.label,
+    required this.icon,
+    required this.index,
+    required this.gradient,
+  });
+}
+
+// Modern FAB button
+class _ModernFAB extends StatelessWidget {
+  final bool isOpen;
+  final double animationValue;
+  final int unreadCount;
   final VoidCallback onTap;
 
-  const _AnimatedMenuItem({
-    required this.item,
-    required this.unread,
-    required this.delay,
+  const _ModernFAB({
+    required this.isOpen,
+    required this.animationValue,
+    required this.unreadCount,
     required this.onTap,
   });
 
   @override
-  State<_AnimatedMenuItem> createState() => _AnimatedMenuItemState();
+  Widget build(BuildContext context) {
+    return Stack(
+      alignment: Alignment.center,
+      clipBehavior: Clip.none,
+      children: [
+        // Outer glow ring
+        if (isOpen)
+          Container(
+            width: 64 + 20 * animationValue,
+            height: 64 + 20 * animationValue,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: const Color(0xFF667EEA).withValues(alpha: 0.4 * animationValue),
+                width: 2,
+              ),
+            ),
+          ),
+
+        // Main button
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(32),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: isOpen
+                      ? [const Color(0xFFEF4444), const Color(0xFFDC2626)]
+                      : [const Color(0xFF667EEA), const Color(0xFF764BA2)],
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: (isOpen ? const Color(0xFFEF4444) : const Color(0xFF667EEA))
+                        .withValues(alpha: 0.4),
+                    blurRadius: 20,
+                    spreadRadius: 2,
+                    offset: const Offset(0, 8),
+                  ),
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.15),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Stack(
+                children: [
+                  Center(
+                    child: _AnimatedMenuIcon(
+                      isOpen: isOpen,
+                      animationValue: animationValue,
+                    ),
+                  ),
+                  // Notification badge
+                  if (unreadCount > 0 && !isOpen)
+                    Positioned(
+                      right: 2,
+                      top: 2,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEF4444),
+                          borderRadius: BorderRadius.circular(10),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFEF4444).withValues(alpha: 0.4),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Text(
+                          unreadCount > 99 ? "99+" : unreadCount.toString(),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }
 
-class _AnimatedMenuItemState extends State<_AnimatedMenuItem> {
+// Modern Menu Item
+class _ModernMenuItem extends StatefulWidget {
+  final _MenuItemData data;
+  final int unread;
+  final VoidCallback onTap;
+  final bool isOnRight;
+
+  const _ModernMenuItem({
+    required this.data,
+    required this.unread,
+    required this.onTap,
+    required this.isOnRight,
+  });
+
+  @override
+  State<_ModernMenuItem> createState() => _ModernMenuItemState();
+}
+
+class _ModernMenuItemState extends State<_ModernMenuItem> {
   bool _isPressed = false;
 
   @override
   Widget build(BuildContext context) {
+    final showBadge = widget.data.index == 1 && widget.unread > 0;
+
     return GestureDetector(
       onTapDown: (_) => setState(() => _isPressed = true),
       onTapUp: (_) => setState(() => _isPressed = false),
       onTapCancel: () => setState(() => _isPressed = false),
       onTap: widget.onTap,
-      child: ClipOval(
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 150),
-            width: 56,
-            height: 56,
-            transform: Matrix4.identity()
-              ..setEntry(0, 0, _isPressed ? 0.9 : 1.0)
-              ..setEntry(1, 1, _isPressed ? 0.9 : 1.0)
-              ..setEntry(2, 2, _isPressed ? 0.9 : 1.0),
-            transformAlignment: Alignment.center,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.white.withValues(alpha: 0.15),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.3),
-                width: 1.5,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.2),
-                  blurRadius: _isPressed ? 8 : 12,
-                  spreadRadius: _isPressed ? 0 : 2,
-                  offset: const Offset(0, 3),
-                ),
-              ],
-            ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Icon button with gradient
+          AnimatedScale(
+            scale: _isPressed ? 0.9 : 1.0,
+            duration: const Duration(milliseconds: 100),
             child: Stack(
+              clipBehavior: Clip.none,
               children: [
-                Center(
-                  child: Icon(
-                    widget.item["icon"] as IconData,
-                    size: 26,
-                    color: Colors.white,
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: widget.data.gradient,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: widget.data.gradient[0].withValues(alpha: 0.4),
+                        blurRadius: _isPressed ? 8 : 16,
+                        spreadRadius: _isPressed ? 0 : 2,
+                        offset: const Offset(0, 6),
+                      ),
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.1),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Center(
+                    child: Icon(
+                      widget.data.icon,
+                      size: 26,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
-                // Unread badge for Messages
-                if (widget.item["index"] == 1 && widget.unread > 0)
+
+                // Badge for messages
+                if (showBadge)
                   Positioned(
-                    right: 2,
-                    top: 2,
+                    right: -6,
+                    top: -6,
                     child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: const BoxDecoration(
-                        color: Colors.red,
-                        shape: BoxShape.circle,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEF4444),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: Colors.white,
+                          width: 2,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFFEF4444).withValues(alpha: 0.4),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
                       ),
                       child: Text(
                         widget.unread > 99 ? "99+" : widget.unread.toString(),
                         style: const TextStyle(
-                          fontSize: 8,
-                          fontWeight: FontWeight.bold,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
                           color: Colors.white,
                         ),
                       ),
@@ -766,14 +808,32 @@ class _AnimatedMenuItemState extends State<_AnimatedMenuItem> {
               ],
             ),
           ),
-        ),
+          const SizedBox(height: 6),
+
+          // Label
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.6),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              widget.data.label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.3,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-// SWIPE DETECTOR - Custom widget for edge swipe detection
-
+// Swipe Detector
 class _SwipeDetector extends StatefulWidget {
   final VoidCallback? onSwipeRight;
 
@@ -800,7 +860,6 @@ class _SwipeDetectorState extends State<_SwipeDetector> {
 
         final deltaX = event.position.dx - _startX;
 
-        // Right swipe: moved right by at least 30px
         if (widget.onSwipeRight != null && deltaX > 30) {
           _hasTriggered = true;
           widget.onSwipeRight!();
@@ -810,6 +869,152 @@ class _SwipeDetectorState extends State<_SwipeDetector> {
         _hasTriggered = false;
       },
       child: Container(color: Colors.transparent),
+    );
+  }
+}
+
+// Custom Animated Menu Icon - Modern design
+class _AnimatedMenuIcon extends StatelessWidget {
+  final bool isOpen;
+  final double animationValue;
+
+  const _AnimatedMenuIcon({
+    required this.isOpen,
+    required this.animationValue,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 28,
+      height: 28,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Animated dots that form menu icon -> X transformation
+          // Top-left dot
+          _AnimatedDot(
+            animation: animationValue,
+            startOffset: const Offset(-8, -8),
+            endOffset: const Offset(-7, -7),
+            rotateToLine: true,
+            lineAngle: 0.785, // 45 degrees
+          ),
+          // Top-right dot
+          _AnimatedDot(
+            animation: animationValue,
+            startOffset: const Offset(8, -8),
+            endOffset: const Offset(7, -7),
+            rotateToLine: true,
+            lineAngle: -0.785,
+          ),
+          // Center dot
+          _AnimatedDot(
+            animation: animationValue,
+            startOffset: Offset.zero,
+            endOffset: Offset.zero,
+            fadeOut: true,
+          ),
+          // Bottom-left dot
+          _AnimatedDot(
+            animation: animationValue,
+            startOffset: const Offset(-8, 8),
+            endOffset: const Offset(-7, 7),
+            rotateToLine: true,
+            lineAngle: -0.785,
+          ),
+          // Bottom-right dot
+          _AnimatedDot(
+            animation: animationValue,
+            startOffset: const Offset(8, 8),
+            endOffset: const Offset(7, 7),
+            rotateToLine: true,
+            lineAngle: 0.785,
+          ),
+
+          // X lines that appear when open
+          if (animationValue > 0.3)
+            Opacity(
+              opacity: ((animationValue - 0.3) / 0.7).clamp(0.0, 1.0),
+              child: Transform.rotate(
+                angle: 0.785 * animationValue,
+                child: Container(
+                  width: 20,
+                  height: 3,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+            ),
+          if (animationValue > 0.3)
+            Opacity(
+              opacity: ((animationValue - 0.3) / 0.7).clamp(0.0, 1.0),
+              child: Transform.rotate(
+                angle: -0.785 * animationValue,
+                child: Container(
+                  width: 20,
+                  height: 3,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AnimatedDot extends StatelessWidget {
+  final double animation;
+  final Offset startOffset;
+  final Offset endOffset;
+  final bool rotateToLine;
+  final double lineAngle;
+  final bool fadeOut;
+
+  const _AnimatedDot({
+    required this.animation,
+    required this.startOffset,
+    required this.endOffset,
+    this.rotateToLine = false,
+    this.lineAngle = 0,
+    this.fadeOut = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final currentOffset = Offset.lerp(startOffset, endOffset, animation)!;
+    final opacity = fadeOut ? (1 - animation).clamp(0.0, 1.0) : (1 - animation * 0.7).clamp(0.0, 1.0);
+
+    return Transform.translate(
+      offset: currentOffset,
+      child: Transform.rotate(
+        angle: rotateToLine ? lineAngle * animation : 0,
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 150),
+          opacity: opacity,
+          child: Container(
+            width: rotateToLine ? 6 + (animation * 8) : 6,
+            height: 6,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(3),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.white.withValues(alpha: 0.3),
+                  blurRadius: 4,
+                  spreadRadius: 1,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
