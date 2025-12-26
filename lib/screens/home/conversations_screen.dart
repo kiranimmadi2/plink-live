@@ -178,13 +178,28 @@ class _ConversationsScreenState extends State<ConversationsScreen>
               color: Colors.white,
             ),
           ),
-          // Profile avatar - uses cached profile for instant display
-          StreamBuilder<Map<String, dynamic>?>(
-            stream: CurrentUserCache().profileStream,
-            initialData: CurrentUserCache().profile,
+          // Profile avatar - uses Firestore stream with cache fallback
+          StreamBuilder<DocumentSnapshot>(
+            stream: _firestore
+                .collection('users')
+                .doc(_auth.currentUser?.uid)
+                .snapshots(),
             builder: (context, snapshot) {
-              final photoUrl = snapshot.data?['photoUrl'] as String? ??
-                  CurrentUserCache().photoUrl;
+              // Try multiple sources for photoUrl
+              String? photoUrl;
+
+              // 1. Try from Firestore snapshot
+              if (snapshot.hasData && snapshot.data!.exists) {
+                final userData = snapshot.data!.data() as Map<String, dynamic>?;
+                photoUrl = userData?['photoUrl'] as String?;
+              }
+
+              // 2. Fallback to cache
+              photoUrl ??= CurrentUserCache().photoUrl;
+
+              // 3. Fallback to Firebase Auth
+              photoUrl ??= _auth.currentUser?.photoURL;
+
               final fixedPhotoUrl = PhotoUrlHelper.fixGooglePhotoUrl(photoUrl);
 
               return Container(
@@ -206,11 +221,17 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                           fit: BoxFit.cover,
                           placeholder: (context, url) => Container(
                             color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                            child: Icon(
+                              Icons.person,
+                              size: 24,
+                              color: isDarkMode ? Colors.grey[600] : Colors.grey[400],
+                            ),
                           ),
                           errorWidget: (context, url, error) => Container(
                             color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
                             child: Icon(
                               Icons.person,
+                              size: 24,
                               color: isDarkMode ? Colors.grey[600] : Colors.grey[400],
                             ),
                           ),
@@ -219,6 +240,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                           color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
                           child: Icon(
                             Icons.person,
+                            size: 24,
                             color: isDarkMode ? Colors.grey[600] : Colors.grey[400],
                           ),
                         ),
