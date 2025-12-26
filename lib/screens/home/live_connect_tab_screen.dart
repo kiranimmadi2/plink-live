@@ -19,6 +19,7 @@ import '../../widgets/edit_profile_bottom_sheet.dart';
 import '../../services/connection_service.dart';
 import '../../services/location_service.dart';
 import '../my_connections_screen.dart';
+import '../../widgets/filters/modern_filter_sheet.dart';
 
 class LiveConnectTabScreen extends ConsumerStatefulWidget {
   const LiveConnectTabScreen({super.key});
@@ -584,23 +585,26 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
         }
       }
 
-      // Sort by distance when using 'Near me', otherwise by match score
-      if (_locationFilter == 'Near me') {
-        people.sort((a, b) {
-          final distA = a['distance'] as double?;
-          final distB = b['distance'] as double?;
-          if (distA == null && distB == null) return 0;
-          if (distA == null) return 1;
-          if (distB == null) return -1;
+      // Always sort by distance (nearest first) when distance data is available
+      // Users without distance data are placed at the end
+      people.sort((a, b) {
+        final distA = a['distance'] as double?;
+        final distB = b['distance'] as double?;
+
+        // Both have distance - sort by distance (nearest first)
+        if (distA != null && distB != null) {
           return distA.compareTo(distB);
-        });
-      } else {
-        // Sort by match score (highest first)
-        people.sort(
-          (a, b) =>
-              (b['matchScore'] as double).compareTo(a['matchScore'] as double),
-        );
-      }
+        }
+
+        // Only one has distance - the one with distance comes first
+        if (distA != null && distB == null) return -1;
+        if (distA == null && distB != null) return 1;
+
+        // Neither has distance - sort by match score as fallback
+        final scoreA = a['matchScore'] as double? ?? 0;
+        final scoreB = b['matchScore'] as double? ?? 0;
+        return scoreB.compareTo(scoreA); // Higher score first
+      });
 
       if (mounted) {
         setState(() {
@@ -873,6 +877,46 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
   }
 
   void _showFilterDialog() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return ModernFilterSheet(
+          locationFilter: _locationFilter,
+          distanceFilter: _distanceFilter,
+          selectedGenders: _selectedGenders,
+          selectedInterests: _selectedInterests,
+          selectedConnectionTypes: _selectedConnectionTypes,
+          selectedActivities: _selectedActivities,
+          availableGenders: _availableGenders,
+          availableInterests: _availableInterests,
+          connectionTypeGroups: _connectionTypeGroups,
+          activityGroups: _activityGroups,
+          checkLocationPermission: _checkLocationPermission,
+          onApply: () {
+            setState(() {
+              _filterByGender = _selectedGenders.isNotEmpty;
+              _filterByInterests = _selectedInterests.isNotEmpty;
+              _filterByConnectionTypes = _selectedConnectionTypes.isNotEmpty;
+              _filterByActivities = _selectedActivities.isNotEmpty;
+            });
+            _loadNearbyPeople();
+          },
+        );
+      },
+    ).then((result) {
+      if (result != null && result is Map<String, dynamic>) {
+        setState(() {
+          _locationFilter = result['locationFilter'] ?? _locationFilter;
+          _distanceFilter = result['distanceFilter'] ?? _distanceFilter;
+        });
+      }
+    });
+  }
+
+  // Legacy method - kept for reference
+  void _showFilterDialogLegacy() {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
