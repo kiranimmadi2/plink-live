@@ -72,6 +72,9 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
   List<String> _myConnections = []; // List of connected user IDs
   bool _connectionsLoaded = false;
 
+  // Bottom sheet state - prevents multiple sheets from opening
+  bool _isProfileSheetOpen = false;
+
   // Available genders
   final List<String> _availableGenders = ['Male', 'Female', 'Other'];
 
@@ -797,9 +800,14 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
   void _showMyProfile() {
     if (_userProfile == null) return;
 
+    // Prevent multiple bottom sheets from opening
+    if (_isProfileSheetOpen) return;
+
     // Create ExtendedUserProfile from current user's data
     final userId = _auth.currentUser?.uid;
     if (userId == null) return;
+
+    _isProfileSheetOpen = true;
 
     final myProfile = ExtendedUserProfile.fromMap(_userProfile!, userId);
 
@@ -816,14 +824,21 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
           _showEditProfile(); // Show the edit sheet
         },
       ),
-    );
+    ).whenComplete(() {
+      _isProfileSheetOpen = false;
+    });
   }
 
   void _showEditProfile() {
     if (_userProfile == null) return;
 
+    // Prevent multiple bottom sheets from opening
+    if (_isProfileSheetOpen) return;
+
     final userId = _auth.currentUser?.uid;
     if (userId == null) return;
+
+    _isProfileSheetOpen = true;
 
     // ignore: unused_local_variable
     final myProfile = ExtendedUserProfile.fromMap(_userProfile!, userId);
@@ -839,7 +854,9 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
           _loadUserProfile();
         },
       ),
-    );
+    ).whenComplete(() {
+      _isProfileSheetOpen = false;
+    });
   }
 
   // Helper method to calculate distance between two coordinates using Haversine formula
@@ -2274,6 +2291,15 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
   }
 
   void _showProfileDetail(ExtendedUserProfile user) async {
+    // Prevent multiple bottom sheets from opening
+    if (_isProfileSheetOpen) {
+      debugPrint('LiveConnect: Profile sheet already open, ignoring click');
+      return;
+    }
+
+    // Mark sheet as opening
+    _isProfileSheetOpen = true;
+
     // Check connection status before showing sheet
     final connectionStatus = await _connectionService
         .getConnectionRequestStatus(user.uid);
@@ -2282,7 +2308,10 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
       user.uid,
     );
 
-    if (!mounted) return;
+    if (!mounted) {
+      _isProfileSheetOpen = false;
+      return;
+    }
 
     // Determine the status to display
     final displayStatus = isConnected
@@ -2398,7 +2427,10 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
           );
         },
       ),
-    );
+    ).whenComplete(() {
+      // Reset flag when sheet is closed (by any means)
+      _isProfileSheetOpen = false;
+    });
   }
 
   @override
