@@ -319,6 +319,9 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
           _selectedInterests = List<String>.from(userData?['interests'] ?? []);
         });
 
+        // Fetch fresh location in background before loading people
+        await _fetchCurrentLocation();
+
         // Always load nearby people (filters can be applied via filter dialog)
         _loadNearbyPeople();
       }
@@ -353,6 +356,74 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
     }
   }
 
+  /// Fetch current location and update state
+  /// This runs automatically when Live Connect opens
+  Future<void> _fetchCurrentLocation() async {
+    if (!mounted) return;
+
+    try {
+      debugPrint('LiveConnect: Fetching current location...');
+
+      // Try to get real-time location
+      final position = await _locationService.getCurrentLocation(
+        silent: true,
+        highAccuracy: false, // Use balanced mode for faster response
+      );
+
+      if (position != null && mounted) {
+        setState(() {
+          _currentUserLat = position.latitude;
+          _currentUserLon = position.longitude;
+        });
+        debugPrint(
+          'LiveConnect: Got fresh location: ${position.latitude}, ${position.longitude}',
+        );
+      } else {
+        // Fall back to profile location if real-time unavailable
+        final profileLat = _userProfile?['latitude']?.toDouble();
+        final profileLon = _userProfile?['longitude']?.toDouble();
+
+        if (profileLat != null && profileLon != null && mounted) {
+          setState(() {
+            _currentUserLat = profileLat;
+            _currentUserLon = profileLon;
+          });
+          debugPrint(
+            'LiveConnect: Using profile location: $profileLat, $profileLon',
+          );
+        } else {
+          debugPrint('LiveConnect: No location available');
+        }
+      }
+    } catch (e) {
+      debugPrint('LiveConnect: Error fetching location: $e');
+      // Try profile location as fallback
+      final profileLat = _userProfile?['latitude']?.toDouble();
+      final profileLon = _userProfile?['longitude']?.toDouble();
+
+      if (profileLat != null && profileLon != null && mounted) {
+        setState(() {
+          _currentUserLat = profileLat;
+          _currentUserLon = profileLon;
+        });
+      }
+    }
+  }
+
+  /// Refresh Live Connect - fetches fresh location and reloads people
+  /// Called by pull-to-refresh
+  Future<void> _refreshLiveConnect() async {
+    debugPrint('LiveConnect: Refreshing with fresh location...');
+
+    // Force fetch fresh location
+    await _fetchCurrentLocation();
+
+    // Reload people with new location
+    await _loadNearbyPeople();
+
+    debugPrint('LiveConnect: Refresh complete');
+  }
+
   Future<void> _loadNearbyPeople({bool loadMore = false}) async {
     if (!mounted) return;
 
@@ -379,11 +450,17 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
 
       final userCity = _userProfile?['city'];
 
-      // Get real-time location for accurate distance calculation
-      // Only when using 'Near me' filter or when location is needed
-      if (_locationFilter == 'Near me' || _currentUserLat == null) {
+      // If location not already fetched, fetch it now
+      // This ensures distance is always calculated correctly
+      if (_currentUserLat == null || _currentUserLon == null) {
+        await _fetchCurrentLocation();
+      }
+
+      // For "Near me" filter, always get fresh location for accuracy
+      if (_locationFilter == 'Near me') {
         final position = await _locationService.getCurrentLocation(
           silent: true,
+          highAccuracy: true, // Use high accuracy for Near Me filter
         );
         if (position != null && mounted) {
           setState(() {
@@ -391,20 +468,15 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
             _currentUserLon = position.longitude;
           });
           debugPrint(
-            'LiveConnect: Using real-time location: ${position.latitude}, ${position.longitude}',
-          );
-        } else {
-          // Fall back to profile location if real-time location unavailable
-          _currentUserLat = _userProfile?['latitude']?.toDouble();
-          _currentUserLon = _userProfile?['longitude']?.toDouble();
-          debugPrint(
-            'LiveConnect: Using profile location (real-time unavailable)',
+            'LiveConnect: Fresh location for Near Me: ${position.latitude}, ${position.longitude}',
           );
         }
       }
 
       final userLat = _currentUserLat;
       final userLon = _currentUserLon;
+
+      debugPrint('LiveConnect: Using location lat=$userLat, lon=$userLon for distance calculation');
 
       // Build query based on filters - USE INDEXES FOR BETTER PERFORMANCE
       Query<Map<String, dynamic>> usersQuery = _firestore.collection('users');
@@ -3028,9 +3100,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
         _searchQuery.isNotEmpty) {
       // Show search-specific empty state
       return RefreshIndicator(
-        onRefresh: () async {
-          await _loadNearbyPeople();
-        },
+        onRefresh: _refreshLiveConnect,
         color: Theme.of(context).primaryColor,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -3155,9 +3225,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
       }
 
       return RefreshIndicator(
-        onRefresh: () async {
-          await _loadNearbyPeople();
-        },
+        onRefresh: _refreshLiveConnect,
         color: Theme.of(context).primaryColor,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -3242,9 +3310,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
     }
 
     return RefreshIndicator(
-      onRefresh: () async {
-        await _loadNearbyPeople();
-      },
+      onRefresh: _refreshLiveConnect,
       color: Theme.of(context).primaryColor,
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
