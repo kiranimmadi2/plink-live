@@ -185,22 +185,58 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                 .doc(_auth.currentUser?.uid)
                 .snapshots(),
             builder: (context, snapshot) {
-              // Try multiple sources for photoUrl
+              // Try multiple sources for photoUrl and name
               String? photoUrl;
+              String userName = 'User';
 
               // 1. Try from Firestore snapshot
               if (snapshot.hasData && snapshot.data!.exists) {
                 final userData = snapshot.data!.data() as Map<String, dynamic>?;
                 photoUrl = userData?['photoUrl'] as String?;
+                userName = userData?['name'] as String? ?? 'User';
               }
 
               // 2. Fallback to cache
               photoUrl ??= CurrentUserCache().photoUrl;
+              if (userName == 'User') {
+                userName = CurrentUserCache().name;
+              }
 
               // 3. Fallback to Firebase Auth
               photoUrl ??= _auth.currentUser?.photoURL;
+              if (userName == 'User') {
+                userName = _auth.currentUser?.displayName ?? 'User';
+              }
 
               final fixedPhotoUrl = PhotoUrlHelper.fixGooglePhotoUrl(photoUrl);
+              final initial = userName.isNotEmpty ? userName[0].toUpperCase() : 'U';
+
+              // Avatar fallback widget with user's initial
+              Widget buildAvatarFallback() {
+                return Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.purple.shade400,
+                        Colors.blue.shade400,
+                      ],
+                    ),
+                  ),
+                  child: Center(
+                    child: Text(
+                      initial,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                );
+              }
 
               return Container(
                 width: 44,
@@ -218,32 +254,15 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                   child: fixedPhotoUrl != null && fixedPhotoUrl.isNotEmpty
                       ? CachedNetworkImage(
                           imageUrl: fixedPhotoUrl,
+                          width: 44,
+                          height: 44,
                           fit: BoxFit.cover,
-                          placeholder: (context, url) => Container(
-                            color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
-                            child: Icon(
-                              Icons.person,
-                              size: 24,
-                              color: isDarkMode ? Colors.grey[600] : Colors.grey[400],
-                            ),
-                          ),
-                          errorWidget: (context, url, error) => Container(
-                            color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
-                            child: Icon(
-                              Icons.person,
-                              size: 24,
-                              color: isDarkMode ? Colors.grey[600] : Colors.grey[400],
-                            ),
-                          ),
+                          fadeInDuration: Duration.zero,
+                          fadeOutDuration: Duration.zero,
+                          placeholder: (context, url) => buildAvatarFallback(),
+                          errorWidget: (context, url, error) => buildAvatarFallback(),
                         )
-                      : Container(
-                          color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
-                          child: Icon(
-                            Icons.person,
-                            size: 24,
-                            color: isDarkMode ? Colors.grey[600] : Colors.grey[400],
-                          ),
-                        ),
+                      : buildAvatarFallback(),
                 ),
               );
             },
@@ -577,22 +596,12 @@ class _ConversationsScreenState extends State<ConversationsScreen>
           horizontal: 16,
           vertical: 8,
         ),
-        leading: CircleAvatar(
+        leading: _buildUserAvatar(
+          photoUrl: fixedPhotoUrl,
+          initial: initial,
           radius: 26,
-          backgroundColor: Theme.of(context).primaryColor.withValues(alpha: 0.15),
-          backgroundImage: fixedPhotoUrl != null && fixedPhotoUrl.isNotEmpty
-              ? CachedNetworkImageProvider(fixedPhotoUrl)
-              : null,
-          child: fixedPhotoUrl == null || fixedPhotoUrl.isEmpty
-              ? Text(
-                  initial,
-                  style: TextStyle(
-                    color: Theme.of(context).primaryColor,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                )
-              : null,
+          context: context,
+          uniqueId: otherUserId,
         ),
         title: Text(
           formatDisplayName(displayName),
@@ -878,35 +887,23 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                 // Avatar
                 Stack(
                   children: [
-                    CircleAvatar(
-                      radius: 26,
-                      backgroundColor: conversation.isGroup
-                          ? Theme.of(context).primaryColor.withValues(alpha: 0.15)
-                          : (fixedPhotoUrl != null && fixedPhotoUrl.isNotEmpty
-                              ? Colors.transparent
-                              : Theme.of(context).primaryColor.withValues(alpha: 0.1)),
-                      backgroundImage: !conversation.isGroup &&
-                              fixedPhotoUrl != null &&
-                              fixedPhotoUrl.isNotEmpty
-                          ? CachedNetworkImageProvider(fixedPhotoUrl)
-                          : null,
-                      child: conversation.isGroup
-                          ? Icon(
+                    conversation.isGroup
+                        ? CircleAvatar(
+                            radius: 26,
+                            backgroundColor: Theme.of(context).primaryColor.withValues(alpha: 0.15),
+                            child: Icon(
                               Icons.group,
                               color: Theme.of(context).primaryColor,
                               size: 26,
-                            )
-                          : (fixedPhotoUrl == null || fixedPhotoUrl.isEmpty
-                              ? Text(
-                                  initial,
-                                  style: TextStyle(
-                                    color: Theme.of(context).primaryColor,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                )
-                              : null),
-                    ),
+                            ),
+                          )
+                        : _buildUserAvatar(
+                            photoUrl: fixedPhotoUrl,
+                            initial: initial,
+                            radius: 26,
+                            context: context,
+                            uniqueId: conversation.id,
+                          ),
                     // Online indicator for direct chats
                     if (!conversation.isGroup && otherUserId.isNotEmpty)
                       _buildOnlineIndicator(otherUserId, isDarkMode),
@@ -1011,6 +1008,86 @@ class _ConversationsScreenState extends State<ConversationsScreen>
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  /// Build user avatar with proper error handling for profile photos
+  Widget _buildUserAvatar({
+    required String? photoUrl,
+    required String initial,
+    required double radius,
+    required BuildContext context,
+    String? uniqueId,
+  }) {
+    // Avatar colors for fallback - expanded palette for more variety
+    const List<Color> avatarColors = [
+      Color(0xFF6366F1), // Indigo
+      Color(0xFF8B5CF6), // Purple
+      Color(0xFFEC4899), // Pink
+      Color(0xFFEF4444), // Red
+      Color(0xFFF97316), // Orange
+      Color(0xFF22C55E), // Green
+      Color(0xFF14B8A6), // Teal
+      Color(0xFF06B6D4), // Cyan
+      Color(0xFF3B82F6), // Blue
+      Color(0xFFA855F7), // Violet
+      Color(0xFFF43F5E), // Rose
+      Color(0xFF10B981), // Emerald
+      Color(0xFF0EA5E9), // Sky
+      Color(0xFF6D28D9), // Deep Purple
+      Color(0xFFD946EF), // Fuchsia
+    ];
+
+    // Use uniqueId (userId) for color generation if available, otherwise fall back to initial
+    int colorIndex;
+    if (uniqueId != null && uniqueId.isNotEmpty) {
+      // Generate hash from uniqueId for consistent but unique colors per user
+      int hash = 0;
+      for (int i = 0; i < uniqueId.length; i++) {
+        hash = uniqueId.codeUnitAt(i) + ((hash << 5) - hash);
+      }
+      colorIndex = hash.abs() % avatarColors.length;
+    } else {
+      colorIndex = initial.isNotEmpty ? initial.codeUnitAt(0) % avatarColors.length : 0;
+    }
+    final avatarColor = avatarColors[colorIndex];
+
+    Widget buildFallback() {
+      return Container(
+        width: radius * 2,
+        height: radius * 2,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: avatarColor,
+        ),
+        child: Center(
+          child: Text(
+            initial,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: radius * 0.8,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (photoUrl == null || photoUrl.isEmpty) {
+      return buildFallback();
+    }
+
+    return ClipOval(
+      child: CachedNetworkImage(
+        imageUrl: photoUrl,
+        width: radius * 2,
+        height: radius * 2,
+        fit: BoxFit.cover,
+        fadeInDuration: Duration.zero,
+        fadeOutDuration: Duration.zero,
+        placeholder: (context, url) => buildFallback(),
+        errorWidget: (context, url, error) => buildFallback(),
       ),
     );
   }
@@ -1431,20 +1508,12 @@ class _ConversationsScreenState extends State<ConversationsScreen>
     return ListTile(
       leading: Stack(
         children: [
-          CircleAvatar(
-            backgroundColor: Theme.of(context).primaryColor.withValues(alpha: 0.1),
-            backgroundImage: fixedPhotoUrl != null && fixedPhotoUrl.isNotEmpty
-                ? CachedNetworkImageProvider(fixedPhotoUrl)
-                : null,
-            child: fixedPhotoUrl == null || fixedPhotoUrl.isEmpty
-                ? Text(
-                    initial,
-                    style: TextStyle(
-                      color: Theme.of(context).primaryColor,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  )
-                : null,
+          _buildUserAvatar(
+            photoUrl: fixedPhotoUrl,
+            initial: initial,
+            radius: 20,
+            context: context,
+            uniqueId: userId,
           ),
           if (isOnline)
             Positioned(
