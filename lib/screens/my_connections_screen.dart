@@ -1,13 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:ui';
 import '../services/connection_service.dart';
-import '../widgets/user_avatar.dart';
 import '../widgets/chat_common.dart';
 import '../models/user_profile.dart';
 import '../providers/app_providers.dart';
 import 'enhanced_chat_screen.dart';
+
+// Avatar color palette for fallback
+const List<Color> _avatarColors = [
+  Color(0xFF6366F1), // Indigo
+  Color(0xFF8B5CF6), // Purple
+  Color(0xFFEC4899), // Pink
+  Color(0xFFEF4444), // Red
+  Color(0xFFF97316), // Orange
+  Color(0xFFFBBF24), // Amber
+  Color(0xFF22C55E), // Green
+  Color(0xFF14B8A6), // Teal
+  Color(0xFF06B6D4), // Cyan
+  Color(0xFF3B82F6), // Blue
+];
 
 class MyConnectionsScreen extends ConsumerStatefulWidget {
   const MyConnectionsScreen({super.key});
@@ -22,6 +36,11 @@ class _MyConnectionsScreenState extends ConsumerState<MyConnectionsScreen>
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   late TabController _tabController;
 
+  // Search
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+  bool _isSearching = false;
+
   // For refresh
   final GlobalKey<RefreshIndicatorState> _refreshKey = GlobalKey<RefreshIndicatorState>();
 
@@ -31,12 +50,21 @@ class _MyConnectionsScreenState extends ConsumerState<MyConnectionsScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _searchController.addListener(_onSearchChanged);
   }
 
   @override
   void dispose() {
+    _searchController.removeListener(_onSearchChanged);
+    _searchController.dispose();
     _tabController.dispose();
     super.dispose();
+  }
+
+  void _onSearchChanged() {
+    setState(() {
+      _searchQuery = _searchController.text.toLowerCase().trim();
+    });
   }
 
   Future<void> _refreshData() async {
@@ -49,15 +77,31 @@ class _MyConnectionsScreenState extends ConsumerState<MyConnectionsScreen>
     return Scaffold(
       backgroundColor: const Color(0xFF0f0f23),
       appBar: AppBar(
-        title: const Text(
-          'Connections',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 22,
-          ),
-        ),
+        title: _isSearching
+            ? _buildSearchField()
+            : const Text(
+                'Connections',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 22,
+                ),
+              ),
         elevation: 0,
         backgroundColor: const Color(0xFF0f0f23),
+        actions: [
+          IconButton(
+            icon: Icon(_isSearching ? Icons.close : Icons.search),
+            onPressed: () {
+              setState(() {
+                _isSearching = !_isSearching;
+                if (!_isSearching) {
+                  _searchController.clear();
+                  _searchQuery = '';
+                }
+              });
+            },
+          ),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(50),
           child: _buildTabBar(),
@@ -70,6 +114,20 @@ class _MyConnectionsScreenState extends ConsumerState<MyConnectionsScreen>
           _buildConnectionsTab(),
           _buildSentRequestsTab(),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSearchField() {
+    return TextField(
+      controller: _searchController,
+      autofocus: true,
+      style: const TextStyle(color: Colors.white, fontSize: 16),
+      decoration: InputDecoration(
+        hintText: 'Search connections...',
+        hintStyle: TextStyle(color: Colors.grey[500]),
+        border: InputBorder.none,
+        prefixIcon: Icon(Icons.search, color: Colors.grey[500]),
       ),
     );
   }
@@ -264,16 +322,69 @@ class _MyConnectionsScreenState extends ConsumerState<MyConnectionsScreen>
             );
           }
 
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: connectionIds.length,
-            itemBuilder: (context, index) {
-              return _buildConnectionCardStream(connectionIds[index]);
-            },
-          );
+          // Build filtered connections list
+          return _buildFilteredConnectionsList(connectionIds);
         },
       ),
     );
+  }
+
+  Widget _buildFilteredConnectionsList(List<String> connectionIds) {
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: _fetchConnectionsData(connectionIds),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return _buildLoadingState();
+        }
+
+        final allConnections = snapshot.data!;
+
+        // Filter by search query
+        final filteredConnections = _searchQuery.isEmpty
+            ? allConnections
+            : allConnections.where((conn) {
+                final name = (conn['name'] ?? '').toString().toLowerCase();
+                final location = (conn['location'] ?? '').toString().toLowerCase();
+                return name.contains(_searchQuery) || location.contains(_searchQuery);
+              }).toList();
+
+        if (filteredConnections.isEmpty && _searchQuery.isNotEmpty) {
+          return _buildEmptyState(
+            icon: Icons.search_off,
+            title: 'No Results Found',
+            subtitle: 'No connections match "$_searchQuery"',
+          );
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: filteredConnections.length,
+          itemBuilder: (context, index) {
+            final conn = filteredConnections[index];
+            return _buildConnectionCard(conn['id'], conn);
+          },
+        );
+      },
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchConnectionsData(List<String> connectionIds) async {
+    final List<Map<String, dynamic>> connections = [];
+
+    for (final id in connectionIds) {
+      try {
+        final doc = await _firestore.collection('users').doc(id).get();
+        if (doc.exists) {
+          final data = doc.data()!;
+          data['id'] = id;
+          connections.add(data);
+        }
+      } catch (e) {
+        debugPrint('Error fetching connection $id: $e');
+      }
+    }
+
+    return connections;
   }
 
   // ==================== SENT REQUESTS TAB ====================
@@ -377,9 +488,9 @@ class _MyConnectionsScreenState extends ConsumerState<MyConnectionsScreen>
                       ),
                       child: GestureDetector(
                         onTap: () => _viewProfile(senderId),
-                        child: UserAvatar(
-                          profileImageUrl: senderPhoto,
-                          fallbackText: senderName.isNotEmpty ? senderName[0].toUpperCase() : 'U',
+                        child: _buildColoredAvatar(
+                          photoUrl: senderPhoto,
+                          name: senderName,
                           radius: 28,
                         ),
                       ),
@@ -468,22 +579,6 @@ class _MyConnectionsScreenState extends ConsumerState<MyConnectionsScreen>
     );
   }
 
-  Widget _buildConnectionCardStream(String userId) {
-    return StreamBuilder<DocumentSnapshot>(
-      stream: _firestore.collection('users').doc(userId).snapshots(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData || !snapshot.data!.exists) {
-          return const SizedBox.shrink();
-        }
-
-        final userData = snapshot.data!.data() as Map<String, dynamic>?;
-        if (userData == null) return const SizedBox.shrink();
-
-        return _buildConnectionCard(userId, userData);
-      },
-    );
-  }
-
   Widget _buildConnectionCard(String userId, Map<String, dynamic> userData) {
     final name = userData['name'] ?? 'Unknown User';
     final photoUrl = userData['photoUrl'] as String?;
@@ -540,9 +635,9 @@ class _MyConnectionsScreenState extends ConsumerState<MyConnectionsScreen>
                             ),
                           ],
                         ),
-                        child: UserAvatar(
-                          profileImageUrl: photoUrl,
-                          fallbackText: name.isNotEmpty ? name[0].toUpperCase() : 'U',
+                        child: _buildColoredAvatar(
+                          photoUrl: photoUrl,
+                          name: name,
                           radius: 28,
                         ),
                       ),
@@ -692,9 +787,9 @@ class _MyConnectionsScreenState extends ConsumerState<MyConnectionsScreen>
                       ),
                       child: GestureDetector(
                         onTap: () => _viewProfile(receiverId),
-                        child: UserAvatar(
-                          profileImageUrl: photoUrl,
-                          fallbackText: name.isNotEmpty ? name[0].toUpperCase() : 'U',
+                        child: _buildColoredAvatar(
+                          photoUrl: photoUrl,
+                          name: name,
                           radius: 28,
                         ),
                       ),
@@ -1009,6 +1104,56 @@ class _MyConnectionsScreenState extends ConsumerState<MyConnectionsScreen>
 
   // ==================== HELPER METHODS ====================
 
+  /// Build a colored avatar with photo support
+  Widget _buildColoredAvatar({
+    required String? photoUrl,
+    required String name,
+    double radius = 28,
+  }) {
+    // Get consistent color based on name
+    final colorIndex = name.isNotEmpty ? name.codeUnitAt(0) % _avatarColors.length : 0;
+    final avatarColor = _avatarColors[colorIndex];
+    final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
+
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: avatarColor,
+      child: photoUrl != null && photoUrl.isNotEmpty
+          ? ClipOval(
+              child: CachedNetworkImage(
+                imageUrl: photoUrl,
+                width: radius * 2,
+                height: radius * 2,
+                fit: BoxFit.cover,
+                placeholder: (context, url) => _buildAvatarFallback(initial, avatarColor, radius),
+                errorWidget: (context, url, error) => _buildAvatarFallback(initial, avatarColor, radius),
+              ),
+            )
+          : _buildAvatarFallback(initial, avatarColor, radius),
+    );
+  }
+
+  Widget _buildAvatarFallback(String initial, Color color, double radius) {
+    return Container(
+      width: radius * 2,
+      height: radius * 2,
+      decoration: BoxDecoration(
+        color: color,
+        shape: BoxShape.circle,
+      ),
+      child: Center(
+        child: Text(
+          initial,
+          style: TextStyle(
+            fontSize: radius * 0.8,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+      ),
+    );
+  }
+
   String _formatTimeAgo(dynamic timestamp) {
     if (timestamp == null) return '';
     try {
@@ -1093,9 +1238,9 @@ class _MyConnectionsScreenState extends ConsumerState<MyConnectionsScreen>
                         ),
                       ],
                     ),
-                    child: UserAvatar(
-                      profileImageUrl: photoUrl,
-                      fallbackText: name.isNotEmpty ? name[0].toUpperCase() : 'U',
+                    child: _buildColoredAvatar(
+                      photoUrl: photoUrl,
+                      name: name,
                       radius: 50,
                     ),
                   ),
