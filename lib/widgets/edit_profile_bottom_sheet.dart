@@ -1,9 +1,10 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/profile_service.dart';
+import '../services/current_user_cache.dart';
 
 class EditProfileBottomSheet extends StatefulWidget {
   final Map<String, dynamic> currentProfile;
@@ -344,7 +345,7 @@ class _EditProfileBottomSheetState extends State<EditProfileBottomSheet> {
       }
 
       // Update profile
-      await FirebaseFirestore.instance.collection('users').doc(userId).update({
+      final updates = {
         'name': _nameController.text.trim(),
         'bio': _bioController.text.trim(),
         'location': _locationController.text.trim(),
@@ -353,6 +354,22 @@ class _EditProfileBottomSheetState extends State<EditProfileBottomSheet> {
         'connectionTypes': _selectedConnectionTypes,
         'activities': _selectedActivities,
         'updatedAt': FieldValue.serverTimestamp(),
+      };
+
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .update(updates);
+
+      // Update current user cache immediately (no need to wait for Firestore listener)
+      CurrentUserCache().updateProfile({
+        'name': _nameController.text.trim(),
+        'bio': _bioController.text.trim(),
+        'location': _locationController.text.trim(),
+        if (photoUrl != null) 'photoUrl': photoUrl,
+        'interests': _selectedInterests,
+        'connectionTypes': _selectedConnectionTypes,
+        'activities': _selectedActivities,
       });
 
       if (mounted) {

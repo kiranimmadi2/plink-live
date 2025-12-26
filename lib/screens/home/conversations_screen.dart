@@ -10,6 +10,7 @@ import '../../models/user_profile.dart';
 import '../../utils/photo_url_helper.dart';
 import '../../widgets/chat_common.dart';
 import '../../widgets/app_background.dart';
+import '../../services/current_user_cache.dart';
 import '../enhanced_chat_screen.dart';
 import '../create_group_screen.dart';
 import '../group_chat_screen.dart';
@@ -177,19 +178,13 @@ class _ConversationsScreenState extends State<ConversationsScreen>
               color: Colors.white,
             ),
           ),
-          // Profile avatar
-          StreamBuilder<DocumentSnapshot>(
-            stream: _firestore
-                .collection('users')
-                .doc(_auth.currentUser?.uid)
-                .snapshots(),
+          // Profile avatar - uses cached profile for instant display
+          StreamBuilder<Map<String, dynamic>?>(
+            stream: CurrentUserCache().profileStream,
+            initialData: CurrentUserCache().profile,
             builder: (context, snapshot) {
-              String? photoUrl;
-              if (snapshot.hasData && snapshot.data!.exists) {
-                final userData = snapshot.data!.data() as Map<String, dynamic>;
-                photoUrl = userData['photoUrl'];
-              }
-
+              final photoUrl = snapshot.data?['photoUrl'] as String? ??
+                  CurrentUserCache().photoUrl;
               final fixedPhotoUrl = PhotoUrlHelper.fixGooglePhotoUrl(photoUrl);
 
               return Container(

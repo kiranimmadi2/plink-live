@@ -12,6 +12,7 @@ import '../../widgets/user_avatar.dart';
 import '../../services/realtime_matching_service.dart';
 import '../profile/profile_with_history_screen.dart';
 import '../../services/photo_cache_service.dart';
+import '../../services/current_user_cache.dart';
 import '../../widgets/floating_particles.dart';
 import 'product_detail_screen.dart';
 
@@ -3052,15 +3053,15 @@ class _HomeScreenState extends State<HomeScreen>
               margin: const EdgeInsets.only(left: 8, top: 4),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                image: _auth.currentUser?.photoURL != null
+                image: CurrentUserCache().photoUrl != null
                     ? DecorationImage(
-                        image: NetworkImage(_auth.currentUser!.photoURL!),
+                        image: NetworkImage(CurrentUserCache().photoUrl!),
                         fit: BoxFit.cover,
                       )
                     : null,
-                color: _auth.currentUser?.photoURL == null ? Colors.grey : null,
+                color: CurrentUserCache().photoUrl == null ? Colors.grey : null,
               ),
-              child: _auth.currentUser?.photoURL == null
+              child: CurrentUserCache().photoUrl == null
                   ? const Icon(Icons.person, color: Colors.white, size: 16)
                   : null,
             ),

@@ -26,6 +26,7 @@ import 'services/location_service.dart';
 import 'services/connectivity_service.dart';
 import 'services/analytics_service.dart';
 import 'services/error_tracking_service.dart';
+import 'services/current_user_cache.dart';
 import 'providers/theme_provider.dart';
 import 'utils/app_optimizer.dart';
 import 'utils/memory_manager.dart';
@@ -193,44 +194,67 @@ void main() async {
 }
 
 /// Initialize non-critical services after app has started rendering
+/// Uses frame callbacks to spread work across multiple frames
 Future<void> _initializeServicesInBackground() async {
-  // Shorter delay - reduced from 500ms to 200ms for faster startup
-  await Future.delayed(const Duration(milliseconds: 200));
-
-  // FCM background handler - set up after app is responsive
+  // FCM background handler - lightweight, set up immediately
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
-  // Initialize Firebase Analytics
-  unawaited(AnalyticsService().initialize().catchError((e) {
-    debugPrint('AnalyticsService init error (non-fatal): $e');
-  }));
+  // Use addPostFrameCallback to spread initialization across frames
+  // This prevents blocking the main thread and reduces jank
 
-  // Initialize utilities in sequence with small delays to prevent jank
-  await AppOptimizer.initialize();
-  await Future.delayed(const Duration(milliseconds: 50));
+  // Frame 1: Analytics (lightweight)
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    unawaited(AnalyticsService().initialize().catchError((e) {
+      debugPrint('AnalyticsService init error (non-fatal): $e');
+    }));
+  });
 
-  MemoryManager().initialize();
-  await Future.delayed(const Duration(milliseconds: 50));
+  // Frame 2: App optimizer
+  Future.delayed(const Duration(milliseconds: 100), () {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(Future(() async {
+        await AppOptimizer.initialize();
+      }));
+    });
+  });
 
-  UserManager().initialize();
-  await Future.delayed(const Duration(milliseconds: 50));
+  // Frame 3: Memory manager
+  Future.delayed(const Duration(milliseconds: 200), () {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      MemoryManager().initialize();
+    });
+  });
 
-  // Initialize notification service (can run in parallel, but don't block)
-  unawaited(NotificationService().initialize().catchError((e) {
-    debugPrint('NotificationService init error (non-fatal): $e');
-    ErrorTrackingService().captureException(e, message: 'NotificationService init failed');
-  }));
+  // Frame 4: User manager
+  Future.delayed(const Duration(milliseconds: 300), () {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      UserManager().initialize();
+    });
+  });
 
-  // Initialize connectivity service after a small delay
-  await Future.delayed(const Duration(milliseconds: 100));
-  unawaited(
-    ConnectivityService().initialize().catchError((e) {
-      debugPrint('ConnectivityService init error (non-fatal): $e');
-    }),
-  );
+  // Frame 5: Notification service
+  Future.delayed(const Duration(milliseconds: 400), () {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(NotificationService().initialize().catchError((e) {
+        debugPrint('NotificationService init error (non-fatal): $e');
+        ErrorTrackingService().captureException(e, message: 'NotificationService init failed');
+      }));
+    });
+  });
 
-  // Log app open event
-  unawaited(AnalyticsService().logAppOpen());
+  // Frame 6: Connectivity service
+  Future.delayed(const Duration(milliseconds: 500), () {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(ConnectivityService().initialize().catchError((e) {
+        debugPrint('ConnectivityService init error (non-fatal): $e');
+      }));
+    });
+  });
+
+  // Frame 7: Log app open event
+  Future.delayed(const Duration(milliseconds: 600), () {
+    unawaited(AnalyticsService().logAppOpen());
+  });
 
   // NOTE: Migrations are now run in AuthWrapper._initializeUserServices()
   // after the user is authenticated to avoid permission errors
@@ -442,29 +466,49 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
     try {
       debugPrint('AuthWrapper: Initializing user services...');
 
-      try {
-        await _profileService.ensureProfileExists().timeout(
-          const Duration(seconds: 10),
-          onTimeout: () {
-            debugPrint('⚠️ Profile service timed out');
-          },
-        );
-      } catch (e) {
-        debugPrint('⚠️ Profile service error (non-fatal): $e');
-      }
+      // Initialize current user cache FIRST (fastest, most important)
+      unawaited(CurrentUserCache().initialize());
 
-      await Future.delayed(const Duration(milliseconds: 100));
-      _locationService.initializeLocation();
-      _locationService.startPeriodicLocationUpdates();
-      _locationService.startLocationStream();
-      _conversationService.cleanupDuplicateConversations();
+      // Profile service - run with timeout, don't block
+      unawaited(Future(() async {
+        try {
+          await _profileService.ensureProfileExists().timeout(
+            const Duration(seconds: 10),
+            onTimeout: () {
+              debugPrint('⚠️ Profile service timed out');
+            },
+          );
+        } catch (e) {
+          debugPrint('⚠️ Profile service error (non-fatal): $e');
+        }
+      }));
 
-      // Start listening for notifications from other users
-      _startNotificationListener();
+      // Defer location services to next frame
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Future.delayed(const Duration(milliseconds: 100), () {
+          _locationService.initializeLocation();
+        });
 
-      _runMigrationsInBackground();
+        Future.delayed(const Duration(milliseconds: 200), () {
+          _locationService.startPeriodicLocationUpdates();
+          _locationService.startLocationStream();
+        });
 
-      debugPrint('✓ AuthWrapper: User services initialized');
+        Future.delayed(const Duration(milliseconds: 300), () {
+          _conversationService.cleanupDuplicateConversations();
+        });
+
+        Future.delayed(const Duration(milliseconds: 400), () {
+          _startNotificationListener();
+        });
+      });
+
+      // Run migrations in background after delay
+      Future.delayed(const Duration(milliseconds: 500), () {
+        _runMigrationsInBackground();
+      });
+
+      debugPrint('✓ AuthWrapper: User services initialization scheduled');
     } catch (e) {
       debugPrint("User services init failed: $e");
     }
