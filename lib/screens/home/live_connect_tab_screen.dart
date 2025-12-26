@@ -669,10 +669,10 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
     }
   }
 
-  // Filter people based on search query
+  // Filter people based on search query and maintain distance sorting
   void _applySearchFilter() {
     if (_searchQuery.isEmpty) {
-      _filteredPeople = _nearbyPeople;
+      _filteredPeople = List.from(_nearbyPeople);
     } else {
       final query = _searchQuery.toLowerCase();
       _filteredPeople = _nearbyPeople.where((person) {
@@ -695,6 +695,31 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
         return false;
       }).toList();
     }
+
+    // Always sort filtered results by distance (nearest first)
+    _sortByDistance(_filteredPeople);
+  }
+
+  // Sort people list by distance (nearest first)
+  void _sortByDistance(List<Map<String, dynamic>> people) {
+    people.sort((a, b) {
+      final distA = a['distance'] as double?;
+      final distB = b['distance'] as double?;
+
+      // Both have distance - sort by distance (nearest first)
+      if (distA != null && distB != null) {
+        return distA.compareTo(distB);
+      }
+
+      // Only one has distance - the one with distance comes first
+      if (distA != null && distB == null) return -1;
+      if (distA == null && distB != null) return 1;
+
+      // Neither has distance - sort by match score as fallback
+      final scoreA = a['matchScore'] as double? ?? 0;
+      final scoreB = b['matchScore'] as double? ?? 0;
+      return scoreB.compareTo(scoreA); // Higher score first
+    });
   }
 
   void _showMyProfile() {
@@ -877,7 +902,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
   }
 
   void _showFilterDialog() {
-    showModalBottomSheet(
+    showModalBottomSheet<Map<String, dynamic>>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -895,22 +920,23 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
           activityGroups: _activityGroups,
           checkLocationPermission: _checkLocationPermission,
           onApply: () {
-            setState(() {
-              _filterByGender = _selectedGenders.isNotEmpty;
-              _filterByInterests = _selectedInterests.isNotEmpty;
-              _filterByConnectionTypes = _selectedConnectionTypes.isNotEmpty;
-              _filterByActivities = _selectedActivities.isNotEmpty;
-            });
-            _loadNearbyPeople();
+            // Filters are applied - will reload after dialog closes
           },
         );
       },
     ).then((result) {
-      if (result != null && result is Map<String, dynamic>) {
+      if (result != null) {
         setState(() {
+          // Update all filter states
           _locationFilter = result['locationFilter'] ?? _locationFilter;
           _distanceFilter = result['distanceFilter'] ?? _distanceFilter;
+          _filterByGender = _selectedGenders.isNotEmpty;
+          _filterByInterests = _selectedInterests.isNotEmpty;
+          _filterByConnectionTypes = _selectedConnectionTypes.isNotEmpty;
+          _filterByActivities = _selectedActivities.isNotEmpty;
         });
+        // Reload with new filters and sort by distance
+        _loadNearbyPeople();
       }
     });
   }
