@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -10,22 +9,24 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'home_screen.dart';
 import 'conversations_screen.dart';
 import 'live_connect_tab_screen.dart';
-import 'profile_with_history_screen.dart'; // Use provider-based version
+import '../profile/profile_with_history_screen.dart';
 import 'feed_screen.dart';
 import '../chat/incoming_call_screen.dart';
 
 // Professional & Business screens
 import '../professional/professional_dashboard_screen.dart';
-import '../business/business_dashboard_screen.dart';
+import '../business/universal_business_dashboard.dart';
 
 // services
-import '../../services/location services/location_service.dart';
+import '../../services/location_service.dart';
 import '../../services/notification_service.dart';
 import '../../services/account_type_service.dart';
 import '../../models/user_profile.dart';
 
 class MainNavigationScreen extends StatefulWidget {
-  const MainNavigationScreen({super.key});
+  final int? initialIndex;
+
+  const MainNavigationScreen({super.key, this.initialIndex});
 
   @override
   State<MainNavigationScreen> createState() => _MainNavigationScreenState();
@@ -40,6 +41,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
   Offset _fabPosition = const Offset(0, 0);
   bool _initialPosSet = false;
 
+  // Drag-to-select state
+  int? _hoveredMenuIndex;
+  bool _isDraggingToSelect = false;
+  Offset? _dragStartPosition;
+
   // Account type for showing appropriate dashboard
   AccountType _accountType = AccountType.personal;
   StreamSubscription<AccountType>? _accountTypeSubscription;
@@ -48,7 +54,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
   StreamSubscription<QuerySnapshot>? _unreadSubscription;
   StreamSubscription<QuerySnapshot>? _incomingCallSubscription;
   bool _isShowingIncomingCall = false;
-  final Set<String> _handledCallIds = {}; // Track calls we've already handled
+  final Set<String> _handledCallIds = {};
 
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -63,29 +69,58 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
 
+    if (widget.initialIndex != null) {
+      _currentIndex = widget.initialIndex!;
+    }
+
     _menuController = AnimationController(
-      duration: const Duration(milliseconds: 300),
+      duration: const Duration(milliseconds: 350),
       vsync: this,
     );
 
-    _listenUnread();
-    _listenForIncomingCalls();
-    _updateStatus(true);
-    _checkLocation();
-    _loadAccountType();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeAsync();
+    });
+  }
+
+  void _initializeAsync() {
+    Future.microtask(() => _loadAccountType());
+
+    Future.delayed(const Duration(milliseconds: 50), () {
+      if (mounted) _listenUnread();
+    });
+
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (mounted) _listenForIncomingCalls();
+    });
+
+    Future.delayed(const Duration(milliseconds: 150), () {
+      if (mounted) _updateStatus(true);
+    });
+
+    Future.delayed(const Duration(milliseconds: 200), () {
+      if (mounted) _checkLocation();
+    });
   }
 
   void _loadAccountType() async {
     final user = _auth.currentUser;
     if (user == null) return;
 
-    // Initial load
     final accountType = await _accountTypeService.getCurrentAccountType();
     if (mounted) {
-      setState(() => _accountType = accountType);
+      setState(() {
+        _accountType = accountType;
+        if (_currentIndex == 0 && widget.initialIndex == null) {
+          if (accountType == AccountType.professional) {
+            _currentIndex = 5;
+          } else if (accountType == AccountType.business) {
+            _currentIndex = 6;
+          }
+        }
+      });
     }
 
-    // Listen for changes
     _accountTypeSubscription?.cancel();
     _accountTypeSubscription = _accountTypeService
         .watchAccountType(user.uid)
@@ -111,8 +146,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     if (user == null) return;
 
     _incomingCallSubscription?.cancel();
-
-    // Only listen for calls created in the last 30 seconds to avoid old calls
     final cutoffTime = DateTime.now().subtract(const Duration(seconds: 30));
 
     _incomingCallSubscription = _firestore
@@ -129,11 +162,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
               if (data == null) continue;
 
               final callId = change.doc.id;
-
-              // Skip if we've already handled this call
               if (_handledCallIds.contains(callId)) continue;
 
-              // Check call timestamp - ignore old calls
               final timestamp = data['timestamp'];
               if (timestamp != null) {
                 DateTime? callTime;
@@ -143,30 +173,25 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
                   callTime = DateTime.tryParse(timestamp);
                 }
 
-                // Skip calls older than 30 seconds
                 if (callTime != null && callTime.isBefore(cutoffTime)) {
-                  _handledCallIds.add(
-                    callId,
-                  ); // Mark as handled so we don't check again
+                  _handledCallIds.add(callId);
                   continue;
                 }
               }
 
-              // Mark this call as handled
               _handledCallIds.add(callId);
 
               final callerName = data['callerName'] as String? ?? 'Unknown';
               final callerPhoto = data['callerPhoto'] as String?;
               final callerId = data['callerId'] as String? ?? '';
 
-              // Show incoming call screen
               _showIncomingCall(
                 callId: callId,
                 callerName: callerName,
                 callerPhoto: callerPhoto,
                 callerId: callerId,
               );
-              break; // Only show one call at a time
+              break;
             }
           }
         });
@@ -203,8 +228,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     super.didChangeDependencies();
     if (!_initialPosSet) {
       final size = MediaQuery.of(context).size;
-      // FAB starts on right side, vertically centered
-      _fabPosition = Offset(size.width - 80, size.height / 2 - 32);
+      // Position FAB lower on screen (70% down) so menu opens upward
+      _fabPosition = Offset(size.width - 60, size.height * 0.70);
       _initialPosSet = true;
       setState(() {});
     }
@@ -279,7 +304,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
   void _navigate(int index) {
     HapticFeedback.mediumImpact();
     _closeMenu();
-    Future.delayed(const Duration(milliseconds: 200), () {
+    Future.delayed(const Duration(milliseconds: 250), () {
       if (mounted) {
         setState(() {
           _currentIndex = index;
@@ -310,90 +335,181 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     }
   }
 
-  void _onDragUpdate(DragUpdateDetails d) {
-    // Calculate new position - allow free movement during drag
-    final newX = _fabPosition.dx + d.delta.dx;
-    final newY = _fabPosition.dy + d.delta.dy;
+  // === Drag-to-Select Feature ===
+
+  // Track drag distance to differentiate tap vs drag
+  double _totalDragDistance = 0;
+
+  void _onPanStart(DragStartDetails details) {
+    _dragStartPosition = details.globalPosition;
+    _totalDragDistance = 0;
+    _isDraggingToSelect = false;
+    _hoveredMenuIndex = null;
+  }
+
+  void _onPanUpdate(DragUpdateDetails details) {
+    _totalDragDistance += details.delta.distance;
+
+    // If dragged more than 8px, treat as drag-to-select (quick response)
+    if (_totalDragDistance > 8 && !_isDraggingToSelect) {
+      // Open menu and start drag-to-select mode
+      _isDraggingToSelect = true;
+      HapticFeedback.mediumImpact();
+      if (!_fabMenuOpen) {
+        setState(() => _fabMenuOpen = true);
+        _menuController.forward();
+      }
+    }
+
+    // If in drag-to-select mode, always track hover (even while menu is animating)
+    if (_isDraggingToSelect) {
+      _updateHoveredItem(details.globalPosition);
+    } else if (!_fabMenuOpen) {
+      // Normal FAB position drag (only if not triggering menu)
+      final newX = _fabPosition.dx + details.delta.dx;
+      final newY = _fabPosition.dy + details.delta.dy;
+      setState(() {
+        _fabPosition = Offset(newX, newY);
+      });
+    }
+  }
+
+  void _onPanEnd(DragEndDetails details) {
+    if (_isDraggingToSelect && _hoveredMenuIndex != null) {
+      // Navigate to the selected item
+      HapticFeedback.mediumImpact();
+      final selectedIndex = menuItems[_hoveredMenuIndex!].index;
+      _navigate(selectedIndex);
+    } else if (_isDraggingToSelect) {
+      // Dragged but didn't select anything - close menu
+      _closeMenu();
+    } else if (!_fabMenuOpen) {
+      // Was just moving FAB - snap to edge
+      final size = MediaQuery.of(context).size;
+      final snappedX = _fabPosition.dx > size.width / 2 ? size.width - 60 : 8.0;
+      const minY = 120.0;
+      final maxY = size.height - 120.0;
+      final clampedY = _fabPosition.dy.clamp(minY, maxY);
+      setState(() {
+        _fabPosition = Offset(snappedX, clampedY);
+      });
+    }
 
     setState(() {
-      _fabPosition = Offset(newX, newY);
+      _isDraggingToSelect = false;
+      _hoveredMenuIndex = null;
+      _dragStartPosition = null;
+      _totalDragDistance = 0;
     });
   }
 
-  void _onDragEnd(DragEndDetails d) {
+  void _updateHoveredItem(Offset fingerPos) {
     final size = MediaQuery.of(context).size;
+    final fabX = _fabPosition.dx.clamp(8.0, size.width - 60);
+    final fabY = _fabPosition.dy.clamp(120.0, size.height - 120.0);
+    final goDown = fabY < size.height / 2;
+    final expandLeft = fabX > size.width / 2;
 
-    // Snap X to left (10) or right (size.width - 80) edge based on position
-    final snappedX = _fabPosition.dx > size.width / 2 ? size.width - 80 : 10.0;
+    const itemSpacing = 56.0;
+    const itemWidth = 150.0; // Width of pill items
+    const itemHeight = 48.0;
+    const hitAreaPadding = 25.0; // Generous hit area
 
-    // Clamp Y: 200 from top, 200 from bottom
-    const minY = 200.0;
-    const maxY = 200.0;
-    final clampedY = _fabPosition.dy.clamp(minY, size.height - maxY);
+    int? newHoveredIndex;
 
-    setState(() {
-      _fabPosition = Offset(snappedX, clampedY);
-    });
+    for (int i = 0; i < menuItems.length; i++) {
+      final yOffset = goDown
+          ? (i + 1) * itemSpacing + 6
+          : -(i + 1) * itemSpacing - 6;
+
+      // Calculate item center based on where items are actually positioned
+      double itemCenterX;
+      if (expandLeft) {
+        // Items expand left - right edge aligns with FAB right edge
+        // Item right edge at fabX + 52, so center is at fabX + 52 - itemWidth/2
+        itemCenterX = fabX + 52 - (itemWidth / 2);
+      } else {
+        // Items expand right - left edge aligns with FAB left edge
+        // Item left edge at fabX, so center is at fabX + itemWidth/2
+        itemCenterX = fabX + (itemWidth / 2);
+      }
+      final itemCenterY = fabY + 26 + yOffset;
+
+      final dx = (fingerPos.dx - itemCenterX).abs();
+      final dy = (fingerPos.dy - itemCenterY).abs();
+
+      // Check if finger is within hit area
+      if (dx < (itemWidth / 2 + hitAreaPadding) &&
+          dy < (itemHeight / 2 + hitAreaPadding)) {
+        newHoveredIndex = i;
+        break;
+      }
+    }
+
+    if (newHoveredIndex != _hoveredMenuIndex) {
+      if (newHoveredIndex != null) {
+        HapticFeedback.selectionClick();
+      }
+      setState(() => _hoveredMenuIndex = newHoveredIndex);
+    }
   }
 
   void _resetFAB() {
     final size = MediaQuery.of(context).size;
     setState(() {
-      // Reset to right side, vertically centered
-      _fabPosition = Offset(size.width - 80, size.height / 2 - 32);
+      // Reset to lower position (70% down) so menu opens upward
+      _fabPosition = Offset(size.width - 60, size.height * 0.70);
     });
   }
 
-  // MENU ITEMS - Built dynamically based on account type
-  List<Map<String, dynamic>> get menuItems {
-    final items = <Map<String, dynamic>>[
-      {
-        "label": "Discover",
-        "icon": Icons.explore_outlined,
-        "index": 0,
-        "color": Colors.blue,
-      },
-      {
-        "label": "Messages",
-        "icon": Icons.message_outlined,
-        "index": 1,
-        "color": Colors.green,
-      },
-      {
-        "label": "Live",
-        "icon": Icons.people_outline,
-        "index": 2,
-        "color": Colors.orange,
-      },
-      {
-        "label": "Profile",
-        "icon": Icons.person_outline,
-        "index": 3,
-        "color": Colors.purple,
-      },
+  // Menu items with modern design
+  List<_MenuItemData> get menuItems {
+    final items = <_MenuItemData>[
+      const _MenuItemData(
+        label: "Discover",
+        icon: Icons.explore_rounded,
+        index: 0,
+        gradient: [Color(0xFF667EEA), Color(0xFF764BA2)],
+      ),
+      const _MenuItemData(
+        label: "Messages",
+        icon: Icons.chat_bubble_rounded,
+        index: 1,
+        gradient: [Color(0xFF11998E), Color(0xFF38EF7D)],
+      ),
+      const _MenuItemData(
+        label: "Networking",
+        icon: Icons.people_rounded,
+        index: 2,
+        gradient: [Color(0xFFFF6B6B), Color(0xFFFFE66D)],
+      ),
+      const _MenuItemData(
+        label: "Profile",
+        icon: Icons.person_rounded,
+        index: 3,
+        gradient: [Color(0xFF4FACFE), Color(0xFF00F2FE)],
+      ),
     ];
 
-    // Add Dashboard for Professional/Business accounts
     if (_accountType == AccountType.professional) {
-      items.add({
-        "label": "Dashboard",
-        "icon": Icons.dashboard_outlined,
-        "index": 5,
-        "color": const Color(0xFF9C27B0), // Purple for professional
-      });
+      items.add(const _MenuItemData(
+        label: "Dashboard",
+        icon: Icons.dashboard_rounded,
+        index: 5,
+        gradient: [Color(0xFF9C27B0), Color(0xFFE040FB)],
+      ));
     } else if (_accountType == AccountType.business) {
-      items.add({
-        "label": "Dashboard",
-        "icon": Icons.business_center_outlined,
-        "index": 6,
-        "color": const Color(0xFFFF9800), // Orange for business
-      });
+      items.add(const _MenuItemData(
+        label: "Business",
+        icon: Icons.business_center_rounded,
+        index: 6,
+        gradient: [Color(0xFFFF9800), Color(0xFFFFEB3B)],
+      ));
     }
 
     return items;
   }
 
-  // SCREENS
   Widget _buildScreen() {
     switch (_currentIndex) {
       case 0:
@@ -405,13 +521,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
       case 3:
         return const ProfileWithHistoryScreen();
       case 5:
-        // Professional Dashboard
         return const ProfessionalDashboardScreen();
       case 6:
-        // Business Dashboard
-        return const BusinessDashboardScreen();
+        return const UniversalBusinessDashboard();
       case 7:
-        // Feed Screen
         return FeedScreen(
           onBack: () {
             setState(() => _currentIndex = 0);
@@ -426,11 +539,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
 
-    // Safe area boundaries - FAB must stay within bounds
-    const minX = 10.0;
-    final maxX = size.width - 74; // 64 FAB width + 10 margin
-    const minY = 200.0; // 200 from top
-    final maxY = size.height - 200.0; // 200 from bottom
+    // FAB is 52px, allow it to go to screen edges with small padding
+    const minX = 8.0;
+    final maxX = size.width - 60; // 52px FAB + 8px padding
+    const minY = 120.0;
+    final maxY = size.height - 120.0;
 
     final fabX = _fabPosition.dx.clamp(minX, maxX);
     final fabY = _fabPosition.dy.clamp(minY, maxY);
@@ -438,85 +551,67 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     return Scaffold(
       body: Stack(
         children: [
-          // Main screen
           _buildScreen(),
 
-          // Dark overlay when menu is open (hide on Feed screen)
-          if (_fabMenuOpen && _currentIndex != 7)
+          // Blur overlay when menu is open
+          if (_fabMenuOpen)
             AnimatedBuilder(
               animation: _menuController,
               builder: (context, child) {
                 return GestureDetector(
                   onTap: _closeMenu,
                   child: Container(
-                    color: Colors.black.withValues(
-                      alpha: 0.4 * _menuController.value,
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(
+                        alpha: 0.6 * _menuController.value,
+                      ),
                     ),
                   ),
                 );
               },
             ),
 
-          // Animated menu buttons - half circle arc (left or right based on FAB position) (hide on Feed screen)
-          if (_fabMenuOpen && _currentIndex != 7)
+          // Menu items - pill shape with icon + label
+          if (_fabMenuOpen)
             ...List.generate(menuItems.length, (i) {
-              // Determine if FAB is on left or right side
-              final bool isOnRight = fabX > size.width / 2;
+              // If FAB is in upper half, menu goes down; otherwise up
+              final bool goDown = fabY < size.height / 2;
+              // If FAB is on right side, menu expands to left; otherwise to right
+              final bool expandLeft = fabX > size.width / 2;
+              final bool isHovered = _hoveredMenuIndex == i;
 
               return AnimatedBuilder(
                 animation: _menuController,
                 builder: (context, child) {
-                  // Staggered animation
-                  final delay = i * 0.06;
+                  final delay = i * 0.05;
                   final progress =
                       ((_menuController.value - delay) / (1 - delay)).clamp(
                         0.0,
                         1.0,
                       );
 
-                  // Curved animation
-                  final curvedProgress = Curves.easeOutBack.transform(progress);
+                  final curvedProgress = Curves.easeOutCubic.transform(progress);
 
-                  // Half circle arc parameters
-                  const radius = 95.0;
-                  final totalButtons = menuItems.length;
-                  const buttonSize = 56.0;
-
-                  // Half circle = 180 degrees = pi radians
-                  // Spread buttons from top (-90°) to bottom (90°)
-                  final angleStep = math.pi / (totalButtons - 1);
-                  final baseAngle =
-                      -math.pi / 2 + (angleStep * i); // -90° to +90°
-
-                  // Calculate x and y offsets
-                  double xOffset;
-                  double yOffset;
-
-                  if (isOnRight) {
-                    // FAB is on RIGHT → Arc opens to LEFT
-                    xOffset = -radius * math.cos(baseAngle) * curvedProgress;
-                    yOffset = radius * math.sin(baseAngle) * curvedProgress;
-                  } else {
-                    // FAB is on LEFT → Arc opens to RIGHT
-                    xOffset = radius * math.cos(baseAngle) * curvedProgress;
-                    yOffset = radius * math.sin(baseAngle) * curvedProgress;
-                  }
-
-                  // Center button on FAB
-                  const centerOffset = (64 - buttonSize) / 2;
+                  // Vertical stack layout - 56px spacing for pill items
+                  const itemSpacing = 56.0;
+                  final yOffset = goDown
+                      ? (i + 1) * itemSpacing * curvedProgress + 6 // Go down
+                      : -(i + 1) * itemSpacing * curvedProgress - 6; // Go up
 
                   return Positioned(
-                    left: fabX + xOffset + centerOffset,
-                    top: fabY + yOffset + centerOffset,
+                    // If on right side, use 'right' positioning; otherwise use 'left'
+                    right: expandLeft ? (size.width - fabX - 52) : null,
+                    left: expandLeft ? null : fabX,
+                    top: fabY + yOffset,
                     child: Transform.scale(
                       scale: curvedProgress,
                       child: Opacity(
                         opacity: curvedProgress.clamp(0.0, 1.0),
-                        child: _AnimatedMenuItem(
-                          item: menuItems[i],
+                        child: _CompactMenuItem(
+                          data: menuItems[i],
                           unread: _unreadMessageCount,
-                          delay: delay,
-                          onTap: () => _navigate(menuItems[i]["index"] as int),
+                          isHovered: isHovered,
+                          onTap: () => _navigate(menuItems[i].index),
                         ),
                       ),
                     ),
@@ -525,130 +620,35 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
               );
             }),
 
-          // Main FAB button (hide on Feed screen - it has its own FAB)
-          if (_currentIndex != 7)
-            Positioned(
-              left: fabX,
-              top: fabY,
-              child: GestureDetector(
-                behavior: HitTestBehavior.translucent,
-                onPanUpdate: _onDragUpdate,
-                onPanEnd: _onDragEnd, // Snap to edge when released
-                onDoubleTap: _resetFAB,
-                child: AnimatedBuilder(
-                  animation: _menuController,
-                  builder: (context, child) {
-                    return Stack(
-                      alignment: Alignment.center,
-                      clipBehavior: Clip.none,
-                      children: [
-                        // Pulse ring animation
-                        Container(
-                          width: 64 + 30 * _menuController.value,
-                          height: 64 + 30 * _menuController.value,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: Colors.blue.withValues(
-                                alpha: 0.3 * _menuController.value,
-                              ),
-                              width: 2,
-                            ),
-                          ),
-                        ),
-
-                        // Main FAB with glassmorphism effect
-                        ClipOval(
-                          child: BackdropFilter(
-                            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                            child: Material(
-                              color: Colors.transparent,
-                              child: InkWell(
-                                onTap: _toggleMenu,
-                                borderRadius: BorderRadius.circular(32),
-                                child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 200),
-                                  width: 64,
-                                  height: 64,
-                                  decoration: BoxDecoration(
-                                    color: _fabMenuOpen
-                                        ? Colors.red.withValues(alpha: 0.3)
-                                        : Colors.white.withValues(alpha: 0.15),
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: Colors.white.withValues(
-                                        alpha: 0.3,
-                                      ),
-                                      width: 1.5,
-                                    ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withValues(
-                                          alpha: 0.2,
-                                        ),
-                                        blurRadius: 12,
-                                        spreadRadius: 2,
-                                        offset: const Offset(0, 4),
-                                      ),
-                                    ],
-                                  ),
-                                  child: Stack(
-                                    children: [
-                                      Center(
-                                        child: AnimatedRotation(
-                                          turns: _fabMenuOpen ? 0.125 : 0,
-                                          duration: const Duration(
-                                            milliseconds: 200,
-                                          ),
-                                          child: Icon(
-                                            _fabMenuOpen
-                                                ? Icons.close
-                                                : Icons.apps,
-                                            size: 28,
-                                            color: Colors.white,
-                                          ),
-                                        ),
-                                      ),
-                                      if (_unreadMessageCount > 0 &&
-                                          !_fabMenuOpen)
-                                        Positioned(
-                                          right: 4,
-                                          top: 4,
-                                          child: Container(
-                                            padding: const EdgeInsets.all(4),
-                                            decoration: const BoxDecoration(
-                                              color: Colors.red,
-                                              shape: BoxShape.circle,
-                                            ),
-                                            child: Text(
-                                              _unreadMessageCount > 99
-                                                  ? "99+"
-                                                  : _unreadMessageCount
-                                                        .toString(),
-                                              style: const TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 9,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    );
-                  },
-                ),
+          // Main FAB button - Modern design with drag-to-select
+          Positioned(
+            left: fabX,
+            top: fabY,
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              // Pan for drag-to-select (opens menu on drag, selects on release)
+              onPanStart: _onPanStart,
+              onPanUpdate: _onPanUpdate,
+              onPanEnd: _onPanEnd,
+              // Double tap to reset position
+              onDoubleTap: _resetFAB,
+              // Single tap to toggle menu
+              onTap: _toggleMenu,
+              child: AnimatedBuilder(
+                animation: _menuController,
+                builder: (context, child) {
+                  return _ModernFAB(
+                    isOpen: _fabMenuOpen,
+                    animationValue: _menuController.value,
+                    unreadCount: _unreadMessageCount,
+                    onTap: _toggleMenu,
+                  );
+                },
               ),
             ),
+          ),
 
-          // Swipe gesture detector - HomeScreen -> FeedScreen (right swipe from left edge)
-          // Full screen height, left edge 100px wide for detecting right swipe
+          // Swipe gesture detector
           if (_currentIndex == 0)
             Positioned(
               left: 0,
@@ -668,93 +668,121 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
   }
 }
 
-// ANIMATED MENU ITEM
+// Data class for menu items
+class _MenuItemData {
+  final String label;
+  final IconData icon;
+  final int index;
+  final List<Color> gradient;
 
-class _AnimatedMenuItem extends StatefulWidget {
-  final Map<String, dynamic> item;
-  final int unread;
-  final double delay;
+  const _MenuItemData({
+    required this.label,
+    required this.icon,
+    required this.index,
+    required this.gradient,
+  });
+}
+
+// Modern FAB button - Pure Glass theme
+class _ModernFAB extends StatelessWidget {
+  final bool isOpen;
+  final double animationValue;
+  final int unreadCount;
   final VoidCallback onTap;
 
-  const _AnimatedMenuItem({
-    required this.item,
-    required this.unread,
-    required this.delay,
+  const _ModernFAB({
+    required this.isOpen,
+    required this.animationValue,
+    required this.unreadCount,
     required this.onTap,
   });
 
   @override
-  State<_AnimatedMenuItem> createState() => _AnimatedMenuItemState();
-}
-
-class _AnimatedMenuItemState extends State<_AnimatedMenuItem> {
-  bool _isPressed = false;
-
-  @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTapDown: (_) => setState(() => _isPressed = true),
-      onTapUp: (_) => setState(() => _isPressed = false),
-      onTapCancel: () => setState(() => _isPressed = false),
-      onTap: widget.onTap,
-      child: ClipOval(
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 150),
-            width: 56,
-            height: 56,
-            transform: Matrix4.identity()
-              ..setEntry(0, 0, _isPressed ? 0.9 : 1.0)
-              ..setEntry(1, 1, _isPressed ? 0.9 : 1.0)
-              ..setEntry(2, 2, _isPressed ? 0.9 : 1.0),
-            transformAlignment: Alignment.center,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.white.withValues(alpha: 0.15),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.3),
-                width: 1.5,
+      onTap: onTap,
+      child: SizedBox(
+        width: 52,
+        height: 52,
+        child: Container(
+          width: 52,
+          height: 52,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            // Pure frosted glass
+            color: Colors.white.withValues(alpha: isOpen ? 0.2 : 0.18),
+            // Soft shadows
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.1),
+                blurRadius: 20,
+                spreadRadius: 0,
+                offset: const Offset(0, 8),
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.2),
-                  blurRadius: _isPressed ? 8 : 12,
-                  spreadRadius: _isPressed ? 0 : 2,
-                  offset: const Offset(0, 3),
-                ),
-              ],
-            ),
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: ClipOval(
             child: Stack(
               children: [
-                Center(
-                  child: Icon(
-                    widget.item["icon"] as IconData,
-                    size: 26,
-                    color: Colors.white,
+                // Subtle tint when open (reddish) or closed (neutral)
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: isOpen
+                          ? [
+                              const Color(0xFFE0A0A0).withValues(alpha: 0.15),
+                              const Color(0xFFD08080).withValues(alpha: 0.08),
+                            ]
+                          : [
+                              const Color(0xFFA0B0C0).withValues(alpha: 0.12),
+                              const Color(0xFF90A0B0).withValues(alpha: 0.06),
+                            ],
+                    ),
                   ),
                 ),
-                // Unread badge for Messages
-                if (widget.item["index"] == 1 && widget.unread > 0)
-                  Positioned(
-                    right: 2,
-                    top: 2,
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: const BoxDecoration(
-                        color: Colors.red,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Text(
-                        widget.unread > 99 ? "99+" : widget.unread.toString(),
-                        style: const TextStyle(
-                          fontSize: 8,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
+                // Glass highlight (top shine)
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: Container(
+                    height: 26,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.white.withValues(alpha: 0.3),
+                          Colors.white.withValues(alpha: 0.0),
+                        ],
                       ),
                     ),
                   ),
+                ),
+                // Frosted border
+                Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.3),
+                      width: 1,
+                    ),
+                  ),
+                ),
+                // Icon
+                Center(
+                  child: _AnimatedMenuIcon(
+                    isOpen: isOpen,
+                    animationValue: animationValue,
+                  ),
+                ),
               ],
             ),
           ),
@@ -764,8 +792,136 @@ class _AnimatedMenuItemState extends State<_AnimatedMenuItem> {
   }
 }
 
-// SWIPE DETECTOR - Custom widget for edge swipe detection
+// Menu Item - Pill shape with icon + label (like Google Calendar)
+class _CompactMenuItem extends StatefulWidget {
+  final _MenuItemData data;
+  final int unread;
+  final bool isHovered;
+  final VoidCallback onTap;
 
+  const _CompactMenuItem({
+    required this.data,
+    required this.unread,
+    this.isHovered = false,
+    required this.onTap,
+  });
+
+  @override
+  State<_CompactMenuItem> createState() => _CompactMenuItemState();
+}
+
+class _CompactMenuItemState extends State<_CompactMenuItem> {
+  bool _isPressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final showBadge = widget.data.index == 1 && widget.unread > 0;
+    final isHovered = widget.isHovered;
+
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _isPressed = true),
+      onTapUp: (_) => setState(() => _isPressed = false),
+      onTapCancel: () => setState(() => _isPressed = false),
+      onTap: widget.onTap,
+      child: AnimatedScale(
+        scale: isHovered ? 1.08 : (_isPressed ? 0.95 : 1.0),
+        duration: const Duration(milliseconds: 150),
+        curve: Curves.easeOutCubic,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            // Pill-shaped container with icon + label
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(28),
+                // Frosted glass effect - brighter when hovered
+                color: Colors.white.withValues(alpha: isHovered ? 0.30 : 0.18),
+                // Shadow
+                boxShadow: [
+                  if (isHovered) ...[
+                    BoxShadow(
+                      color: Colors.white.withValues(alpha: 0.3),
+                      blurRadius: 15,
+                      spreadRadius: 1,
+                    ),
+                  ] else ...[
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.1),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ],
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: isHovered ? 0.5 : 0.25),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Icon
+                  Icon(
+                    widget.data.icon,
+                    size: 20,
+                    color: Colors.white.withValues(alpha: 0.95),
+                  ),
+                  const SizedBox(width: 10),
+                  // Label
+                  Text(
+                    widget.data.label,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.white.withValues(alpha: 0.95),
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Badge for messages
+            if (showBadge)
+              Positioned(
+                right: -4,
+                top: -4,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.red,
+                    borderRadius: BorderRadius.circular(10),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.2),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Text(
+                    widget.unread > 99 ? "99+" : widget.unread.toString(),
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// Swipe Detector
 class _SwipeDetector extends StatefulWidget {
   final VoidCallback? onSwipeRight;
 
@@ -792,7 +948,6 @@ class _SwipeDetectorState extends State<_SwipeDetector> {
 
         final deltaX = event.position.dx - _startX;
 
-        // Right swipe: moved right by at least 30px
         if (widget.onSwipeRight != null && deltaX > 30) {
           _hasTriggered = true;
           widget.onSwipeRight!();
@@ -805,3 +960,66 @@ class _SwipeDetectorState extends State<_SwipeDetector> {
     );
   }
 }
+
+// Custom Animated Menu Icon - Modern design
+class _AnimatedMenuIcon extends StatelessWidget {
+  final bool isOpen;
+  final double animationValue;
+
+  const _AnimatedMenuIcon({
+    required this.isOpen,
+    required this.animationValue,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // Rotate from + (0°) to X (45°)
+    final rotation = animationValue * 0.785; // 45 degrees in radians
+
+    return Transform.rotate(
+      angle: rotation,
+      child: SizedBox(
+        width: 28,
+        height: 28,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            // Horizontal bar of +
+            Container(
+              width: 20,
+              height: 3,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(2),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.15),
+                    blurRadius: 2,
+                    offset: const Offset(0, 1),
+                  ),
+                ],
+              ),
+            ),
+            // Vertical bar of +
+            Container(
+              width: 3,
+              height: 20,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(2),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.15),
+                    blurRadius: 2,
+                    offset: const Offset(0, 1),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
