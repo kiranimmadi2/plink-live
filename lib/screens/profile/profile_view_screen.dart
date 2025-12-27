@@ -5,7 +5,7 @@ import '../../models/post_model.dart';
 import '../../models/user_profile.dart';
 import '../../res/utils/photo_url_helper.dart';
 import '../../widgets/account_badges.dart';
-import '../enhanced_chat_screen.dart';
+import '../chat/enhanced_chat_screen.dart';
 
 class ProfileViewScreen extends StatefulWidget {
   final UserProfile userProfile;

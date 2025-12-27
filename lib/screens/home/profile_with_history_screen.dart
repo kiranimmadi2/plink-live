@@ -14,7 +14,7 @@ import '../../res/config/app_colors.dart';
 import '../login/login_screen.dart';
 import '../profile/profile_view_screen.dart';
 import '../profile/settings_screen.dart';
-import '../enhanced_chat_screen.dart';
+import '../chat/enhanced_chat_screen.dart';
 import '../../models/user_profile.dart';
 
 class ProfileWithHistoryScreen extends ConsumerStatefulWidget {

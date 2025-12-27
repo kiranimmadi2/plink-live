@@ -12,7 +12,7 @@ import '../../res/config/app_colors.dart';
 import '../../widgets/other widgets/user_avatar.dart';
 import '../../widgets/app_background.dart';
 import '../../res/utils/photo_url_helper.dart';
-import '../enhanced_chat_screen.dart';
+import '../chat/enhanced_chat_screen.dart';
 import '../../models/user_profile.dart';
 import '../../models/extended_user_profile.dart';
 import '../../widgets/profile widgets/profile_detail_bottom_sheet.dart';

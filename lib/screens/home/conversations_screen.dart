@@ -11,7 +11,7 @@ import '../../res/utils/photo_url_helper.dart';
 import '../../widgets/chat_common.dart';
 import '../../widgets/app_background.dart';
 import '../../services/current_user_cache.dart';
-import '../enhanced_chat_screen.dart';
+import '../chat/enhanced_chat_screen.dart';
 import '../chat/create_group_screen.dart';
 import '../chat/group_chat_screen.dart';
 

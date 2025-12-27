@@ -7,7 +7,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:video_player/video_player.dart';
 import '../../services/universal_intent_service.dart';
 import '../../models/user_profile.dart';
-import '../enhanced_chat_screen.dart';
+import '../chat/enhanced_chat_screen.dart';
 import '../../widgets/other widgets/user_avatar.dart';
 import '../../services/realtime_matching_service.dart';
 import 'profile_with_history_screen.dart';
