@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -9,16 +8,16 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'home_screen.dart';
 import 'conversations_screen.dart';
 import 'live_connect_tab_screen.dart';
-import '../profile/profile_with_history_screen.dart';
+import 'profile_with_history_screen.dart';
 import 'feed_screen.dart';
 import '../chat/incoming_call_screen.dart';
 
 // Professional & Business screens
 import '../professional/professional_dashboard_screen.dart';
-import '../business/universal_business_dashboard.dart';
+import '../business/business_dashboard_screen.dart';
 
 // services
-import '../../services/location_service.dart';
+import '../../services/location services/location_service.dart';
 import '../../services/notification_service.dart';
 import '../../services/account_type_service.dart';
 import '../../models/user_profile.dart';
@@ -44,7 +43,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
   // Drag-to-select state
   int? _hoveredMenuIndex;
   bool _isDraggingToSelect = false;
-  Offset? _dragStartPosition;
 
   // Account type for showing appropriate dashboard
   AccountType _accountType = AccountType.personal;
@@ -341,7 +339,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
   double _totalDragDistance = 0;
 
   void _onPanStart(DragStartDetails details) {
-    _dragStartPosition = details.globalPosition;
     _totalDragDistance = 0;
     _isDraggingToSelect = false;
     _hoveredMenuIndex = null;
@@ -398,7 +395,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     setState(() {
       _isDraggingToSelect = false;
       _hoveredMenuIndex = null;
-      _dragStartPosition = null;
       _totalDragDistance = 0;
     });
   }
@@ -483,12 +479,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
         index: 2,
         gradient: [Color(0xFFFF6B6B), Color(0xFFFFE66D)],
       ),
-      const _MenuItemData(
-        label: "Profile",
-        icon: Icons.person_rounded,
-        index: 3,
-        gradient: [Color(0xFF4FACFE), Color(0xFF00F2FE)],
-      ),
     ];
 
     if (_accountType == AccountType.professional) {
@@ -523,7 +513,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
       case 5:
         return const ProfessionalDashboardScreen();
       case 6:
-        return const UniversalBusinessDashboard();
+        return const BusinessDashboardScreen();
       case 7:
         return FeedScreen(
           onBack: () {

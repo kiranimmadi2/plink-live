@@ -379,28 +379,26 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
 
       final userCity = _userProfile?['city'];
 
-      // Get real-time location for accurate distance calculation
-      // Only when using 'Near me' filter or when location is needed
-      if (_locationFilter == 'Near me' || _currentUserLat == null) {
-        final position = await _locationService.getCurrentLocation(
-          silent: true,
+      // ALWAYS get fresh real-time location for accurate distance calculation
+      // This ensures distance is correct when user moves to new location
+      final position = await _locationService.getCurrentLocation(
+        silent: true,
+      );
+      if (position != null && mounted) {
+        setState(() {
+          _currentUserLat = position.latitude;
+          _currentUserLon = position.longitude;
+        });
+        debugPrint(
+          'LiveConnect: Using fresh real-time location: ${position.latitude}, ${position.longitude}',
         );
-        if (position != null && mounted) {
-          setState(() {
-            _currentUserLat = position.latitude;
-            _currentUserLon = position.longitude;
-          });
-          debugPrint(
-            'LiveConnect: Using real-time location: ${position.latitude}, ${position.longitude}',
-          );
-        } else {
-          // Fall back to profile location if real-time location unavailable
-          _currentUserLat = _userProfile?['latitude']?.toDouble();
-          _currentUserLon = _userProfile?['longitude']?.toDouble();
-          debugPrint(
-            'LiveConnect: Using profile location (real-time unavailable)',
-          );
-        }
+      } else {
+        // Fall back to profile location if real-time location unavailable
+        _currentUserLat = _userProfile?['latitude']?.toDouble();
+        _currentUserLon = _userProfile?['longitude']?.toDouble();
+        debugPrint(
+          'LiveConnect: Using profile location (real-time unavailable)',
+        );
       }
 
       final userLat = _currentUserLat;
@@ -585,23 +583,25 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
         }
       }
 
-      // Sort by distance when using 'Near me', otherwise by match score
-      if (_locationFilter == 'Near me') {
-        people.sort((a, b) {
-          final distA = a['distance'] as double?;
-          final distB = b['distance'] as double?;
-          if (distA == null && distB == null) return 0;
-          if (distA == null) return 1;
-          if (distB == null) return -1;
+      // Always sort by distance (closest first), users without distance go to end
+      people.sort((a, b) {
+        final distA = a['distance'] as double?;
+        final distB = b['distance'] as double?;
+
+        // Both have distance - sort by closest first
+        if (distA != null && distB != null) {
           return distA.compareTo(distB);
-        });
-      } else {
-        // Sort by match score (highest first)
-        people.sort(
-          (a, b) =>
-              (b['matchScore'] as double).compareTo(a['matchScore'] as double),
-        );
-      }
+        }
+
+        // Only A has distance - A comes first
+        if (distA != null && distB == null) return -1;
+
+        // Only B has distance - B comes first
+        if (distA == null && distB != null) return 1;
+
+        // Neither has distance - sort by match score
+        return (b['matchScore'] as double).compareTo(a['matchScore'] as double);
+      });
 
       if (mounted) {
         setState(() {
@@ -2078,6 +2078,19 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
     return colors[index % colors.length];
   }
 
+  /// Check if user is truly online based on lastSeen timestamp
+  /// User is considered online only if lastSeen is within last 5 minutes
+  bool _isUserTrulyOnline(bool isOnlineFlag, DateTime? lastSeen) {
+    if (!isOnlineFlag) return false;
+    if (lastSeen == null) return false;
+
+    final now = DateTime.now();
+    final difference = now.difference(lastSeen);
+
+    // Consider online only if seen within last 5 minutes
+    return difference.inMinutes < 5;
+  }
+
   // ignore: unused_element
   Future<void> _toggleFavorite(String userId, String userName) async {
     final currentUserId = _auth.currentUser?.uid;
@@ -3427,27 +3440,48 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                           );
                         },
                       ),
-                      if (extendedProfile.isOnline)
-                        Positioned(
-                          right: 0,
-                          bottom: 0,
-                          child: Container(
-                            width: 14,
-                            height: 14,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF00D67D),
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: isGlass
-                                    ? Colors.white
-                                    : (isDarkMode
-                                          ? Colors.black
-                                          : Colors.white),
-                                width: 2,
+                      // Real-time online status indicator
+                      StreamBuilder<DocumentSnapshot>(
+                        stream: _firestore.collection('users').doc(userId).snapshots(),
+                        builder: (context, snapshot) {
+                          bool isOnline = false;
+                          if (snapshot.hasData && snapshot.data!.exists) {
+                            final data = snapshot.data!.data() as Map<String, dynamic>?;
+                            if (data != null) {
+                              final onlineFlag = data['isOnline'] as bool? ?? false;
+                              final lastSeenTimestamp = data['lastSeen'];
+                              DateTime? lastSeen;
+                              if (lastSeenTimestamp != null) {
+                                lastSeen = (lastSeenTimestamp as Timestamp).toDate();
+                              }
+                              isOnline = _isUserTrulyOnline(onlineFlag, lastSeen);
+                            }
+                          }
+
+                          if (!isOnline) return const SizedBox.shrink();
+
+                          return Positioned(
+                            right: 0,
+                            bottom: 0,
+                            child: Container(
+                              width: 14,
+                              height: 14,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF00D67D),
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: isGlass
+                                      ? Colors.white
+                                      : (isDarkMode
+                                            ? Colors.black
+                                            : Colors.white),
+                                  width: 2,
+                                ),
                               ),
                             ),
-                          ),
-                        ),
+                          );
+                        },
+                      ),
                     ],
                   ),
                   const SizedBox(width: 16),
