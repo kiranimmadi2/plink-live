@@ -7,19 +7,19 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:supper/providers/theme_provider.dart';
-import '../../widgets/user_avatar.dart';
+import '../../providers/other providers/theme_provider.dart';
+import '../../res/config/app_colors.dart';
+import '../../widgets/other widgets/user_avatar.dart';
 import '../../widgets/app_background.dart';
-import '../../utils/photo_url_helper.dart';
+import '../../res/utils/photo_url_helper.dart';
 import '../enhanced_chat_screen.dart';
 import '../../models/user_profile.dart';
 import '../../models/extended_user_profile.dart';
-import '../../widgets/profile_detail_bottom_sheet.dart';
-import '../../widgets/edit_profile_bottom_sheet.dart';
+import '../../widgets/profile widgets/profile_detail_bottom_sheet.dart';
+import '../../widgets/profile widgets/edit_profile_bottom_sheet.dart';
 import '../../services/connection_service.dart';
-import '../../services/location_service.dart';
-import '../my_connections_screen.dart';
-import '../../widgets/filters/modern_filter_sheet.dart';
+import '../../services/location services/location_service.dart';
+import '../chat/my_connections_screen.dart';
 
 class LiveConnectTabScreen extends ConsumerStatefulWidget {
   const LiveConnectTabScreen({super.key});
@@ -54,7 +54,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
   bool _filterByGender = false;
   bool _filterByConnectionTypes = false;
   bool _filterByActivities = false;
-  double _distanceFilter = 100.0; // Distance in km (increased for more results)
+  double _distanceFilter = 50.0; // Distance in km
   String _locationFilter =
       'Worldwide'; // 'Near me', 'City', 'Country', 'Worldwide'
   final List<String> _selectedGenders = [];
@@ -71,9 +71,6 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
       {}; // userId -> 'sent'|'received'|null
   List<String> _myConnections = []; // List of connected user IDs
   bool _connectionsLoaded = false;
-
-  // Bottom sheet state - prevents multiple sheets from opening
-  bool _isProfileSheetOpen = false;
 
   // Available genders
   final List<String> _availableGenders = ['Male', 'Female', 'Other'];
@@ -320,16 +317,10 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
           _userProfile = userData;
           // Load user's saved interests
           _selectedInterests = List<String>.from(userData?['interests'] ?? []);
-          // Use profile location immediately for fast loading
-          _currentUserLat = userData?['latitude']?.toDouble();
-          _currentUserLon = userData?['longitude']?.toDouble();
         });
 
-        // Load nearby people IMMEDIATELY with profile location
+        // Always load nearby people (filters can be applied via filter dialog)
         _loadNearbyPeople();
-
-        // Fetch fresh GPS location in BACKGROUND (don't wait)
-        _fetchCurrentLocationInBackground();
       }
     } catch (e) {
       debugPrint('Error loading user profile: $e');
@@ -362,113 +353,6 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
     }
   }
 
-  /// Fetch current location and update state
-  /// This runs automatically when Live Connect opens
-  Future<void> _fetchCurrentLocation() async {
-    if (!mounted) return;
-
-    try {
-      debugPrint('LiveConnect: Fetching current location...');
-
-      // Try to get real-time location
-      final position = await _locationService.getCurrentLocation(
-        silent: true,
-        highAccuracy: false, // Use balanced mode for faster response
-      );
-
-      if (position != null && mounted) {
-        setState(() {
-          _currentUserLat = position.latitude;
-          _currentUserLon = position.longitude;
-        });
-        debugPrint(
-          'LiveConnect: Got fresh location: ${position.latitude}, ${position.longitude}',
-        );
-      } else {
-        // Fall back to profile location if real-time unavailable
-        final profileLat = _userProfile?['latitude']?.toDouble();
-        final profileLon = _userProfile?['longitude']?.toDouble();
-
-        if (profileLat != null && profileLon != null && mounted) {
-          setState(() {
-            _currentUserLat = profileLat;
-            _currentUserLon = profileLon;
-          });
-          debugPrint(
-            'LiveConnect: Using profile location: $profileLat, $profileLon',
-          );
-        } else {
-          debugPrint('LiveConnect: No location available');
-        }
-      }
-    } catch (e) {
-      debugPrint('LiveConnect: Error fetching location: $e');
-      // Try profile location as fallback
-      final profileLat = _userProfile?['latitude']?.toDouble();
-      final profileLon = _userProfile?['longitude']?.toDouble();
-
-      if (profileLat != null && profileLon != null && mounted) {
-        setState(() {
-          _currentUserLat = profileLat;
-          _currentUserLon = profileLon;
-        });
-      }
-    }
-  }
-
-  /// Fetch GPS location in background without blocking UI
-  /// Updates location and refreshes list when ready
-  void _fetchCurrentLocationInBackground() {
-    _locationService.getCurrentLocation(silent: true).then((position) {
-      if (position != null && mounted) {
-        final oldLat = _currentUserLat;
-        final oldLon = _currentUserLon;
-
-        setState(() {
-          _currentUserLat = position.latitude;
-          _currentUserLon = position.longitude;
-        });
-
-        // If location changed significantly (>100m), refresh the list
-        if (oldLat != null && oldLon != null) {
-          final distance = _calculateDistance(
-            oldLat,
-            oldLon,
-            position.latitude,
-            position.longitude,
-          );
-          if (distance > 0.1) {
-            // More than 100 meters
-            debugPrint(
-              'LiveConnect: Location updated significantly, refreshing list',
-            );
-            _loadNearbyPeople();
-          }
-        }
-
-        debugPrint(
-          'LiveConnect: Background location updated: ${position.latitude}, ${position.longitude}',
-        );
-      }
-    }).catchError((e) {
-      debugPrint('LiveConnect: Background location fetch failed: $e');
-    });
-  }
-
-  /// Refresh Live Connect - fetches fresh location and reloads people
-  /// Called by pull-to-refresh
-  Future<void> _refreshLiveConnect() async {
-    debugPrint('LiveConnect: Refreshing with fresh location...');
-
-    // Force fetch fresh location
-    await _fetchCurrentLocation();
-
-    // Reload people with new location
-    await _loadNearbyPeople();
-
-    debugPrint('LiveConnect: Refresh complete');
-  }
-
   Future<void> _loadNearbyPeople({bool loadMore = false}) async {
     if (!mounted) return;
 
@@ -495,27 +379,32 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
 
       final userCity = _userProfile?['city'];
 
-      // Use existing location - don't block waiting for GPS
-      // If no location, try quick fetch from last known position
-      if (_currentUserLat == null || _currentUserLon == null) {
-        // Try profile location first (instant)
-        final profileLat = _userProfile?['latitude']?.toDouble();
-        final profileLon = _userProfile?['longitude']?.toDouble();
-        if (profileLat != null && profileLon != null) {
-          _currentUserLat = profileLat;
-          _currentUserLon = profileLon;
+      // Get real-time location for accurate distance calculation
+      // Only when using 'Near me' filter or when location is needed
+      if (_locationFilter == 'Near me' || _currentUserLat == null) {
+        final position = await _locationService.getCurrentLocation(
+          silent: true,
+        );
+        if (position != null && mounted) {
+          setState(() {
+            _currentUserLat = position.latitude;
+            _currentUserLon = position.longitude;
+          });
+          debugPrint(
+            'LiveConnect: Using real-time location: ${position.latitude}, ${position.longitude}',
+          );
+        } else {
+          // Fall back to profile location if real-time location unavailable
+          _currentUserLat = _userProfile?['latitude']?.toDouble();
+          _currentUserLon = _userProfile?['longitude']?.toDouble();
+          debugPrint(
+            'LiveConnect: Using profile location (real-time unavailable)',
+          );
         }
       }
 
       final userLat = _currentUserLat;
       final userLon = _currentUserLon;
-
-      // For "Near me" filter, fetch fresh location in BACKGROUND (don't block)
-      if (_locationFilter == 'Near me') {
-        _fetchCurrentLocationInBackground();
-      }
-
-      debugPrint('LiveConnect: Using location lat=$userLat, lon=$userLon for distance calculation');
 
       // Build query based on filters - USE INDEXES FOR BETTER PERFORMANCE
       Query<Map<String, dynamic>> usersQuery = _firestore.collection('users');
@@ -696,26 +585,23 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
         }
       }
 
-      // Always sort by distance (nearest first) when distance data is available
-      // Users without distance data are placed at the end
-      people.sort((a, b) {
-        final distA = a['distance'] as double?;
-        final distB = b['distance'] as double?;
-
-        // Both have distance - sort by distance (nearest first)
-        if (distA != null && distB != null) {
+      // Sort by distance when using 'Near me', otherwise by match score
+      if (_locationFilter == 'Near me') {
+        people.sort((a, b) {
+          final distA = a['distance'] as double?;
+          final distB = b['distance'] as double?;
+          if (distA == null && distB == null) return 0;
+          if (distA == null) return 1;
+          if (distB == null) return -1;
           return distA.compareTo(distB);
-        }
-
-        // Only one has distance - the one with distance comes first
-        if (distA != null && distB == null) return -1;
-        if (distA == null && distB != null) return 1;
-
-        // Neither has distance - sort by match score as fallback
-        final scoreA = a['matchScore'] as double? ?? 0;
-        final scoreB = b['matchScore'] as double? ?? 0;
-        return scoreB.compareTo(scoreA); // Higher score first
-      });
+        });
+      } else {
+        // Sort by match score (highest first)
+        people.sort(
+          (a, b) =>
+              (b['matchScore'] as double).compareTo(a['matchScore'] as double),
+        );
+      }
 
       if (mounted) {
         setState(() {
@@ -780,10 +666,10 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
     }
   }
 
-  // Filter people based on search query and maintain distance sorting
+  // Filter people based on search query
   void _applySearchFilter() {
     if (_searchQuery.isEmpty) {
-      _filteredPeople = List.from(_nearbyPeople);
+      _filteredPeople = _nearbyPeople;
     } else {
       final query = _searchQuery.toLowerCase();
       _filteredPeople = _nearbyPeople.where((person) {
@@ -806,44 +692,14 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
         return false;
       }).toList();
     }
-
-    // Always sort filtered results by distance (nearest first)
-    _sortByDistance(_filteredPeople);
-  }
-
-  // Sort people list by distance (nearest first)
-  void _sortByDistance(List<Map<String, dynamic>> people) {
-    people.sort((a, b) {
-      final distA = a['distance'] as double?;
-      final distB = b['distance'] as double?;
-
-      // Both have distance - sort by distance (nearest first)
-      if (distA != null && distB != null) {
-        return distA.compareTo(distB);
-      }
-
-      // Only one has distance - the one with distance comes first
-      if (distA != null && distB == null) return -1;
-      if (distA == null && distB != null) return 1;
-
-      // Neither has distance - sort by match score as fallback
-      final scoreA = a['matchScore'] as double? ?? 0;
-      final scoreB = b['matchScore'] as double? ?? 0;
-      return scoreB.compareTo(scoreA); // Higher score first
-    });
   }
 
   void _showMyProfile() {
     if (_userProfile == null) return;
 
-    // Prevent multiple bottom sheets from opening
-    if (_isProfileSheetOpen) return;
-
     // Create ExtendedUserProfile from current user's data
     final userId = _auth.currentUser?.uid;
     if (userId == null) return;
-
-    _isProfileSheetOpen = true;
 
     final myProfile = ExtendedUserProfile.fromMap(_userProfile!, userId);
 
@@ -860,21 +716,14 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
           _showEditProfile(); // Show the edit sheet
         },
       ),
-    ).whenComplete(() {
-      _isProfileSheetOpen = false;
-    });
+    );
   }
 
   void _showEditProfile() {
     if (_userProfile == null) return;
 
-    // Prevent multiple bottom sheets from opening
-    if (_isProfileSheetOpen) return;
-
     final userId = _auth.currentUser?.uid;
     if (userId == null) return;
-
-    _isProfileSheetOpen = true;
 
     // ignore: unused_local_variable
     final myProfile = ExtendedUserProfile.fromMap(_userProfile!, userId);
@@ -890,9 +739,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
           _loadUserProfile();
         },
       ),
-    ).whenComplete(() {
-      _isProfileSheetOpen = false;
-    });
+    );
   }
 
   // Helper method to calculate distance between two coordinates using Haversine formula
@@ -1027,47 +874,6 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
   }
 
   void _showFilterDialog() {
-    showModalBottomSheet<Map<String, dynamic>>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        return ModernFilterSheet(
-          locationFilter: _locationFilter,
-          distanceFilter: _distanceFilter,
-          selectedGenders: _selectedGenders,
-          selectedInterests: _selectedInterests,
-          selectedConnectionTypes: _selectedConnectionTypes,
-          selectedActivities: _selectedActivities,
-          availableGenders: _availableGenders,
-          availableInterests: _availableInterests,
-          connectionTypeGroups: _connectionTypeGroups,
-          activityGroups: _activityGroups,
-          checkLocationPermission: _checkLocationPermission,
-          onApply: () {
-            // Filters are applied - will reload after dialog closes
-          },
-        );
-      },
-    ).then((result) {
-      if (result != null) {
-        setState(() {
-          // Update all filter states
-          _locationFilter = result['locationFilter'] ?? _locationFilter;
-          _distanceFilter = result['distanceFilter'] ?? _distanceFilter;
-          _filterByGender = _selectedGenders.isNotEmpty;
-          _filterByInterests = _selectedInterests.isNotEmpty;
-          _filterByConnectionTypes = _selectedConnectionTypes.isNotEmpty;
-          _filterByActivities = _selectedActivities.isNotEmpty;
-        });
-        // Reload with new filters and sort by distance
-        _loadNearbyPeople();
-      }
-    });
-  }
-
-  // Legacy method - kept for reference
-  void _showFilterDialogLegacy() {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -2327,15 +2133,6 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
   }
 
   void _showProfileDetail(ExtendedUserProfile user) async {
-    // Prevent multiple bottom sheets from opening
-    if (_isProfileSheetOpen) {
-      debugPrint('LiveConnect: Profile sheet already open, ignoring click');
-      return;
-    }
-
-    // Mark sheet as opening
-    _isProfileSheetOpen = true;
-
     // Check connection status before showing sheet
     final connectionStatus = await _connectionService
         .getConnectionRequestStatus(user.uid);
@@ -2344,10 +2141,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
       user.uid,
     );
 
-    if (!mounted) {
-      _isProfileSheetOpen = false;
-      return;
-    }
+    if (!mounted) return;
 
     // Determine the status to display
     final displayStatus = isConnected
@@ -2463,10 +2257,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
           );
         },
       ),
-    ).whenComplete(() {
-      // Reset flag when sheet is closed (by any means)
-      _isProfileSheetOpen = false;
-    });
+    );
   }
 
   @override
@@ -2652,530 +2443,466 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                     shape: BoxShape.circle,
                     gradient: RadialGradient(
                       colors: [
-                      AppColors.iosPurple.withValues(alpha: 0.2),
-                      AppColors.iosPurple.withValues(alpha: 0.0),
-                    ],
+                        AppColors.iosPurple.withValues(alpha: 0.2),
+                        AppColors.iosPurple.withValues(alpha: 0.0),
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
-            Positioned(
-              bottom: 200,
-              left: -100,
-              child: Container(
-                width: 350,
-                height: 350,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    colors: [
-                      AppColors.iosBlue.withValues(alpha: 0.15),
-                      AppColors.iosBlue.withValues(alpha: 0.0),
-                    ],
+              Positioned(
+                bottom: 200,
+                left: -100,
+                child: Container(
+                  width: 350,
+                  height: 350,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [
+                        AppColors.iosBlue.withValues(alpha: 0.15),
+                        AppColors.iosBlue.withValues(alpha: 0.0),
+                      ],
+                    ),
                   ),
                 ),
+              ),
+            ],
+
+            // Main content
+            SafeArea(
+              child: Column(
+                children: [
+                  // Search bar - compact size
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
+                    child: Container(
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: isGlass
+                            ? Colors.white.withValues(alpha: 0.7)
+                            : (isDarkMode
+                                  ? const Color(0xFF1C1C1E)
+                                  : const Color(0xFFF2F2F7)),
+                        borderRadius: BorderRadius.circular(10),
+                        border: isGlass
+                            ? Border.all(
+                                color: Colors.white.withValues(alpha: 0.2),
+                                width: 1,
+                              )
+                            : null,
+                      ),
+                      child: TextField(
+                        onChanged: (value) {
+                          setState(() {
+                            _searchQuery = value;
+                            _applySearchFilter();
+                          });
+                        },
+                        style: TextStyle(
+                          color: isDarkMode ? Colors.white : Colors.black,
+                          fontSize: 15,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: 'Search by name, interests, or city...',
+                          hintStyle: TextStyle(
+                            color: isDarkMode
+                                ? Colors.grey[600]
+                                : Colors.grey[500],
+                            fontSize: 15,
+                          ),
+                          prefixIcon: Icon(
+                            Icons.search,
+                            color: isDarkMode
+                                ? Colors.grey[500]
+                                : Colors.grey[500],
+                            size: 20,
+                          ),
+                          prefixIconConstraints: const BoxConstraints(
+                            minWidth: 40,
+                            minHeight: 40,
+                          ),
+                          suffixIcon: _searchQuery.isNotEmpty
+                              ? IconButton(
+                                  icon: Icon(
+                                    Icons.clear,
+                                    color: isDarkMode
+                                        ? Colors.grey[500]
+                                        : Colors.grey[500],
+                                    size: 18,
+                                  ),
+                                  onPressed: () {
+                                    setState(() {
+                                      _searchQuery = '';
+                                      _applySearchFilter();
+                                    });
+                                  },
+                                )
+                              : null,
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 0,
+                            vertical: 10,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  // Quick Filters
+                  Container(
+                    height: 50,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
+                      children: [
+                        // Near Me quick filter
+                        Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: FilterChip(
+                            label: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.location_on, size: 14),
+                                SizedBox(width: 3),
+                                Text('Near Me', style: TextStyle(fontSize: 12)),
+                              ],
+                            ),
+                            selected: _locationFilter == 'Near me',
+                            onSelected: (selected) async {
+                              if (selected) {
+                                final hasPermission =
+                                    await _checkLocationPermission();
+                                if (!hasPermission) return;
+                              }
+                              setState(() {
+                                _locationFilter = selected
+                                    ? 'Near me'
+                                    : 'Worldwide';
+                              });
+                              _loadNearbyPeople();
+                            },
+                            selectedColor: const Color(0xFF00D67D),
+                            checkmarkColor: Colors.white,
+                            visualDensity: VisualDensity.compact,
+                            materialTapTargetSize:
+                                MaterialTapTargetSize.shrinkWrap,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            labelStyle: TextStyle(
+                              fontSize: 12,
+                              color: _locationFilter == 'Near me'
+                                  ? Colors.white
+                                  : (isDarkMode
+                                        ? Colors.grey[400]
+                                        : Colors.grey[700]),
+                              fontWeight: _locationFilter == 'Near me'
+                                  ? FontWeight.w600
+                                  : FontWeight.normal,
+                            ),
+                            backgroundColor: isDarkMode
+                                ? const Color(0xFF2A2A2A)
+                                : Colors.grey[200],
+                          ),
+                        ),
+                        // Dating filter
+                        Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: FilterChip(
+                            label: const Text(
+                              'Dating',
+                              style: TextStyle(fontSize: 12),
+                            ),
+                            selected:
+                                _filterByInterests &&
+                                _selectedInterests.contains('Dating'),
+                            onSelected: (selected) {
+                              setState(() {
+                                if (selected) {
+                                  _filterByInterests = true;
+                                  // Clear other category filters (mutually exclusive)
+                                  _selectedInterests.removeWhere(
+                                    (item) => [
+                                      'Dating',
+                                      'Friendship',
+                                      'Business',
+                                      'Sports',
+                                    ].contains(item),
+                                  );
+                                  _selectedInterests.add('Dating');
+                                } else {
+                                  _selectedInterests.remove('Dating');
+                                  if (_selectedInterests.isEmpty) {
+                                    _filterByInterests = false;
+                                  }
+                                }
+                              });
+                              _loadNearbyPeople();
+                            },
+                            selectedColor: const Color(0xFFFF6B9D),
+                            checkmarkColor: Colors.white,
+                            visualDensity: VisualDensity.compact,
+                            materialTapTargetSize:
+                                MaterialTapTargetSize.shrinkWrap,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            labelStyle: TextStyle(
+                              fontSize: 12,
+                              color:
+                                  _filterByInterests &&
+                                      _selectedInterests.contains('Dating')
+                                  ? Colors.white
+                                  : (isDarkMode
+                                        ? Colors.grey[400]
+                                        : Colors.grey[700]),
+                              fontWeight:
+                                  _filterByInterests &&
+                                      _selectedInterests.contains('Dating')
+                                  ? FontWeight.w600
+                                  : FontWeight.normal,
+                            ),
+                            backgroundColor: isDarkMode
+                                ? const Color(0xFF2A2A2A)
+                                : Colors.grey[200],
+                          ),
+                        ),
+                        // Friendship filter
+                        Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: FilterChip(
+                            label: const Text(
+                              'Friendship',
+                              style: TextStyle(fontSize: 12),
+                            ),
+                            selected:
+                                _filterByInterests &&
+                                _selectedInterests.contains('Friendship'),
+                            onSelected: (selected) {
+                              setState(() {
+                                if (selected) {
+                                  _filterByInterests = true;
+                                  // Clear other category filters (mutually exclusive)
+                                  _selectedInterests.removeWhere(
+                                    (item) => [
+                                      'Dating',
+                                      'Friendship',
+                                      'Business',
+                                      'Sports',
+                                    ].contains(item),
+                                  );
+                                  _selectedInterests.add('Friendship');
+                                } else {
+                                  _selectedInterests.remove('Friendship');
+                                  if (_selectedInterests.isEmpty) {
+                                    _filterByInterests = false;
+                                  }
+                                }
+                              });
+                              _loadNearbyPeople();
+                            },
+                            selectedColor: const Color(0xFF4A90E2),
+                            checkmarkColor: Colors.white,
+                            visualDensity: VisualDensity.compact,
+                            materialTapTargetSize:
+                                MaterialTapTargetSize.shrinkWrap,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            labelStyle: TextStyle(
+                              fontSize: 12,
+                              color:
+                                  _filterByInterests &&
+                                      _selectedInterests.contains('Friendship')
+                                  ? Colors.white
+                                  : (isDarkMode
+                                        ? Colors.grey[400]
+                                        : Colors.grey[700]),
+                              fontWeight:
+                                  _filterByInterests &&
+                                      _selectedInterests.contains('Friendship')
+                                  ? FontWeight.w600
+                                  : FontWeight.normal,
+                            ),
+                            backgroundColor: isDarkMode
+                                ? const Color(0xFF2A2A2A)
+                                : Colors.grey[200],
+                          ),
+                        ),
+                        // Business filter
+                        Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: FilterChip(
+                            label: const Text(
+                              'Business',
+                              style: TextStyle(fontSize: 12),
+                            ),
+                            selected:
+                                _filterByInterests &&
+                                _selectedInterests.contains('Business'),
+                            onSelected: (selected) {
+                              setState(() {
+                                if (selected) {
+                                  _filterByInterests = true;
+                                  // Clear other category filters (mutually exclusive)
+                                  _selectedInterests.removeWhere(
+                                    (item) => [
+                                      'Dating',
+                                      'Friendship',
+                                      'Business',
+                                      'Sports',
+                                    ].contains(item),
+                                  );
+                                  _selectedInterests.add('Business');
+                                } else {
+                                  _selectedInterests.remove('Business');
+                                  if (_selectedInterests.isEmpty) {
+                                    _filterByInterests = false;
+                                  }
+                                }
+                              });
+                              _loadNearbyPeople();
+                            },
+                            selectedColor: const Color(0xFF9B59B6),
+                            checkmarkColor: Colors.white,
+                            visualDensity: VisualDensity.compact,
+                            materialTapTargetSize:
+                                MaterialTapTargetSize.shrinkWrap,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            labelStyle: TextStyle(
+                              fontSize: 12,
+                              color:
+                                  _filterByInterests &&
+                                      _selectedInterests.contains('Business')
+                                  ? Colors.white
+                                  : (isDarkMode
+                                        ? Colors.grey[400]
+                                        : Colors.grey[700]),
+                              fontWeight:
+                                  _filterByInterests &&
+                                      _selectedInterests.contains('Business')
+                                  ? FontWeight.w600
+                                  : FontWeight.normal,
+                            ),
+                            backgroundColor: isDarkMode
+                                ? const Color(0xFF2A2A2A)
+                                : Colors.grey[200],
+                          ),
+                        ),
+                        // Sports filter
+                        Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: FilterChip(
+                            label: const Text(
+                              'Sports',
+                              style: TextStyle(fontSize: 12),
+                            ),
+                            selected:
+                                _filterByInterests &&
+                                _selectedInterests.contains('Sports'),
+                            onSelected: (selected) {
+                              setState(() {
+                                if (selected) {
+                                  _filterByInterests = true;
+                                  // Clear other category filters (mutually exclusive)
+                                  _selectedInterests.removeWhere(
+                                    (item) => [
+                                      'Dating',
+                                      'Friendship',
+                                      'Business',
+                                      'Sports',
+                                    ].contains(item),
+                                  );
+                                  _selectedInterests.add('Sports');
+                                } else {
+                                  _selectedInterests.remove('Sports');
+                                  if (_selectedInterests.isEmpty) {
+                                    _filterByInterests = false;
+                                  }
+                                }
+                              });
+                              _loadNearbyPeople();
+                            },
+                            selectedColor: const Color(0xFFFFB800),
+                            checkmarkColor: Colors.white,
+                            visualDensity: VisualDensity.compact,
+                            materialTapTargetSize:
+                                MaterialTapTargetSize.shrinkWrap,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            labelStyle: TextStyle(
+                              fontSize: 12,
+                              color:
+                                  _filterByInterests &&
+                                      _selectedInterests.contains('Sports')
+                                  ? Colors.white
+                                  : (isDarkMode
+                                        ? Colors.grey[400]
+                                        : Colors.grey[700]),
+                              fontWeight:
+                                  _filterByInterests &&
+                                      _selectedInterests.contains('Sports')
+                                  ? FontWeight.w600
+                                  : FontWeight.normal,
+                            ),
+                            backgroundColor: isDarkMode
+                                ? const Color(0xFF2A2A2A)
+                                : Colors.grey[200],
+                          ),
+                        ),
+                        // All Filters button
+                        Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: ActionChip(
+                            label: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.tune, size: 14),
+                                SizedBox(width: 3),
+                                Text('Filters', style: TextStyle(fontSize: 12)),
+                              ],
+                            ),
+                            onPressed: _showFilterDialog,
+                            visualDensity: VisualDensity.compact,
+                            materialTapTargetSize:
+                                MaterialTapTargetSize.shrinkWrap,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            backgroundColor: isDarkMode
+                                ? const Color(0xFF2A2A2A)
+                                : Colors.grey[200],
+                            labelStyle: TextStyle(
+                              fontSize: 12,
+                              color: isDarkMode
+                                  ? Colors.grey[400]
+                                  : Colors.grey[700],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  // Main content
+                  Expanded(child: _buildContent(isDarkMode, isGlass)),
+                ],
               ),
             ),
           ],
-
-          // Main content
-          SafeArea(
-            child: Column(
-              children: [
-                // Search bar - compact size
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 10,
-                  ),
-                  child: Container(
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: isGlass
-                          ? Colors.white.withValues(alpha: 0.7)
-                          : (isDarkMode
-                                ? const Color(0xFF1C1C1E)
-                                : const Color(0xFFF2F2F7)),
-                      borderRadius: BorderRadius.circular(10),
-                      border: isGlass
-                          ? Border.all(
-                              color: Colors.white.withValues(alpha: 0.2),
-                              width: 1,
-                            )
-                          : null,
-                    ),
-                    child: TextField(
-                      onChanged: (value) {
-                        setState(() {
-                          _searchQuery = value;
-                          _applySearchFilter();
-                        });
-                      },
-                      style: TextStyle(
-                        color: isDarkMode ? Colors.white : Colors.black,
-                        fontSize: 15,
-                      ),
-                      decoration: InputDecoration(
-                        hintText: 'Search by name, interests, or city...',
-                        hintStyle: TextStyle(
-                          color: isDarkMode
-                              ? Colors.grey[600]
-                              : Colors.grey[500],
-                          fontSize: 15,
-                        ),
-                        prefixIcon: Icon(
-                          Icons.search,
-                          color: isDarkMode
-                              ? Colors.grey[500]
-                              : Colors.grey[500],
-                          size: 20,
-                        ),
-                        prefixIconConstraints: const BoxConstraints(
-                          minWidth: 40,
-                          minHeight: 40,
-                        ),
-                        suffixIcon: _searchQuery.isNotEmpty
-                            ? IconButton(
-                                icon: Icon(
-                                  Icons.clear,
-                                  color: isDarkMode
-                                      ? Colors.grey[500]
-                                      : Colors.grey[500],
-                                  size: 18,
-                                ),
-                                onPressed: () {
-                                  setState(() {
-                                    _searchQuery = '';
-                                    _applySearchFilter();
-                                  });
-                                },
-                              )
-                            : null,
-                        border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 0,
-                          vertical: 10,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                // Quick Filters
-                Container(
-                  height: 50,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: ListView(
-                    scrollDirection: Axis.horizontal,
-                    children: [
-                      // Near Me quick filter
-                      Padding(
-                        padding: const EdgeInsets.only(right: 6),
-                        child: FilterChip(
-                          label: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.location_on, size: 14),
-                              SizedBox(width: 3),
-                              Text('Near Me', style: TextStyle(fontSize: 12)),
-                            ],
-                          ),
-                          selected: _locationFilter == 'Near me',
-                          onSelected: (selected) async {
-                            if (selected) {
-                              final hasPermission =
-                                  await _checkLocationPermission();
-                              if (!hasPermission) return;
-                            }
-                            setState(() {
-                              _locationFilter = selected
-                                  ? 'Near me'
-                                  : 'Worldwide';
-                            });
-                            _loadNearbyPeople();
-                          },
-                          selectedColor: const Color(0xFF00D67D),
-                          checkmarkColor: Colors.white,
-                          visualDensity: VisualDensity.compact,
-                          materialTapTargetSize:
-                              MaterialTapTargetSize.shrinkWrap,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          labelStyle: TextStyle(
-                            fontSize: 12,
-                            color: _locationFilter == 'Near me'
-                                ? Colors.white
-                                : (isDarkMode
-                                      ? Colors.grey[400]
-                                      : Colors.grey[700]),
-                            fontWeight: _locationFilter == 'Near me'
-                                ? FontWeight.w600
-                                : FontWeight.normal,
-                          ),
-                          backgroundColor: isDarkMode
-                              ? const Color(0xFF2A2A2A)
-                              : Colors.grey[200],
-                        ),
-                      ),
-                      // Dating filter
-                      Padding(
-                        padding: const EdgeInsets.only(right: 6),
-                        child: FilterChip(
-                          label: const Text(
-                            'Dating',
-                            style: TextStyle(fontSize: 12),
-                          ),
-                          selected:
-                              _filterByInterests &&
-                              _selectedInterests.contains('Dating'),
-                          onSelected: (selected) {
-                            setState(() {
-                              if (selected) {
-                                _filterByInterests = true;
-                                // Clear other category filters (mutually exclusive)
-                                _selectedInterests.removeWhere((item) =>
-                                  ['Dating', 'Friendship', 'Business', 'Sports'].contains(item));
-                                _selectedInterests.add('Dating');
-                              } else {
-                                _selectedInterests.remove('Dating');
-                                if (_selectedInterests.isEmpty) {
-                                  _filterByInterests = false;
-                                }
-                              }
-                            });
-                            _loadNearbyPeople();
-                          },
-                          selectedColor: const Color(0xFFFF6B9D),
-                          checkmarkColor: Colors.white,
-                          visualDensity: VisualDensity.compact,
-                          materialTapTargetSize:
-                              MaterialTapTargetSize.shrinkWrap,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          labelStyle: TextStyle(
-                            fontSize: 12,
-                            color:
-                                _filterByInterests &&
-                                    _selectedInterests.contains('Dating')
-                                ? Colors.white
-                                : (isDarkMode
-                                      ? Colors.grey[400]
-                                      : Colors.grey[700]),
-                            fontWeight:
-                                _filterByInterests &&
-                                    _selectedInterests.contains('Dating')
-                                ? FontWeight.w600
-                                : FontWeight.normal,
-                          ),
-                          backgroundColor: isDarkMode
-                              ? const Color(0xFF2A2A2A)
-                              : Colors.grey[200],
-                        ),
-                      ),
-                      // Friendship filter
-                      Padding(
-                        padding: const EdgeInsets.only(right: 6),
-                        child: FilterChip(
-                          label: const Text(
-                            'Friendship',
-                            style: TextStyle(fontSize: 12),
-                          ),
-                          selected:
-                              _filterByInterests &&
-                              _selectedInterests.contains('Friendship'),
-                          onSelected: (selected) {
-                            setState(() {
-                              if (selected) {
-                                _filterByInterests = true;
-                                // Clear other category filters (mutually exclusive)
-                                _selectedInterests.removeWhere((item) =>
-                                  ['Dating', 'Friendship', 'Business', 'Sports'].contains(item));
-                                _selectedInterests.add('Friendship');
-                              } else {
-                                _selectedInterests.remove('Friendship');
-                                if (_selectedInterests.isEmpty) {
-                                  _filterByInterests = false;
-                                }
-                              }
-                            });
-                            _loadNearbyPeople();
-                          },
-                          selectedColor: const Color(0xFF4A90E2),
-                          checkmarkColor: Colors.white,
-                          visualDensity: VisualDensity.compact,
-                          materialTapTargetSize:
-                              MaterialTapTargetSize.shrinkWrap,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          labelStyle: TextStyle(
-                            fontSize: 12,
-                            color:
-                                _filterByInterests &&
-                                    _selectedInterests.contains('Friendship')
-                                ? Colors.white
-                                : (isDarkMode
-                                      ? Colors.grey[400]
-                                      : Colors.grey[700]),
-                            fontWeight:
-                                _filterByInterests &&
-                                    _selectedInterests.contains('Friendship')
-                                ? FontWeight.w600
-                                : FontWeight.normal,
-                          ),
-                          backgroundColor: isDarkMode
-                              ? const Color(0xFF2A2A2A)
-                              : Colors.grey[200],
-                        ),
-                      ),
-                      // Business filter
-                      Padding(
-                        padding: const EdgeInsets.only(right: 6),
-                        child: FilterChip(
-                          label: const Text(
-                            'Business',
-                            style: TextStyle(fontSize: 12),
-                          ),
-                          selected:
-                              _filterByInterests &&
-                              _selectedInterests.contains('Business'),
-                          onSelected: (selected) {
-                            setState(() {
-                              if (selected) {
-                                _filterByInterests = true;
-                                // Clear other category filters (mutually exclusive)
-                                _selectedInterests.removeWhere((item) =>
-                                  ['Dating', 'Friendship', 'Business', 'Sports'].contains(item));
-                                _selectedInterests.add('Business');
-                              } else {
-                                _selectedInterests.remove('Business');
-                                if (_selectedInterests.isEmpty) {
-                                  _filterByInterests = false;
-                                }
-                              }
-                            });
-                            _loadNearbyPeople();
-                          },
-                          selectedColor: const Color(0xFF9B59B6),
-                          checkmarkColor: Colors.white,
-                          visualDensity: VisualDensity.compact,
-                          materialTapTargetSize:
-                              MaterialTapTargetSize.shrinkWrap,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          labelStyle: TextStyle(
-                            fontSize: 12,
-                            color:
-                                _filterByInterests &&
-                                    _selectedInterests.contains('Business')
-                                ? Colors.white
-                                : (isDarkMode
-                                      ? Colors.grey[400]
-                                      : Colors.grey[700]),
-                            fontWeight:
-                                _filterByInterests &&
-                                    _selectedInterests.contains('Business')
-                                ? FontWeight.w600
-                                : FontWeight.normal,
-                          ),
-                          backgroundColor: isDarkMode
-                              ? const Color(0xFF2A2A2A)
-                              : Colors.grey[200],
-                        ),
-                      ),
-                      // Sports filter
-                      Padding(
-                        padding: const EdgeInsets.only(right: 6),
-                        child: FilterChip(
-                          label: const Text(
-                            'Sports',
-                            style: TextStyle(fontSize: 12),
-                          ),
-                          selected:
-                              _filterByInterests &&
-                              _selectedInterests.contains('Sports'),
-                          onSelected: (selected) {
-                            setState(() {
-                              if (selected) {
-                                _filterByInterests = true;
-                                // Clear other category filters (mutually exclusive)
-                                _selectedInterests.removeWhere((item) =>
-                                  ['Dating', 'Friendship', 'Business', 'Sports'].contains(item));
-                                _selectedInterests.add('Sports');
-                              } else {
-                                _selectedInterests.remove('Sports');
-                                if (_selectedInterests.isEmpty) {
-                                  _filterByInterests = false;
-                                }
-                              }
-                            });
-                            _loadNearbyPeople();
-                          },
-                          selectedColor: const Color(0xFFFFB800),
-                          checkmarkColor: Colors.white,
-                          visualDensity: VisualDensity.compact,
-                          materialTapTargetSize:
-                              MaterialTapTargetSize.shrinkWrap,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          labelStyle: TextStyle(
-                            fontSize: 12,
-                            color:
-                                _filterByInterests &&
-                                    _selectedInterests.contains('Sports')
-                                ? Colors.white
-                                : (isDarkMode
-                                      ? Colors.grey[400]
-                                      : Colors.grey[700]),
-                            fontWeight:
-                                _filterByInterests &&
-                                    _selectedInterests.contains('Sports')
-                                ? FontWeight.w600
-                                : FontWeight.normal,
-                          ),
-                          backgroundColor: isDarkMode
-                              ? const Color(0xFF2A2A2A)
-                              : Colors.grey[200],
-                        ),
-                      ),
-                      // All Filters button
-                      Padding(
-                        padding: const EdgeInsets.only(right: 6),
-                        child: ActionChip(
-                          label: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.tune, size: 14),
-                              SizedBox(width: 3),
-                              Text('Filters', style: TextStyle(fontSize: 12)),
-                            ],
-                          ),
-                          onPressed: _showFilterDialog,
-                          visualDensity: VisualDensity.compact,
-                          materialTapTargetSize:
-                              MaterialTapTargetSize.shrinkWrap,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          backgroundColor: isDarkMode
-                              ? const Color(0xFF2A2A2A)
-                              : Colors.grey[200],
-                          labelStyle: TextStyle(
-                            fontSize: 12,
-                            color: isDarkMode
-                                ? Colors.grey[400]
-                                : Colors.grey[700],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 8),
-                // Main content
-                Expanded(child: _buildContent(isDarkMode, isGlass)),
-              ],
-            ),
-          ),
-        ],
-      ),
-      ),
-    );
-  }
-
-  /// Build skeleton loading card for better UX while loading
-  Widget _buildSkeletonCard(bool isDarkMode) {
-    final shimmerBase = isDarkMode ? Colors.grey[800]! : Colors.grey[300]!;
-    final shimmerHighlight = isDarkMode ? Colors.grey[700]! : Colors.grey[100]!;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDarkMode ? Colors.grey[900] : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          // Avatar skeleton
-          Container(
-            width: 70,
-            height: 70,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: LinearGradient(
-                colors: [shimmerBase, shimmerHighlight, shimmerBase],
-              ),
-            ),
-          ),
-          const SizedBox(width: 16),
-          // Content skeleton
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Name skeleton
-                Container(
-                  height: 18,
-                  width: 120,
-                  decoration: BoxDecoration(
-                    color: shimmerBase,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                // Location skeleton
-                Container(
-                  height: 14,
-                  width: 80,
-                  decoration: BoxDecoration(
-                    color: shimmerBase,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                // Interests skeleton
-                Row(
-                  children: [
-                    Container(
-                      height: 24,
-                      width: 60,
-                      decoration: BoxDecoration(
-                        color: shimmerBase,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
-                      height: 24,
-                      width: 50,
-                      decoration: BoxDecoration(
-                        color: shimmerBase,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -3248,14 +2975,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
     }
 
     if (_isLoadingPeople) {
-      // Show skeleton loading cards for better UX
-      return ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: 6, // Show 6 skeleton cards
-        itemBuilder: (context, index) {
-          return _buildSkeletonCard(isDarkMode);
-        },
-      );
+      return const Center(child: CircularProgressIndicator());
     }
 
     if (_filteredPeople.isEmpty &&
@@ -3263,7 +2983,9 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
         _searchQuery.isNotEmpty) {
       // Show search-specific empty state
       return RefreshIndicator(
-        onRefresh: _refreshLiveConnect,
+        onRefresh: () async {
+          await _loadNearbyPeople();
+        },
         color: Theme.of(context).primaryColor,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -3359,19 +3081,20 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
       IconData icon = Icons.search_off;
 
       if (_locationFilter == 'Near me' &&
-          (_currentUserLat == null || _currentUserLon == null)) {
+          (_userProfile?['latitude'] == null ||
+              _userProfile?['longitude'] == null)) {
         title = 'Location not available';
         subtitle = 'Enable location permissions to find nearby users';
         icon = Icons.location_off;
-      } else if (_locationFilter == 'Near me') {
-        title = 'No users nearby';
-        subtitle =
-            'Try increasing the distance (currently ${_distanceFilter.round()} km) or switch to Worldwide';
-        icon = Icons.radar;
       } else if (_filterByInterests && _selectedInterests.isEmpty) {
         title = 'No interests selected';
         subtitle = 'Select at least one interest to find matches';
         icon = Icons.favorite_border;
+      } else if (_locationFilter == 'Near me' && _distanceFilter < 10) {
+        title = 'Search radius too small';
+        subtitle =
+            'Try expanding your distance to ${(_distanceFilter * 2).round()} km or more';
+        icon = Icons.radar;
       } else if (_locationFilter == 'City' &&
           (_userProfile?['city'] == null ||
               (_userProfile?['city'] as String).isEmpty)) {
@@ -3387,7 +3110,9 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
       }
 
       return RefreshIndicator(
-        onRefresh: _refreshLiveConnect,
+        onRefresh: () async {
+          await _loadNearbyPeople();
+        },
         color: Theme.of(context).primaryColor,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -3472,7 +3197,9 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
     }
 
     return RefreshIndicator(
-      onRefresh: _refreshLiveConnect,
+      onRefresh: () async {
+        await _loadNearbyPeople();
+      },
       color: Theme.of(context).primaryColor,
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
@@ -3581,8 +3308,13 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                     children: [
                       Builder(
                         builder: (context) {
-                          final fixedPhotoUrl = PhotoUrlHelper.fixGooglePhotoUrl(extendedProfile.photoUrl);
-                          final userInitial = userName.isNotEmpty ? userName[0].toUpperCase() : '?';
+                          final fixedPhotoUrl =
+                              PhotoUrlHelper.fixGooglePhotoUrl(
+                                extendedProfile.photoUrl,
+                              );
+                          final userInitial = userName.isNotEmpty
+                              ? userName[0].toUpperCase()
+                              : '?';
 
                           // Fallback widget showing user's initial
                           Widget buildInitialAvatar() {
@@ -3598,7 +3330,9 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                                 ),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: gradientColors[0].withValues(alpha: 0.3),
+                                    color: gradientColors[0].withValues(
+                                      alpha: 0.3,
+                                    ),
                                     blurRadius: 12,
                                     offset: const Offset(0, 4),
                                   ),
@@ -3630,7 +3364,9 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                               shape: BoxShape.circle,
                               boxShadow: [
                                 BoxShadow(
-                                  color: gradientColors[0].withValues(alpha: 0.3),
+                                  color: gradientColors[0].withValues(
+                                    alpha: 0.3,
+                                  ),
                                   blurRadius: 12,
                                   offset: const Offset(0, 4),
                                 ),

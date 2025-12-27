@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import '../utils/photo_url_helper.dart';
+import '../res/utils/photo_url_helper.dart';
 
 /// A CircleAvatar that safely handles network images with proper error handling.
 /// Shows user's initial letter when image fails to load or is not available.

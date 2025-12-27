@@ -18,7 +18,8 @@ class LocationService {
   // Debouncing: Prevent multiple simultaneous location updates
   bool _isUpdatingLocation = false;
   DateTime? _lastLocationUpdate;
-  bool _periodicUpdatesStarted = false; // Prevent multiple periodic update loops
+  bool _periodicUpdatesStarted =
+      false; // Prevent multiple periodic update loops
   bool _isInitialized = false; // Prevent multiple initialization calls
   bool _isFetchingBackground = false; // Prevent duplicate background fetches
 
@@ -65,7 +66,9 @@ class LocationService {
     bool highAccuracy = false,
   }) async {
     try {
-      _log('LocationService: Starting getCurrentLocation (silent=$silent, highAccuracy=$highAccuracy), isWeb=$kIsWeb');
+      _log(
+        'LocationService: Starting getCurrentLocation (silent=$silent, highAccuracy=$highAccuracy), isWeb=$kIsWeb',
+      );
 
       // Check if location services are enabled
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
@@ -95,7 +98,8 @@ class LocationService {
         final hasRequested = await hasRequestedPermissionBefore();
         _log('LocationService: Has requested before=$hasRequested');
 
-        if (!hasRequested || kIsWeb) { // Always try on web
+        if (!hasRequested || kIsWeb) {
+          // Always try on web
           // Request permission for the first time
           _log('LocationService: Requesting permission...');
           permission = await Geolocator.requestPermission();
@@ -108,16 +112,19 @@ class LocationService {
       }
 
       if (permission == LocationPermission.deniedForever) {
-        _log('Location permissions are permanently denied - silent fetch skipped');
+        _log(
+          'Location permissions are permanently denied - silent fetch skipped',
+        );
         return null;
       }
 
       if (permission == LocationPermission.whileInUse ||
           permission == LocationPermission.always) {
-
         // HIGH ACCURACY MODE: User wants precise location
         if (highAccuracy) {
-          _log('LocationService: Using HIGH accuracy mode (may take longer)...');
+          _log(
+            'LocationService: Using HIGH accuracy mode (may take longer)...',
+          );
           try {
             final position = await Geolocator.getCurrentPosition(
               locationSettings: const LocationSettings(
@@ -125,10 +132,14 @@ class LocationService {
                 timeLimit: Duration(seconds: 60),
               ),
             );
-            _log('LocationService: Got HIGH accuracy position lat=${position.latitude}, lng=${position.longitude}, accuracy=${position.accuracy}m');
+            _log(
+              'LocationService: Got HIGH accuracy position lat=${position.latitude}, lng=${position.longitude}, accuracy=${position.accuracy}m',
+            );
             return position;
           } catch (e) {
-            _log('LocationService: High accuracy failed: $e, falling back to medium...');
+            _log(
+              'LocationService: High accuracy failed: $e, falling back to medium...',
+            );
             // Fall through to medium accuracy
           }
         }
@@ -145,7 +156,9 @@ class LocationService {
             _log('LocationService: Trying last known position first...');
             final lastPosition = await Geolocator.getLastKnownPosition();
             if (lastPosition != null) {
-              _log('LocationService: Got last known position lat=${lastPosition.latitude}, lng=${lastPosition.longitude}');
+              _log(
+                'LocationService: Got last known position lat=${lastPosition.latitude}, lng=${lastPosition.longitude}',
+              );
               // Continue fetching fresh location in background, but return this immediately
               _fetchFreshLocationInBackground();
               return lastPosition;
@@ -158,14 +171,18 @@ class LocationService {
         // Strategy 2: Try HIGH accuracy first for user-initiated requests
         if (!silent) {
           try {
-            _log('LocationService: Trying high accuracy with 45s timeout (user-initiated)...');
+            _log(
+              'LocationService: Trying high accuracy with 45s timeout (user-initiated)...',
+            );
             final position = await Geolocator.getCurrentPosition(
               locationSettings: const LocationSettings(
                 accuracy: LocationAccuracy.high,
                 timeLimit: Duration(seconds: 45),
               ),
             );
-            _log('LocationService: Got high accuracy position lat=${position.latitude}, lng=${position.longitude}, accuracy=${position.accuracy}m');
+            _log(
+              'LocationService: Got high accuracy position lat=${position.latitude}, lng=${position.longitude}, accuracy=${position.accuracy}m',
+            );
             return position;
           } catch (e) {
             _log('LocationService: High accuracy failed: $e, trying medium...');
@@ -181,7 +198,9 @@ class LocationService {
               timeLimit: Duration(seconds: 30),
             ),
           );
-          _log('LocationService: Got medium accuracy position lat=${position.latitude}, lng=${position.longitude}, accuracy=${position.accuracy}m');
+          _log(
+            'LocationService: Got medium accuracy position lat=${position.latitude}, lng=${position.longitude}, accuracy=${position.accuracy}m',
+          );
           return position;
         } catch (e) {
           _log('LocationService: Medium accuracy failed: $e');
@@ -196,7 +215,9 @@ class LocationService {
               timeLimit: Duration(seconds: 20),
             ),
           );
-          _log('LocationService: Got low accuracy position lat=${position.latitude}, lng=${position.longitude}, accuracy=${position.accuracy}m');
+          _log(
+            'LocationService: Got low accuracy position lat=${position.latitude}, lng=${position.longitude}, accuracy=${position.accuracy}m',
+          );
           return position;
         } catch (e) {
           _log('LocationService: Low accuracy failed: $e');
@@ -212,10 +233,14 @@ class LocationService {
           _log('LocationService: Trying web fallback...');
           final position = await Geolocator.getCurrentPosition(
             locationSettings: LocationSettings(
-              accuracy: highAccuracy ? LocationAccuracy.best : LocationAccuracy.medium,
+              accuracy: highAccuracy
+                  ? LocationAccuracy.best
+                  : LocationAccuracy.medium,
             ),
           );
-          _log('LocationService: Web fallback success lat=${position.latitude}, lng=${position.longitude}');
+          _log(
+            'LocationService: Web fallback success lat=${position.latitude}, lng=${position.longitude}',
+          );
           return position;
         } catch (webError) {
           _log('LocationService: Web fallback failed: $webError');
@@ -229,7 +254,9 @@ class LocationService {
   void _fetchFreshLocationInBackground() async {
     // Prevent duplicate background fetches
     if (_isFetchingBackground) {
-      _log('LocationService: Background fetch already in progress, skipping...');
+      _log(
+        'LocationService: Background fetch already in progress, skipping...',
+      );
       return;
     }
 
@@ -243,7 +270,9 @@ class LocationService {
           timeLimit: Duration(seconds: 60),
         ),
       );
-      _log('LocationService: Background fetch completed lat=${position.latitude}, lng=${position.longitude}');
+      _log(
+        'LocationService: Background fetch completed lat=${position.latitude}, lng=${position.longitude}',
+      );
 
       // Update user location silently in background
       // Note: updateUserLocation has its own rate limiting
@@ -257,18 +286,26 @@ class LocationService {
   }
 
   // Get city name from coordinates - Enhanced with real API
-  Future<Map<String, dynamic>?> getCityFromCoordinates(double latitude, double longitude) async {
+  Future<Map<String, dynamic>?> getCityFromCoordinates(
+    double latitude,
+    double longitude,
+  ) async {
     try {
-      _log('LocationService: Getting detailed address for lat=$latitude, lng=$longitude');
-      
+      _log(
+        'LocationService: Getting detailed address for lat=$latitude, lng=$longitude',
+      );
+
       // Use the new geocoding service for all platforms
-      final addressData = await GeocodingService.getAddressFromCoordinates(latitude, longitude);
-      
+      final addressData = await GeocodingService.getAddressFromCoordinates(
+        latitude,
+        longitude,
+      );
+
       if (addressData != null) {
         _log('LocationService: Got address data: ${addressData['display']}');
         return addressData;
       }
-      
+
       // Fallback to old geocoding method if API fails
       if (!kIsWeb) {
         try {
@@ -281,7 +318,8 @@ class LocationService {
             Placemark place = placemarks[0];
 
             return {
-              'formatted': '${place.locality ?? place.subLocality ?? ''}, ${place.administrativeArea ?? ''}',
+              'formatted':
+                  '${place.locality ?? place.subLocality ?? ''}, ${place.administrativeArea ?? ''}',
               'area': place.subLocality ?? '',
               'city': place.locality ?? '',
               'state': place.administrativeArea ?? '',
@@ -315,21 +353,33 @@ class LocationService {
   }
 
   // Update user's location in Firestore with detailed address - SILENT MODE SUPPORTED
-  Future<bool> updateUserLocation({Position? position, bool silent = true, bool forceUpdate = false}) async {
+  Future<bool> updateUserLocation({
+    Position? position,
+    bool silent = true,
+    bool forceUpdate = false,
+  }) async {
     try {
-      _log('LocationService: updateUserLocation called (silent=$silent, forceUpdate=$forceUpdate)');
+      _log(
+        'LocationService: updateUserLocation called (silent=$silent, forceUpdate=$forceUpdate)',
+      );
 
       // DEBOUNCE: If already updating, skip this call
       if (_isUpdatingLocation) {
-        _log('LocationService: Already updating location, skipping duplicate call');
+        _log(
+          'LocationService: Already updating location, skipping duplicate call',
+        );
         return false;
       }
 
       // RATE LIMIT: Don't update more than once per minute (unless forced)
       if (!forceUpdate && _lastLocationUpdate != null) {
-        final timeSinceLastUpdate = DateTime.now().difference(_lastLocationUpdate!);
+        final timeSinceLastUpdate = DateTime.now().difference(
+          _lastLocationUpdate!,
+        );
         if (timeSinceLastUpdate.inSeconds < 60) {
-          _log('LocationService: Updated ${timeSinceLastUpdate.inSeconds}s ago, skipping (rate limit: 60s)');
+          _log(
+            'LocationService: Updated ${timeSinceLastUpdate.inSeconds}s ago, skipping (rate limit: 60s)',
+          );
           return false;
         }
       }
@@ -343,18 +393,29 @@ class LocationService {
         return false;
       }
 
-      Position? currentPosition = position ?? await getCurrentLocation(silent: silent);
+      Position? currentPosition =
+          position ?? await getCurrentLocation(silent: silent);
 
       // DISTANCE CHECK: Skip update if user hasn't moved significantly (unless forced)
-      if (!forceUpdate && currentPosition != null && _lastKnownPosition != null) {
-        final distance = _calculateDistance(_lastKnownPosition!, currentPosition);
+      if (!forceUpdate &&
+          currentPosition != null &&
+          _lastKnownPosition != null) {
+        final distance = _calculateDistance(
+          _lastKnownPosition!,
+          currentPosition,
+        );
         if (distance < minimumDistanceForUpdate) {
-          _log('LocationService: User moved only ${distance.toStringAsFixed(1)}m (< ${minimumDistanceForUpdate}m), skipping update');
+          _log(
+            'LocationService: User moved only ${distance.toStringAsFixed(1)}m (< ${minimumDistanceForUpdate}m), skipping update',
+          );
           _isUpdatingLocation = false;
-          _lastLocationUpdate = DateTime.now(); // Still update timestamp to prevent rapid checks
+          _lastLocationUpdate =
+              DateTime.now(); // Still update timestamp to prevent rapid checks
           return true; // Return true since location is still valid
         }
-        _log('LocationService: User moved ${distance.toStringAsFixed(1)}m, updating location');
+        _log(
+          'LocationService: User moved ${distance.toStringAsFixed(1)}m, updating location',
+        );
       }
 
       if (currentPosition != null) {
@@ -364,13 +425,20 @@ class LocationService {
           currentPosition.longitude,
         );
 
-        if (addressData != null && addressData['city'] != null && addressData['city'].toString().isNotEmpty) {
-          _log('LocationService: Updating user location silently with detailed address: ${addressData['display']}');
+        if (addressData != null &&
+            addressData['city'] != null &&
+            addressData['city'].toString().isNotEmpty) {
+          _log(
+            'LocationService: Updating user location silently with detailed address: ${addressData['display']}',
+          );
 
           Map<String, dynamic> locationData = {
             'latitude': currentPosition.latitude,
             'longitude': currentPosition.longitude,
-            'location': addressData['formatted'] ?? addressData['display'] ?? addressData['city'],
+            'location':
+                addressData['formatted'] ??
+                addressData['display'] ??
+                addressData['city'],
             'city': addressData['city'],
             'area': addressData['area'] ?? '',
             'state': addressData['state'] ?? '',
@@ -381,18 +449,22 @@ class LocationService {
           };
 
           // Update user document SILENTLY in background - use set with merge to ensure document exists
-          await _firestore.collection('users').doc(userId).set(
-            locationData,
-            SetOptions(merge: true),
-          );
+          await _firestore
+              .collection('users')
+              .doc(userId)
+              .set(locationData, SetOptions(merge: true));
 
-          _log('LocationService: Location updated silently with area: ${addressData['area']}, city: ${addressData['city']}');
+          _log(
+            'LocationService: Location updated silently with area: ${addressData['area']}, city: ${addressData['city']}',
+          );
           _lastKnownPosition = currentPosition; // Save for distance filtering
           _lastLocationUpdate = DateTime.now();
           _isUpdatingLocation = false;
           return true;
         } else {
-          _log('LocationService: Could not get valid address data from coordinates (silent fetch)');
+          _log(
+            'LocationService: Could not get valid address data from coordinates (silent fetch)',
+          );
           _isUpdatingLocation = false;
           return false;
         }
@@ -425,7 +497,9 @@ class LocationService {
       // Check if location services are enabled SILENTLY
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled && !kIsWeb) {
-        _log('LocationService: Location services are disabled - skipping silent init');
+        _log(
+          'LocationService: Location services are disabled - skipping silent init',
+        );
         return; // Exit silently, no alerts
       }
 
@@ -445,25 +519,35 @@ class LocationService {
 
         if (!hasRequested) {
           // ONLY on very first app launch, request permission once
-          _log('LocationService: First app launch - requesting location permission ONE TIME...');
+          _log(
+            'LocationService: First app launch - requesting location permission ONE TIME...',
+          );
           permission = await Geolocator.requestPermission();
           await markPermissionRequested();
           _log('LocationService: Permission after request: $permission');
 
           if (permission == LocationPermission.whileInUse ||
               permission == LocationPermission.always) {
-            _log('LocationService: Permission granted, updating location silently...');
+            _log(
+              'LocationService: Permission granted, updating location silently...',
+            );
             final success = await updateUserLocation(silent: true);
             _log('LocationService: Silent location update success: $success');
           } else {
-            _log('LocationService: Permission denied by user - will not ask again');
+            _log(
+              'LocationService: Permission denied by user - will not ask again',
+            );
           }
         } else {
           // Permission was already requested before, skip silently
-          _log('LocationService: Permission was requested before, skipping silent init');
+          _log(
+            'LocationService: Permission was requested before, skipping silent init',
+          );
         }
       } else if (permission == LocationPermission.deniedForever) {
-        _log('LocationService: Permission denied forever - skipping silent init');
+        _log(
+          'LocationService: Permission denied forever - skipping silent init',
+        );
       }
     } catch (e) {
       _log('LocationService: Error initializing location: $e');
@@ -511,20 +595,26 @@ class LocationService {
       }
 
       _periodicUpdatesStarted = true;
-      _log('LocationService: Starting periodic background location updates (every 10 minutes)...');
+      _log(
+        'LocationService: Starting periodic background location updates (every 10 minutes)...',
+      );
 
       // Cancel any existing timer first
       _periodicTimer?.cancel();
 
       // Use Timer.periodic instead of while(true) - can be cancelled on logout
-      _periodicTimer = Timer.periodic(const Duration(minutes: 10), (timer) async {
+      _periodicTimer = Timer.periodic(const Duration(minutes: 10), (
+        timer,
+      ) async {
         try {
           // Check if user is still authenticated
           if (_auth.currentUser != null) {
             _log('LocationService: Running periodic silent location update...');
             await updateUserLocation(silent: true);
           } else {
-            _log('LocationService: User not authenticated, stopping periodic updates');
+            _log(
+              'LocationService: User not authenticated, stopping periodic updates',
+            );
             stopPeriodicLocationUpdates();
           }
         } catch (e) {
@@ -571,30 +661,40 @@ class LocationService {
       // Cancel existing subscription
       _positionStreamSubscription?.cancel();
 
-      _log('LocationService: Starting location stream (distance filter: ${minimumDistanceForUpdate}m)...');
+      _log(
+        'LocationService: Starting location stream (distance filter: ${minimumDistanceForUpdate}m)...',
+      );
 
       // Use location stream with distance filter - only triggers when user moves
       final LocationSettings locationSettings = LocationSettings(
         accuracy: LocationAccuracy.medium, // Battery efficient
-        distanceFilter: minimumDistanceForUpdate.toInt(), // Only update when moved 100+ meters
+        distanceFilter: minimumDistanceForUpdate
+            .toInt(), // Only update when moved 100+ meters
       );
 
-      _positionStreamSubscription = Geolocator.getPositionStream(
-        locationSettings: locationSettings,
-      ).listen(
-        (Position position) async {
-          _log('LocationService: Stream received new position lat=${position.latitude}, lng=${position.longitude}');
+      _positionStreamSubscription =
+          Geolocator.getPositionStream(
+            locationSettings: locationSettings,
+          ).listen(
+            (Position position) async {
+              _log(
+                'LocationService: Stream received new position lat=${position.latitude}, lng=${position.longitude}',
+              );
 
-          // Check if user is still authenticated
-          if (_auth.currentUser != null) {
-            // Update location (forceUpdate since stream already filtered by distance)
-            await updateUserLocation(position: position, silent: true, forceUpdate: true);
-          }
-        },
-        onError: (error) {
-          _log('LocationService: Stream error: $error');
-        },
-      );
+              // Check if user is still authenticated
+              if (_auth.currentUser != null) {
+                // Update location (forceUpdate since stream already filtered by distance)
+                await updateUserLocation(
+                  position: position,
+                  silent: true,
+                  forceUpdate: true,
+                );
+              }
+            },
+            onError: (error) {
+              _log('LocationService: Stream error: $error');
+            },
+          );
     } catch (e) {
       _log('LocationService: Error starting location stream: $e');
     }
@@ -630,24 +730,34 @@ class LocationService {
           final lastUpdate = locationUpdatedAt.toDate();
           final timeSinceUpdate = DateTime.now().difference(lastUpdate);
 
-          _log('LocationService: Last location update was ${timeSinceUpdate.inHours} hours ago');
+          _log(
+            'LocationService: Last location update was ${timeSinceUpdate.inHours} hours ago',
+          );
 
           // If location is older than 24 hours, refresh it
           if (timeSinceUpdate > locationFreshnessThreshold) {
-            _log('LocationService: Location is stale (>${locationFreshnessThreshold.inHours}h old), refreshing...');
+            _log(
+              'LocationService: Location is stale (>${locationFreshnessThreshold.inHours}h old), refreshing...',
+            );
             return await updateUserLocation(silent: true);
           } else {
-            _log('LocationService: Location is fresh (${timeSinceUpdate.inHours}h old), no update needed');
+            _log(
+              'LocationService: Location is fresh (${timeSinceUpdate.inHours}h old), no update needed',
+            );
             return true;
           }
         } else {
           // No location timestamp, update location
-          _log('LocationService: No location timestamp found, updating location...');
+          _log(
+            'LocationService: No location timestamp found, updating location...',
+          );
           return await updateUserLocation(silent: true);
         }
       } else {
         // User document doesn't exist, create with location
-        _log('LocationService: User document not found, creating with location...');
+        _log(
+          'LocationService: User document not found, creating with location...',
+        );
         return await updateUserLocation(silent: true);
       }
     } catch (e) {
@@ -701,7 +811,8 @@ class LocationService {
         return {
           'canGetLocation': false,
           'reason': 'Permission denied forever',
-          'message': 'Please enable location permission for this app in your device settings',
+          'message':
+              'Please enable location permission for this app in your device settings',
           'canOpenSettings': true,
         };
       }
@@ -735,7 +846,9 @@ class LocationService {
     bool highAccuracy = false,
   }) async {
     try {
-      _log('LocationService: Force refreshing location (silent=$silent, highAccuracy=$highAccuracy)...');
+      _log(
+        'LocationService: Force refreshing location (silent=$silent, highAccuracy=$highAccuracy)...',
+      );
       final userId = _auth.currentUser?.uid;
       if (userId == null) {
         _log('LocationService: No authenticated user');
@@ -745,7 +858,9 @@ class LocationService {
       // Check if location services are enabled SILENTLY
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled && !kIsWeb) {
-        _log('LocationService: Location services are disabled - skipping silent refresh');
+        _log(
+          'LocationService: Location services are disabled - skipping silent refresh',
+        );
         return false;
       }
 
@@ -759,7 +874,9 @@ class LocationService {
       }
 
       if (permission == LocationPermission.deniedForever) {
-        _log('LocationService: Permission denied forever - skipping silent refresh');
+        _log(
+          'LocationService: Permission denied forever - skipping silent refresh',
+        );
         return false;
       }
 
@@ -771,7 +888,9 @@ class LocationService {
           highAccuracy: highAccuracy,
         );
         if (position != null) {
-          _log('LocationService: Got GPS position: ${position.latitude}, ${position.longitude}, accuracy=${position.accuracy}m');
+          _log(
+            'LocationService: Got GPS position: ${position.latitude}, ${position.longitude}, accuracy=${position.accuracy}m',
+          );
 
           // Update user location SILENTLY
           return await updateUserLocation(position: position, silent: silent);

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../providers/app_providers.dart';
+import '../../providers/other providers/app_providers.dart';
 import '../home/main_navigation_screen.dart';
 import '../../res/config/app_colors.dart';
 

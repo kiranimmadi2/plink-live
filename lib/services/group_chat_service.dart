@@ -603,7 +603,7 @@ class GroupChatService {
       });
 
       final updates = <String, dynamic>{
-        'lastMessage': text.isNotEmpty ? text : (imageUrl != null ? '📷 Photo' : '📎 File'),
+        'lastMessage': text.isNotEmpty ? text : (imageUrl != null ? ' Photo' : '📎 File'),
         'lastMessageTime': FieldValue.serverTimestamp(),
         'lastMessageSenderId': currentUserId,
       };

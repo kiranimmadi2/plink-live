@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import './app_providers.dart';
+import 'other providers/app_providers.dart';
 
 /// LIVE CONNECT FILTER STATE
 

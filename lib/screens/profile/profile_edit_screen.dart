@@ -8,7 +8,7 @@ import 'dart:io';
 import '../../res/config/app_colors.dart';
 import '../../services/auth_service.dart';
 import '../../services/user_manager.dart';
-import '../../services/location_service.dart';
+import '../../services/location services/location_service.dart';
 
 class ProfileEditScreen extends StatefulWidget {
   const ProfileEditScreen({super.key});
@@ -471,7 +471,9 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
             ),
           );
         } else {
-          debugPrint('ProfileEditScreen: Geocoding failed or returned invalid data');
+          debugPrint(
+            'ProfileEditScreen: Geocoding failed or returned invalid data',
+          );
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
@@ -766,7 +768,9 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                         height: 50,
                         decoration: BoxDecoration(
                           color: AppColors.buttonBackground(),
-                          borderRadius: BorderRadius.circular(AppColors.buttonBorderRadius),
+                          borderRadius: BorderRadius.circular(
+                            AppColors.buttonBorderRadius,
+                          ),
                           border: Border.all(
                             color: AppColors.buttonBorder(),
                             width: 1,

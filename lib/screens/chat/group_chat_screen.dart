@@ -477,7 +477,7 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen>
 
       // Update conversation
       await _firestore.collection('conversations').doc(widget.groupId).update({
-        'lastMessage': '📷 Photo',
+        'lastMessage': ' Photo',
         'lastMessageTime': FieldValue.serverTimestamp(),
         'lastMessageSenderId': currentUserId,
       });
@@ -2408,7 +2408,7 @@ class _GroupChatScreenState extends ConsumerState<GroupChatScreen>
                 ),
               ),
               Text(
-                replyData['text'] ?? '📷 Photo',
+                replyData['text'] ?? ' Photo',
                 style: TextStyle(
                   fontSize: 12,
                   color: isMe

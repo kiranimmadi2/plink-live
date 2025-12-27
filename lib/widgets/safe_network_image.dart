@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import '../utils/photo_url_helper.dart';
+import '../res/utils/photo_url_helper.dart';
 
 /// A network image widget that handles CORS issues on web platform.
 /// Automatically uses Image.network for web and CachedNetworkImage for mobile.

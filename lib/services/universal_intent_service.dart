@@ -4,9 +4,9 @@ import 'package:flutter/foundation.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'dart:convert';
 import 'dart:math' as math;
-import 'gemini_service.dart';
+import 'location services/gemini_service.dart';
 import 'unified_post_service.dart';
-import '../config/api_config.dart';
+import '../res/config/api_config.dart';
 import '../models/post_model.dart';
 
 class UniversalIntentService {

@@ -19,12 +19,12 @@ import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/user_profile.dart';
 import '../models/message_model.dart';
-import '../utils/photo_url_helper.dart';
-import '../services/conversation_service.dart';
+import '../res/utils/photo_url_helper.dart';
+import '../services/chat services/conversation_service.dart';
 import '../services/hybrid_chat_service.dart';
-import '../providers/app_providers.dart';
+import '../providers/other providers/app_providers.dart';
 import 'profile/profile_view_screen.dart';
-import 'video_player_screen.dart';
+import 'call/video_player_screen.dart';
 
 class EnhancedChatScreen extends ConsumerStatefulWidget {
   final UserProfile otherUser;
@@ -259,8 +259,9 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
       }
 
       // Fallback: Create conversation if not provided
-      final conversationId =
-          await _conversationService.getOrCreateConversation(widget.otherUser);
+      final conversationId = await _conversationService.getOrCreateConversation(
+        widget.otherUser,
+      );
 
       if (mounted) {
         setState(() {
@@ -380,14 +381,26 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
                     children: [
                       Builder(
                         builder: (context) {
-                          final fixedPhotoUrl = PhotoUrlHelper.fixGooglePhotoUrl(widget.otherUser.profileImageUrl);
-                          final initial = widget.otherUser.name.isNotEmpty ? widget.otherUser.name[0].toUpperCase() : '?';
+                          final fixedPhotoUrl =
+                              PhotoUrlHelper.fixGooglePhotoUrl(
+                                widget.otherUser.profileImageUrl,
+                              );
+                          final initial = widget.otherUser.name.isNotEmpty
+                              ? widget.otherUser.name[0].toUpperCase()
+                              : '?';
 
                           Widget buildFallbackAvatar() {
                             return CircleAvatar(
                               radius: 18,
-                              backgroundColor: Theme.of(context).primaryColor.withValues(alpha: 0.1),
-                              child: Text(initial, style: TextStyle(color: Theme.of(context).primaryColor)),
+                              backgroundColor: Theme.of(
+                                context,
+                              ).primaryColor.withValues(alpha: 0.1),
+                              child: Text(
+                                initial,
+                                style: TextStyle(
+                                  color: Theme.of(context).primaryColor,
+                                ),
+                              ),
                             );
                           }
 
@@ -401,7 +414,8 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
                               width: 36,
                               height: 36,
                               fit: BoxFit.cover,
-                              placeholder: (context, url) => buildFallbackAvatar(),
+                              placeholder: (context, url) =>
+                                  buildFallbackAvatar(),
                               errorWidget: (context, url, error) {
                                 if (error.toString().contains('429')) {
                                   PhotoUrlHelper.markAsRateLimited(url);
@@ -801,8 +815,12 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
             ),
             child: Builder(
               builder: (context) {
-                final fixedPhotoUrl = PhotoUrlHelper.fixGooglePhotoUrl(widget.otherUser.profileImageUrl);
-                final initial = widget.otherUser.name.isNotEmpty ? widget.otherUser.name[0].toUpperCase() : '?';
+                final fixedPhotoUrl = PhotoUrlHelper.fixGooglePhotoUrl(
+                  widget.otherUser.profileImageUrl,
+                );
+                final initial = widget.otherUser.name.isNotEmpty
+                    ? widget.otherUser.name[0].toUpperCase()
+                    : '?';
 
                 Widget buildFallbackAvatar() {
                   return CircleAvatar(
@@ -1093,132 +1111,132 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
     return GestureDetector(
       onLongPress: () => _showMessageOptions(message, isMe),
       child: Padding(
-          padding: EdgeInsets.only(
-            bottom: 6,
-            left: isMe ? 60 : 0,
-            right: isMe ? 0 : 60,
-          ),
-          child: Row(
-            mainAxisAlignment: isMe
-                ? MainAxisAlignment.end
-                : MainAxisAlignment.start,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              if (!isMe && showAvatar)
-                _buildAvatar(isDarkMode)
-              else if (!isMe)
-                const SizedBox(width: 40),
-              Flexible(
-                child: Column(
-                  crossAxisAlignment: isMe
-                      ? CrossAxisAlignment.end
-                      : CrossAxisAlignment.start,
-                  children: [
-                    if (message.replyToMessageId != null)
-                      _buildReplyBubble(
-                        message.replyToMessageId!,
-                        isMe,
-                        isDarkMode,
+        padding: EdgeInsets.only(
+          bottom: 6,
+          left: isMe ? 60 : 0,
+          right: isMe ? 0 : 60,
+        ),
+        child: Row(
+          mainAxisAlignment: isMe
+              ? MainAxisAlignment.end
+              : MainAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            if (!isMe && showAvatar)
+              _buildAvatar(isDarkMode)
+            else if (!isMe)
+              const SizedBox(width: 40),
+            Flexible(
+              child: Column(
+                crossAxisAlignment: isMe
+                    ? CrossAxisAlignment.end
+                    : CrossAxisAlignment.start,
+                children: [
+                  if (message.replyToMessageId != null)
+                    _buildReplyBubble(
+                      message.replyToMessageId!,
+                      isMe,
+                      isDarkMode,
+                    ),
+                  Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: message.type == MessageType.text ? 14 : 4,
+                      vertical: message.type == MessageType.text ? 10 : 4,
+                    ),
+                    decoration: BoxDecoration(
+                      gradient: isMe
+                          ? LinearGradient(
+                              colors: sentGradientColors,
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            )
+                          : null,
+                      color: isMe ? null : receivedBgColor,
+                      borderRadius: BorderRadius.only(
+                        topLeft: const Radius.circular(18),
+                        topRight: const Radius.circular(18),
+                        bottomLeft: Radius.circular(isMe ? 18 : 4),
+                        bottomRight: Radius.circular(isMe ? 4 : 18),
                       ),
-                    Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: message.type == MessageType.text ? 14 : 4,
-                        vertical: message.type == MessageType.text ? 10 : 4,
-                      ),
-                      decoration: BoxDecoration(
-                        gradient: isMe
-                            ? LinearGradient(
-                                colors: sentGradientColors,
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              )
-                            : null,
-                        color: isMe ? null : receivedBgColor,
-                        borderRadius: BorderRadius.only(
-                          topLeft: const Radius.circular(18),
-                          topRight: const Radius.circular(18),
-                          bottomLeft: Radius.circular(isMe ? 18 : 4),
-                          bottomRight: Radius.circular(isMe ? 4 : 18),
+                      border: isHighlighted
+                          ? Border.all(color: Colors.orange, width: 2)
+                          : null,
+                      boxShadow: [
+                        BoxShadow(
+                          color: isMe
+                              ? sentGradientColors[0].withValues(alpha: 0.25)
+                              : Colors.black.withValues(
+                                  alpha: isDarkMode ? 0.2 : 0.06,
+                                ),
+                          blurRadius: isMe ? 12 : 6,
+                          offset: const Offset(0, 3),
+                          spreadRadius: 0,
                         ),
-                        border: isHighlighted
-                            ? Border.all(color: Colors.orange, width: 2)
-                            : null,
-                        boxShadow: [
-                          BoxShadow(
-                            color: isMe
-                                ? sentGradientColors[0].withValues(alpha: 0.25)
-                                : Colors.black.withValues(
-                                    alpha: isDarkMode ? 0.2 : 0.06,
-                                  ),
-                            blurRadius: isMe ? 12 : 6,
-                            offset: const Offset(0, 3),
-                            spreadRadius: 0,
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildMessageContent(
+                          message,
+                          isMe,
+                          isDarkMode,
+                          searchQuery,
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.only(
+                            left: 4,
+                            right: 4,
+                            bottom: 2,
                           ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildMessageContent(
-                            message,
-                            isMe,
-                            isDarkMode,
-                            searchQuery,
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.only(
-                              left: 4,
-                              right: 4,
-                              bottom: 2,
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (message.isEdited == true) ...[
-                                  Text(
-                                    'edited ',
-                                    style: TextStyle(
-                                      color: isMe
-                                          ? Colors.white.withValues(alpha: 0.55)
-                                          : (isDarkMode
-                                                ? Colors.grey[500]
-                                                : Colors.grey[600]),
-                                      fontSize: 11,
-                                      fontStyle: FontStyle.italic,
-                                    ),
-                                  ),
-                                ],
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (message.isEdited == true) ...[
                                 Text(
-                                  formattedTime,
+                                  'edited ',
                                   style: TextStyle(
                                     color: isMe
-                                        ? Colors.white.withValues(alpha: 0.65)
+                                        ? Colors.white.withValues(alpha: 0.55)
                                         : (isDarkMode
                                               ? Colors.grey[500]
                                               : Colors.grey[600]),
                                     fontSize: 11,
-                                    fontWeight: FontWeight.w400,
+                                    fontStyle: FontStyle.italic,
                                   ),
                                 ),
-                                if (isMe) ...[
-                                  const SizedBox(width: 4),
-                                  _buildMessageStatusIcon(message.status, isMe),
-                                ],
                               ],
-                            ),
+                              Text(
+                                formattedTime,
+                                style: TextStyle(
+                                  color: isMe
+                                      ? Colors.white.withValues(alpha: 0.65)
+                                      : (isDarkMode
+                                            ? Colors.grey[500]
+                                            : Colors.grey[600]),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w400,
+                                ),
+                              ),
+                              if (isMe) ...[
+                                const SizedBox(width: 4),
+                                _buildMessageStatusIcon(message.status, isMe),
+                              ],
+                            ],
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                    if (message.reactions != null &&
-                        message.reactions!.isNotEmpty)
-                      _buildReactions(message, isDarkMode),
-                  ],
-                ),
+                  ),
+                  if (message.reactions != null &&
+                      message.reactions!.isNotEmpty)
+                    _buildReactions(message, isDarkMode),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
+      ),
     );
   }
 
@@ -1237,8 +1255,12 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
       ),
       child: Builder(
         builder: (context) {
-          final fixedPhotoUrl = PhotoUrlHelper.fixGooglePhotoUrl(widget.otherUser.profileImageUrl);
-          final initial = widget.otherUser.name.isNotEmpty ? widget.otherUser.name[0].toUpperCase() : '?';
+          final fixedPhotoUrl = PhotoUrlHelper.fixGooglePhotoUrl(
+            widget.otherUser.profileImageUrl,
+          );
+          final initial = widget.otherUser.name.isNotEmpty
+              ? widget.otherUser.name[0].toUpperCase()
+              : '?';
 
           Widget buildFallbackAvatar() {
             return CircleAvatar(
@@ -1388,7 +1410,10 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
     if (message.mediaUrl != null) {
       return GestureDetector(
         onTap: () {
-          _openFullScreenImage(context, CachedNetworkImageProvider(message.mediaUrl!));
+          _openFullScreenImage(
+            context,
+            CachedNetworkImageProvider(message.mediaUrl!),
+          );
         },
         child: ClipRRect(
           borderRadius: BorderRadius.circular(14),
@@ -1831,8 +1856,12 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
             children: [
               Builder(
                 builder: (context) {
-                  final fixedPhotoUrl = PhotoUrlHelper.fixGooglePhotoUrl(widget.otherUser.profileImageUrl);
-                  final initial = widget.otherUser.name.isNotEmpty ? widget.otherUser.name[0].toUpperCase() : '?';
+                  final fixedPhotoUrl = PhotoUrlHelper.fixGooglePhotoUrl(
+                    widget.otherUser.profileImageUrl,
+                  );
+                  final initial = widget.otherUser.name.isNotEmpty
+                      ? widget.otherUser.name[0].toUpperCase()
+                      : '?';
 
                   Widget buildFallbackAvatar() {
                     return CircleAvatar(
@@ -2646,13 +2675,13 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
                     if (messageType == MessageType.text.index) {
                       lastMessageText = lastMessageData['text'] ?? '';
                     } else if (messageType == MessageType.image.index) {
-                      lastMessageText = '📷 Photo';
+                      lastMessageText = ' Photo';
                     } else if (messageType == MessageType.video.index) {
-                      lastMessageText = '📹 Video';
+                      lastMessageText = ' Video';
                     } else if (messageType == MessageType.audio.index) {
-                      lastMessageText = '🎵 Audio';
+                      lastMessageText = ' Audio';
                     } else if (messageType == MessageType.file.index) {
-                      lastMessageText = '📎 File';
+                      lastMessageText = ' File';
                     } else {
                       lastMessageText = lastMessageData['text'] ?? '';
                     }

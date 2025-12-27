@@ -7,7 +7,7 @@ import 'package:flutter_ringtone_player/flutter_ringtone_player.dart';
 import '../../models/user_profile.dart';
 import '../../res/config/app_colors.dart';
 import '../../res/config/app_text_styles.dart';
-import 'voice_call_screen.dart';
+import '../call/voice_call_screen.dart';
 
 class IncomingCallScreen extends StatefulWidget {
   final String callId;
@@ -34,6 +34,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
   late Animation<double> _pulseAnimation;
   StreamSubscription? _callStatusSubscription;
   bool _isAnswering = false;
+  bool _isNavigating = false;
 
   @override
   void initState() {
@@ -114,20 +115,26 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
         .doc(widget.callId)
         .snapshots()
         .listen((snapshot) {
-      if (!mounted) return;
+      if (!mounted || _isNavigating) return;
 
       final data = snapshot.data();
       if (data == null) {
-        Navigator.of(context).pop();
+        _safeNavigateBack();
         return;
       }
 
       final status = data['status'] as String?;
 
       if (status == 'ended' || status == 'rejected') {
-        Navigator.of(context).pop();
+        _safeNavigateBack();
       }
     });
+  }
+
+  void _safeNavigateBack() {
+    if (_isNavigating || !mounted) return;
+    _isNavigating = true;
+    Navigator.of(context).pop();
   }
 
   @override
@@ -139,17 +146,19 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
   }
 
   Future<void> _acceptCall() async {
-    if (_isAnswering) return;
+    if (_isAnswering || _isNavigating) return;
     setState(() => _isAnswering = true);
+    _isNavigating = true;
 
     HapticFeedback.mediumImpact();
     await _stopRingtone();
 
     try {
-      // Update call status
+      // Update call status to connected so both sides know
       await _firestore.collection('calls').doc(widget.callId).update({
-        'status': 'accepted',
+        'status': 'connected',
         'acceptedAt': FieldValue.serverTimestamp(),
+        'connectedAt': FieldValue.serverTimestamp(),
       });
 
       if (!mounted) return;
@@ -217,6 +226,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
   }
 
   Future<void> _rejectCall() async {
+    if (_isNavigating) return;
     HapticFeedback.mediumImpact();
     await _stopRingtone();
 
@@ -226,14 +236,10 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
         'rejectedAt': FieldValue.serverTimestamp(),
       });
 
-      if (mounted) {
-        Navigator.of(context).pop();
-      }
+      _safeNavigateBack();
     } catch (e) {
       debugPrint('Error rejecting call: $e');
-      if (mounted) {
-        Navigator.of(context).pop();
-      }
+      _safeNavigateBack();
     }
   }
 

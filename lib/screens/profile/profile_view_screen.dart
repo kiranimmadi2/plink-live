@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../models/post_model.dart';
 import '../../models/user_profile.dart';
-import '../../utils/photo_url_helper.dart';
+import '../../res/utils/photo_url_helper.dart';
 import '../../widgets/account_badges.dart';
 import '../enhanced_chat_screen.dart';
 

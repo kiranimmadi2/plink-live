@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../widgets/voice_orb.dart';
-import '../widgets/audio_visualizer.dart';
+import '../../widgets/voice_orb.dart';
+import '../../widgets/audio_visualizer.dart';
 
 class VoiceAssistantScreen extends StatefulWidget {
   const VoiceAssistantScreen({super.key});

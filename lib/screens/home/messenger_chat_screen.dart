@@ -13,7 +13,7 @@ import 'package:timeago/timeago.dart' as timeago;
 import 'dart:io';
 
 import '../../models/user_profile.dart';
-import '../../utils/photo_url_helper.dart';
+import '../../res/utils/photo_url_helper.dart';
 
 class MessengerChatScreen extends StatefulWidget {
   final UserProfile otherUser;
@@ -221,7 +221,7 @@ class _MessengerChatScreenState extends State<MessengerChatScreen> {
       if (_conversationId == null) {
         final docRef = await _firestore.collection('conversations').add({
           'participants': [currentUser.uid, widget.otherUser.uid],
-          'lastMessage': text.isNotEmpty ? text : '📷 Photo',
+          'lastMessage': text.isNotEmpty ? text : ' Photo',
           'lastMessageTime': FieldValue.serverTimestamp(),
           'unreadCount': {
             currentUser.uid: 0,
@@ -248,7 +248,7 @@ class _MessengerChatScreenState extends State<MessengerChatScreen> {
 
       // Update conversation
       await _firestore.collection('conversations').doc(_conversationId).update({
-        'lastMessage': text.isNotEmpty ? text : '📷 Photo',
+        'lastMessage': text.isNotEmpty ? text : ' Photo',
         'lastMessageTime': FieldValue.serverTimestamp(),
         'unreadCount.${widget.otherUser.uid}': FieldValue.increment(1),
       });

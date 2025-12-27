@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:collection';
 import 'package:flutter/foundation.dart';
-import '../config/api_config.dart';
+import '../../res/config/api_config.dart';
 
 /// High-performance in-memory cache service for embeddings and match results
 /// Implements LRU (Least Recently Used) eviction policy
@@ -11,7 +11,8 @@ class CacheService {
   CacheService._internal();
 
   // LRU cache for embeddings
-  final LinkedHashMap<String, CachedEmbedding> _embeddingCache = LinkedHashMap();
+  final LinkedHashMap<String, CachedEmbedding> _embeddingCache =
+      LinkedHashMap();
 
   // LRU cache for match results
   final LinkedHashMap<String, CachedMatches> _matchCache = LinkedHashMap();
@@ -19,7 +20,8 @@ class CacheService {
   // LRU cache for messages
   final LinkedHashMap<String, CachedMessages> _messageCache = LinkedHashMap();
   static const int _maxMessageCacheSize = 20; // Cache last 20 conversations
-  static const int _messagesPerConversation = 50; // Store last 50 messages per conversation
+  static const int _messagesPerConversation =
+      50; // Store last 50 messages per conversation
   static const Duration _messageCacheDuration = Duration(minutes: 10);
 
   // Statistics
@@ -161,7 +163,10 @@ class CacheService {
   }
 
   /// Store messages in cache
-  void cacheMessages(String conversationId, List<Map<String, dynamic>> messages) {
+  void cacheMessages(
+    String conversationId,
+    List<Map<String, dynamic>> messages,
+  ) {
     try {
       // Remove if already exists
       if (_messageCache.containsKey(conversationId)) {
@@ -291,7 +296,10 @@ class CacheService {
   }
 
   /// Warm up cache with frequently used embeddings
-  Future<void> warmupCache(List<String> texts, Future<List<double>> Function(String) generateEmbedding) async {
+  Future<void> warmupCache(
+    List<String> texts,
+    Future<List<double>> Function(String) generateEmbedding,
+  ) async {
     try {
       for (final text in texts) {
         if (!_embeddingCache.containsKey(_generateKey(text))) {
@@ -317,10 +325,7 @@ class CachedEmbedding {
   final List<double> embedding;
   final DateTime timestamp;
 
-  CachedEmbedding({
-    required this.embedding,
-    required this.timestamp,
-  });
+  CachedEmbedding({required this.embedding, required this.timestamp});
 }
 
 /// Cached match results data class
@@ -341,8 +346,5 @@ class CachedMessages {
   final List<Map<String, dynamic>> messages;
   final DateTime timestamp;
 
-  CachedMessages({
-    required this.messages,
-    required this.timestamp,
-  });
+  CachedMessages({required this.messages, required this.timestamp});
 }

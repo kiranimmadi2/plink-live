@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supper/providers/theme_provider.dart';
-
+import '../providers/other providers/theme_provider.dart';
+import '../res/config/app_colors.dart';
 import '../widgets/glassmorphic_container.dart';
 
 class ThemeSettingsScreen extends ConsumerStatefulWidget {

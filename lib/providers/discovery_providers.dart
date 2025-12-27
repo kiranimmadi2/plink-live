@@ -1,8 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/universal_intent_service.dart';
-import '../services/photo_cache_service.dart';
-import './app_providers.dart';
+import '../services/profile services/photo_cache_service.dart';
+import 'other providers/app_providers.dart';
 
 /// HOME SCREEN STATE
 

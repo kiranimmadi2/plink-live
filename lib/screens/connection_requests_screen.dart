@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/connection_service.dart';
-import '../widgets/user_avatar.dart';
+import '../widgets/other widgets/user_avatar.dart';
 
 class ConnectionRequestsScreen extends ConsumerStatefulWidget {
   const ConnectionRequestsScreen({super.key});

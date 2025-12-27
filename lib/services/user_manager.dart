@@ -2,7 +2,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
-import 'photo_cache_service.dart';
+import 'profile services/photo_cache_service.dart';
 
 class UserManager {
   static final UserManager _instance = UserManager._internal();
@@ -199,10 +199,14 @@ class UserManager {
       final user = currentUser;
       if (user != null) {
         try {
-          await _firestore.collection('users').doc(user.uid).update({
-            'isOnline': false,
-            'lastSeen': FieldValue.serverTimestamp(),
-          }).timeout(const Duration(seconds: 5));
+          await _firestore
+              .collection('users')
+              .doc(user.uid)
+              .update({
+                'isOnline': false,
+                'lastSeen': FieldValue.serverTimestamp(),
+              })
+              .timeout(const Duration(seconds: 5));
         } catch (e) {
           debugPrint('⚠️ Failed to update online status: $e');
         }

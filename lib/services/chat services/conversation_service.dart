@@ -1,7 +1,7 @@
 ﻿import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../models/conversation_model.dart';
-import '../models/user_profile.dart';
+import '../../models/conversation_model.dart';
+import '../../models/user_profile.dart';
 
 class ConversationService {
   static final ConversationService _instance = ConversationService._internal();
@@ -99,17 +99,12 @@ class ConversationService {
           .get();
 
       if (conversationDoc.exists) {
-        // debugPrint('ConversationService: Conversation already exists: $conversationId');
-
-        // IMPORTANT: Validate and fix participants array if corrupted
-        // This ensures the conversation will appear in the Messages screen
-        final wasFixed = await _validateAndFixParticipants(conversationId);
-        if (wasFixed) {
-          // debugPrint('ConversationService: ⚠️ Fixed corrupted participants array for $conversationId');
-        }
-
-        // Update participant info if needed
-        await _updateParticipantInfo(conversationId, currentUserId, otherUser);
+        // Return immediately for faster loading
+        // Run validation in background (non-blocking)
+        Future.microtask(() async {
+          await _validateAndFixParticipants(conversationId);
+          await _updateParticipantInfo(conversationId, currentUserId, otherUser);
+        });
         return conversationId;
       }
 
@@ -331,18 +326,19 @@ class ConversationService {
 
     try {
       // Create message document
-      final messageRef = await _firestore // ignore: unused_local_variable
-          .collection('conversations')
-          .doc(conversationId)
-          .collection('messages')
-          .add({
-            'senderId': currentUserId,
-            'text': text,
-            'imageUrl': imageUrl,
-            'timestamp': FieldValue.serverTimestamp(),
-            'isRead': false,
-            'isEdited': false,
-          });
+      final messageRef =
+          await _firestore // ignore: unused_local_variable
+              .collection('conversations')
+              .doc(conversationId)
+              .collection('messages')
+              .add({
+                'senderId': currentUserId,
+                'text': text,
+                'imageUrl': imageUrl,
+                'timestamp': FieldValue.serverTimestamp(),
+                'isRead': false,
+                'isEdited': false,
+              });
 
       // Update conversation with last message
       await _firestore.collection('conversations').doc(conversationId).update({

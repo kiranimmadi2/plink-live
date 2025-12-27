@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:flutter/foundation.dart';
-import 'gemini_service.dart';
+import 'location services/gemini_service.dart';
 
 class SmartPromptParser {
   final GenerativeModel _model;

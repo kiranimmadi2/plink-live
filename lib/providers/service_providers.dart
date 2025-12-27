@@ -1,20 +1,20 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 // Services
-import '../services/gemini_service.dart';
-import '../services/location_service.dart';
+import '../services/location services/gemini_service.dart';
+import '../services/location services/location_service.dart';
 import '../services/connection_service.dart';
-import '../services/conversation_service.dart';
+import '../services/chat services/conversation_service.dart';
 import '../services/unified_post_service.dart';
 import '../services/notification_service.dart';
 import '../services/analytics_service.dart';
 import '../services/connectivity_service.dart';
 import '../services/universal_intent_service.dart';
 import '../services/unified_matching_service.dart';
-import '../services/photo_cache_service.dart';
+import '../services/profile services/photo_cache_service.dart';
 import '../services/hybrid_chat_service.dart';
 import '../services/group_chat_service.dart';
-import '../services/error_tracking_service.dart';
+import '../services/error services/error_tracking_service.dart';
 
 /// AI & MATCHING SERVICES
 

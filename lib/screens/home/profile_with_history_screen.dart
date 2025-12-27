@@ -7,9 +7,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../services/universal_intent_service.dart';
-import '../../services/location_service.dart';
-import '../../widgets/user_avatar.dart';
-import '../../providers/theme_provider.dart';
+import '../../services/location services/location_service.dart';
+import '../../widgets/other widgets/user_avatar.dart';
+import '../../providers/other providers/theme_provider.dart';
+import '../../res/config/app_colors.dart';
 import '../login/login_screen.dart';
 import '../profile/profile_view_screen.dart';
 import '../profile/settings_screen.dart';
@@ -1106,7 +1107,9 @@ class _ProfileWithHistoryScreenState
 
                                                   if (!mounted) return;
                                                   // ignore: use_build_context_synchronously
-                                                  ScaffoldMessenger.of(context).showSnackBar(
+                                                  ScaffoldMessenger.of(
+                                                    context,
+                                                  ).showSnackBar(
                                                     const SnackBar(
                                                       content: Text(
                                                         'Location updated successfully',
@@ -1118,7 +1121,9 @@ class _ProfileWithHistoryScreenState
                                                 } else {
                                                   if (!mounted) return;
                                                   // ignore: use_build_context_synchronously
-                                                  ScaffoldMessenger.of(context).showSnackBar(
+                                                  ScaffoldMessenger.of(
+                                                    context,
+                                                  ).showSnackBar(
                                                     const SnackBar(
                                                       content: Text(
                                                         'Could not update location',
@@ -1134,13 +1139,14 @@ class _ProfileWithHistoryScreenState
                                                 );
                                                 if (!mounted) return;
                                                 // ignore: use_build_context_synchronously
-                                                ScaffoldMessenger.of(context).showSnackBar(
+                                                ScaffoldMessenger.of(
+                                                  context,
+                                                ).showSnackBar(
                                                   const SnackBar(
                                                     content: Text(
                                                       'Location update failed',
                                                     ),
-                                                    backgroundColor:
-                                                        Colors.red,
+                                                    backgroundColor: Colors.red,
                                                   ),
                                                 );
                                               }

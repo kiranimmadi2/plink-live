@@ -1,9 +1,12 @@
 import 'dart:async';
+import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../models/user_profile.dart';
-import '../widgets/safe_circle_avatar.dart';
+import '../../models/user_profile.dart';
+import '../../widgets/safe_circle_avatar.dart';
+import '../../widgets/floating_particles.dart';
+import '../../services/other services/voice_call_service.dart';
 
 class VoiceCallScreen extends StatefulWidget {
   final String callId;
@@ -24,6 +27,7 @@ class VoiceCallScreen extends StatefulWidget {
 class _VoiceCallScreenState extends State<VoiceCallScreen>
     with SingleTickerProviderStateMixin {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final VoiceCallService _voiceCallService = VoiceCallService();
 
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
@@ -32,14 +36,67 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
   Timer? _callTimer;
   int _callDuration = 0;
   bool _isMuted = false;
-  bool _isSpeakerOn = false;
+  bool _isSpeakerOn = true; // Speaker on by default
   StreamSubscription? _callSubscription;
+  bool _webrtcConnected = false;
 
   @override
   void initState() {
     super.initState();
     _setupAnimation();
+    _setupVoiceCallService();
     _listenToCallStatus();
+    _joinCall();
+  }
+
+  void _setupVoiceCallService() {
+    _voiceCallService.onUserJoined = (uid) {
+      debugPrint('VoiceCallScreen: Remote user joined');
+      if (mounted) {
+        setState(() {
+          _webrtcConnected = true;
+        });
+      }
+    };
+
+    _voiceCallService.onUserOffline = (uid) {
+      debugPrint('VoiceCallScreen: Remote user offline');
+      if (mounted) {
+        setState(() {
+          _webrtcConnected = false;
+        });
+      }
+    };
+
+    _voiceCallService.onError = (message) {
+      debugPrint('VoiceCallScreen: Error - $message');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    };
+  }
+
+  Future<void> _joinCall() async {
+    debugPrint('VoiceCallScreen: Joining call ${widget.callId}, isOutgoing: ${widget.isOutgoing}');
+
+    final success = await _voiceCallService.joinCall(
+      widget.callId,
+      isCaller: widget.isOutgoing,
+    );
+
+    if (!success && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to connect audio'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+    }
   }
 
   void _setupAnimation() {
@@ -59,22 +116,29 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
         .doc(widget.callId)
         .snapshots()
         .listen((snapshot) {
-      if (!mounted) return;
+          if (!mounted) return;
 
-      final data = snapshot.data();
-      if (data != null) {
-        final status = data['status'] as String? ?? 'calling';
-        setState(() {
-          _callStatus = status;
+          final data = snapshot.data();
+          if (data != null) {
+            final status = data['status'] as String? ?? 'calling';
+            setState(() {
+              _callStatus = status;
+            });
+
+            if (status == 'connected' || status == 'accepted') {
+              _startCallTimer();
+              // Update status to connected if it was accepted
+              if (status == 'accepted') {
+                _firestore.collection('calls').doc(widget.callId).update({
+                  'status': 'connected',
+                  'connectedAt': FieldValue.serverTimestamp(),
+                });
+              }
+            } else if (status == 'ended' || status == 'declined' || status == 'rejected') {
+              _endCall(showSnackbar: status == 'declined' || status == 'rejected');
+            }
+          }
         });
-
-        if (status == 'connected') {
-          _startCallTimer();
-        } else if (status == 'ended' || status == 'declined') {
-          _endCall(showSnackbar: status == 'declined');
-        }
-      }
-    });
   }
 
   void _startCallTimer() {
@@ -97,6 +161,9 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
   Future<void> _endCall({bool showSnackbar = false}) async {
     _callTimer?.cancel();
     _callSubscription?.cancel();
+
+    // Leave WebRTC call
+    await _voiceCallService.leaveCall();
 
     try {
       await _firestore.collection('calls').doc(widget.callId).update({
@@ -123,15 +190,17 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
 
   void _toggleMute() {
     HapticFeedback.lightImpact();
+    _voiceCallService.toggleMute();
     setState(() {
-      _isMuted = !_isMuted;
+      _isMuted = _voiceCallService.isMuted;
     });
   }
 
   void _toggleSpeaker() {
     HapticFeedback.lightImpact();
+    _voiceCallService.toggleSpeaker();
     setState(() {
-      _isSpeakerOn = !_isSpeakerOn;
+      _isSpeakerOn = _voiceCallService.isSpeakerOn;
     });
   }
 
@@ -139,6 +208,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
   void dispose() {
     _callTimer?.cancel();
     _callSubscription?.cancel();
+    _voiceCallService.leaveCall();
     _pulseController.dispose();
     super.dispose();
   }
@@ -146,32 +216,54 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0f0f23),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFF1a1a2e),
-              Color(0xFF16213e),
-              Color(0xFF0f0f23),
-            ],
+      backgroundColor: Colors.black,
+      body: Stack(
+        children: [
+          // Background Image (same as home screen)
+          Positioned.fill(
+            child: Image.asset(
+              'assets/logo/home_background.webp',
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                return Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Colors.grey.shade900, Colors.black],
+                    ),
+                  ),
+                );
+              },
+            ),
           ),
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              const SizedBox(height: 60),
-              _buildUserInfo(),
-              const SizedBox(height: 40),
-              _buildCallStatus(),
-              const Spacer(),
-              _buildCallControls(),
-              const SizedBox(height: 60),
-            ],
+
+          // Blur effect with dark overlay
+          Positioned.fill(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+              child: Container(color: Colors.black.withValues(alpha: 0.6)),
+            ),
           ),
-        ),
+
+          // Floating particles
+          const Positioned.fill(child: FloatingParticles(particleCount: 12)),
+
+          // Main content
+          SafeArea(
+            child: Column(
+              children: [
+                const SizedBox(height: 60),
+                _buildUserInfo(),
+                const SizedBox(height: 40),
+                _buildCallStatus(),
+                const Spacer(),
+                _buildCallControls(),
+                const SizedBox(height: 60),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -288,7 +380,30 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
             ],
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 8),
+        // WebRTC connection indicator
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 6,
+              height: 6,
+              decoration: BoxDecoration(
+                color: _webrtcConnected ? Colors.green : Colors.orange,
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              _webrtcConnected ? 'Audio connected' : 'Connecting audio...',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.6),
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
         Text(
           'Voice Call',
           style: TextStyle(
@@ -331,18 +446,10 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
               color: Colors.red,
               shape: BoxShape.circle,
               boxShadow: [
-                BoxShadow(
-                  color: Colors.red,
-                  blurRadius: 20,
-                  spreadRadius: 2,
-                ),
+                BoxShadow(color: Colors.red, blurRadius: 20, spreadRadius: 2),
               ],
             ),
-            child: const Icon(
-              Icons.call_end,
-              color: Colors.white,
-              size: 32,
-            ),
+            child: const Icon(Icons.call_end, color: Colors.white, size: 32),
           ),
         ),
         const SizedBox(height: 16),

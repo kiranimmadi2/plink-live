@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'notification_service.dart';
-import 'gemini_service.dart';
+import 'location services/gemini_service.dart';
 
 class RealtimeMatchingService {
   static final RealtimeMatchingService _instance =

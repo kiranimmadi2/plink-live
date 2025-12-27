@@ -8,11 +8,10 @@ import 'package:video_player/video_player.dart';
 import '../../services/universal_intent_service.dart';
 import '../../models/user_profile.dart';
 import '../enhanced_chat_screen.dart';
-import '../../widgets/user_avatar.dart';
+import '../../widgets/other widgets/user_avatar.dart';
 import '../../services/realtime_matching_service.dart';
-import '../profile/profile_with_history_screen.dart';
-import '../../services/photo_cache_service.dart';
-import '../../services/current_user_cache.dart';
+import 'profile_with_history_screen.dart';
+import '../../services/profile services/photo_cache_service.dart';
 import '../../widgets/floating_particles.dart';
 import 'product_detail_screen.dart';
 
@@ -3053,15 +3052,15 @@ class _HomeScreenState extends State<HomeScreen>
               margin: const EdgeInsets.only(left: 8, top: 4),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                image: CurrentUserCache().photoUrl != null
+                image: _auth.currentUser?.photoURL != null
                     ? DecorationImage(
-                        image: NetworkImage(CurrentUserCache().photoUrl!),
+                        image: NetworkImage(_auth.currentUser!.photoURL!),
                         fit: BoxFit.cover,
                       )
                     : null,
-                color: CurrentUserCache().photoUrl == null ? Colors.grey : null,
+                color: _auth.currentUser?.photoURL == null ? Colors.grey : null,
               ),
-              child: CurrentUserCache().photoUrl == null
+              child: _auth.currentUser?.photoURL == null
                   ? const Icon(Icons.person, color: Colors.white, size: 16)
                   : null,
             ),

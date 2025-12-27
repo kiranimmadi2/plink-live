@@ -354,22 +354,12 @@ class _GlassSearchFieldState extends State<GlassSearchField> {
       }
       return GestureDetector(
         onTap: widget.onMicTap,
-        child: Container(
-          width: 34,
-          height: 34,
-          margin: const EdgeInsets.only(right: 6),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: Colors.black.withValues(alpha: 0.4),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.2),
-              width: 1,
-            ),
-          ),
+        child: Padding(
+          padding: const EdgeInsets.only(right: 8),
           child: Icon(
             Icons.mic,
             color: Colors.white.withValues(alpha: 0.9),
-            size: 18,
+            size: 22,
           ),
         ),
       );

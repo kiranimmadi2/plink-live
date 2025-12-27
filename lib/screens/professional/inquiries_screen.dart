@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../models/inquiry_model.dart';
 import '../../services/inquiry_service.dart';
-import '../../utils/photo_url_helper.dart';
+import '../../res/utils/photo_url_helper.dart';
 
 /// Screen for professionals to manage their inquiries
 class InquiriesScreen extends StatefulWidget {

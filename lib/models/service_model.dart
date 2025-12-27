@@ -84,8 +84,8 @@ class ServiceModel {
     DateTime? updatedAt,
     this.views = 0,
     this.inquiries = 0,
-  })  : createdAt = createdAt ?? DateTime.now(),
-        updatedAt = updatedAt ?? DateTime.now();
+  }) : createdAt = createdAt ?? DateTime.now(),
+       updatedAt = updatedAt ?? DateTime.now();
 
   /// Create from Firestore document
   factory ServiceModel.fromFirestore(DocumentSnapshot doc) {
@@ -246,28 +246,28 @@ class ServiceCategories {
   ];
 
   static const Map<String, String> icons = {
-    'Design & Creative': '🎨',
-    'Web Development': '🌐',
-    'Mobile Development': '📱',
-    'Writing & Content': '✍️',
-    'Marketing & SEO': '📈',
-    'Video & Animation': '🎬',
-    'Music & Audio': '🎵',
-    'Business & Finance': '💼',
-    'Legal & Consulting': '⚖️',
-    'Engineering & Architecture': '🏗️',
-    'Education & Tutoring': '📚',
-    'Health & Wellness': '💪',
-    'Photography': '📷',
-    'Data & Analytics': '📊',
-    'AI & Machine Learning': '🤖',
-    'Home Services': '🏠',
-    'Events & Entertainment': '🎉',
-    'Other': '📦',
+    'Design & Creative': '',
+    'Web Development': '',
+    'Mobile Development': '',
+    'Writing & Content': '',
+    'Marketing & SEO': '',
+    'Video & Animation': '',
+    'Music & Audio': '',
+    'Business & Finance': '',
+    'Legal & Consulting': '',
+    'Engineering & Architecture': '',
+    'Education & Tutoring': '',
+    'Health & Wellness': '',
+    'Photography': '',
+    'Data & Analytics': '',
+    'AI & Machine Learning': '',
+    'Home Services': '',
+    'Events & Entertainment': '',
+    'Other': '',
   };
 
   static String getIcon(String category) {
-    return icons[category] ?? '📦';
+    return icons[category] ?? '';
   }
 }
 

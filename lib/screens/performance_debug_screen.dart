@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
-import '../utils/performance_monitor.dart';
+import '../res/utils/performance_monitor.dart';
 
 class PerformanceDebugScreen extends StatefulWidget {
   const PerformanceDebugScreen({super.key});

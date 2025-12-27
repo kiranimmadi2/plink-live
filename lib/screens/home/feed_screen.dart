@@ -17,6 +17,7 @@ import '../../widgets/other widgets/user_avatar.dart';
 import '../../models/user_profile.dart';
 import '../chat/enhanced_chat_screen.dart';
 import '../../services/notification_service.dart';
+import '../../res/utils/snackbar_helper.dart';
 import 'my_posts_screen.dart';
 import 'create_post_screen.dart';
 import 'edit_post_screen.dart';
@@ -39,9 +40,18 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
   // Posts data
   List<DocumentSnapshot> _posts = [];
   bool _isLoading = true;
+  bool _isLoadingMore = false; // Separate flag for pagination loading
   bool _hasMore = true;
   DocumentSnapshot? _lastDocument;
-  final int _pageSize = 20;
+  final int _pageSize = 30; // Increased page size for fewer loads
+
+  // Cached filtered posts to avoid recomputation
+  List<DocumentSnapshot>? _cachedFilteredPosts;
+  String? _lastSearchQuery;
+  String? _lastSelectedCategory;
+
+  // Real-time stream subscription
+  StreamSubscription<QuerySnapshot>? _postsSubscription;
 
   // Saved posts
   Set<String> _savedPostIds = {};
@@ -55,6 +65,10 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
   // Categories
   String _selectedCategory = 'All';
   bool _isCategoryLoading = false;
+
+  // Expanded posts tracking
+  final Set<String> _expandedPosts = {};
+
   final List<Map<String, dynamic>> _categories = [
     {'name': 'All', 'icon': Icons.grid_view_rounded},
     {'name': 'Seeking', 'icon': Icons.search_rounded},
@@ -68,7 +82,7 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _loadFeedPosts();
+    _subscribeToFeedPosts();
     _loadSavedPosts();
     _scrollController.addListener(_onScroll);
     _searchController.addListener(_onSearchChanged);
@@ -123,6 +137,7 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _postsSubscription?.cancel();
     _scrollController.dispose();
     _searchController.dispose();
     _silenceTimer?.cancel();
@@ -131,55 +146,60 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
   }
 
   void _onScroll() {
+    // Trigger loading earlier (500px before end) for smoother experience
     if (_scrollController.position.pixels >=
-        _scrollController.position.maxScrollExtent - 200) {
-      if (!_isLoading && _hasMore) {
+        _scrollController.position.maxScrollExtent - 500) {
+      if (!_isLoadingMore && !_isLoading && _hasMore) {
         _loadMorePosts();
       }
     }
   }
 
-  Future<void> _loadFeedPosts() async {
+  void _subscribeToFeedPosts() {
     if (!mounted) return;
 
     setState(() {
       _isLoading = true;
     });
 
-    try {
-      // Simple query without compound index requirement
-      Query query = _firestore
-          .collection('posts')
-          .orderBy('createdAt', descending: true)
-          .limit(_pageSize);
-
-      final snapshot = await query.get();
-
-      if (mounted) {
-        setState(() {
-          _posts = snapshot.docs;
-          _isLoading = false;
-          _hasMore = snapshot.docs.length == _pageSize;
-          if (snapshot.docs.isNotEmpty) {
-            _lastDocument = snapshot.docs.last;
-          }
-        });
-      }
-    } catch (e) {
-      debugPrint('Error loading feed posts: $e');
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
+    // Real-time stream subscription for latest posts
+    _postsSubscription = _firestore
+        .collection('posts')
+        .orderBy('createdAt', descending: true)
+        .limit(_pageSize)
+        .snapshots()
+        .listen(
+          (snapshot) {
+            if (mounted) {
+              setState(() {
+                _posts = snapshot.docs;
+                _isLoading = false;
+                _hasMore = snapshot.docs.length == _pageSize;
+                if (snapshot.docs.isNotEmpty) {
+                  _lastDocument = snapshot.docs.last;
+                }
+                // Invalidate cache when posts change
+                _cachedFilteredPosts = null;
+              });
+            }
+          },
+          onError: (e) {
+            debugPrint('Error loading feed posts: $e');
+            if (mounted) {
+              setState(() {
+                _isLoading = false;
+              });
+            }
+          },
+        );
   }
 
   Future<void> _loadMorePosts() async {
-    if (_isLoading || !_hasMore || _lastDocument == null) return;
+    if (_isLoadingMore || _isLoading || !_hasMore || _lastDocument == null)
+      return;
 
     setState(() {
-      _isLoading = true;
+      _isLoadingMore = true;
     });
 
     try {
@@ -195,18 +215,20 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
       if (mounted) {
         setState(() {
           _posts.addAll(snapshot.docs);
-          _isLoading = false;
+          _isLoadingMore = false;
           _hasMore = snapshot.docs.length == _pageSize;
           if (snapshot.docs.isNotEmpty) {
             _lastDocument = snapshot.docs.last;
           }
+          // Invalidate cache when posts change
+          _cachedFilteredPosts = null;
         });
       }
     } catch (e) {
       debugPrint('Error loading more posts: $e');
       if (mounted) {
         setState(() {
-          _isLoading = false;
+          _isLoadingMore = false;
         });
       }
     }
@@ -367,9 +389,22 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
 
   List<DocumentSnapshot> get _filteredPosts {
     final searchQuery = _searchController.text.toLowerCase().trim();
-    final currentUserId = _auth.currentUser?.uid;
 
-    return _posts.where((doc) {
+    // Return cached result if inputs haven't changed
+    if (_cachedFilteredPosts != null &&
+        _lastSearchQuery == searchQuery &&
+        _lastSelectedCategory == _selectedCategory) {
+      return _cachedFilteredPosts!;
+    }
+
+    final currentUserId = _auth.currentUser?.uid;
+    final seenIds = <String>{};
+
+    final result = _posts.where((doc) {
+      // Remove duplicates by ID
+      if (seenIds.contains(doc.id)) return false;
+      seenIds.add(doc.id);
+
       final data = doc.data() as Map<String, dynamic>;
 
       // Filter out current user's own posts (they can see them in My Posts tab)
@@ -381,91 +416,114 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
 
       // Category filter
       if (_selectedCategory != 'All') {
-        final intentAnalysis = data['intentAnalysis'] as Map<String, dynamic>?;
-        // Check actionType from multiple possible locations
-        final actionType =
-            (data['actionType'] ??
-                    intentAnalysis?['action_type'] ??
-                    data['type'] ??
-                    '')
-                .toString()
-                .toLowerCase();
-        final domain = (intentAnalysis?['domain'] ?? '')
-            .toString()
-            .toLowerCase();
-        final title = (data['title'] ?? '').toString().toLowerCase();
-        final description = (data['description'] ?? '')
-            .toString()
-            .toLowerCase();
-        final hashtags =
-            (data['hashtags'] as List<dynamic>?)?.join(' ').toLowerCase() ?? '';
-        final combinedText = '$title $description $hashtags';
-
-        if (_selectedCategory == 'Seeking') {
-          if (actionType != 'seeking' &&
-              !combinedText.contains('looking') &&
-              !combinedText.contains('need') &&
-              !combinedText.contains('want') &&
-              !combinedText.contains('search') &&
-              !combinedText.contains('find')) {
-            return false;
-          }
-        }
-        if (_selectedCategory == 'Offering') {
-          if (actionType != 'offering' &&
-              !combinedText.contains('sell') &&
-              !combinedText.contains('offer') &&
-              !combinedText.contains('available') &&
-              !combinedText.contains('sale')) {
-            return false;
-          }
-        }
-        if (_selectedCategory == 'Services') {
-          if (!domain.contains('service') &&
-              !combinedText.contains('service') &&
-              !combinedText.contains('repair') &&
-              !combinedText.contains('install') &&
-              !combinedText.contains('fix')) {
-            return false;
-          }
-        }
-        if (_selectedCategory == 'Jobs') {
-          if (!domain.contains('job') &&
-              !combinedText.contains('job') &&
-              !combinedText.contains('hiring') &&
-              !combinedText.contains('work') &&
-              !combinedText.contains('vacancy') &&
-              !combinedText.contains('career')) {
-            return false;
-          }
-        }
-        if (_selectedCategory == 'Buy/Sell') {
-          if (!domain.contains('marketplace') && data['price'] == null) {
-            return false;
-          }
-        }
+        if (!_matchesCategory(data)) return false;
       }
 
       // Search filter
       if (searchQuery.isNotEmpty) {
-        final title = (data['title'] ?? '').toString().toLowerCase();
-        final description = (data['description'] ?? '')
-            .toString()
-            .toLowerCase();
-        final prompt = (data['originalPrompt'] ?? '').toString().toLowerCase();
-        final userName = (data['userName'] ?? '').toString().toLowerCase();
-        final hashtags =
-            (data['hashtags'] as List<dynamic>?)?.join(' ').toLowerCase() ?? '';
-
-        return title.contains(searchQuery) ||
-            description.contains(searchQuery) ||
-            prompt.contains(searchQuery) ||
-            userName.contains(searchQuery) ||
-            hashtags.contains(searchQuery);
+        if (!_matchesSearch(data, searchQuery)) return false;
       }
 
       return true;
     }).toList();
+
+    // Cache the result
+    _cachedFilteredPosts = result;
+    _lastSearchQuery = searchQuery;
+    _lastSelectedCategory = _selectedCategory;
+
+    return result;
+  }
+
+  // Extracted for better performance - avoid recreating strings repeatedly
+  bool _matchesCategory(Map<String, dynamic> data) {
+    final intentAnalysis = data['intentAnalysis'] as Map<String, dynamic>?;
+    final actionType =
+        (data['actionType'] ??
+                intentAnalysis?['action_type'] ??
+                data['type'] ??
+                '')
+            .toString()
+            .toLowerCase();
+
+    switch (_selectedCategory) {
+      case 'Seeking':
+        if (actionType == 'seeking') return true;
+        final text = _getCombinedText(data);
+        return text.contains('looking') ||
+            text.contains('need') ||
+            text.contains('want') ||
+            text.contains('search') ||
+            text.contains('find');
+
+      case 'Offering':
+        if (actionType == 'offering') return true;
+        final text = _getCombinedText(data);
+        return text.contains('sell') ||
+            text.contains('offer') ||
+            text.contains('available') ||
+            text.contains('sale');
+
+      case 'Services':
+        final domain = (intentAnalysis?['domain'] ?? '')
+            .toString()
+            .toLowerCase();
+        if (domain.contains('service')) return true;
+        final text = _getCombinedText(data);
+        return text.contains('service') ||
+            text.contains('repair') ||
+            text.contains('install') ||
+            text.contains('fix');
+
+      case 'Jobs':
+        final domain = (intentAnalysis?['domain'] ?? '')
+            .toString()
+            .toLowerCase();
+        if (domain.contains('job')) return true;
+        final text = _getCombinedText(data);
+        return text.contains('job') ||
+            text.contains('hiring') ||
+            text.contains('work') ||
+            text.contains('vacancy') ||
+            text.contains('career');
+
+      case 'Buy/Sell':
+        final domain = (intentAnalysis?['domain'] ?? '')
+            .toString()
+            .toLowerCase();
+        return domain.contains('marketplace') || data['price'] != null;
+
+      default:
+        return true;
+    }
+  }
+
+  String _getCombinedText(Map<String, dynamic> data) {
+    final title = (data['title'] ?? '').toString().toLowerCase();
+    final description = (data['description'] ?? '').toString().toLowerCase();
+    final hashtags =
+        (data['hashtags'] as List<dynamic>?)?.join(' ').toLowerCase() ?? '';
+    return '$title $description $hashtags';
+  }
+
+  bool _matchesSearch(Map<String, dynamic> data, String searchQuery) {
+    final title = (data['title'] ?? '').toString().toLowerCase();
+    if (title.contains(searchQuery)) return true;
+
+    final description = (data['description'] ?? '').toString().toLowerCase();
+    if (description.contains(searchQuery)) return true;
+
+    final prompt = (data['originalPrompt'] ?? '').toString().toLowerCase();
+    if (prompt.contains(searchQuery)) return true;
+
+    final userName = (data['userName'] ?? '').toString().toLowerCase();
+    if (userName.contains(searchQuery)) return true;
+
+    final hashtags =
+        (data['hashtags'] as List<dynamic>?)?.join(' ').toLowerCase() ?? '';
+    if (hashtags.contains(searchQuery)) return true;
+
+    return false;
   }
 
   @override
@@ -495,6 +553,12 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
                 // Header
                 _buildHeader(),
 
+                // Divider line
+                Container(
+                  height: 0.5,
+                  color: Colors.white.withValues(alpha: 0.2),
+                ),
+
                 // Search bar
                 _buildGlassSearchBar(),
 
@@ -509,37 +573,38 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
                         )
                       : _filteredPosts.isEmpty
                       ? _buildEmptyState()
-                      : RefreshIndicator(
-                          onRefresh: _loadFeedPosts,
-                          color: Colors.white,
-                          backgroundColor: AppColors.backgroundDark,
-                          child: ListView.builder(
-                            controller: _scrollController,
-                            padding: const EdgeInsets.all(16),
-                            itemCount:
-                                _filteredPosts.length + (_hasMore ? 1 : 0),
-                            itemBuilder: (context, index) {
-                              if (index == _filteredPosts.length) {
-                                return const Padding(
-                                  padding: EdgeInsets.all(16),
-                                  child: Center(
-                                    child: CircularProgressIndicator(
-                                      color: Colors.white,
-                                    ),
+                      : ListView.builder(
+                          controller: _scrollController,
+                          padding: const EdgeInsets.all(16),
+                          // Performance optimizations
+                          addAutomaticKeepAlives: false,
+                          addRepaintBoundaries: true,
+                          cacheExtent: 500, // Pre-render items 500px ahead
+                          itemCount:
+                              _filteredPosts.length + (_isLoadingMore ? 1 : 0),
+                          itemBuilder: (context, index) {
+                            if (index == _filteredPosts.length) {
+                              return const Padding(
+                                padding: EdgeInsets.all(16),
+                                child: Center(
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
                                   ),
-                                );
-                              }
+                                ),
+                              );
+                            }
 
-                              final doc = _filteredPosts[index];
-                              final data = doc.data() as Map<String, dynamic>;
+                            final doc = _filteredPosts[index];
+                            final data = doc.data() as Map<String, dynamic>;
 
-                              return _buildPostCard(
+                            return RepaintBoundary(
+                              child: _buildPostCard(
                                 postId: doc.id,
                                 post: data,
                                 isSaved: _savedPostIds.contains(doc.id),
-                              );
-                            },
-                          ),
+                              ),
+                            );
+                          },
                         ),
                 ),
               ],
@@ -564,15 +629,11 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
 
   void _showCreatePostDialog() async {
     HapticFeedback.mediumImpact();
-    final result = await Navigator.push(
+    await Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const CreatePostScreen()),
     );
-
-    // Refresh feed if post was created
-    if (result == true && mounted) {
-      _loadFeedPosts();
-    }
+    // Feed auto-refreshes via real-time subscription
   }
 
   Widget _buildHeader() {
@@ -583,18 +644,10 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
           // Back button
           GestureDetector(
             onTap: widget.onBack,
-            child: Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: AppColors.glassBackgroundDark(alpha: 0.3),
-                shape: BoxShape.circle,
-                border: Border.all(color: AppColors.glassBorder(alpha: 0.3)),
-              ),
-              child: const Icon(
-                Icons.arrow_back_ios_new_rounded,
-                color: Colors.white,
-                size: 18,
-              ),
+            child: const Icon(
+              Icons.arrow_back_ios_new_rounded,
+              color: Colors.white,
+              size: 18,
             ),
           ),
 
@@ -620,18 +673,10 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
                 MaterialPageRoute(builder: (_) => const MyPostsScreen()),
               );
             },
-            child: Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: AppColors.glassBackgroundDark(alpha: 0.3),
-                shape: BoxShape.circle,
-                border: Border.all(color: AppColors.glassBorder(alpha: 0.3)),
-              ),
-              child: const Icon(
-                Icons.person_rounded,
-                color: Colors.white,
-                size: 20,
-              ),
+            child: const Icon(
+              Icons.more_vert_rounded,
+              color: Colors.white,
+              size: 20,
             ),
           ),
         ],
@@ -797,186 +842,159 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
       ),
       child: Material(
         color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(contentLevel >= 2 ? 18 : 14),
-          onTap: () {
-            HapticFeedback.lightImpact();
-            _openUserChat(post);
-          },
-          child: Padding(
-            padding: EdgeInsets.all(cardPadding),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header with user info
-                Row(
-                  children: [
-                    UserAvatar(
-                      profileImageUrl: PhotoUrlHelper.fixGooglePhotoUrl(
-                        userPhoto,
-                      ),
-                      radius: contentLevel >= 2 ? 18 : 14,
-                      fallbackText: userName,
+        child: Padding(
+          padding: EdgeInsets.all(cardPadding),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header with user info
+              Row(
+                children: [
+                  UserAvatar(
+                    profileImageUrl: PhotoUrlHelper.fixGooglePhotoUrl(
+                      userPhoto,
                     ),
-                    SizedBox(width: contentLevel >= 2 ? 10 : 8),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            userName,
-                            style: AppTextStyles.caption.copyWith(
-                              fontWeight: FontWeight.w600,
-                              fontSize: contentLevel >= 2 ? 13 : 12,
-                              color: Colors.white,
-                            ),
-                          ),
-                          if (time != null)
-                            Text(
-                              timeago.format(time),
-                              style: AppTextStyles.caption.copyWith(
-                                color: Colors.white70,
-                                fontSize: 10,
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                    // Action buttons
-                    // For own posts: Edit and Delete
-                    if (isOwnPost) ...[
-                      _buildIconOnlyButton(
-                        icon: Icons.edit_outlined,
-                        color: Colors.white,
-                        onTap: () => _editPost(postId, post),
-                        contentLevel: contentLevel,
-                      ),
-                      const SizedBox(width: 10),
-                      _buildIconOnlyButton(
-                        icon: Icons.delete_outline_rounded,
-                        color: Colors.white,
-                        onTap: () => _showDeleteConfirmation(postId),
-                        contentLevel: contentLevel,
-                      ),
-                    ],
-                    // For other's posts: Chat, Call, Save
-                    if (!isOwnPost) ...[
-                      _buildIconOnlyButton(
-                        icon: Icons.chat_bubble_outline_rounded,
-                        color: Colors.white,
-                        onTap: () => _openUserChat(post),
-                        contentLevel: contentLevel,
-                      ),
-                      if (post['allowCalls'] ?? true) ...[
-                        const SizedBox(width: 10),
-                        _buildIconOnlyButton(
-                          icon: Icons.call_outlined,
-                          color: Colors.white,
-                          onTap: () => _makeVoiceCall(post),
-                          contentLevel: contentLevel,
-                        ),
-                      ],
-                      const SizedBox(width: 10),
-                      _buildIconOnlyButton(
-                        icon: _savedPostIds.contains(postId)
-                            ? Icons.bookmark_rounded
-                            : Icons.bookmark_border_rounded,
-                        color: Colors.white,
-                        onTap: () => _toggleSavePost(postId, post),
-                        contentLevel: contentLevel,
-                      ),
-                    ],
-                  ],
-                ),
-
-                SizedBox(height: contentLevel >= 2 ? 12 : 8),
-
-                // Title
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    height: 1.4,
+                    radius: contentLevel >= 2 ? 18 : 14,
+                    fallbackText: userName,
                   ),
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                ),
-
-                // Description
-                if (hasDescription) ...[
-                  const SizedBox(height: 6),
-                  Text(
-                    description,
-                    style: AppTextStyles.bodyMedium.copyWith(
-                      color: Colors.white70,
-                      height: 1.4,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-
-                // Price
-                if (hasPrice) ...[
-                  SizedBox(height: contentLevel >= 2 ? 8 : 6),
-                  Text(
-                    '₹${price.toString()}',
-                    style: TextStyle(
-                      fontSize: contentLevel >= 2 ? 16 : 14,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.vibrantGreen,
-                    ),
-                  ),
-                ],
-
-                // Post Image
-                if (imageUrl != null && imageUrl.isNotEmpty) ...[
-                  const SizedBox(height: 10),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: CachedNetworkImage(
-                      imageUrl: imageUrl,
-                      width: double.infinity,
-                      height: imageHeight,
-                      fit: BoxFit.cover,
-                      placeholder: (context, url) => Container(
-                        height: imageHeight,
-                        decoration: BoxDecoration(
-                          color: AppColors.glassBackgroundDark(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Center(
-                          child: CircularProgressIndicator(
+                  SizedBox(width: contentLevel >= 2 ? 10 : 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          userName,
+                          style: AppTextStyles.caption.copyWith(
+                            fontWeight: FontWeight.w600,
+                            fontSize: contentLevel >= 2 ? 13 : 12,
                             color: Colors.white,
-                            strokeWidth: 2,
                           ),
                         ),
+                        if (time != null)
+                          Text(
+                            timeago.format(time),
+                            style: AppTextStyles.caption.copyWith(
+                              color: Colors.white70,
+                              fontSize: 10,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  // Action buttons
+                  // For own posts: Edit and Delete
+                  if (isOwnPost) ...[
+                    _buildIconOnlyButton(
+                      icon: Icons.edit_outlined,
+                      color: Colors.white,
+                      onTap: () => _editPost(postId, post),
+                      contentLevel: contentLevel,
+                    ),
+                    const SizedBox(width: 10),
+                    _buildIconOnlyButton(
+                      icon: Icons.delete_outline_rounded,
+                      color: Colors.white,
+                      onTap: () => _showDeleteConfirmation(postId),
+                      contentLevel: contentLevel,
+                    ),
+                  ],
+                  // For other's posts: Chat, Call, Save
+                  if (!isOwnPost) ...[
+                    _buildIconOnlyButton(
+                      icon: Icons.chat_bubble_outline_rounded,
+                      color: Colors.white,
+                      onTap: () => _openUserChat(post),
+                      contentLevel: contentLevel,
+                    ),
+                    if (post['allowCalls'] ?? true) ...[
+                      const SizedBox(width: 10),
+                      _buildIconOnlyButton(
+                        icon: Icons.call_outlined,
+                        color: Colors.white,
+                        onTap: () => _makeVoiceCall(post),
+                        contentLevel: contentLevel,
                       ),
-                      errorWidget: (context, url, error) => Container(
-                        height: imageHeight,
-                        decoration: BoxDecoration(
-                          color: AppColors.glassBackgroundDark(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(
-                          Icons.image_not_supported_outlined,
-                          color: AppColors.textTertiaryDark,
-                          size: 32,
+                    ],
+                    const SizedBox(width: 10),
+                    _buildIconOnlyButton(
+                      icon: _savedPostIds.contains(postId)
+                          ? Icons.bookmark_rounded
+                          : Icons.bookmark_border_rounded,
+                      color: Colors.white,
+                      onTap: () => _toggleSavePost(postId, post),
+                      contentLevel: contentLevel,
+                    ),
+                  ],
+                ],
+              ),
+
+              SizedBox(height: contentLevel >= 2 ? 12 : 8),
+
+              // Title and Description with See More
+              _buildExpandableText(
+                title: title,
+                description: hasDescription ? description : null,
+                postId: postId,
+              ),
+
+              // Price
+              if (hasPrice) ...[
+                SizedBox(height: contentLevel >= 2 ? 8 : 6),
+                Text(
+                  '₹${price.toString()}',
+                  style: TextStyle(
+                    fontSize: contentLevel >= 2 ? 16 : 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.vibrantGreen,
+                  ),
+                ),
+              ],
+
+              // Post Image
+              if (imageUrl != null && imageUrl.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: CachedNetworkImage(
+                    imageUrl: imageUrl,
+                    width: double.infinity,
+                    height: imageHeight,
+                    fit: BoxFit.cover,
+                    placeholder: (context, url) => Container(
+                      height: imageHeight,
+                      decoration: BoxDecoration(
+                        color: AppColors.glassBackgroundDark(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Center(
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
                         ),
                       ),
                     ),
+                    errorWidget: (context, url, error) => Container(
+                      height: imageHeight,
+                      decoration: BoxDecoration(
+                        color: AppColors.glassBackgroundDark(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.image_not_supported_outlined,
+                        color: AppColors.textTertiaryDark,
+                        size: 32,
+                      ),
+                    ),
                   ),
-                ],
-
-                const SizedBox(height: 12),
-
-                // Action buttons row
-                _buildActionButtons(postId, post, isOwnPost, isSaved),
+                ),
               ],
-            ),
+
+              const SizedBox(height: 12),
+
+              // Action buttons row
+              _buildActionButtons(postId, post, isOwnPost, isSaved),
+            ],
           ),
         ),
       ),
@@ -1032,6 +1050,105 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
     );
   }
 
+  Widget _buildExpandableText({
+    required String title,
+    String? description,
+    required String postId,
+  }) {
+    final isExpanded = _expandedPosts.contains(postId);
+
+    const titleStyle = TextStyle(
+      fontSize: 16,
+      fontWeight: FontWeight.bold,
+      color: Colors.white,
+      height: 1.4,
+    );
+
+    final descStyle = AppTextStyles.bodyMedium.copyWith(
+      color: Colors.white70,
+      height: 1.4,
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Calculate if title exceeds 3 lines
+        final titleSpan = TextSpan(text: title, style: titleStyle);
+        final titlePainter = TextPainter(
+          text: titleSpan,
+          maxLines: 3,
+          textDirection: TextDirection.ltr,
+        )..layout(maxWidth: constraints.maxWidth);
+
+        final titleExceeds3Lines = titlePainter.didExceedMaxLines;
+
+        // Calculate if description exceeds 2 lines
+        bool descExceeds2Lines = false;
+        if (description != null && description.isNotEmpty) {
+          final descSpan = TextSpan(text: description, style: descStyle);
+          final descPainter = TextPainter(
+            text: descSpan,
+            maxLines: 2,
+            textDirection: TextDirection.ltr,
+          )..layout(maxWidth: constraints.maxWidth);
+
+          descExceeds2Lines = descPainter.didExceedMaxLines;
+        }
+
+        // Show "See more" only if text exceeds limits
+        final needsSeeMore = titleExceeds3Lines || descExceeds2Lines;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Title
+            Text(
+              title,
+              style: titleStyle,
+              maxLines: isExpanded ? null : 3,
+              overflow: isExpanded ? null : TextOverflow.ellipsis,
+            ),
+
+            // Description
+            if (description != null && description.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(
+                description,
+                style: descStyle,
+                maxLines: isExpanded ? null : 2,
+                overflow: isExpanded ? null : TextOverflow.ellipsis,
+              ),
+            ],
+
+            // See more / See less button - only if text exceeds limits
+            if (needsSeeMore) ...[
+              const SizedBox(height: 4),
+              GestureDetector(
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  setState(() {
+                    if (isExpanded) {
+                      _expandedPosts.remove(postId);
+                    } else {
+                      _expandedPosts.add(postId);
+                    }
+                  });
+                },
+                child: Text(
+                  isExpanded ? 'See less' : 'See more',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.iosBlue,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        );
+      },
+    );
+  }
+
   void _makeVoiceCall(Map<String, dynamic> post) {
     final postUserId = post['userId'] as String?;
     final currentUserId = _auth.currentUser?.uid;
@@ -1049,156 +1166,148 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
       builder: (context) => Dialog(
         backgroundColor: Colors.transparent,
         insetPadding: const EdgeInsets.symmetric(horizontal: 40),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-            child: Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(20),
-                color: AppColors.glassBackgroundDark(alpha: 0.2),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.3),
-                  width: 1,
-                ),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1A1A2E),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.white24, width: 1),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.5),
+                blurRadius: 20,
+                spreadRadius: 5,
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // User avatar with call icon
+              Stack(
+                alignment: Alignment.bottomRight,
                 children: [
-                  // User avatar with call icon
-                  Stack(
-                    alignment: Alignment.bottomRight,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(3),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: AppColors.vibrantGreen.withValues(
-                              alpha: 0.5,
-                            ),
-                            width: 2,
-                          ),
-                        ),
-                        child: CircleAvatar(
-                          radius: 35,
-                          backgroundColor: Colors.grey[800],
-                          backgroundImage: userPhoto != null
-                              ? NetworkImage(userPhoto)
-                              : null,
-                          child: userPhoto == null
-                              ? Text(
-                                  userName.isNotEmpty
-                                      ? userName[0].toUpperCase()
-                                      : 'U',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 28,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                )
-                              : null,
-                        ),
+                  Container(
+                    padding: const EdgeInsets.all(3),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Colors.blue.withValues(alpha: 0.5),
+                        width: 2,
                       ),
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: const BoxDecoration(
-                          color: AppColors.vibrantGreen,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.call,
-                          color: Colors.white,
-                          size: 16,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Call $userName?',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+                    ),
+                    child: CircleAvatar(
+                      radius: 35,
+                      backgroundColor: Colors.grey[800],
+                      backgroundImage: userPhoto != null
+                          ? NetworkImage(userPhoto)
+                          : null,
+                      child: userPhoto == null
+                          ? Text(
+                              userName.isNotEmpty
+                                  ? userName[0].toUpperCase()
+                                  : 'U',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 28,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            )
+                          : null,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'You are about to start a voice call.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.white70, fontSize: 13),
-                  ),
-                  const SizedBox(height: 20),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () => Navigator.pop(context),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(10),
-                              color: Colors.white.withValues(alpha: 0.15),
-                              border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.2),
-                              ),
-                            ),
-                            child: const Center(
-                              child: Text(
-                                'Cancel',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () async {
-                            Navigator.pop(context);
-                            // Wait for dialog to close before navigating
-                            await Future.delayed(
-                              const Duration(milliseconds: 100),
-                            );
-                            if (!mounted) return;
-                            _initiateCall(post);
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(10),
-                              color: AppColors.vibrantGreen,
-                            ),
-                            child: const Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.call, color: Colors.white, size: 18),
-                                SizedBox(width: 6),
-                                Text(
-                                  'Call',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withValues(alpha: 0.6),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.call,
+                      color: Colors.white,
+                      size: 16,
+                    ),
                   ),
                 ],
               ),
-            ),
+              const SizedBox(height: 16),
+              Text(
+                'Call $userName?',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'You are about to start a voice call.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white70, fontSize: 14),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          side: const BorderSide(color: Colors.white24),
+                        ),
+                      ),
+                      child: const Text(
+                        'Cancel',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        Navigator.pop(context);
+                        // Wait for dialog to close before navigating
+                        await Future.delayed(const Duration(milliseconds: 100));
+                        if (!mounted) return;
+                        _initiateCall(post);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue.withValues(alpha: 0.4),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          side: BorderSide(
+                            color: Colors.blue.withValues(alpha: 0.5),
+                            width: 1,
+                          ),
+                        ),
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.call, color: Colors.white, size: 18),
+                          SizedBox(width: 6),
+                          Text(
+                            'Call',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
       ),
@@ -1326,17 +1435,13 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
 
   void _editPost(String postId, Map<String, dynamic> post) async {
     HapticFeedback.mediumImpact();
-    final result = await Navigator.push(
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => EditPostScreen(postId: postId, postData: post),
       ),
     );
-
-    // Refresh feed if post was updated
-    if (result == true && mounted) {
-      _loadFeedPosts();
-    }
+    // Feed auto-refreshes via real-time subscription
   }
 
   void _showDeleteConfirmation(String postId) {
@@ -1461,23 +1566,13 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
       await _firestore.collection('posts').doc(postId).delete();
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Post deleted successfully'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        _loadFeedPosts(); // Refresh
+        SnackBarHelper.showSuccess(context, 'Post deleted successfully');
+        // Feed auto-refreshes via real-time subscription
       }
     } catch (e) {
       debugPrint('Error deleting post: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to delete post'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        SnackBarHelper.showError(context, 'Failed to delete post');
       }
     }
   }

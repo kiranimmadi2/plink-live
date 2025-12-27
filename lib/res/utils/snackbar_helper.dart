@@ -1,64 +1,51 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import '../config/app_colors.dart';
-import '../config/app_text_styles.dart';
 
 /// Global SnackBar helper with consistent glassmorphism styling
+/// Matches login screen snackbar design
 class SnackBarHelper {
   SnackBarHelper._();
 
-  /// Show error snackbar with red gradient
+  /// Show error snackbar with red glassmorphic gradient
   static void showError(BuildContext context, String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       _buildSnackBar(
         message: message,
         icon: Icons.error_outline,
-        gradient: AppColors.primaryGradient,
+        accentColor: Colors.redAccent,
       ),
     );
   }
 
-  /// Show success snackbar with green gradient
+  /// Show success snackbar with green glassmorphic gradient
   static void showSuccess(BuildContext context, String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       _buildSnackBar(
         message: message,
-        icon: Icons.check_circle_outline,
-        gradient: const LinearGradient(
-          colors: [Color(0xFF00C853), Color(0xFF69F0AE)],
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-        ),
+        icon: Icons.check_circle,
+        accentColor: Colors.greenAccent,
       ),
     );
   }
 
-  /// Show warning snackbar with orange gradient
+  /// Show warning snackbar with orange glassmorphic gradient
   static void showWarning(BuildContext context, String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       _buildSnackBar(
         message: message,
         icon: Icons.warning_amber_rounded,
-        gradient: const LinearGradient(
-          colors: [Color(0xFFFF9800), Color(0xFFFFB74D)],
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-        ),
+        accentColor: Colors.orangeAccent,
       ),
     );
   }
 
-  /// Show info snackbar with blue gradient
+  /// Show info snackbar with blue glassmorphic gradient
   static void showInfo(BuildContext context, String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       _buildSnackBar(
         message: message,
         icon: Icons.info_outline,
-        gradient: const LinearGradient(
-          colors: [Color(0xFF2196F3), Color(0xFF64B5F6)],
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-        ),
+        accentColor: Colors.blueAccent,
       ),
     );
   }
@@ -66,7 +53,7 @@ class SnackBarHelper {
   static SnackBar _buildSnackBar({
     required String message,
     required IconData icon,
-    required Gradient gradient,
+    required Color accentColor,
   }) {
     return SnackBar(
       content: ClipRRect(
@@ -75,15 +62,22 @@ class SnackBarHelper {
           filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
           child: Container(
             decoration: BoxDecoration(
-              gradient: gradient,
+              gradient: LinearGradient(
+                colors: [
+                  Colors.white.withValues(alpha: 0.25),
+                  accentColor.withValues(alpha: 0.15),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: AppColors.glassBorder(alpha: 0.3),
+                color: Colors.white.withValues(alpha: 0.3),
                 width: 1.5,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.primaryShadow(alpha: 0.3),
+                  color: Colors.black.withValues(alpha: 0.1),
                   blurRadius: 15,
                   spreadRadius: 2,
                 ),
@@ -94,16 +88,17 @@ class SnackBarHelper {
               children: [
                 Icon(
                   icon,
-                  color: Colors.white,
+                  color: accentColor,
                   size: 28,
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     message,
-                    style: AppTextStyles.bodyMedium.copyWith(
-                      fontWeight: FontWeight.w500,
+                    style: const TextStyle(
                       color: Colors.white,
+                      fontWeight: FontWeight.w500,
+                      fontSize: 15,
                     ),
                   ),
                 ),
@@ -116,7 +111,8 @@ class SnackBarHelper {
       elevation: 0,
       behavior: SnackBarBehavior.floating,
       padding: EdgeInsets.zero,
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      margin: const EdgeInsets.only(bottom: 20, left: 16, right: 16),
       duration: const Duration(seconds: 3),
     );
   }

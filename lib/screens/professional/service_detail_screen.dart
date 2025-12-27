@@ -6,7 +6,7 @@ import '../../models/review_model.dart';
 import '../../models/user_profile.dart';
 import '../../services/professional_service.dart';
 import '../../services/review_service.dart';
-import '../../utils/photo_url_helper.dart';
+import '../../res/utils/photo_url_helper.dart';
 import '../../widgets/professional/send_inquiry_sheet.dart';
 import 'public_professional_profile_screen.dart';
 

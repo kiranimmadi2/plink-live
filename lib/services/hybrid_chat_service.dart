@@ -224,7 +224,7 @@ class HybridChatService {
         'localPath': localPath,
         'fileName': fileName,
         'fileSize': fileSize,
-        'status': 'sending', // Shows clock icon
+        'status': 'sent', // Single tick - saved locally, not yet on server
         'isSentByMe': 1,
         'timestamp': timestamp,
         'isRead': 0,
@@ -239,7 +239,7 @@ class HybridChatService {
       _log('HybridChat: Local DB unavailable, sending directly to Firebase');
     }
 
-    // User sees message immediately! ✓ (grey checkmark)
+    // User sees message immediately! ✓ (single grey tick - sent locally)
 
     // STEP 2: Upload Media (if any) & Upload to Firebase
     try {
@@ -274,7 +274,7 @@ class HybridChatService {
             'fileName': fileName,
             'fileSize': fileSize,
             'timestamp': FieldValue.serverTimestamp(),
-            'status': 'sent',
+            'status': 'delivered', // Double tick - message reached server
             'isRead': false,
             'replyToMessageId': replyToMessageId,
             'replyToText': replyToText,
@@ -285,19 +285,19 @@ class HybridChatService {
 
       _log('HybridChat: Message uploaded to Firebase: $messageId');
 
-      // STEP 3: Update local status to "sent" (if available)
+      // STEP 3: Update local status to "delivered" (if available)
       if (localDbAvailable) {
-        await _localDb.updateMessageStatus(messageId, 'sent');
-        _log('HybridChat: Message status updated to sent');
+        await _localDb.updateMessageStatus(messageId, 'delivered');
+        _log('HybridChat: Message status updated to delivered');
       }
 
-      // User sees ✓ (single grey checkmark)
+      // User sees ✓✓ (double grey checkmark - delivered to server)
 
       // STEP 4: Update conversation metadata
       String lastMsg =
-          text ?? (type == MessageType.image ? '📷 Image' : '📎 File');
-      if (type == MessageType.video) lastMsg = '🎥 Video';
-      if (type == MessageType.audio) lastMsg = '🎵 Audio';
+          text ?? (type == MessageType.image ? ' Image' : '📎 File');
+      if (type == MessageType.video) lastMsg = ' Video';
+      if (type == MessageType.audio) lastMsg = ' Audio';
 
       await _firestore.collection('conversations').doc(conversationId).update({
         'lastMessage': lastMsg,
@@ -480,7 +480,9 @@ class HybridChatService {
         return;
       }
 
-      _log('HybridChat: Marking ${messagesToUpdate.length} messages as delivered');
+      _log(
+        'HybridChat: Marking ${messagesToUpdate.length} messages as delivered',
+      );
 
       final batch = _firestore.batch();
       for (var doc in messagesToUpdate) {

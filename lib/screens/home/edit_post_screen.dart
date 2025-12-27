@@ -10,6 +10,7 @@ import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../../res/config/app_assets.dart';
 import '../../res/config/app_colors.dart';
 import '../../res/config/app_text_styles.dart';
+import '../../res/utils/snackbar_helper.dart';
 
 class EditPostScreen extends StatefulWidget {
   final String postId;
@@ -174,8 +175,14 @@ class _EditPostScreenState extends State<EditPostScreen> {
 
     // Extract price
     final pricePatterns = [
-      RegExp(r'(?:price|cost|amount|rupees|rs|₹|inr|\$|dollar|usd)\s*[:\s]*(\d+(?:\.\d{1,2})?)', caseSensitive: false),
-      RegExp(r'(\d+(?:\.\d{1,2})?)\s*(?:rupees|rs|₹|inr|dollar|\$|usd)', caseSensitive: false),
+      RegExp(
+        r'(?:price|cost|amount|rupees|rs|₹|inr|\$|dollar|usd)\s*[:\s]*(\d+(?:\.\d{1,2})?)',
+        caseSensitive: false,
+      ),
+      RegExp(
+        r'(\d+(?:\.\d{1,2})?)\s*(?:rupees|rs|₹|inr|dollar|\$|usd)',
+        caseSensitive: false,
+      ),
       RegExp(r'for\s+(\d+(?:\.\d{1,2})?)', caseSensitive: false),
     ];
 
@@ -185,7 +192,9 @@ class _EditPostScreenState extends State<EditPostScreen> {
         final priceValue = priceMatch.group(1);
         if (priceValue != null) {
           _priceController.text = priceValue;
-          remainingText = remainingText.replaceFirst(priceMatch.group(0)!, '').trim();
+          remainingText = remainingText
+              .replaceFirst(priceMatch.group(0)!, '')
+              .trim();
           break;
         }
       }
@@ -196,25 +205,34 @@ class _EditPostScreenState extends State<EditPostScreen> {
     final hashtagMatches = hashtagPattern.allMatches(remainingText);
     for (final match in hashtagMatches) {
       final tag = match.group(1);
-      if (tag != null && !_hashtags.contains('#$tag') && _hashtags.length < 10) {
+      if (tag != null &&
+          !_hashtags.contains('#$tag') &&
+          _hashtags.length < 10) {
         _hashtags.add('#$tag');
       }
       remainingText = remainingText.replaceFirst(match.group(0)!, '').trim();
     }
 
     // Check for "hashtag" keyword
-    final hashtagKeywordPattern = RegExp(r'hashtag[s]?\s+(\w+(?:\s+\w+)*)', caseSensitive: false);
+    final hashtagKeywordPattern = RegExp(
+      r'hashtag[s]?\s+(\w+(?:\s+\w+)*)',
+      caseSensitive: false,
+    );
     final keywordMatch = hashtagKeywordPattern.firstMatch(remainingText);
     if (keywordMatch != null) {
       final hashtagWords = keywordMatch.group(1)?.split(RegExp(r'\s+'));
       if (hashtagWords != null) {
         for (final word in hashtagWords) {
-          if (word.isNotEmpty && !_hashtags.contains('#$word') && _hashtags.length < 10) {
+          if (word.isNotEmpty &&
+              !_hashtags.contains('#$word') &&
+              _hashtags.length < 10) {
             _hashtags.add('#$word');
           }
         }
       }
-      remainingText = remainingText.replaceFirst(keywordMatch.group(0)!, '').trim();
+      remainingText = remainingText
+          .replaceFirst(keywordMatch.group(0)!, '')
+          .trim();
     }
 
     // Clean up remaining text
@@ -421,12 +439,11 @@ class _EditPostScreenState extends State<EditPostScreen> {
   }
 
   void _showSnackBar(String message, {required bool isError}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: isError ? Colors.red : Colors.green,
-      ),
-    );
+    if (isError) {
+      SnackBarHelper.showError(context, message);
+    } else {
+      SnackBarHelper.showSuccess(context, message);
+    }
   }
 
   @override
@@ -447,9 +464,7 @@ class _EditPostScreenState extends State<EditPostScreen> {
           ),
 
           // Dark overlay
-          Positioned.fill(
-            child: Container(color: AppColors.darkOverlay()),
-          ),
+          Positioned.fill(child: Container(color: AppColors.darkOverlay())),
 
           // Main content
           SafeArea(
@@ -457,6 +472,12 @@ class _EditPostScreenState extends State<EditPostScreen> {
               children: [
                 // Header
                 _buildHeader(),
+
+                // Divider line
+                Container(
+                  height: 0.5,
+                  color: Colors.white.withValues(alpha: 0.2),
+                ),
 
                 // Form
                 Expanded(
@@ -545,18 +566,10 @@ class _EditPostScreenState extends State<EditPostScreen> {
           // Back button
           GestureDetector(
             onTap: () => Navigator.pop(context),
-            child: Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: AppColors.glassBackgroundDark(alpha: 0.3),
-                shape: BoxShape.circle,
-                border: Border.all(color: AppColors.glassBorder(alpha: 0.3)),
-              ),
-              child: const Icon(
-                Icons.arrow_back_ios_new_rounded,
-                color: Colors.white,
-                size: 18,
-              ),
+            child: const Icon(
+              Icons.arrow_back_ios_new_rounded,
+              color: Colors.white,
+              size: 18,
             ),
           ),
 
@@ -662,8 +675,8 @@ class _EditPostScreenState extends State<EditPostScreen> {
                   Text(
                     _isListening
                         ? (_fullSpeechText.isNotEmpty
-                            ? _fullSpeechText
-                            : 'Say title, description, price, hashtags...')
+                              ? _fullSpeechText
+                              : 'Say title, description, price, hashtags...')
                         : 'Speak everything at once - title, price, hashtags',
                     style: TextStyle(
                       color: Colors.white.withValues(alpha: 0.7),
@@ -811,10 +824,7 @@ class _EditPostScreenState extends State<EditPostScreen> {
   Widget _buildImagePreview({required Widget child}) {
     return Stack(
       children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          child: child,
-        ),
+        ClipRRect(borderRadius: BorderRadius.circular(16), child: child),
         Positioned(
           top: 8,
           right: 8,
@@ -843,22 +853,36 @@ class _EditPostScreenState extends State<EditPostScreen> {
                   padding: const EdgeInsets.all(20),
                   decoration: const BoxDecoration(
                     color: AppColors.backgroundDark,
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(20),
+                    ),
                   ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       ListTile(
-                        leading: const Icon(Icons.camera_alt, color: Colors.white),
-                        title: const Text('Take Photo', style: TextStyle(color: Colors.white)),
+                        leading: const Icon(
+                          Icons.camera_alt,
+                          color: Colors.white,
+                        ),
+                        title: const Text(
+                          'Take Photo',
+                          style: TextStyle(color: Colors.white),
+                        ),
                         onTap: () {
                           Navigator.pop(context);
                           _pickImageFromCamera();
                         },
                       ),
                       ListTile(
-                        leading: const Icon(Icons.photo_library, color: Colors.white),
-                        title: const Text('Choose from Gallery', style: TextStyle(color: Colors.white)),
+                        leading: const Icon(
+                          Icons.photo_library,
+                          color: Colors.white,
+                        ),
+                        title: const Text(
+                          'Choose from Gallery',
+                          style: TextStyle(color: Colors.white),
+                        ),
                         onTap: () {
                           Navigator.pop(context);
                           _pickImageFromGallery();
@@ -945,10 +969,15 @@ class _EditPostScreenState extends State<EditPostScreen> {
           children: [
             // Currency Dropdown
             Container(
+              height: 52,
               padding: const EdgeInsets.symmetric(horizontal: 12),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(26),
                 color: Colors.white.withValues(alpha: 0.15),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.3),
+                  width: 1.5,
+                ),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withValues(alpha: 0.2),
@@ -960,7 +989,7 @@ class _EditPostScreenState extends State<EditPostScreen> {
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<String>(
                   value: _selectedCurrency,
-                  dropdownColor: Colors.black.withValues(alpha: 0.85),
+                  dropdownColor: const Color(0xFF2D2D3A),
                   icon: Icon(Icons.arrow_drop_down, color: Colors.grey[400]),
                   style: const TextStyle(color: Colors.white, fontSize: 16),
                   borderRadius: BorderRadius.circular(16),
@@ -968,11 +997,11 @@ class _EditPostScreenState extends State<EditPostScreen> {
                   items: _currencies.map((currency) {
                     return DropdownMenuItem<String>(
                       value: currency['code'],
-                      child: Container(
+                      child: Padding(
                         padding: const EdgeInsets.symmetric(vertical: 4),
                         child: Text(
                           '${currency['symbol']} ${currency['code']}',
-                          style: const TextStyle(color: Colors.white),
+                          style: const TextStyle(color: Colors.white, fontSize: 16),
                         ),
                       ),
                     );
@@ -993,6 +1022,8 @@ class _EditPostScreenState extends State<EditPostScreen> {
             // Price Field
             Expanded(
               child: Container(
+                height: 52,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(26),
                   color: Colors.white.withValues(alpha: 0.15),
@@ -1000,43 +1031,39 @@ class _EditPostScreenState extends State<EditPostScreen> {
                     color: Colors.white.withValues(alpha: 0.3),
                     width: 1.5,
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.2),
-                      blurRadius: 8,
-                      spreadRadius: 1,
-                    ),
-                  ],
                 ),
-                child: TextField(
-                  controller: _priceController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  inputFormatters: [
-                    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
-                  ],
-                  cursorColor: Colors.white,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w400,
-                  ),
-                  decoration: InputDecoration(
-                    hintText: 'Enter price',
-                    hintStyle: TextStyle(
-                      color: Colors.grey[400],
-                      fontSize: 15,
+                child: Center(
+                  child: TextField(
+                    controller: _priceController,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(
+                        RegExp(r'^\d*\.?\d{0,2}'),
+                      ),
+                    ],
+                    cursorColor: Colors.white,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
                       fontWeight: FontWeight.w400,
                     ),
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(
-                      vertical: 16,
-                      horizontal: 16,
+                    decoration: InputDecoration(
+                      hintText: 'Enter price',
+                      hintStyle: TextStyle(
+                        color: Colors.grey[400],
+                        fontSize: 15,
+                        fontWeight: FontWeight.w400,
+                      ),
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      contentPadding: EdgeInsets.zero,
+                      isDense: true,
+                      filled: true,
+                      fillColor: Colors.transparent,
                     ),
-                    isDense: true,
-                    filled: true,
-                    fillColor: Colors.transparent,
                   ),
                 ),
               ),
@@ -1049,7 +1076,7 @@ class _EditPostScreenState extends State<EditPostScreen> {
 
   Widget _buildCallToggle() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(26),
         color: Colors.white.withValues(alpha: 0.15),
@@ -1057,18 +1084,11 @@ class _EditPostScreenState extends State<EditPostScreen> {
           color: Colors.white.withValues(alpha: 0.3),
           width: 1.5,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.2),
-            blurRadius: 8,
-            spreadRadius: 1,
-          ),
-        ],
       ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: _allowCalls
                   ? AppColors.vibrantGreen.withValues(alpha: 0.2)
@@ -1078,31 +1098,18 @@ class _EditPostScreenState extends State<EditPostScreen> {
             child: Icon(
               Icons.call_rounded,
               color: _allowCalls ? AppColors.vibrantGreen : Colors.grey,
-              size: 24,
+              size: 20,
             ),
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Allow Calls',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Let people call you about this post',
-                  style: TextStyle(
-                    color: Colors.grey[400],
-                    fontSize: 12,
-                  ),
-                ),
-              ],
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Text(
+              'Allow Calls',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ),
           Switch(
@@ -1170,7 +1177,11 @@ class _EditPostScreenState extends State<EditPostScreen> {
                       fontSize: 15,
                       fontWeight: FontWeight.w400,
                     ),
-                    prefixIcon: Icon(Icons.tag_rounded, color: Colors.grey[400], size: 22),
+                    prefixIcon: Icon(
+                      Icons.tag_rounded,
+                      color: Colors.grey[400],
+                      size: 22,
+                    ),
                     border: InputBorder.none,
                     enabledBorder: InputBorder.none,
                     focusedBorder: InputBorder.none,
@@ -1197,7 +1208,11 @@ class _EditPostScreenState extends State<EditPostScreen> {
                       width: 1,
                     ),
                   ),
-                  child: const Icon(Icons.add_rounded, color: Colors.white, size: 20),
+                  child: const Icon(
+                    Icons.add_rounded,
+                    color: Colors.white,
+                    size: 20,
+                  ),
                 ),
               ),
             ],
@@ -1212,11 +1227,16 @@ class _EditPostScreenState extends State<EditPostScreen> {
             runSpacing: 8,
             children: _hashtags.map((tag) {
               return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.grey[800],
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.2),
+                  ),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -1232,7 +1252,11 @@ class _EditPostScreenState extends State<EditPostScreen> {
                     const SizedBox(width: 6),
                     GestureDetector(
                       onTap: () => _removeHashtag(tag),
-                      child: const Icon(Icons.close_rounded, color: Colors.white70, size: 16),
+                      child: const Icon(
+                        Icons.close_rounded,
+                        color: Colors.white70,
+                        size: 16,
+                      ),
                     ),
                   ],
                 ),
@@ -1253,10 +1277,7 @@ class _EditPostScreenState extends State<EditPostScreen> {
         decoration: BoxDecoration(
           color: AppColors.buttonBackground(),
           borderRadius: BorderRadius.circular(AppColors.buttonBorderRadius),
-          border: Border.all(
-            color: AppColors.buttonBorder(),
-            width: 1,
-          ),
+          border: Border.all(color: AppColors.buttonBorder(), width: 1),
         ),
         child: const Center(
           child: Text(

@@ -7,13 +7,13 @@ import 'package:timeago/timeago.dart' as timeago;
 
 import '../../models/conversation_model.dart';
 import '../../models/user_profile.dart';
-import '../../utils/photo_url_helper.dart';
+import '../../res/utils/photo_url_helper.dart';
 import '../../widgets/chat_common.dart';
 import '../../widgets/app_background.dart';
 import '../../services/current_user_cache.dart';
 import '../enhanced_chat_screen.dart';
-import '../create_group_screen.dart';
-import '../group_chat_screen.dart';
+import '../chat/create_group_screen.dart';
+import '../chat/group_chat_screen.dart';
 
 class ConversationsScreen extends StatefulWidget {
   const ConversationsScreen({super.key});
@@ -108,7 +108,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
       backgroundColor: Colors.transparent,
       body: AppBackground(
         showParticles: true,
-        overlayOpacity: 0.4,
+        overlayOpacity: 0.6,
         child: SafeArea(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -587,9 +587,15 @@ class _ConversationsScreenState extends State<ConversationsScreen>
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
         color: isDarkMode
-            ? Colors.white.withValues(alpha: 0.06)
-            : Colors.grey.withValues(alpha: 0.08),
+            ? Colors.white.withValues(alpha: 0.1)
+            : Colors.white.withValues(alpha: 0.7),
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDarkMode
+              ? Colors.white.withValues(alpha: 0.08)
+              : Colors.grey.withValues(alpha: 0.15),
+          width: 1,
+        ),
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(
@@ -871,9 +877,15 @@ class _ConversationsScreenState extends State<ConversationsScreen>
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
         color: isDarkMode
-            ? Colors.white.withValues(alpha: 0.06)
-            : Colors.grey.withValues(alpha: 0.08),
+            ? Colors.white.withValues(alpha: 0.1)
+            : Colors.white.withValues(alpha: 0.7),
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDarkMode
+              ? Colors.white.withValues(alpha: 0.08)
+              : Colors.grey.withValues(alpha: 0.15),
+          width: 1,
+        ),
       ),
       child: Material(
         color: Colors.transparent,

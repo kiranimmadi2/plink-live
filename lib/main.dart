@@ -14,22 +14,21 @@ import 'package:supper/screens/login/onboarding_screen.dart';
 import 'firebase_options.dart';
 import 'screens/login/splash_screen.dart';
 import 'screens/home/main_navigation_screen.dart';
-import 'screens/chat/voice_call_screen.dart';
+import 'screens/call/voice_call_screen.dart';
 import 'models/user_profile.dart';
 
 import 'services/auth_service.dart';
-import 'services/profile_service.dart';
+import 'services/profile services/profile_service.dart';
 import 'services/user_manager.dart';
 import 'services/notification_service.dart';
-import 'services/conversation_service.dart';
-import 'services/location_service.dart';
+import 'services/chat services/conversation_service.dart';
+import 'services/location services/location_service.dart';
 import 'services/connectivity_service.dart';
 import 'services/analytics_service.dart';
-import 'services/error_tracking_service.dart';
-import 'services/current_user_cache.dart';
-import 'providers/theme_provider.dart';
-import 'utils/app_optimizer.dart';
-import 'utils/memory_manager.dart';
+import 'services/error services/error_tracking_service.dart';
+import 'providers/other providers/theme_provider.dart';
+import 'res/utils/app_optimizer.dart';
+import 'res/utils/memory_manager.dart';
 
 // FCM background handler
 @pragma('vm:entry-point')
@@ -89,10 +88,7 @@ Future<void> _showCallNotification({
     interruptionLevel: InterruptionLevel.timeSensitive,
   );
 
-  const details = NotificationDetails(
-    android: androidDetails,
-    iOS: iosDetails,
-  );
+  const details = NotificationDetails(android: androidDetails, iOS: iosDetails);
 
   await localNotifications.show(
     DateTime.now().millisecondsSinceEpoch ~/ 1000,
@@ -194,67 +190,51 @@ void main() async {
 }
 
 /// Initialize non-critical services after app has started rendering
-/// Uses frame callbacks to spread work across multiple frames
 Future<void> _initializeServicesInBackground() async {
-  // FCM background handler - lightweight, set up immediately
+  // Shorter delay - reduced from 500ms to 200ms for faster startup
+  await Future.delayed(const Duration(milliseconds: 200));
+
+  // FCM background handler - set up after app is responsive
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
-  // Use addPostFrameCallback to spread initialization across frames
-  // This prevents blocking the main thread and reduces jank
-
-  // Frame 1: Analytics (lightweight)
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    unawaited(AnalyticsService().initialize().catchError((e) {
+  // Initialize Firebase Analytics
+  unawaited(
+    AnalyticsService().initialize().catchError((e) {
       debugPrint('AnalyticsService init error (non-fatal): $e');
-    }));
-  });
+    }),
+  );
 
-  // Frame 2: App optimizer
-  Future.delayed(const Duration(milliseconds: 100), () {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      unawaited(Future(() async {
-        await AppOptimizer.initialize();
-      }));
-    });
-  });
+  // Initialize utilities in sequence with small delays to prevent jank
+  await AppOptimizer.initialize();
+  await Future.delayed(const Duration(milliseconds: 50));
 
-  // Frame 3: Memory manager
-  Future.delayed(const Duration(milliseconds: 200), () {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      MemoryManager().initialize();
-    });
-  });
+  MemoryManager().initialize();
+  await Future.delayed(const Duration(milliseconds: 50));
 
-  // Frame 4: User manager
-  Future.delayed(const Duration(milliseconds: 300), () {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      UserManager().initialize();
-    });
-  });
+  UserManager().initialize();
+  await Future.delayed(const Duration(milliseconds: 50));
 
-  // Frame 5: Notification service
-  Future.delayed(const Duration(milliseconds: 400), () {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      unawaited(NotificationService().initialize().catchError((e) {
-        debugPrint('NotificationService init error (non-fatal): $e');
-        ErrorTrackingService().captureException(e, message: 'NotificationService init failed');
-      }));
-    });
-  });
+  // Initialize notification service (can run in parallel, but don't block)
+  unawaited(
+    NotificationService().initialize().catchError((e) {
+      debugPrint('NotificationService init error (non-fatal): $e');
+      ErrorTrackingService().captureException(
+        e,
+        message: 'NotificationService init failed',
+      );
+    }),
+  );
 
-  // Frame 6: Connectivity service
-  Future.delayed(const Duration(milliseconds: 500), () {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      unawaited(ConnectivityService().initialize().catchError((e) {
-        debugPrint('ConnectivityService init error (non-fatal): $e');
-      }));
-    });
-  });
+  // Initialize connectivity service after a small delay
+  await Future.delayed(const Duration(milliseconds: 100));
+  unawaited(
+    ConnectivityService().initialize().catchError((e) {
+      debugPrint('ConnectivityService init error (non-fatal): $e');
+    }),
+  );
 
-  // Frame 7: Log app open event
-  Future.delayed(const Duration(milliseconds: 600), () {
-    unawaited(AnalyticsService().logAppOpen());
-  });
+  // Log app open event
+  unawaited(AnalyticsService().logAppOpen());
 
   // NOTE: Migrations are now run in AuthWrapper._initializeUserServices()
   // after the user is authenticated to avoid permission errors
@@ -290,10 +270,7 @@ class MyApp extends ConsumerWidget {
         return null;
       },
       builder: (context, child) {
-        return Container(
-          color: const Color(0xFF0f0f23),
-          child: child,
-        );
+        return Container(color: const Color(0xFF0f0f23), child: child);
       },
     );
   }
@@ -403,11 +380,7 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFF1a1a2e),
-              Color(0xFF16213e),
-              Color(0xFF0f0f23),
-            ],
+            colors: [Color(0xFF1a1a2e), Color(0xFF16213e), Color(0xFF0f0f23)],
           ),
         ),
         child: const Center(
@@ -440,7 +413,11 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
               const SizedBox(height: 16),
               const Text(
                 'Something went wrong',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
               ),
               const SizedBox(height: 8),
               Text(
@@ -466,49 +443,29 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
     try {
       debugPrint('AuthWrapper: Initializing user services...');
 
-      // Initialize current user cache FIRST (fastest, most important)
-      unawaited(CurrentUserCache().initialize());
+      try {
+        await _profileService.ensureProfileExists().timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {
+            debugPrint('⚠️ Profile service timed out');
+          },
+        );
+      } catch (e) {
+        debugPrint('⚠️ Profile service error (non-fatal): $e');
+      }
 
-      // Profile service - run with timeout, don't block
-      unawaited(Future(() async {
-        try {
-          await _profileService.ensureProfileExists().timeout(
-            const Duration(seconds: 10),
-            onTimeout: () {
-              debugPrint('⚠️ Profile service timed out');
-            },
-          );
-        } catch (e) {
-          debugPrint('⚠️ Profile service error (non-fatal): $e');
-        }
-      }));
+      await Future.delayed(const Duration(milliseconds: 100));
+      _locationService.initializeLocation();
+      _locationService.startPeriodicLocationUpdates();
+      _locationService.startLocationStream();
+      _conversationService.cleanupDuplicateConversations();
 
-      // Defer location services to next frame
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        Future.delayed(const Duration(milliseconds: 100), () {
-          _locationService.initializeLocation();
-        });
+      // Start listening for notifications from other users
+      _startNotificationListener();
 
-        Future.delayed(const Duration(milliseconds: 200), () {
-          _locationService.startPeriodicLocationUpdates();
-          _locationService.startLocationStream();
-        });
+      _runMigrationsInBackground();
 
-        Future.delayed(const Duration(milliseconds: 300), () {
-          _conversationService.cleanupDuplicateConversations();
-        });
-
-        Future.delayed(const Duration(milliseconds: 400), () {
-          _startNotificationListener();
-        });
-      });
-
-      // Run migrations in background after delay
-      Future.delayed(const Duration(milliseconds: 500), () {
-        _runMigrationsInBackground();
-      });
-
-      debugPrint('✓ AuthWrapper: User services initialization scheduled');
+      debugPrint('✓ AuthWrapper: User services initialized');
     } catch (e) {
       debugPrint("User services init failed: $e");
     }
@@ -517,16 +474,18 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
   /// Listen for notifications from Firestore and show them locally
   void _startNotificationListener() {
     _notificationSubscription?.cancel();
-    _notificationSubscription = _notificationService.getUserNotificationsStream().listen(
-      (notifications) async {
-        for (final notification in notifications) {
-          await _notificationService.processNewNotification(notification);
-        }
-      },
-      onError: (e) {
-        debugPrint('❌ Notification listener error: $e');
-      },
-    );
+    _notificationSubscription = _notificationService
+        .getUserNotificationsStream()
+        .listen(
+          (notifications) async {
+            for (final notification in notifications) {
+              await _notificationService.processNewNotification(notification);
+            }
+          },
+          onError: (e) {
+            debugPrint('❌ Notification listener error: $e');
+          },
+        );
     debugPrint('✓ Notification listener started');
   }
 

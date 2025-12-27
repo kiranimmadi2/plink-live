@@ -2,8 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
-import '../utils/photo_url_helper.dart';
-import 'current_user_cache.dart';
+import '../res/utils/photo_url_helper.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -239,9 +238,6 @@ class AuthService {
 
   Future<void> signOut() async {
     try {
-      // Clear current user cache first
-      CurrentUserCache().clear();
-
       // Fire and forget - update user's online status (don't wait for it)
       final user = _auth.currentUser;
       if (user != null) {
@@ -263,7 +259,6 @@ class AuthService {
       ]);
     } catch (e) {
       // Even if there's an error, try to force sign out from Firebase
-      CurrentUserCache().clear();
       try {
         await _auth.signOut();
       } catch (_) {}
