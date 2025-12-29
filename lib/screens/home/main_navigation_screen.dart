@@ -70,9 +70,73 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
 
     _listenUnread();
     _listenForIncomingCalls();
+    _checkAndMarkMissedCalls(); // Check for old unanswered calls
     _updateStatus(true);
     _checkLocation();
     _loadAccountType();
+  }
+
+  // Check for old calls that were never answered and mark them as missed
+  Future<void> _checkAndMarkMissedCalls() async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+
+    try {
+      // Get calls where this user is the receiver and status is still calling/ringing
+      final oldCalls = await _firestore
+          .collection('calls')
+          .where('receiverId', isEqualTo: user.uid)
+          .where('status', whereIn: ['calling', 'ringing'])
+          .get();
+
+      final now = DateTime.now();
+      final cutoffTime = now.subtract(const Duration(seconds: 60));
+
+      for (var doc in oldCalls.docs) {
+        final data = doc.data();
+        // Use timestamp or createdAt field
+        final timestamp = data['timestamp'] ?? data['createdAt'];
+        DateTime? callTime;
+
+        if (timestamp is Timestamp) {
+          callTime = timestamp.toDate();
+        } else if (timestamp is String) {
+          callTime = DateTime.tryParse(timestamp);
+        }
+
+        // If call is older than 60 seconds, mark as missed
+        if (callTime != null && callTime.isBefore(cutoffTime)) {
+          await _firestore.collection('calls').doc(doc.id).update({
+            'status': 'missed',
+            'missedAt': FieldValue.serverTimestamp(),
+          });
+
+          // Show missed call notification
+          final callerName = data['callerName'] as String? ?? 'Unknown';
+          _showMissedCallNotification(callerName);
+        }
+      }
+    } catch (e) {
+      debugPrint('Error checking missed calls: $e');
+    }
+  }
+
+  void _showMissedCallNotification(String callerName) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.phone_missed, color: Colors.white),
+            const SizedBox(width: 12),
+            Expanded(child: Text('Missed call from $callerName')),
+          ],
+        ),
+        backgroundColor: Colors.orange.shade700,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 4),
+      ),
+    );
   }
 
   void _loadAccountType() async {
@@ -112,44 +176,96 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
 
     _incomingCallSubscription?.cancel();
 
-    // Only listen for calls created in the last 30 seconds to avoid old calls
-    final cutoffTime = DateTime.now().subtract(const Duration(seconds: 30));
+    final currentUserId = user.uid;
+    debugPrint('  ====== CALL LISTENER SETUP ======');
+    debugPrint('  Current user ID: $currentUserId');
+    debugPrint('  User email: ${user.email}');
 
     _incomingCallSubscription = _firestore
         .collection('calls')
-        .where('receiverId', isEqualTo: user.uid)
+        .where('receiverId', isEqualTo: currentUserId)
         .where('status', isEqualTo: 'calling')
         .snapshots()
         .listen((snapshot) {
           if (!mounted || _isShowingIncomingCall) return;
 
+          debugPrint('  ====== CALL SNAPSHOT ======');
+          debugPrint('  Total calls in snapshot: ${snapshot.docs.length}');
+          debugPrint('  Changes count: ${snapshot.docChanges.length}');
+
+          // Get current time for checking call freshness
+          final now = DateTime.now();
+          final cutoffTime = now.subtract(const Duration(seconds: 30));
+
           for (var change in snapshot.docChanges) {
+            debugPrint('  Change type: ${change.type}');
+
             if (change.type == DocumentChangeType.added) {
               final data = change.doc.data();
-              if (data == null) continue;
+              if (data == null) {
+                debugPrint('  Skipping: null data');
+                continue;
+              }
 
               final callId = change.doc.id;
+              final callerId = data['callerId'] as String? ?? '';
+              final receiverId = data['receiverId'] as String? ?? '';
+
+              debugPrint('  ====== CALL DETAILS ======');
+              debugPrint('  Call ID: $callId');
+              debugPrint('  Caller ID: $callerId');
+              debugPrint('  Receiver ID: $receiverId');
+              debugPrint('  My User ID: $currentUserId');
+              debugPrint('  Am I caller? ${callerId == currentUserId}');
+              debugPrint('  Am I receiver? ${receiverId == currentUserId}');
 
               // Skip if we've already handled this call
-              if (_handledCallIds.contains(callId)) continue;
+              if (_handledCallIds.contains(callId)) {
+                debugPrint('    Skipping: already handled');
+                continue;
+              }
 
-              // Check call timestamp - ignore old calls
-              final timestamp = data['timestamp'];
-              if (timestamp != null) {
-                DateTime? callTime;
-                if (timestamp is Timestamp) {
-                  callTime = timestamp.toDate();
-                } else if (timestamp is String) {
-                  callTime = DateTime.tryParse(timestamp);
-                }
+              // CRITICAL CHECK: Skip if current user is the caller (not the receiver)
+              if (callerId == currentUserId) {
+                debugPrint('    Skipping: I am the caller, not receiver');
+                _handledCallIds.add(callId);
+                continue;
+              }
 
-                // Skip calls older than 30 seconds
-                if (callTime != null && callTime.isBefore(cutoffTime)) {
-                  _handledCallIds.add(
-                    callId,
-                  ); // Mark as handled so we don't check again
-                  continue;
-                }
+              // Double verify: receiver ID must match current user exactly
+              if (receiverId != currentUserId) {
+                debugPrint('    Skipping: receiver ID does not match my ID');
+                debugPrint('  Expected: $currentUserId, Got: $receiverId');
+                _handledCallIds.add(callId);
+                continue;
+              }
+
+              debugPrint('    Call is valid for this user!');
+
+              // Check call timestamp - ignore old calls and mark as missed
+              // Use timestamp or createdAt field
+              final timestamp = data['timestamp'] ?? data['createdAt'];
+              DateTime? callTime;
+              if (timestamp is Timestamp) {
+                callTime = timestamp.toDate();
+              } else if (timestamp is String) {
+                callTime = DateTime.tryParse(timestamp);
+              }
+
+              // If call is older than 30 seconds, mark as missed instead of showing incoming call
+              if (callTime != null && callTime.isBefore(cutoffTime)) {
+                _handledCallIds.add(callId);
+
+                // Mark as missed in Firestore
+                _firestore.collection('calls').doc(callId).update({
+                  'status': 'missed',
+                  'missedAt': FieldValue.serverTimestamp(),
+                });
+
+                // Show missed call notification
+                final callerName = data['callerName'] as String? ?? 'Unknown';
+                _showMissedCallNotification(callerName);
+                continue;
               }
 
               // Mark this call as handled
@@ -157,14 +273,13 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
 
               final callerName = data['callerName'] as String? ?? 'Unknown';
               final callerPhoto = data['callerPhoto'] as String?;
-              final callerId = data['callerId'] as String? ?? '';
 
-              // Show incoming call screen
+              // Show incoming call screen for fresh calls only
               _showIncomingCall(
                 callId: callId,
                 callerName: callerName,
                 callerPhoto: callerPhoto,
-                callerId: callerId,
+                callerId: callerId, // Using callerId from earlier check
               );
               break; // Only show one call at a time
             }

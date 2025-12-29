@@ -1106,8 +1106,8 @@ class _ProfileWithHistoryScreenState
                                                   _loadUserData();
 
                                                   if (!mounted) return;
-                                                  // ignore: use_build_context_synchronously
                                                   ScaffoldMessenger.of(
+                                                    // ignore: use_build_context_synchronously
                                                     context,
                                                   ).showSnackBar(
                                                     const SnackBar(
@@ -1120,8 +1120,8 @@ class _ProfileWithHistoryScreenState
                                                   );
                                                 } else {
                                                   if (!mounted) return;
-                                                  // ignore: use_build_context_synchronously
                                                   ScaffoldMessenger.of(
+                                                    // ignore: use_build_context_synchronously
                                                     context,
                                                   ).showSnackBar(
                                                     const SnackBar(
@@ -1138,8 +1138,8 @@ class _ProfileWithHistoryScreenState
                                                   'Error during manual location update: $e',
                                                 );
                                                 if (!mounted) return;
-                                                // ignore: use_build_context_synchronously
                                                 ScaffoldMessenger.of(
+                                                  // ignore: use_build_context_synchronously
                                                   context,
                                                 ).showSnackBar(
                                                   const SnackBar(

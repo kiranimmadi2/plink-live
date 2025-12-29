@@ -812,7 +812,7 @@ class _MyPostsScreenState extends State<MyPostsScreen>
                       // Remaining days warning
                       Text(
                         remainingDays <= 7
-                            ? '⚠️ $remainingDays days left'
+                            ? '   $remainingDays days left'
                             : '$remainingDays days left',
                         style: AppTextStyles.caption.copyWith(
                           color: remainingDays <= 7

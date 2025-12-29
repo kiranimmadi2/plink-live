@@ -501,7 +501,7 @@ class NotificationService {
         'read': true,
       });
     } catch (e) {
-      debugPrint('❌ Error marking notification as read: $e');
+      debugPrint('  Error marking notification as read: $e');
     }
   }
 

@@ -195,8 +195,9 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _loadMorePosts() async {
-    if (_isLoadingMore || _isLoading || !_hasMore || _lastDocument == null)
+    if (_isLoadingMore || _isLoading || !_hasMore || _lastDocument == null) {
       return;
+    }
 
     setState(() {
       _isLoadingMore = true;
@@ -1323,6 +1324,10 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
     final userName = post['userName'] ?? 'User';
     final userPhoto = post['userPhoto'];
 
+    debugPrint('  ====== INITIATING CALL (Feed) ======');
+    debugPrint('  Caller ID (me): ${currentUser.uid}');
+    debugPrint('  Receiver ID (other): $postUserId');
+
     try {
       // Get current user's profile for proper name
       final callerDoc = await _firestore
@@ -1341,6 +1346,9 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
           callerData?['profileImageUrl'] ??
           currentUser.photoURL;
 
+      debugPrint('  Caller name: $callerName');
+      debugPrint('  Receiver name: $userName');
+
       // Create call record in Firestore
       final callDoc = await _firestore.collection('calls').add({
         'callerId': currentUser.uid,
@@ -1354,6 +1362,8 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
         'status': 'calling',
         'timestamp': FieldValue.serverTimestamp(),
       });
+
+      debugPrint('  Call document created: ${callDoc.id}');
 
       // Send push notification to receiver for incoming call
       await NotificationService().sendNotificationToUser(

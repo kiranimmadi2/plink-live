@@ -60,7 +60,11 @@ class AuthService {
     }
   }
 
-  Future<User?> signUpWithEmail(String email, String password, {String? accountType}) async {
+  Future<User?> signUpWithEmail(
+    String email,
+    String password, {
+    String? accountType,
+  }) async {
     try {
       final UserCredential result = await _auth.createUserWithEmailAndPassword(
         email: email,
@@ -84,7 +88,8 @@ class AuthService {
           'lastSeen': FieldValue.serverTimestamp(),
           'createdAt': FieldValue.serverTimestamp(),
           'isOnline': true,
-          'discoveryModeEnabled': true, // Enable Live Connect discovery by default
+          'discoveryModeEnabled':
+              true, // Enable Live Connect discovery by default
           'interests': [], // Initialize empty interests
           'connections': [], // Initialize empty connections
           'connectionCount': 0,
@@ -94,9 +99,7 @@ class AuthService {
           // Account type fields
           'accountType': accType,
           'accountStatus': needsVerification ? 'pendingVerification' : 'active',
-          'verification': {
-            'status': needsVerification ? 'pending' : 'none',
-          },
+          'verification': {'status': needsVerification ? 'pending' : 'none'},
         }, SetOptions(merge: true));
       }
 
@@ -127,34 +130,41 @@ class AuthService {
 
   Future<User?> signInWithGoogle({String? accountType}) async {
     try {
-      debugPrint('🔐 Google Sign In: Starting...');
+      debugPrint('   Google Sign In: Starting...');
 
       // Check if already signed in
       await _googleSignIn.signOut();
-      debugPrint('🔐 Google Sign In: Signed out previous session');
+      debugPrint('   Google Sign In: Signed out previous session');
 
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-      debugPrint('🔐 Google Sign In: signIn() completed, user: ${googleUser?.email}');
+      debugPrint(
+        '   Google Sign In: signIn() completed, user: ${googleUser?.email}',
+      );
 
       if (googleUser == null) {
-        debugPrint('🔐 Google Sign In: User cancelled or no account selected');
+        debugPrint('   Google Sign In: User cancelled or no account selected');
         return null;
       }
 
-      debugPrint('🔐 Google Sign In: Getting authentication tokens...');
+      debugPrint('   Google Sign In: Getting authentication tokens...');
       final GoogleSignInAuthentication googleAuth =
           await googleUser.authentication;
-      debugPrint('🔐 Google Sign In: Got tokens - accessToken: ${googleAuth.accessToken != null}, idToken: ${googleAuth.idToken != null}');
+      debugPrint(
+        '   Google Sign In: Got tokens - accessToken: ${googleAuth.accessToken != null}, idToken: ${googleAuth.idToken != null}',
+      );
 
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
 
-      debugPrint('🔐 Google Sign In: Signing in to Firebase...');
-      final UserCredential result =
-          await _auth.signInWithCredential(credential);
-      debugPrint('🔐 Google Sign In: Firebase sign in successful - uid: ${result.user?.uid}');
+      debugPrint('   Google Sign In: Signing in to Firebase...');
+      final UserCredential result = await _auth.signInWithCredential(
+        credential,
+      );
+      debugPrint(
+        '   Google Sign In: Firebase sign in successful - uid: ${result.user?.uid}',
+      );
 
       // Save Google profile photo URL to Firestore
       if (result.user != null) {
@@ -165,7 +175,10 @@ class AuthService {
         photoUrl = PhotoUrlHelper.getHighQualityGooglePhoto(photoUrl);
 
         // Check if this is a new user or existing user
-        final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+        final doc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
         final isNewUser = !doc.exists;
 
         // Determine account type and status for new users
@@ -183,7 +196,8 @@ class AuthService {
           'isOnline': true,
           // Only set these for new users to avoid overwriting existing values
           if (isNewUser) ...{
-            'discoveryModeEnabled': true, // Enable Live Connect discovery by default
+            'discoveryModeEnabled':
+                true, // Enable Live Connect discovery by default
             'interests': [], // Initialize empty interests
             'connections': [], // Initialize empty connections
             'connectionCount': 0,
@@ -192,10 +206,10 @@ class AuthService {
             'activities': [], // Initialize empty activities
             // Account type fields
             'accountType': accType,
-            'accountStatus': needsVerification ? 'pendingVerification' : 'active',
-            'verification': {
-              'status': needsVerification ? 'pending' : 'none',
-            },
+            'accountStatus': needsVerification
+                ? 'pendingVerification'
+                : 'active',
+            'verification': {'status': needsVerification ? 'pending' : 'none'},
           },
         }, SetOptions(merge: true));
 
@@ -230,8 +244,8 @@ class AuthService {
       }
       throw Exception(message);
     } catch (e) {
-      debugPrint('🔐 Google Sign In ERROR: $e');
-      debugPrint('🔐 Google Sign In ERROR Type: ${e.runtimeType}');
+      debugPrint('   Google Sign In ERROR: $e');
+      debugPrint('   Google Sign In ERROR Type: ${e.runtimeType}');
       throw Exception('Google sign-in failed: ${e.toString()}');
     }
   }
@@ -241,12 +255,16 @@ class AuthService {
       // Fire and forget - update user's online status (don't wait for it)
       final user = _auth.currentUser;
       if (user != null) {
-        FirebaseFirestore.instance.collection('users').doc(user.uid).update({
-          'isOnline': false,
-          'lastSeen': FieldValue.serverTimestamp(),
-        }).catchError((e) {
-          debugPrint('Error updating status on logout: $e');
-        });
+        FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .update({
+              'isOnline': false,
+              'lastSeen': FieldValue.serverTimestamp(),
+            })
+            .catchError((e) {
+              debugPrint('Error updating status on logout: $e');
+            });
       }
 
       // Sign out from Firebase and Google immediately
@@ -299,7 +317,8 @@ class AuthService {
               message = 'SMS quota exceeded. Please try again tomorrow.';
               break;
             case 'app-not-authorized':
-              message = 'App not authorized. Please check Firebase configuration.';
+              message =
+                  'App not authorized. Please check Firebase configuration.';
               break;
             case 'captcha-check-failed':
               message = 'reCAPTCHA verification failed. Please try again.';
@@ -308,7 +327,8 @@ class AuthService {
               message = 'Missing app identifier. Please reinstall the app.';
               break;
             default:
-              message = e.message ?? 'Phone verification failed. Please try again.';
+              message =
+                  e.message ?? 'Phone verification failed. Please try again.';
           }
           onError(message);
         },
@@ -343,7 +363,9 @@ class AuthService {
         smsCode: otp,
       );
 
-      final UserCredential result = await _auth.signInWithCredential(credential);
+      final UserCredential result = await _auth.signInWithCredential(
+        credential,
+      );
 
       // Fire and forget - update profile in background for faster login
       if (result.user != null) {
@@ -514,9 +536,13 @@ class AuthService {
       if (!hasPasswordProvider()) {
         final provider = getPrimarySignInMethod();
         if (provider == 'google.com') {
-          throw Exception('You signed in with Google. Please use Google to manage your password.');
+          throw Exception(
+            'You signed in with Google. Please use Google to manage your password.',
+          );
         } else {
-          throw Exception('Password change is only available for email/password accounts.');
+          throw Exception(
+            'Password change is only available for email/password accounts.',
+          );
         }
       }
 
@@ -598,7 +624,10 @@ class AuthService {
   /// Fire-and-forget: Update user profile on phone login (runs in background)
   void _updateUserProfileOnPhoneLogin(User user) async {
     try {
-      final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
       final isNewUser = !doc.exists;
 
       // Determine account type and status for new users
@@ -623,9 +652,7 @@ class AuthService {
           // Account type fields
           'accountType': accType,
           'accountStatus': needsVerification ? 'pendingVerification' : 'active',
-          'verification': {
-            'status': needsVerification ? 'pending' : 'none',
-          },
+          'verification': {'status': needsVerification ? 'pending' : 'none'},
         },
       }, SetOptions(merge: true));
 
@@ -640,7 +667,10 @@ class AuthService {
   /// Fire-and-forget: Update user profile on email login (runs in background)
   void _updateUserProfileOnLogin(User user, String email) async {
     try {
-      final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
       final isNewUser = !doc.exists;
 
       await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
@@ -681,11 +711,7 @@ class AuthService {
           .collection('users')
           .doc(userId)
           .collection('securityEvents')
-          .add({
-        'type': 'password_change',
-        'timestamp': now,
-        'success': true,
-      });
+          .add({'type': 'password_change', 'timestamp': now, 'success': true});
     } catch (e) {
       // Don't fail the password change if logging fails
       debugPrint('Failed to record password change: $e');

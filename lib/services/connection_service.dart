@@ -292,7 +292,7 @@ class ConnectionService {
       );
       return connections.contains(user2Id);
     } catch (e) {
-      debugPrint('❌ Error checking connection status: $e');
+      debugPrint('  Error checking connection status: $e');
       return false;
     }
   }
@@ -309,7 +309,7 @@ class ConnectionService {
           .get();
       return List<String>.from(userDoc.data()?['connections'] ?? []);
     } catch (e) {
-      debugPrint('❌ Error getting connections: $e');
+      debugPrint('  Error getting connections: $e');
       return [];
     }
   }
@@ -326,7 +326,7 @@ class ConnectionService {
           .get();
       return userDoc.data()?['connectionCount'] ?? 0;
     } catch (e) {
-      debugPrint('❌ Error getting connection count: $e');
+      debugPrint('  Error getting connection count: $e');
       return 0;
     }
   }
@@ -433,7 +433,7 @@ class ConnectionService {
         data: {'requestId': requestId},
       );
     } catch (e) {
-      debugPrint('❌ Error sending connection notification: $e');
+      debugPrint('  Error sending connection notification: $e');
     }
   }
 }

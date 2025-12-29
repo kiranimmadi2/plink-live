@@ -12,10 +12,7 @@ class ChooseAccountTypeScreen extends StatefulWidget {
 class _ChooseAccountTypeScreenState extends State<ChooseAccountTypeScreen> {
   int selectedIndex = -1;
 
-  final List<String> accountTypes = [
-    "Personal Account",
-    "Business Account",
-  ];
+  final List<String> accountTypes = ["Personal Account", "Business Account"];
 
   void _onCardTap(int index) {
     setState(() {
@@ -30,7 +27,9 @@ class _ChooseAccountTypeScreenState extends State<ChooseAccountTypeScreen> {
           content: const Text('Please select an account type'),
           backgroundColor: Colors.blue.shade600,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
         ),
       );
       return;
@@ -57,7 +56,7 @@ class _ChooseAccountTypeScreenState extends State<ChooseAccountTypeScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SizedBox(height: 40),
+                    const SizedBox(height: 30),
                     // Title
                     const Text(
                       "Select an account type",
@@ -77,7 +76,7 @@ class _ChooseAccountTypeScreenState extends State<ChooseAccountTypeScreen> {
                         fontWeight: FontWeight.w400,
                       ),
                     ),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 14),
 
                     // Personal Account Card
                     _AccountTypeCard(
@@ -99,17 +98,11 @@ class _ChooseAccountTypeScreenState extends State<ChooseAccountTypeScreen> {
                           emoji: "💬",
                           text: "Connect - Chat, Calls",
                         ),
-                        _FeatureItem(
-                          emoji: "📤",
-                          text: "Share - Post, Ideas",
-                        ),
-                        _FeatureItem(
-                          emoji: "✅",
-                          text: "Trust - Verify Rate",
-                        ),
+                        _FeatureItem(emoji: "📤", text: "Share - Post, Ideas"),
+                        _FeatureItem(emoji: "✅", text: "Trust - Verify Rate"),
                       ],
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 12),
 
                     // Business Account Card
                     _AccountTypeCard(
@@ -127,10 +120,7 @@ class _ChooseAccountTypeScreenState extends State<ChooseAccountTypeScreen> {
                           emoji: "📁",
                           text: "Propose - Full Projects",
                         ),
-                        _FeatureItem(
-                          emoji: "🪪",
-                          text: "Showcase - Portfolio",
-                        ),
+                        _FeatureItem(emoji: "🪪", text: "Showcase - Portfolio"),
                         _FeatureItem(
                           emoji: "📧",
                           text: "Manage - Clients, Discussions",
@@ -141,7 +131,7 @@ class _ChooseAccountTypeScreenState extends State<ChooseAccountTypeScreen> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 12),
                   ],
                 ),
               ),
@@ -149,7 +139,7 @@ class _ChooseAccountTypeScreenState extends State<ChooseAccountTypeScreen> {
 
             // Continue Button
             Padding(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(16),
               child: SizedBox(
                 width: double.infinity,
                 height: 56,
@@ -198,11 +188,7 @@ class _ChooseAccountTypeScreenState extends State<ChooseAccountTypeScreen> {
               ),
               borderRadius: BorderRadius.circular(24),
             ),
-            child: const Icon(
-              Icons.person,
-              color: Colors.white,
-              size: 28,
-            ),
+            child: const Icon(Icons.person, color: Colors.white, size: 28),
           ),
           // Verification badge
           Positioned(
@@ -236,8 +222,8 @@ class _ChooseAccountTypeScreenState extends State<ChooseAccountTypeScreen> {
 
   Widget _buildBusinessIcon() {
     return Container(
-      width: 56,
-      height: 56,
+      width: 45,
+      height: 45,
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
@@ -253,11 +239,7 @@ class _ChooseAccountTypeScreenState extends State<ChooseAccountTypeScreen> {
           ),
         ],
       ),
-      child: const Icon(
-        Icons.work_rounded,
-        color: Colors.white,
-        size: 28,
-      ),
+      child: const Icon(Icons.work_rounded, color: Colors.white, size: 25),
     );
   }
 }
@@ -286,9 +268,11 @@ class _AccountTypeCard extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF2563EB) : const Color(0xFFE8F1FF),
+          color: isSelected
+              ? const Color.fromARGB(255, 75, 126, 238)
+              : const Color.fromARGB(255, 216, 231, 255),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isSelected
@@ -299,7 +283,7 @@ class _AccountTypeCard extends StatelessWidget {
           boxShadow: [
             BoxShadow(
               color: isSelected
-                  ? const Color(0xFF2563EB).withValues(alpha: 0.3)
+                  ? const Color.fromARGB(255, 54, 94, 180)
                   : Colors.black.withValues(alpha: 0.04),
               blurRadius: isSelected ? 20 : 10,
               offset: const Offset(0, 8),
@@ -313,7 +297,7 @@ class _AccountTypeCard extends StatelessWidget {
             Row(
               children: [
                 icon,
-                const SizedBox(width: 16),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -343,54 +327,56 @@ class _AccountTypeCard extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 10),
 
             // Features List
-            ...features.map((feature) => Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Row(
-                children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? Colors.white.withValues(alpha: 0.15)
-                          : Colors.white,
-                      borderRadius: BorderRadius.circular(10),
-                      boxShadow: isSelected
-                          ? null
-                          : [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.05),
-                                blurRadius: 4,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                    ),
-                    child: Center(
-                      child: Text(
-                        feature.emoji,
-                        style: const TextStyle(fontSize: 18),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Text(
-                      feature.text,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
+            ...features.map(
+              (feature) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
                         color: isSelected
-                            ? Colors.white
-                            : const Color(0xFF374151),
+                            ? Colors.white.withValues(alpha: 0.15)
+                            : Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        boxShadow: isSelected
+                            ? null
+                            : [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.05),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                      ),
+                      child: Center(
+                        child: Text(
+                          feature.emoji,
+                          style: const TextStyle(fontSize: 18),
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        feature.text,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: isSelected
+                              ? Colors.white
+                              : const Color(0xFF374151),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            )),
+            ),
           ],
         ),
       ),
@@ -402,8 +388,5 @@ class _FeatureItem {
   final String emoji;
   final String text;
 
-  const _FeatureItem({
-    required this.emoji,
-    required this.text,
-  });
+  const _FeatureItem({required this.emoji, required this.text});
 }

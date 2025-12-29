@@ -208,7 +208,7 @@ class UserManager {
               })
               .timeout(const Duration(seconds: 5));
         } catch (e) {
-          debugPrint('⚠️ Failed to update online status: $e');
+          debugPrint('   Failed to update online status: $e');
         }
       }
 

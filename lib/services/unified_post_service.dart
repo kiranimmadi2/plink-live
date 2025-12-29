@@ -183,7 +183,7 @@ Examples:
       // Fallback if AI fails
       return _createFallbackIntent(userInput);
     } catch (e) {
-      debugPrint('⚠️ Error analyzing intent: $e');
+      debugPrint('   Error analyzing intent: $e');
       return _createFallbackIntent(userInput);
     }
   }
@@ -219,7 +219,7 @@ Examples:
         'confidence': 0.8,
       };
     } catch (e) {
-      debugPrint('⚠️ Error parsing intent JSON: $e');
+      debugPrint('   Error parsing intent JSON: $e');
       return _createFallbackIntent(jsonStr);
     }
   }
@@ -269,19 +269,105 @@ Examples:
 
   /// Extract keywords from text
   List<String> _extractKeywords(String text) {
-    final stopWords = {'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been',
-                       'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will',
-                       'would', 'could', 'should', 'may', 'might', 'must', 'shall',
-                       'can', 'need', 'dare', 'ought', 'used', 'to', 'of', 'in',
-                       'for', 'on', 'with', 'at', 'by', 'from', 'as', 'into',
-                       'through', 'during', 'before', 'after', 'above', 'below',
-                       'between', 'under', 'again', 'further', 'then', 'once',
-                       'and', 'but', 'or', 'nor', 'so', 'yet', 'both', 'either',
-                       'neither', 'not', 'only', 'own', 'same', 'than', 'too',
-                       'very', 'just', 'i', 'me', 'my', 'myself', 'we', 'our',
-                       'ours', 'you', 'your', 'he', 'him', 'his', 'she', 'her',
-                       'it', 'its', 'they', 'them', 'their', 'what', 'which',
-                       'who', 'whom', 'this', 'that', 'these', 'those', 'am'};
+    final stopWords = {
+      'the',
+      'a',
+      'an',
+      'is',
+      'are',
+      'was',
+      'were',
+      'be',
+      'been',
+      'being',
+      'have',
+      'has',
+      'had',
+      'do',
+      'does',
+      'did',
+      'will',
+      'would',
+      'could',
+      'should',
+      'may',
+      'might',
+      'must',
+      'shall',
+      'can',
+      'need',
+      'dare',
+      'ought',
+      'used',
+      'to',
+      'of',
+      'in',
+      'for',
+      'on',
+      'with',
+      'at',
+      'by',
+      'from',
+      'as',
+      'into',
+      'through',
+      'during',
+      'before',
+      'after',
+      'above',
+      'below',
+      'between',
+      'under',
+      'again',
+      'further',
+      'then',
+      'once',
+      'and',
+      'but',
+      'or',
+      'nor',
+      'so',
+      'yet',
+      'both',
+      'either',
+      'neither',
+      'not',
+      'only',
+      'own',
+      'same',
+      'than',
+      'too',
+      'very',
+      'just',
+      'i',
+      'me',
+      'my',
+      'myself',
+      'we',
+      'our',
+      'ours',
+      'you',
+      'your',
+      'he',
+      'him',
+      'his',
+      'she',
+      'her',
+      'it',
+      'its',
+      'they',
+      'them',
+      'their',
+      'what',
+      'which',
+      'who',
+      'whom',
+      'this',
+      'that',
+      'these',
+      'those',
+      'am',
+    };
 
     return text
         .toLowerCase()
@@ -322,7 +408,7 @@ Examples:
       final sourceEmbedding = sourcePost.embedding ?? [];
 
       if (sourceEmbedding.isEmpty) {
-        debugPrint('⚠️ Source post has no embedding, regenerating...');
+        debugPrint(' Source post has no embedding, regenerating...');
         // Regenerate embedding
         final embeddingText = _createTextForEmbedding(
           title: sourcePost.title,
@@ -341,7 +427,7 @@ Examples:
         return findMatches(postId); // Retry with new embedding
       }
 
-      debugPrint('🔍 Finding matches for: ${sourcePost.title}');
+      debugPrint(' Finding matches for: ${sourcePost.title}');
 
       // Query active posts (exclude own posts)
       final querySnapshot = await _firestore
@@ -359,7 +445,7 @@ Examples:
 
         // Skip if no embedding
         if (candidateEmbedding.isEmpty) {
-          debugPrint('⚠️ Skipping post ${doc.id} - no embedding');
+          debugPrint(' Skipping post ${doc.id} - no embedding');
           continue;
         }
 
@@ -418,7 +504,7 @@ Examples:
           .map((doc) => PostModel.fromFirestore(doc))
           .toList();
     } catch (e) {
-      debugPrint('❌ Error getting user posts: $e');
+      debugPrint('  Error getting user posts: $e');
       return [];
     }
   }
@@ -432,7 +518,7 @@ Examples:
       });
       return true;
     } catch (e) {
-      debugPrint('❌ Error deactivating post: $e');
+      debugPrint('  Error deactivating post: $e');
       return false;
     }
   }
@@ -443,7 +529,7 @@ Examples:
       await _firestore.collection('posts').doc(postId).delete();
       return true;
     } catch (e) {
-      debugPrint('❌ Error deleting post: $e');
+      debugPrint('  Error deleting post: $e');
       return false;
     }
   }
@@ -470,7 +556,7 @@ Examples:
         'viewCount': FieldValue.increment(1),
       });
     } catch (e) {
-      debugPrint('⚠️ Error incrementing view count: $e');
+      debugPrint('   Error incrementing view count: $e');
     }
   }
 
@@ -481,7 +567,7 @@ Examples:
         'matchedUserIds': FieldValue.arrayUnion([matchedUserId]),
       });
     } catch (e) {
-      debugPrint('⚠️ Error adding matched user: $e');
+      debugPrint('   Error adding matched user: $e');
     }
   }
 }

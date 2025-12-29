@@ -131,7 +131,7 @@ class RealtimeMatchingService {
       // UPDATED: If embedding missing, generate it now
       if (newEmbedding.isEmpty) {
         debugPrint(
-          '⚠️ New post ${newPost.id} missing embedding, generating...',
+          '   New post ${newPost.id} missing embedding, generating...',
         );
         try {
           final text =

@@ -34,11 +34,14 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
 
   String _callStatus = 'calling';
   Timer? _callTimer;
+  Timer? _callTimeoutTimer; // Timer to mark call as missed if not answered
   int _callDuration = 0;
   bool _isMuted = false;
   bool _isSpeakerOn = true; // Speaker on by default
   StreamSubscription? _callSubscription;
   bool _webrtcConnected = false;
+
+  static const int _callTimeoutSeconds = 60; // Mark as missed after 60 seconds
 
   @override
   void initState() {
@@ -47,6 +50,49 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
     _setupVoiceCallService();
     _listenToCallStatus();
     _joinCall();
+
+    // Start timeout timer for outgoing calls
+    if (widget.isOutgoing) {
+      _startCallTimeout();
+    }
+  }
+
+  void _startCallTimeout() {
+    _callTimeoutTimer?.cancel();
+    _callTimeoutTimer = Timer(const Duration(seconds: _callTimeoutSeconds), () {
+      // If call is still in calling/ringing state after timeout, mark as missed
+      if (mounted && (_callStatus == 'calling' || _callStatus == 'ringing')) {
+        _markCallAsMissed();
+      }
+    });
+  }
+
+  Future<void> _markCallAsMissed() async {
+    _callTimer?.cancel();
+    _callTimeoutTimer?.cancel();
+    _callSubscription?.cancel();
+
+    // Leave WebRTC call
+    await _voiceCallService.leaveCall();
+
+    try {
+      await _firestore.collection('calls').doc(widget.callId).update({
+        'status': 'missed',
+        'missedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      debugPrint('Error marking call as missed: $e');
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Call not answered'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      Navigator.of(context).pop();
+    }
   }
 
   void _setupVoiceCallService() {
@@ -126,6 +172,8 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
             });
 
             if (status == 'connected' || status == 'accepted') {
+              // Cancel timeout timer since call is connected
+              _callTimeoutTimer?.cancel();
               _startCallTimer();
               // Update status to connected if it was accepted
               if (status == 'accepted') {
@@ -134,8 +182,9 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
                   'connectedAt': FieldValue.serverTimestamp(),
                 });
               }
-            } else if (status == 'ended' || status == 'declined' || status == 'rejected') {
-              _endCall(showSnackbar: status == 'declined' || status == 'rejected');
+            } else if (status == 'ended' || status == 'declined' || status == 'rejected' || status == 'missed') {
+              _callTimeoutTimer?.cancel();
+              _endCall(showSnackbar: status == 'declined' || status == 'rejected' || status == 'missed');
             }
           }
         });
@@ -207,6 +256,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
   @override
   void dispose() {
     _callTimer?.cancel();
+    _callTimeoutTimer?.cancel();
     _callSubscription?.cancel();
     _voiceCallService.leaveCall();
     _pulseController.dispose();

@@ -107,21 +107,21 @@ void _validateFirebaseConfig() {
       dotenv.env['FIREBASE_WEB_API_KEY'];
 
   if (projectId == null || projectId.isEmpty) {
-    debugPrint('⚠️ WARNING: Firebase project ID is missing!');
+    debugPrint('   WARNING: Firebase project ID is missing!');
     debugPrint(
       '   Please ensure .env file exists with FIREBASE_WEB_PROJECT_ID',
     );
   }
 
   if (apiKey == null || apiKey.isEmpty) {
-    debugPrint('⚠️ WARNING: Firebase API key is missing!');
+    debugPrint('   WARNING: Firebase API key is missing!');
     debugPrint(
       '   Please ensure .env file exists with FIREBASE_ANDROID_API_KEY or FIREBASE_WEB_API_KEY',
     );
   }
 
   if ((projectId?.isNotEmpty ?? false) && (apiKey?.isNotEmpty ?? false)) {
-    debugPrint('✓ Firebase configuration loaded successfully');
+    debugPrint(' Firebase configuration loaded successfully');
   }
 }
 
@@ -136,7 +136,7 @@ void main() async {
         exception.toString().contains('Failed to decode image') ||
         exception.toString().contains('codec')) {
       debugPrint(
-        '⚠️ Image decode error (suppressed): ${details.exceptionAsString()}',
+        '   Image decode error (suppressed): ${details.exceptionAsString()}',
       );
       return; // Don't propagate
     }
@@ -447,11 +447,11 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
         await _profileService.ensureProfileExists().timeout(
           const Duration(seconds: 10),
           onTimeout: () {
-            debugPrint('⚠️ Profile service timed out');
+            debugPrint('   Profile service timed out');
           },
         );
       } catch (e) {
-        debugPrint('⚠️ Profile service error (non-fatal): $e');
+        debugPrint('   Profile service error (non-fatal): $e');
       }
 
       await Future.delayed(const Duration(milliseconds: 100));
@@ -483,7 +483,7 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
             }
           },
           onError: (e) {
-            debugPrint('❌ Notification listener error: $e');
+            debugPrint('  Notification listener error: $e');
           },
         );
     debugPrint('✓ Notification listener started');

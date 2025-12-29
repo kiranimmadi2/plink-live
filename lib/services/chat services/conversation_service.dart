@@ -326,19 +326,18 @@ class ConversationService {
 
     try {
       // Create message document
-      final messageRef =
-          await _firestore // ignore: unused_local_variable
-              .collection('conversations')
-              .doc(conversationId)
-              .collection('messages')
-              .add({
-                'senderId': currentUserId,
-                'text': text,
-                'imageUrl': imageUrl,
-                'timestamp': FieldValue.serverTimestamp(),
-                'isRead': false,
-                'isEdited': false,
-              });
+      await _firestore
+          .collection('conversations')
+          .doc(conversationId)
+          .collection('messages')
+          .add({
+            'senderId': currentUserId,
+            'text': text,
+            'imageUrl': imageUrl,
+            'timestamp': FieldValue.serverTimestamp(),
+            'isRead': false,
+            'isEdited': false,
+          });
 
       // Update conversation with last message
       await _firestore.collection('conversations').doc(conversationId).update({
