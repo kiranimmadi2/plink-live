@@ -1595,7 +1595,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 40),
             child: Text(
-              'Start chatting with people from Discover or Live Connect',
+              'Start chatting with people from Home or Live Connect',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14,

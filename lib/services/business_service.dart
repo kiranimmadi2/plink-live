@@ -4,6 +4,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import '../models/business_model.dart';
+import '../models/business_post_model.dart';
+import '../models/business_order_model.dart';
 
 /// Service for managing business profiles, listings, and reviews
 class BusinessService {
@@ -598,5 +600,292 @@ class BusinessService {
     } catch (e) {
       return false;
     }
+  }
+
+  // ONLINE STATUS
+
+  /// Update business online status
+  Future<bool> updateOnlineStatus(String businessId, bool isOnline) async {
+    try {
+      await _firestore.collection('businesses').doc(businessId).update({
+        'isOnline': isOnline,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      return true;
+    } catch (e) {
+      debugPrint('Error updating online status: $e');
+      return false;
+    }
+  }
+
+  // BANK ACCOUNT OPERATIONS
+
+  /// Update bank account details
+  Future<bool> updateBankAccount(String businessId, BankAccount bankAccount) async {
+    try {
+      await _firestore.collection('businesses').doc(businessId).update({
+        'bankAccount': bankAccount.toMap(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      return true;
+    } catch (e) {
+      debugPrint('Error updating bank account: $e');
+      return false;
+    }
+  }
+
+  /// Remove bank account
+  Future<bool> removeBankAccount(String businessId) async {
+    try {
+      await _firestore.collection('businesses').doc(businessId).update({
+        'bankAccount': FieldValue.delete(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      return true;
+    } catch (e) {
+      debugPrint('Error removing bank account: $e');
+      return false;
+    }
+  }
+
+  // POST OPERATIONS
+
+  /// Create a new post
+  Future<String?> createPost(BusinessPost post) async {
+    if (_currentUserId == null) return null;
+
+    try {
+      final docRef = await _firestore
+          .collection('business_posts')
+          .add(post.toMap());
+      return docRef.id;
+    } catch (e) {
+      debugPrint('Error creating post: $e');
+      return null;
+    }
+  }
+
+  /// Update post
+  Future<bool> updatePost(String postId, BusinessPost post) async {
+    try {
+      await _firestore
+          .collection('business_posts')
+          .doc(postId)
+          .update(post.copyWith(updatedAt: DateTime.now()).toMap());
+      return true;
+    } catch (e) {
+      debugPrint('Error updating post: $e');
+      return false;
+    }
+  }
+
+  /// Delete post
+  Future<bool> deletePost(String postId) async {
+    try {
+      await _firestore.collection('business_posts').doc(postId).delete();
+      return true;
+    } catch (e) {
+      debugPrint('Error deleting post: $e');
+      return false;
+    }
+  }
+
+  /// Toggle post active status
+  Future<bool> togglePostActive(String postId, bool isActive) async {
+    try {
+      await _firestore.collection('business_posts').doc(postId).update({
+        'isActive': isActive,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      return true;
+    } catch (e) {
+      debugPrint('Error toggling post: $e');
+      return false;
+    }
+  }
+
+  /// Get posts for a business
+  Future<List<BusinessPost>> getBusinessPosts(String businessId) async {
+    try {
+      final snapshot = await _firestore
+          .collection('business_posts')
+          .where('businessId', isEqualTo: businessId)
+          .orderBy('createdAt', descending: true)
+          .get();
+
+      return snapshot.docs
+          .map((doc) => BusinessPost.fromFirestore(doc))
+          .toList();
+    } catch (e) {
+      debugPrint('Error getting posts: $e');
+      return [];
+    }
+  }
+
+  /// Stream posts for a business
+  Stream<List<BusinessPost>> watchBusinessPosts(String businessId) {
+    return _firestore
+        .collection('business_posts')
+        .where('businessId', isEqualTo: businessId)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => BusinessPost.fromFirestore(doc))
+              .toList(),
+        );
+  }
+
+  // ORDER OPERATIONS
+
+  /// Create a new order
+  Future<String?> createOrder(BusinessOrder order) async {
+    if (_currentUserId == null) return null;
+
+    try {
+      final docRef = await _firestore
+          .collection('business_orders')
+          .add(order.toMap());
+
+      // Increment order counts for business
+      await _firestore.collection('businesses').doc(order.businessId).update({
+        'totalOrders': FieldValue.increment(1),
+        'todayOrders': FieldValue.increment(1),
+        'pendingOrders': FieldValue.increment(1),
+      });
+
+      return docRef.id;
+    } catch (e) {
+      debugPrint('Error creating order: $e');
+      return null;
+    }
+  }
+
+  /// Update order status
+  Future<bool> updateOrderStatus(String orderId, OrderStatus newStatus) async {
+    try {
+      final orderDoc = await _firestore.collection('business_orders').doc(orderId).get();
+      if (!orderDoc.exists) return false;
+
+      final order = BusinessOrder.fromFirestore(orderDoc);
+      final oldStatus = order.status;
+
+      // Update order
+      await _firestore.collection('business_orders').doc(orderId).update({
+        'status': newStatus.name,
+        'updatedAt': FieldValue.serverTimestamp(),
+        if (newStatus == OrderStatus.completed) 'completedDate': FieldValue.serverTimestamp(),
+      });
+
+      // Update business counts
+      final updates = <String, dynamic>{};
+
+      // Decrement old status count
+      if (oldStatus == OrderStatus.pending || oldStatus == OrderStatus.newOrder) {
+        updates['pendingOrders'] = FieldValue.increment(-1);
+      }
+
+      // Increment new status count
+      if (newStatus == OrderStatus.completed) {
+        updates['completedOrders'] = FieldValue.increment(1);
+        updates['totalEarnings'] = FieldValue.increment(order.totalAmount);
+        updates['monthlyEarnings'] = FieldValue.increment(order.totalAmount);
+        updates['todayEarnings'] = FieldValue.increment(order.totalAmount);
+      } else if (newStatus == OrderStatus.cancelled) {
+        updates['cancelledOrders'] = FieldValue.increment(1);
+      }
+
+      if (updates.isNotEmpty) {
+        await _firestore.collection('businesses').doc(order.businessId).update(updates);
+      }
+
+      return true;
+    } catch (e) {
+      debugPrint('Error updating order status: $e');
+      return false;
+    }
+  }
+
+  /// Get orders for a business
+  Future<List<BusinessOrder>> getBusinessOrders(String businessId) async {
+    try {
+      final snapshot = await _firestore
+          .collection('business_orders')
+          .where('businessId', isEqualTo: businessId)
+          .orderBy('createdAt', descending: true)
+          .get();
+
+      return snapshot.docs
+          .map((doc) => BusinessOrder.fromFirestore(doc))
+          .toList();
+    } catch (e) {
+      debugPrint('Error getting orders: $e');
+      return [];
+    }
+  }
+
+  /// Stream orders for a business
+  Stream<List<BusinessOrder>> watchBusinessOrders(String businessId) {
+    return _firestore
+        .collection('business_orders')
+        .where('businessId', isEqualTo: businessId)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => BusinessOrder.fromFirestore(doc))
+              .toList(),
+        );
+  }
+
+  /// Get order by ID
+  Future<BusinessOrder?> getOrder(String orderId) async {
+    try {
+      final doc = await _firestore.collection('business_orders').doc(orderId).get();
+      if (!doc.exists) return null;
+      return BusinessOrder.fromFirestore(doc);
+    } catch (e) {
+      debugPrint('Error getting order: $e');
+      return null;
+    }
+  }
+
+  /// Add order notes
+  Future<bool> addOrderNotes(String orderId, String notes) async {
+    try {
+      await _firestore.collection('business_orders').doc(orderId).update({
+        'notes': notes,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      return true;
+    } catch (e) {
+      debugPrint('Error adding order notes: $e');
+      return false;
+    }
+  }
+
+  /// Cancel order with reason
+  Future<bool> cancelOrder(String orderId, String reason, String cancelledBy) async {
+    try {
+      await _firestore.collection('business_orders').doc(orderId).update({
+        'status': OrderStatus.cancelled.name,
+        'cancellationReason': reason,
+        'cancelledBy': cancelledBy,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      return true;
+    } catch (e) {
+      debugPrint('Error cancelling order: $e');
+      return false;
+    }
+  }
+
+  // BUSINESS ID GENERATION
+
+  /// Generate a unique business ID
+  Future<String> generateBusinessId() async {
+    final year = DateTime.now().year;
+    final random = DateTime.now().millisecondsSinceEpoch % 100000;
+    return 'BIZ-$year-${random.toString().padLeft(5, '0')}';
   }
 }

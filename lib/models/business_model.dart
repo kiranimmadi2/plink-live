@@ -9,6 +9,7 @@ class BusinessModel {
   final String businessType;
   final String? industry;
   final String? description;
+  final String? tagline;
   final String? logo;
   final String? coverImage;
   final BusinessContact contact;
@@ -20,11 +21,36 @@ class BusinessModel {
   final Map<String, String> socialLinks;
   final bool isVerified;
   final bool isActive;
+  final bool isOnline;
   final double rating;
   final int reviewCount;
   final int followerCount;
   final DateTime createdAt;
   final DateTime updatedAt;
+
+  // Business ID (auto-generated)
+  final String? businessId;
+
+  // Additional info
+  final int? yearEstablished;
+  final String? secondaryPhone;
+  final String? gstNumber;
+  final String? licenseNumber;
+
+  // Order statistics
+  final int totalOrders;
+  final int pendingOrders;
+  final int completedOrders;
+  final int cancelledOrders;
+  final int todayOrders;
+
+  // Earnings
+  final double totalEarnings;
+  final double monthlyEarnings;
+  final double todayEarnings;
+
+  // Bank details
+  final BankAccount? bankAccount;
 
   BusinessModel({
     required this.id,
@@ -34,6 +60,7 @@ class BusinessModel {
     required this.businessType,
     this.industry,
     this.description,
+    this.tagline,
     this.logo,
     this.coverImage,
     required this.contact,
@@ -45,9 +72,24 @@ class BusinessModel {
     this.socialLinks = const {},
     this.isVerified = false,
     this.isActive = true,
+    this.isOnline = false,
     this.rating = 0.0,
     this.reviewCount = 0,
     this.followerCount = 0,
+    this.businessId,
+    this.yearEstablished,
+    this.secondaryPhone,
+    this.gstNumber,
+    this.licenseNumber,
+    this.totalOrders = 0,
+    this.pendingOrders = 0,
+    this.completedOrders = 0,
+    this.cancelledOrders = 0,
+    this.todayOrders = 0,
+    this.totalEarnings = 0.0,
+    this.monthlyEarnings = 0.0,
+    this.todayEarnings = 0.0,
+    this.bankAccount,
     DateTime? createdAt,
     DateTime? updatedAt,
   })  : createdAt = createdAt ?? DateTime.now(),
@@ -67,6 +109,7 @@ class BusinessModel {
       businessType: map['businessType'] ?? 'Other',
       industry: map['industry'],
       description: map['description'],
+      tagline: map['tagline'],
       logo: map['logo'],
       coverImage: map['coverImage'],
       contact: BusinessContact.fromMap(map['contact'] ?? {}),
@@ -80,9 +123,26 @@ class BusinessModel {
       socialLinks: Map<String, String>.from(map['socialLinks'] ?? {}),
       isVerified: map['isVerified'] ?? false,
       isActive: map['isActive'] ?? true,
+      isOnline: map['isOnline'] ?? false,
       rating: (map['rating'] ?? 0).toDouble(),
       reviewCount: map['reviewCount'] ?? 0,
       followerCount: map['followerCount'] ?? 0,
+      businessId: map['businessId'],
+      yearEstablished: map['yearEstablished'],
+      secondaryPhone: map['secondaryPhone'],
+      gstNumber: map['gstNumber'],
+      licenseNumber: map['licenseNumber'],
+      totalOrders: map['totalOrders'] ?? 0,
+      pendingOrders: map['pendingOrders'] ?? 0,
+      completedOrders: map['completedOrders'] ?? 0,
+      cancelledOrders: map['cancelledOrders'] ?? 0,
+      todayOrders: map['todayOrders'] ?? 0,
+      totalEarnings: (map['totalEarnings'] ?? 0).toDouble(),
+      monthlyEarnings: (map['monthlyEarnings'] ?? 0).toDouble(),
+      todayEarnings: (map['todayEarnings'] ?? 0).toDouble(),
+      bankAccount: map['bankAccount'] != null
+          ? BankAccount.fromMap(map['bankAccount'])
+          : null,
       createdAt: map['createdAt'] != null
           ? (map['createdAt'] as Timestamp).toDate()
           : DateTime.now(),
@@ -100,6 +160,7 @@ class BusinessModel {
       'businessType': businessType,
       'industry': industry,
       'description': description,
+      'tagline': tagline,
       'logo': logo,
       'coverImage': coverImage,
       'contact': contact.toMap(),
@@ -111,9 +172,24 @@ class BusinessModel {
       'socialLinks': socialLinks,
       'isVerified': isVerified,
       'isActive': isActive,
+      'isOnline': isOnline,
       'rating': rating,
       'reviewCount': reviewCount,
       'followerCount': followerCount,
+      'businessId': businessId,
+      'yearEstablished': yearEstablished,
+      'secondaryPhone': secondaryPhone,
+      'gstNumber': gstNumber,
+      'licenseNumber': licenseNumber,
+      'totalOrders': totalOrders,
+      'pendingOrders': pendingOrders,
+      'completedOrders': completedOrders,
+      'cancelledOrders': cancelledOrders,
+      'todayOrders': todayOrders,
+      'totalEarnings': totalEarnings,
+      'monthlyEarnings': monthlyEarnings,
+      'todayEarnings': todayEarnings,
+      'bankAccount': bankAccount?.toMap(),
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
     };
@@ -127,6 +203,7 @@ class BusinessModel {
     String? businessType,
     String? industry,
     String? description,
+    String? tagline,
     String? logo,
     String? coverImage,
     BusinessContact? contact,
@@ -138,9 +215,24 @@ class BusinessModel {
     Map<String, String>? socialLinks,
     bool? isVerified,
     bool? isActive,
+    bool? isOnline,
     double? rating,
     int? reviewCount,
     int? followerCount,
+    String? businessId,
+    int? yearEstablished,
+    String? secondaryPhone,
+    String? gstNumber,
+    String? licenseNumber,
+    int? totalOrders,
+    int? pendingOrders,
+    int? completedOrders,
+    int? cancelledOrders,
+    int? todayOrders,
+    double? totalEarnings,
+    double? monthlyEarnings,
+    double? todayEarnings,
+    BankAccount? bankAccount,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -152,6 +244,7 @@ class BusinessModel {
       businessType: businessType ?? this.businessType,
       industry: industry ?? this.industry,
       description: description ?? this.description,
+      tagline: tagline ?? this.tagline,
       logo: logo ?? this.logo,
       coverImage: coverImage ?? this.coverImage,
       contact: contact ?? this.contact,
@@ -163,9 +256,24 @@ class BusinessModel {
       socialLinks: socialLinks ?? this.socialLinks,
       isVerified: isVerified ?? this.isVerified,
       isActive: isActive ?? this.isActive,
+      isOnline: isOnline ?? this.isOnline,
       rating: rating ?? this.rating,
       reviewCount: reviewCount ?? this.reviewCount,
       followerCount: followerCount ?? this.followerCount,
+      businessId: businessId ?? this.businessId,
+      yearEstablished: yearEstablished ?? this.yearEstablished,
+      secondaryPhone: secondaryPhone ?? this.secondaryPhone,
+      gstNumber: gstNumber ?? this.gstNumber,
+      licenseNumber: licenseNumber ?? this.licenseNumber,
+      totalOrders: totalOrders ?? this.totalOrders,
+      pendingOrders: pendingOrders ?? this.pendingOrders,
+      completedOrders: completedOrders ?? this.completedOrders,
+      cancelledOrders: cancelledOrders ?? this.cancelledOrders,
+      todayOrders: todayOrders ?? this.todayOrders,
+      totalEarnings: totalEarnings ?? this.totalEarnings,
+      monthlyEarnings: monthlyEarnings ?? this.monthlyEarnings,
+      todayEarnings: todayEarnings ?? this.todayEarnings,
+      bankAccount: bankAccount ?? this.bankAccount,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -656,5 +764,76 @@ class BusinessReview {
       'reply': reply,
       'replyAt': replyAt != null ? Timestamp.fromDate(replyAt!) : null,
     };
+  }
+}
+
+/// Bank account details for business payments
+class BankAccount {
+  final String accountHolderName;
+  final String bankName;
+  final String accountNumber;
+  final String ifscCode;
+  final String? swiftCode;
+  final String? upiId;
+  final bool isVerified;
+
+  BankAccount({
+    required this.accountHolderName,
+    required this.bankName,
+    required this.accountNumber,
+    required this.ifscCode,
+    this.swiftCode,
+    this.upiId,
+    this.isVerified = false,
+  });
+
+  factory BankAccount.fromMap(Map<String, dynamic> map) {
+    return BankAccount(
+      accountHolderName: map['accountHolderName'] ?? '',
+      bankName: map['bankName'] ?? '',
+      accountNumber: map['accountNumber'] ?? '',
+      ifscCode: map['ifscCode'] ?? '',
+      swiftCode: map['swiftCode'],
+      upiId: map['upiId'],
+      isVerified: map['isVerified'] ?? false,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'accountHolderName': accountHolderName,
+      'bankName': bankName,
+      'accountNumber': accountNumber,
+      'ifscCode': ifscCode,
+      'swiftCode': swiftCode,
+      'upiId': upiId,
+      'isVerified': isVerified,
+    };
+  }
+
+  BankAccount copyWith({
+    String? accountHolderName,
+    String? bankName,
+    String? accountNumber,
+    String? ifscCode,
+    String? swiftCode,
+    String? upiId,
+    bool? isVerified,
+  }) {
+    return BankAccount(
+      accountHolderName: accountHolderName ?? this.accountHolderName,
+      bankName: bankName ?? this.bankName,
+      accountNumber: accountNumber ?? this.accountNumber,
+      ifscCode: ifscCode ?? this.ifscCode,
+      swiftCode: swiftCode ?? this.swiftCode,
+      upiId: upiId ?? this.upiId,
+      isVerified: isVerified ?? this.isVerified,
+    );
+  }
+
+  /// Get masked account number for display (e.g., ****1234)
+  String get maskedAccountNumber {
+    if (accountNumber.length < 4) return accountNumber;
+    return '****${accountNumber.substring(accountNumber.length - 4)}';
   }
 }

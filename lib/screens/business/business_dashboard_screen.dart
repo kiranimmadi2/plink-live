@@ -2,9 +2,12 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../models/business_model.dart';
 import '../../services/business_service.dart';
 import '../../widgets/business/business_card.dart';
+import 'business_setup_screen.dart';
+import 'business_settings_screen.dart';
 
 /// Tab-based dashboard for managing business profile, listings, and reviews
 class BusinessDashboardScreen extends ConsumerStatefulWidget {
@@ -414,9 +417,6 @@ class _BusinessDashboardScreenState extends ConsumerState<BusinessDashboardScree
               const SizedBox(height: 24),
             ],
 
-            // Tips Card
-            _buildTipsCard(isDarkMode),
-
             const SizedBox(height: 100),
           ],
         ),
@@ -681,36 +681,28 @@ class _BusinessDashboardScreenState extends ConsumerState<BusinessDashboardScree
               Icons.phone_outlined,
               contact.phone!,
               isDarkMode,
-              onTap: () {
-                // TODO: Launch phone dialer
-              },
+              onTap: () => _launchPhone(contact.phone!),
             ),
           if (contact.email != null)
             _buildContactRow(
               Icons.email_outlined,
               contact.email!,
               isDarkMode,
-              onTap: () {
-                // TODO: Launch email client
-              },
+              onTap: () => _launchEmail(contact.email!),
             ),
           if (contact.website != null)
             _buildContactRow(
               Icons.language_outlined,
               contact.website!,
               isDarkMode,
-              onTap: () {
-                // TODO: Launch browser
-              },
+              onTap: () => _launchUrl(contact.website!),
             ),
           if (contact.whatsapp != null)
             _buildContactRow(
               Icons.chat_outlined,
               contact.whatsapp!,
               isDarkMode,
-              onTap: () {
-                // TODO: Launch WhatsApp
-              },
+              onTap: () => _launchWhatsApp(contact.whatsapp!),
             ),
         ],
       ),
@@ -869,80 +861,6 @@ class _BusinessDashboardScreenState extends ConsumerState<BusinessDashboardScree
             ),
           );
         }),
-      ),
-    );
-  }
-
-  Widget _buildTipsCard(bool isDarkMode) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            const Color(0xFF00D67D).withValues(alpha: 0.15),
-            const Color(0xFF00D67D).withValues(alpha: 0.05),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: const Color(0xFF00D67D).withValues(alpha: 0.3),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Row(
-            children: [
-              Icon(
-                Icons.lightbulb_outline,
-                color: Color(0xFF00D67D),
-                size: 24,
-              ),
-              SizedBox(width: 12),
-              Text(
-                'Tips to grow your business',
-                style: TextStyle(
-                  color: Color(0xFF00D67D),
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          _buildTipItem('Add high-quality photos for your products'),
-          _buildTipItem('Keep your business hours up to date'),
-          _buildTipItem('Respond quickly to customer reviews'),
-          _buildTipItem('Add detailed descriptions to your listings'),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTipItem(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Icon(
-            Icons.check_circle,
-            color: Color(0xFF00D67D),
-            size: 16,
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              text,
-              style: const TextStyle(
-                color: Colors.white70,
-                fontSize: 13,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -1600,19 +1518,101 @@ class _BusinessDashboardScreenState extends ConsumerState<BusinessDashboardScree
     }
   }
 
-  // Action methods
-  void _editBusiness() {
-    // TODO: Navigate to business edit screen
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Edit business coming soon')),
-    );
+  // URL Launcher methods
+  Future<void> _launchPhone(String phone) async {
+    final uri = Uri(scheme: 'tel', path: phone);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not launch phone dialer')),
+        );
+      }
+    }
   }
 
-  void _showSettings() {
-    // TODO: Navigate to business settings
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Business settings coming soon')),
+  Future<void> _launchEmail(String email) async {
+    final uri = Uri(scheme: 'mailto', path: email);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not launch email client')),
+        );
+      }
+    }
+  }
+
+  Future<void> _launchUrl(String url) async {
+    String finalUrl = url;
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      finalUrl = 'https://$url';
+    }
+    final uri = Uri.parse(finalUrl);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not launch browser')),
+        );
+      }
+    }
+  }
+
+  Future<void> _launchWhatsApp(String phone) async {
+    // Remove any non-digit characters except +
+    final cleanPhone = phone.replaceAll(RegExp(r'[^\d+]'), '');
+    final uri = Uri.parse('https://wa.me/$cleanPhone');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not launch WhatsApp')),
+        );
+      }
+    }
+  }
+
+  // Action methods
+  void _editBusiness() async {
+    if (_business == null) return;
+
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => BusinessSetupScreen(
+          existingBusiness: _business,
+          onComplete: () {
+            Navigator.pop(context, true);
+          },
+        ),
+      ),
     );
+
+    // Reload business data if updated
+    if (result == true) {
+      _loadBusinessData();
+    }
+  }
+
+  void _showSettings() async {
+    if (_business == null) return;
+
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => BusinessSettingsScreen(business: _business!),
+      ),
+    );
+
+    // Reload business data if settings were changed
+    if (result == true) {
+      _loadBusinessData();
+    }
   }
 
   void _showAddListingSheet(String type) {

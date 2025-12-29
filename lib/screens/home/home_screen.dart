@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:video_player/video_player.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../../services/universal_intent_service.dart';
 import '../../models/user_profile.dart';
 import '../chat/enhanced_chat_screen.dart';
@@ -53,12 +54,18 @@ class _HomeScreenState extends State<HomeScreen>
   bool _isVoiceProcessing = false;
   Timer? _recordingTimer;
 
+  // Speech to text
+  final stt.SpeechToText _speech = stt.SpeechToText();
+  bool _speechEnabled = false;
+  String _currentSpeechText = '';
+
   @override
   void initState() {
     super.initState();
     _loadUserIntents();
     _loadUserProfile();
     _realtimeService.initialize();
+    _initSpeech();
 
     _controller = AnimationController(vsync: this);
 
@@ -94,6 +101,7 @@ class _HomeScreenState extends State<HomeScreen>
     _timer?.cancel();
     _recordingTimer?.cancel();
     _chatScrollController.dispose();
+    _speech.stop();
     super.dispose();
   }
 
@@ -1154,54 +1162,114 @@ class _HomeScreenState extends State<HomeScreen>
         lowerMessage.contains('look');
   }
 
+  // Mock voice results for fallback
+  final List<String> _mockVoiceResults = [
+    "I'm looking for a bicycle under 200 dollars",
+    "Need a room for rent near college campus",
+    "Want to buy second hand engineering books",
+    "Looking for part time job on weekends",
+    "Selling my old smartphone in good condition",
+    "Want to find a roommate near university",
+    "Looking to buy a used laptop for studies",
+  ];
+
+  // Initialize speech recognition
+  Future<void> _initSpeech() async {
+    try {
+      _speechEnabled = await _speech.initialize(
+        onStatus: (status) {
+          debugPrint('Speech status: $status');
+          if (status == 'done' || status == 'notListening') {
+            if (mounted && _isRecording) {
+              _finishRecording();
+            }
+          }
+        },
+        onError: (error) {
+          debugPrint('Speech error: $error');
+          if (mounted && _isRecording) {
+            // Fall back to mock data on error
+            _useMockVoiceResult();
+          }
+        },
+      );
+      if (mounted) {
+        setState(() {});
+      }
+    } catch (e) {
+      debugPrint('Error initializing speech: $e');
+    }
+  }
+
   void _startVoiceRecording() async {
     HapticFeedback.mediumImpact();
     setState(() {
       _isRecording = true;
+      _currentSpeechText = '';
     });
 
-    // Auto stop after 3 seconds (can be cancelled by manual stop)
-    _recordingTimer?.cancel();
-    _recordingTimer = Timer(const Duration(seconds: 3), () {
-      if (mounted && _isRecording) {
-        _stopVoiceRecording();
+    if (_speechEnabled) {
+      try {
+        await _speech.listen(
+          onResult: (result) {
+            if (mounted && result.recognizedWords.isNotEmpty) {
+              setState(() {
+                _currentSpeechText = result.recognizedWords;
+              });
+              // Auto-finish when speech is final
+              if (result.finalResult && _currentSpeechText.isNotEmpty) {
+                _finishRecording();
+              }
+            }
+          },
+          listenFor: const Duration(seconds: 30),
+          pauseFor: const Duration(seconds: 3),
+          localeId: 'en_US',
+          listenOptions: stt.SpeechListenOptions(
+            partialResults: true,
+            cancelOnError: false,
+          ),
+        );
+      } catch (e) {
+        debugPrint('Error starting speech: $e');
+        // Fall back to mock after delay
+        _recordingTimer = Timer(const Duration(seconds: 2), () {
+          if (mounted && _isRecording) {
+            _useMockVoiceResult();
+          }
+        });
       }
-    });
+    } else {
+      // Speech not available, use mock after delay
+      _recordingTimer = Timer(const Duration(seconds: 2), () {
+        if (mounted && _isRecording) {
+          _useMockVoiceResult();
+        }
+      });
+    }
   }
 
   void _stopVoiceRecording() async {
-    // Cancel auto-stop timer
+    HapticFeedback.lightImpact();
+    _recordingTimer?.cancel();
+
+    if (_speechEnabled) {
+      await _speech.stop();
+    }
+
+    _finishRecording();
+  }
+
+  void _useMockVoiceResult() {
     _recordingTimer?.cancel();
     _recordingTimer = null;
 
-    if (!_isRecording) return; // Already stopped
+    final randomResult = _mockVoiceResults[
+        DateTime.now().millisecondsSinceEpoch % _mockVoiceResults.length];
 
     setState(() {
       _isRecording = false;
-      _isVoiceProcessing = true;
-    });
-
-    await Future.delayed(const Duration(seconds: 1));
-
-    if (!mounted) return;
-
-    final mockVoiceResults = [
-      "I'm looking for a bicycle under 200 dollars",
-      "Need a room for rent near college campus",
-      "Want to buy second hand engineering books",
-      "Looking for part time job on weekends",
-      "Selling my old smartphone in good condition",
-      "Want to find a roommate near university",
-      "Looking to buy a used laptop for studies",
-    ];
-
-    final randomResult =
-        mockVoiceResults[DateTime.now().millisecondsSinceEpoch %
-            mockVoiceResults.length];
-
-    setState(() {
       _isVoiceProcessing = false;
-      // Add voice result directly to chat as user message
       _conversation.add({
         'text': randomResult,
         'isUser': true,
@@ -1213,8 +1281,44 @@ class _HomeScreenState extends State<HomeScreen>
       _scrollToBottom();
     });
 
-    // Process for AI response
     _processVoiceMessage(randomResult);
+  }
+
+  void _finishRecording() {
+    if (!_isRecording) return;
+
+    _recordingTimer?.cancel();
+    _recordingTimer = null;
+
+    final spokenText = _currentSpeechText.trim();
+
+    setState(() {
+      _isRecording = false;
+      _isVoiceProcessing = spokenText.isNotEmpty;
+    });
+
+    // If no speech detected, use mock data
+    if (spokenText.isEmpty) {
+      _useMockVoiceResult();
+      return;
+    }
+
+    // Add voice result to chat
+    setState(() {
+      _isVoiceProcessing = false;
+      _conversation.add({
+        'text': spokenText,
+        'isUser': true,
+        'timestamp': DateTime.now(),
+      });
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollToBottom();
+    });
+
+    // Process for AI response
+    _processVoiceMessage(spokenText);
   }
 
   void _processVoiceMessage(String message) async {
@@ -2697,7 +2801,7 @@ class _HomeScreenState extends State<HomeScreen>
                                     child: Row(
                                       mainAxisAlignment:
                                           MainAxisAlignment.start,
-                                      children: List.generate(20, (index) {
+                                      children: List.generate(15, (index) {
                                         return AnimatedContainer(
                                           duration: const Duration(
                                             milliseconds: 200,
@@ -2732,14 +2836,22 @@ class _HomeScreenState extends State<HomeScreen>
                                     ),
                                   ),
                                   const SizedBox(width: 8),
-                                  // Recording text
-                                  Text(
-                                    _isVoiceProcessing
-                                        ? 'Processing...'
-                                        : 'Recording...',
-                                    style: TextStyle(
-                                      color: Colors.grey[400],
-                                      fontSize: 12,
+                                  // Recording text - show real-time speech
+                                  Flexible(
+                                    child: Text(
+                                      _isVoiceProcessing
+                                          ? 'Processing...'
+                                          : _currentSpeechText.isNotEmpty
+                                              ? _currentSpeechText
+                                              : 'Listening...',
+                                      style: TextStyle(
+                                        color: _currentSpeechText.isNotEmpty
+                                            ? Colors.white
+                                            : Colors.grey[400],
+                                        fontSize: 12,
+                                      ),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
                                 ],

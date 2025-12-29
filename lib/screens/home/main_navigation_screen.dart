@@ -14,7 +14,7 @@ import '../chat/incoming_call_screen.dart';
 
 // Professional & Business screens
 import '../professional/professional_dashboard_screen.dart';
-import '../business/business_dashboard_screen.dart';
+import '../business/business_main_screen.dart';
 
 // services
 import '../../services/location services/location_service.dart';
@@ -155,13 +155,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     if (mounted) {
       setState(() {
         _accountType = accountType;
-        if (_currentIndex == 0 && widget.initialIndex == null) {
-          if (accountType == AccountType.professional) {
-            _currentIndex = 5;
-          } else if (accountType == AccountType.business) {
-            _currentIndex = 6;
-          }
-        }
+        // Always start on the home screen (index 0) regardless of account type
+        // User can navigate to their dashboard using the FAB menu if needed
       });
     }
 
@@ -568,8 +563,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
   List<_MenuItemData> get menuItems {
     final items = <_MenuItemData>[
       const _MenuItemData(
-        label: "Discover",
-        icon: Icons.explore_rounded,
+        label: "Home",
+        icon: Icons.home_rounded,
         index: 0,
         gradient: [Color(0xFF667EEA), Color(0xFF764BA2)],
       ),
@@ -619,7 +614,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
       case 5:
         return const ProfessionalDashboardScreen();
       case 6:
-        return const BusinessDashboardScreen();
+        return const BusinessMainScreen();
       case 7:
         return FeedScreen(
           onBack: () {
