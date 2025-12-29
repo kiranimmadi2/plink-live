@@ -77,6 +77,9 @@ dependencies:
   path_provider: ^2.1.4
   package_info_plus: ^8.0.3
 
+  # Charts
+  fl_chart: ^0.69.0
+
   # Contacts and sharing
   flutter_contacts: ^1.1.9+2
   share_plus: ^10.1.4
