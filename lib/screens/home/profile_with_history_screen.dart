@@ -8,6 +8,9 @@ import 'package:timeago/timeago.dart' as timeago;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../services/universal_intent_service.dart';
 import '../../services/location services/location_service.dart';
+import '../../services/account_type_service.dart';
+import '../business/business_setup_screen.dart';
+import '../business/business_main_screen.dart';
 import '../../widgets/other widgets/user_avatar.dart';
 import '../../providers/other providers/theme_provider.dart';
 import '../../res/config/app_colors.dart';
@@ -31,6 +34,11 @@ class _ProfileWithHistoryScreenState
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final UniversalIntentService _intentService = UniversalIntentService();
   final LocationService _locationService = LocationService();
+  final AccountTypeService _accountTypeService = AccountTypeService();
+
+  // Account type state
+  AccountType _currentAccountType = AccountType.personal;
+  bool _isAccountTypeLoading = false;
 
   Map<String, dynamic>? _userProfile;
   List<Map<String, dynamic>> _searchHistory = [];
@@ -58,6 +66,7 @@ class _ProfileWithHistoryScreenState
     super.initState();
     _loadUserData();
     _setupProfileListener(); // Listen for real-time profile updates
+    _loadAccountType(); // Load account type
 
     // Use addPostFrameCallback to defer location update until after initial frame
     // This prevents blocking the UI during widget initialization
@@ -66,6 +75,101 @@ class _ProfileWithHistoryScreenState
         _updateLocationIfNeeded();
       }
     });
+  }
+
+  Future<void> _loadAccountType() async {
+    final accountType = await _accountTypeService.getCurrentAccountType();
+    if (mounted) {
+      setState(() {
+        _currentAccountType = accountType;
+      });
+    }
+  }
+
+  Future<void> _switchAccountType(AccountType newType) async {
+    if (_isAccountTypeLoading) return;
+
+    setState(() {
+      _isAccountTypeLoading = true;
+    });
+
+    try {
+      final success = await _accountTypeService.upgradeAccountType(newType);
+
+      if (success && mounted) {
+        setState(() {
+          _currentAccountType = newType;
+          _isAccountTypeLoading = false;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Switched to ${newType.name.replaceFirst(newType.name[0], newType.name[0].toUpperCase())} Account',
+            ),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+        );
+
+        // Navigate based on account type
+        if (newType == AccountType.business) {
+          final userId = _auth.currentUser?.uid;
+          if (userId != null) {
+            final businessDocs = await _firestore
+                .collection('businesses')
+                .where('userId', isEqualTo: userId)
+                .limit(1)
+                .get();
+
+            if (mounted) {
+              if (businessDocs.docs.isEmpty) {
+                // No business exists, go to setup
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const BusinessSetupScreen()),
+                );
+              } else {
+                // Business exists, go to business main screen
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const BusinessMainScreen()),
+                );
+              }
+            }
+          }
+        } else if (newType == AccountType.personal) {
+          // Already on personal profile screen, no navigation needed
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            _isAccountTypeLoading = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to switch account type'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isAccountTypeLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   void _setupProfileListener() {
@@ -854,7 +958,7 @@ class _ProfileWithHistoryScreenState
                   color: isDarkMode ? Colors.white : Colors.black,
                 ),
                 onPressed: () {
-                  // Navigate back to home screen (Discover tab)
+                  // Navigate back to home screen (Home tab)
                   // Pop until we reach the MainNavigationScreen (first route)
                   Navigator.popUntil(context, (route) => route.isFirst);
                 },
@@ -1302,6 +1406,9 @@ class _ProfileWithHistoryScreenState
                           ),
 
                           // Profile Detail Sections removed
+
+                          // Account Type Toggle Section
+                          _buildAccountTypeSection(isDarkMode, isGlass),
                         ],
                       ),
                     ),
@@ -1840,6 +1947,141 @@ class _ProfileWithHistoryScreenState
       default:
         return const Color(0xFF00D67D);
     }
+  }
+
+  Widget _buildAccountTypeSection(bool isDarkMode, bool isGlass) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isGlass
+            ? Colors.white.withValues(alpha: 0.7)
+            : (isDarkMode ? Colors.grey[900] : Colors.white),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: isGlass
+            ? []
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.08),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+        border: isGlass
+            ? Border.all(
+                color: Colors.white.withValues(alpha: 0.3),
+                width: 1.5,
+              )
+            : null,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: AppColors.iosOrange.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.swap_horiz_rounded, color: AppColors.iosOrange, size: 18),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Account Type',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: isDarkMode ? Colors.white : Colors.black,
+                ),
+              ),
+              const Spacer(),
+              if (_isAccountTypeLoading)
+                const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          // Account Type Toggle Chips
+          Row(
+            children: [
+              Expanded(
+                child: _buildAccountTypeChip(
+                  label: 'Personal',
+                  icon: Icons.person_outline,
+                  isSelected: _currentAccountType == AccountType.personal,
+                  color: AppColors.iosBlue,
+                  isDark: isDarkMode,
+                  onTap: () => _switchAccountType(AccountType.personal),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildAccountTypeChip(
+                  label: 'Business',
+                  icon: Icons.business_center_outlined,
+                  isSelected: _currentAccountType == AccountType.business,
+                  color: AppColors.iosOrange,
+                  isDark: isDarkMode,
+                  onTap: () => _switchAccountType(AccountType.business),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAccountTypeChip({
+    required String label,
+    required IconData icon,
+    required bool isSelected,
+    required Color color,
+    required bool isDark,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: _isAccountTypeLoading ? null : onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? color.withValues(alpha: 0.2)
+              : (isDark ? Colors.grey[800] : Colors.grey[100]),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? color : Colors.transparent,
+            width: 2,
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              color: isSelected ? color : (isDark ? Colors.grey[400] : Colors.grey[600]),
+              size: 24,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                color: isSelected ? color : (isDark ? Colors.grey[400] : Colors.grey[600]),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   List<Widget> _buildHistorySliver(bool isDarkMode, bool isGlass) {
