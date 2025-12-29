@@ -7,15 +7,17 @@ import '../../models/business_model.dart';
 import '../../services/business_service.dart';
 import '../home/main_navigation_screen.dart';
 
-/// Multi-step wizard for setting up a business profile
+/// Multi-step wizard for setting up or editing a business profile
 class BusinessSetupScreen extends ConsumerStatefulWidget {
   final VoidCallback? onComplete;
   final VoidCallback? onSkip;
+  final BusinessModel? existingBusiness; // For editing mode
 
   const BusinessSetupScreen({
     super.key,
     this.onComplete,
     this.onSkip,
+    this.existingBusiness,
   });
 
   @override
@@ -58,6 +60,9 @@ class _BusinessSetupScreenState extends ConsumerState<BusinessSetupScreen>
 
   static const int _totalSteps = 4;
 
+  // Check if we're in editing mode
+  bool get _isEditing => widget.existingBusiness != null;
+
   @override
   void initState() {
     super.initState();
@@ -65,6 +70,40 @@ class _BusinessSetupScreenState extends ConsumerState<BusinessSetupScreen>
       vsync: this,
       duration: const Duration(milliseconds: 800),
     )..forward();
+
+    // Pre-populate fields if editing
+    if (_isEditing) {
+      _populateExistingData();
+    }
+  }
+
+  void _populateExistingData() {
+    final business = widget.existingBusiness!;
+
+    // Basic Info
+    _businessNameController.text = business.businessName;
+    _legalNameController.text = business.legalName ?? '';
+    _descriptionController.text = business.description ?? '';
+    _selectedBusinessType = business.businessType;
+    _selectedIndustry = business.industry;
+
+    // Contact Info
+    _phoneController.text = business.contact.phone ?? '';
+    _emailController.text = business.contact.email ?? '';
+    _websiteController.text = business.contact.website ?? '';
+    _whatsappController.text = business.contact.whatsapp ?? '';
+
+    // Address
+    if (business.address != null) {
+      _streetController.text = business.address!.street ?? '';
+      _cityController.text = business.address!.city ?? '';
+      _stateController.text = business.address!.state ?? '';
+      _countryController.text = business.address!.country ?? '';
+      _postalCodeController.text = business.address!.postalCode ?? '';
+    }
+
+    // Hours
+    _useDefaultHours = business.hours != null;
   }
 
   @override
@@ -181,6 +220,9 @@ class _BusinessSetupScreenState extends ConsumerState<BusinessSetupScreen>
       String? logoUrl;
       if (_logoFile != null) {
         logoUrl = await _businessService.uploadLogo(_logoFile!);
+      } else if (_isEditing) {
+        // Keep existing logo if no new one selected
+        logoUrl = widget.existingBusiness!.logo;
       }
 
       // Build contact
@@ -224,8 +266,8 @@ class _BusinessSetupScreenState extends ConsumerState<BusinessSetupScreen>
 
       // Build business model
       final business = BusinessModel(
-        id: '',
-        userId: '',
+        id: _isEditing ? widget.existingBusiness!.id : '',
+        userId: _isEditing ? widget.existingBusiness!.userId : '',
         businessName: _businessNameController.text.trim(),
         legalName: _legalNameController.text.trim().isEmpty
             ? null
@@ -239,20 +281,54 @@ class _BusinessSetupScreenState extends ConsumerState<BusinessSetupScreen>
         contact: contact,
         address: address,
         hours: _useDefaultHours ? BusinessHours.defaultHours() : null,
+        // Preserve existing values when editing
+        coverImage: _isEditing ? widget.existingBusiness!.coverImage : null,
+        rating: _isEditing ? widget.existingBusiness!.rating : 0.0,
+        reviewCount: _isEditing ? widget.existingBusiness!.reviewCount : 0,
+        followerCount: _isEditing ? widget.existingBusiness!.followerCount : 0,
+        isVerified: _isEditing ? widget.existingBusiness!.isVerified : false,
+        isActive: _isEditing ? widget.existingBusiness!.isActive : true,
       );
 
-      final businessId = await _businessService.createBusiness(business);
+      bool success;
+      if (_isEditing) {
+        // Update existing business
+        success = await _businessService.updateBusiness(
+          widget.existingBusiness!.id,
+          business,
+        );
+      } else {
+        // Create new business
+        final businessId = await _businessService.createBusiness(business);
+        success = businessId != null;
+      }
 
-      if (businessId != null) {
+      if (success) {
         HapticFeedback.heavyImpact();
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(_isEditing
+                  ? 'Business updated successfully'
+                  : 'Business created successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
 
         if (widget.onComplete != null) {
           widget.onComplete!();
+        } else if (_isEditing) {
+          // Go back to dashboard when editing
+          if (mounted) Navigator.pop(context, true);
         } else {
           _navigateToMainScreen();
         }
       } else {
-        _showError('Failed to create business. Please try again.');
+        _showError(_isEditing
+            ? 'Failed to update business. Please try again.'
+            : 'Failed to create business. Please try again.');
       }
     } catch (e) {
       debugPrint('Error saving business: $e');
@@ -328,10 +404,10 @@ class _BusinessSetupScreenState extends ConsumerState<BusinessSetupScreen>
                 ),
               ),
               TextButton(
-                onPressed: _skipSetup,
-                child: const Text(
-                  'Skip',
-                  style: TextStyle(
+                onPressed: _isEditing ? () => Navigator.pop(context) : _skipSetup,
+                child: Text(
+                  _isEditing ? 'Cancel' : 'Skip',
+                  style: const TextStyle(
                     color: Colors.white54,
                     fontSize: 14,
                   ),
@@ -375,9 +451,9 @@ class _BusinessSetupScreenState extends ConsumerState<BusinessSetupScreen>
         children: [
           const SizedBox(height: 20),
 
-          const Text(
-            'Tell us about\nyour business',
-            style: TextStyle(
+          Text(
+            _isEditing ? 'Edit your\nbusiness' : 'Tell us about\nyour business',
+            style: const TextStyle(
               color: Colors.white,
               fontSize: 32,
               fontWeight: FontWeight.bold,
@@ -388,7 +464,9 @@ class _BusinessSetupScreenState extends ConsumerState<BusinessSetupScreen>
           const SizedBox(height: 12),
 
           Text(
-            'This information will be displayed on your business profile.',
+            _isEditing
+                ? 'Update your business profile information.'
+                : 'This information will be displayed on your business profile.',
             style: TextStyle(
               color: Colors.white.withValues(alpha: 0.7),
               fontSize: 16,
@@ -1059,7 +1137,7 @@ class _BusinessSetupScreenState extends ConsumerState<BusinessSetupScreen>
         break;
       case 3:
         canContinue = true;
-        buttonText = 'Create Business';
+        buttonText = _isEditing ? 'Update Business' : 'Create Business';
         break;
       default:
         canContinue = false;
