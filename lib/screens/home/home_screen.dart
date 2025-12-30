@@ -11,7 +11,6 @@ import '../../models/user_profile.dart';
 import '../chat/enhanced_chat_screen.dart';
 import '../../widgets/other widgets/user_avatar.dart';
 import '../../services/realtime_matching_service.dart';
-import 'profile_with_history_screen.dart';
 import '../../services/profile services/photo_cache_service.dart';
 import '../../widgets/floating_particles.dart';
 import 'product_detail_screen.dart';
@@ -2598,31 +2597,23 @@ class _HomeScreenState extends State<HomeScreen>
             child: GestureDetector(
               onTap: () {
                 HapticFeedback.lightImpact();
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const ProfileWithHistoryScreen(),
-                  ),
-                ).then((_) => _loadUserProfile());
+                Scaffold.of(context).openEndDrawer();
               },
               child: Container(
+                width: 44,
+                height: 44,
                 decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.grey,
-                  border: Border.all(color: Colors.white, width: 2),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.2),
-                      blurRadius: 5,
-                      spreadRadius: 1,
-                    ),
-                  ],
+                  color: Colors.white.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.3),
+                    width: 1,
+                  ),
                 ),
-                padding: const EdgeInsets.all(2),
-                child: UserAvatar(
-                  profileImageUrl: _auth.currentUser?.photoURL,
-                  radius: 20,
-                  fallbackText: _currentUserName,
+                child: const Icon(
+                  Icons.menu_rounded,
+                  color: Colors.white,
+                  size: 24,
                 ),
               ),
             ),

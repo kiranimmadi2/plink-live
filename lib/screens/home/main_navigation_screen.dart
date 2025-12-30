@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -414,20 +415,21 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
         children: [
           _buildScreen(),
 
-          // Bottom Navigation Bar
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: _ModernBottomNavBar(
-              currentIndex: _currentIndex,
-              unreadCount: _unreadMessageCount,
-              onTap: (index) {
-                HapticFeedback.mediumImpact();
-                setState(() => _currentIndex = index);
-              },
+          // Bottom Navigation Bar (hide on Feed screen)
+          if (_currentIndex != 7)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: _ModernBottomNavBar(
+                currentIndex: _currentIndex,
+                unreadCount: _unreadMessageCount,
+                onTap: (index) {
+                  HapticFeedback.mediumImpact();
+                  setState(() => _currentIndex = index);
+                },
+              ),
             ),
-          ),
 
           // Swipe gesture detector for Feed
           if (_currentIndex == 0)
@@ -473,45 +475,55 @@ class _ModernBottomNavBar extends StatelessWidget {
         bottom: bottomPadding + 8,
         top: 8,
       ),
-      child: Container(
-        height: 70,
-        decoration: BoxDecoration(
-          color: const Color(0xFF1A1A1A).withValues(alpha: 0.95),
-          borderRadius: BorderRadius.circular(35),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.3),
-              blurRadius: 15,
-              offset: const Offset(0, 4),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(35),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+          child: Container(
+            height: 70,
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.4),
+              borderRadius: BorderRadius.circular(35),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.15),
+                width: 1,
+              ),
             ),
-          ],
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            _NavItem(
-              icon: Icons.home_outlined,
-              selectedIcon: Icons.home_rounded,
-              label: 'Home',
-              isSelected: currentIndex == 0,
-              onTap: () => onTap(0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _NavItem(
+                  icon: Icons.home_outlined,
+                  selectedIcon: Icons.home_rounded,
+                  label: 'Home',
+                  isSelected: currentIndex == 0,
+                  onTap: () => onTap(0),
+                ),
+                _NavItem(
+                  icon: Icons.chat_bubble_outline_rounded,
+                  selectedIcon: Icons.chat_bubble_rounded,
+                  label: 'Chat',
+                  isSelected: currentIndex == 1,
+                  badge: unreadCount > 0 ? unreadCount : null,
+                  onTap: () => onTap(1),
+                ),
+                _NavItem(
+                  icon: Icons.people_outline_rounded,
+                  selectedIcon: Icons.people_rounded,
+                  label: 'Networking',
+                  isSelected: currentIndex == 2,
+                  onTap: () => onTap(2),
+                ),
+                _NavItem(
+                  icon: Icons.person_outline_rounded,
+                  selectedIcon: Icons.person_rounded,
+                  label: 'Profile',
+                  isSelected: currentIndex == 3,
+                  onTap: () => onTap(3),
+                ),
+              ],
             ),
-            _NavItem(
-              icon: Icons.chat_bubble_outline_rounded,
-              selectedIcon: Icons.chat_bubble_rounded,
-              label: 'Chat',
-              isSelected: currentIndex == 1,
-              badge: unreadCount > 0 ? unreadCount : null,
-              onTap: () => onTap(1),
-            ),
-            _NavItem(
-              icon: Icons.people_outline_rounded,
-              selectedIcon: Icons.people_rounded,
-              label: 'Networking',
-              isSelected: currentIndex == 2,
-              onTap: () => onTap(2),
-            ),
-          ],
+          ),
         ),
       ),
     );

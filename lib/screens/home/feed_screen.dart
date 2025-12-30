@@ -71,22 +71,175 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
 
   final List<Map<String, dynamic>> _categories = [
     {'name': 'All', 'icon': Icons.grid_view_rounded},
-    {'name': 'Seeking', 'icon': Icons.search_rounded},
-    {'name': 'Offering', 'icon': Icons.local_offer_rounded},
-    {'name': 'Services', 'icon': Icons.handyman_rounded},
+    {'name': 'News', 'icon': Icons.newspaper_rounded},
+    {'name': 'Entertainment', 'icon': Icons.movie_rounded},
+    {'name': 'Technology', 'icon': Icons.computer_rounded},
     {'name': 'Jobs', 'icon': Icons.work_rounded},
-    {'name': 'Buy/Sell', 'icon': Icons.shopping_cart_rounded},
+    {'name': 'Products', 'icon': Icons.shopping_bag_rounded},
   ];
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _createDummyPosts(); // Create dummy posts for all categories
     _subscribeToFeedPosts();
     _loadSavedPosts();
     _scrollController.addListener(_onScroll);
     _searchController.addListener(_onSearchChanged);
     _initSpeech();
+  }
+
+  Future<void> _createDummyPosts() async {
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) return;
+
+    // Check if dummy posts already exist
+    final existingPosts = await _firestore
+        .collection('posts')
+        .where('isDummyPost', isEqualTo: true)
+        .limit(1)
+        .get();
+
+    if (existingPosts.docs.isNotEmpty) return; // Dummy posts already exist
+
+    final dummyPosts = [
+      // News Posts (2)
+      {
+        'title': 'Breaking News: Major Tech Company Announces New AI Initiative',
+        'description': 'A leading technology company has announced a groundbreaking AI research program that aims to revolutionize healthcare diagnostics.',
+        'originalPrompt': 'Breaking news about AI technology',
+        'userId': 'dummy_user_1',
+        'userName': 'News Daily',
+        'userPhoto': null,
+        'isActive': true,
+        'isDummyPost': true,
+        'createdAt': FieldValue.serverTimestamp(),
+      },
+      {
+        'title': 'Latest Update: Government Launches New Education Policy',
+        'description': 'The government has unveiled a comprehensive education reform policy focusing on digital learning and skill development.',
+        'originalPrompt': 'Latest education policy news',
+        'userId': 'dummy_user_2',
+        'userName': 'Education Times',
+        'userPhoto': null,
+        'isActive': true,
+        'isDummyPost': true,
+        'createdAt': FieldValue.serverTimestamp(),
+      },
+
+      // Entertainment Posts (2)
+      {
+        'title': 'New Blockbuster Movie Breaks Box Office Records',
+        'description': 'The latest superhero film has shattered opening weekend records, earning over \$500 million globally in just three days.',
+        'originalPrompt': 'Movie box office news',
+        'userId': 'dummy_user_3',
+        'userName': 'Film Buzz',
+        'userPhoto': null,
+        'isActive': true,
+        'isDummyPost': true,
+        'createdAt': FieldValue.serverTimestamp(),
+      },
+      {
+        'title': 'Popular Music Artist Announces World Tour Concert Dates',
+        'description': 'Grammy-winning artist reveals 50-city world tour with exclusive concert performances and special guest appearances.',
+        'originalPrompt': 'Music concert announcement',
+        'userId': 'dummy_user_4',
+        'userName': 'Music Central',
+        'userPhoto': null,
+        'isActive': true,
+        'isDummyPost': true,
+        'createdAt': FieldValue.serverTimestamp(),
+      },
+
+      // Technology Posts (2)
+      {
+        'title': 'Revolutionary Smartphone with AI Camera Technology Launched',
+        'description': 'The new flagship phone features advanced AI-powered camera system, 5G connectivity, and all-day battery life.',
+        'originalPrompt': 'New smartphone technology',
+        'userId': 'dummy_user_5',
+        'userName': 'Tech Insider',
+        'userPhoto': null,
+        'isActive': true,
+        'isDummyPost': true,
+        'createdAt': FieldValue.serverTimestamp(),
+      },
+      {
+        'title': 'Software Update: Popular App Gets Major Feature Upgrade',
+        'description': 'The latest software update brings revolutionary digital features including enhanced security and improved user interface.',
+        'originalPrompt': 'Software app update',
+        'userId': 'dummy_user_6',
+        'userName': 'App World',
+        'userPhoto': null,
+        'isActive': true,
+        'isDummyPost': true,
+        'createdAt': FieldValue.serverTimestamp(),
+      },
+
+      // Jobs Posts (2)
+      {
+        'title': 'Hiring: Senior Software Developer Position Available',
+        'description': 'We are looking for experienced developers to join our growing team. Great career opportunity with competitive salary.',
+        'originalPrompt': 'Job hiring software developer',
+        'userId': 'dummy_user_7',
+        'userName': 'TechCorp HR',
+        'userPhoto': null,
+        'isActive': true,
+        'isDummyPost': true,
+        'createdAt': FieldValue.serverTimestamp(),
+      },
+      {
+        'title': 'Multiple Job Openings: Marketing & Sales Positions',
+        'description': 'Exciting employment opportunities in marketing and sales. Work from home option available. Apply now for this career opportunity.',
+        'originalPrompt': 'Job vacancy marketing',
+        'userId': 'dummy_user_8',
+        'userName': 'Jobs Portal',
+        'userPhoto': null,
+        'isActive': true,
+        'isDummyPost': true,
+        'createdAt': FieldValue.serverTimestamp(),
+      },
+
+      // Products Posts (2)
+      {
+        'title': 'Premium Wireless Headphones - 50% Discount Sale!',
+        'description': 'High-quality wireless headphones now available at amazing price. Shop now and get free shipping on all orders.',
+        'originalPrompt': 'Product headphones sale',
+        'userId': 'dummy_user_9',
+        'userName': 'Audio Store',
+        'userPhoto': null,
+        'price': 2999,
+        'isActive': true,
+        'isDummyPost': true,
+        'createdAt': FieldValue.serverTimestamp(),
+      },
+      {
+        'title': 'Buy Smart Watch - Latest Model with Health Features',
+        'description': 'Premium smartwatch with heart rate monitor, GPS, and fitness tracking. Special offer with discount for limited time.',
+        'originalPrompt': 'Product smartwatch buy',
+        'userId': 'dummy_user_10',
+        'userName': 'Gadget Shop',
+        'userPhoto': null,
+        'price': 4999,
+        'isActive': true,
+        'isDummyPost': true,
+        'createdAt': FieldValue.serverTimestamp(),
+      },
+    ];
+
+    // Add all dummy posts to Firestore
+    final batch = _firestore.batch();
+    for (final post in dummyPosts) {
+      final docRef = _firestore.collection('posts').doc();
+      batch.set(docRef, post);
+    }
+
+    try {
+      await batch.commit();
+      debugPrint('Dummy posts created successfully');
+    } catch (e) {
+      debugPrint('Error creating dummy posts: $e');
+    }
   }
 
   @override
@@ -438,61 +591,64 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
 
   // Extracted for better performance - avoid recreating strings repeatedly
   bool _matchesCategory(Map<String, dynamic> data) {
-    final intentAnalysis = data['intentAnalysis'] as Map<String, dynamic>?;
-    final actionType =
-        (data['actionType'] ??
-                intentAnalysis?['action_type'] ??
-                data['type'] ??
-                '')
-            .toString()
-            .toLowerCase();
+    final text = _getCombinedText(data);
 
     switch (_selectedCategory) {
-      case 'Seeking':
-        if (actionType == 'seeking') return true;
-        final text = _getCombinedText(data);
-        return text.contains('looking') ||
-            text.contains('need') ||
-            text.contains('want') ||
-            text.contains('search') ||
-            text.contains('find');
+      case 'News':
+        return text.contains('news') ||
+            text.contains('breaking') ||
+            text.contains('update') ||
+            text.contains('report') ||
+            text.contains('headline') ||
+            text.contains('latest') ||
+            text.contains('announcement');
 
-      case 'Offering':
-        if (actionType == 'offering') return true;
-        final text = _getCombinedText(data);
-        return text.contains('sell') ||
-            text.contains('offer') ||
-            text.contains('available') ||
-            text.contains('sale');
+      case 'Entertainment':
+        return text.contains('entertainment') ||
+            text.contains('movie') ||
+            text.contains('music') ||
+            text.contains('film') ||
+            text.contains('song') ||
+            text.contains('celebrity') ||
+            text.contains('show') ||
+            text.contains('concert') ||
+            text.contains('game') ||
+            text.contains('gaming');
 
-      case 'Services':
-        final domain = (intentAnalysis?['domain'] ?? '')
-            .toString()
-            .toLowerCase();
-        if (domain.contains('service')) return true;
-        final text = _getCombinedText(data);
-        return text.contains('service') ||
-            text.contains('repair') ||
-            text.contains('install') ||
-            text.contains('fix');
+      case 'Technology':
+        return text.contains('technology') ||
+            text.contains('tech') ||
+            text.contains('software') ||
+            text.contains('app') ||
+            text.contains('computer') ||
+            text.contains('phone') ||
+            text.contains('ai') ||
+            text.contains('digital') ||
+            text.contains('gadget') ||
+            text.contains('device');
 
       case 'Jobs':
-        final domain = (intentAnalysis?['domain'] ?? '')
-            .toString()
-            .toLowerCase();
-        if (domain.contains('job')) return true;
-        final text = _getCombinedText(data);
         return text.contains('job') ||
             text.contains('hiring') ||
             text.contains('work') ||
             text.contains('vacancy') ||
-            text.contains('career');
+            text.contains('career') ||
+            text.contains('employment') ||
+            text.contains('recruit') ||
+            text.contains('position') ||
+            text.contains('opening');
 
-      case 'Buy/Sell':
-        final domain = (intentAnalysis?['domain'] ?? '')
-            .toString()
-            .toLowerCase();
-        return domain.contains('marketplace') || data['price'] != null;
+      case 'Products':
+        return text.contains('product') ||
+            text.contains('sell') ||
+            text.contains('buy') ||
+            text.contains('sale') ||
+            text.contains('price') ||
+            text.contains('shop') ||
+            text.contains('store') ||
+            text.contains('discount') ||
+            text.contains('offer') ||
+            data['price'] != null;
 
       default:
         return true;
@@ -569,6 +725,10 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
                 // Posts list
                 Expanded(
                   child: _isLoading && _posts.isEmpty
+                      ? const Center(
+                          child: CircularProgressIndicator(color: Colors.white),
+                        )
+                      : _isCategoryLoading
                       ? const Center(
                           child: CircularProgressIndicator(color: Colors.white),
                         )
@@ -746,21 +906,11 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (_isCategoryLoading && isSelected)
-                    const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  else
-                    Icon(
-                      category['icon'] as IconData,
-                      size: 16,
-                      color: Colors.white,
-                    ),
+                  Icon(
+                    category['icon'] as IconData,
+                    size: 16,
+                    color: Colors.white,
+                  ),
                   const SizedBox(width: 6),
                   Text(
                     category['name'],

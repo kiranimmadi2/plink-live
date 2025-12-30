@@ -949,18 +949,7 @@ class _ProfileWithHistoryScreenState
             child: AppBar(
               elevation: 0,
               backgroundColor: Colors.black.withValues(alpha: 0.3),
-              leading: IconButton(
-                icon: const Icon(
-                  Icons.arrow_back_ios_new,
-                  color: Colors.white,
-                  size: 20,
-                ),
-                onPressed: () {
-                  // Navigate back to home screen (Home tab)
-                  // Pop until we reach the MainNavigationScreen (first route)
-                  Navigator.popUntil(context, (route) => route.isFirst);
-                },
-              ),
+              automaticallyImplyLeading: false,
               centerTitle: true,
               title: const Text(
                 'Profile',
@@ -969,9 +958,6 @@ class _ProfileWithHistoryScreenState
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              actions: const [
-                SizedBox(width: 48), // Balance the back button
-              ],
             ),
           ),
         ),
@@ -1034,6 +1020,7 @@ class _ProfileWithHistoryScreenState
                           const SizedBox(height: kToolbarHeight + 60),
                           // Profile Header - Card with glassmorphism
                           Container(
+                            width: double.infinity,
                             margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                             decoration: BoxDecoration(
                               color: Colors.white.withValues(alpha: 0.1),
@@ -1047,7 +1034,7 @@ class _ProfileWithHistoryScreenState
                               child: BackdropFilter(
                                 filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
                                 child: Padding(
-                                  padding: const EdgeInsets.all(24),
+                                  padding: const EdgeInsets.all(20),
                                   child: Column(
                                     children: [
                                       // Profile Photo - Centered
@@ -1169,6 +1156,7 @@ class _ProfileWithHistoryScreenState
 
                           // Edit Profile Card
                           Container(
+                            width: double.infinity,
                             margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                             decoration: BoxDecoration(
                               color: Colors.white.withValues(alpha: 0.1),
@@ -1223,6 +1211,7 @@ class _ProfileWithHistoryScreenState
 
                           // Account Type Card
                           Container(
+                            width: double.infinity,
                             margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                             decoration: BoxDecoration(
                               color: Colors.white.withValues(alpha: 0.1),
@@ -1289,6 +1278,7 @@ class _ProfileWithHistoryScreenState
 
                           // Settings Card
                           Container(
+                            width: double.infinity,
                             margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                             decoration: BoxDecoration(
                               color: Colors.white.withValues(alpha: 0.1),
@@ -1343,6 +1333,7 @@ class _ProfileWithHistoryScreenState
 
                           // Active Status Card
                           Container(
+                            width: double.infinity,
                             margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                             decoration: BoxDecoration(
                               color: Colors.white.withValues(alpha: 0.1),

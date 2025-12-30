@@ -108,6 +108,9 @@ dependencies:
   # Audio player for calls
   audioplayers: ^6.1.0
 
+  # Audio recording for voice messages
+  flutter_sound: ^9.16.3
+
   # Native ringtone player for incoming calls
   flutter_ringtone_player: ^4.0.0+4
 
