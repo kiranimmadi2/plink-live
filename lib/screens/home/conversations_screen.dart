@@ -117,6 +117,8 @@ class _ConversationsScreenState extends State<ConversationsScreen>
               _buildHeader(isDarkMode),
               // Search bar
               _buildSearchBar(isDarkMode),
+              // Tab bar moved to top (below search)
+              _buildTopTabBar(isDarkMode),
               // Tab content
               Expanded(
                 child: TabBarView(
@@ -128,14 +130,14 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                   ],
                 ),
               ),
-              // Bottom tab bar
-              _buildBottomTabBar(isDarkMode),
+              // Add bottom padding for main navigation bar
+              SizedBox(height: 90 + MediaQuery.of(context).padding.bottom),
             ],
           ),
         ),
       ),
       floatingActionButton: Container(
-        margin: const EdgeInsets.only(bottom: 65, right: 4),
+        margin: EdgeInsets.only(bottom: 100 + MediaQuery.of(context).padding.bottom, right: 4),
         height: 56,
         width: 56,
         decoration: BoxDecoration(
@@ -316,55 +318,70 @@ class _ConversationsScreenState extends State<ConversationsScreen>
     );
   }
 
-  Widget _buildBottomTabBar(bool isDarkMode) {
+  Widget _buildTopTabBar(bool isDarkMode) {
     return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       decoration: BoxDecoration(
-        color: isDarkMode ? const Color(0xFF1A1A1A) : Colors.white,
-        border: Border(
-          top: BorderSide(
-            color: isDarkMode
-                ? Colors.white.withValues(alpha: 0.1)
-                : Colors.grey.withValues(alpha: 0.2),
-            width: 0.5,
-          ),
-        ),
+        color: isDarkMode
+            ? Colors.white.withValues(alpha: 0.08)
+            : Colors.grey.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: TabBar(
         controller: _tabController,
-        indicatorColor: Colors.transparent,
+        indicatorSize: TabBarIndicatorSize.tab,
+        indicator: BoxDecoration(
+          color: Theme.of(context).primaryColor.withValues(alpha: 0.2),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        indicatorPadding: const EdgeInsets.all(4),
         labelColor: Theme.of(context).primaryColor,
-        unselectedLabelColor: isDarkMode ? Colors.grey[600] : Colors.grey[500],
+        unselectedLabelColor: isDarkMode ? Colors.grey[500] : Colors.grey[600],
         labelStyle: const TextStyle(
-          fontSize: 12,
+          fontSize: 13,
           fontWeight: FontWeight.w600,
         ),
         unselectedLabelStyle: const TextStyle(
-          fontSize: 12,
+          fontSize: 13,
           fontWeight: FontWeight.w500,
         ),
-        tabs: [
+        dividerColor: Colors.transparent,
+        tabs: const [
           Tab(
-            icon: Icon(
-              _currentTabIndex == 0
-                  ? Icons.chat_bubble
-                  : Icons.chat_bubble_outline,
-              size: 24,
+            height: 40,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.chat_bubble_outline, size: 18),
+                SizedBox(width: 6),
+                Text('Chats'),
+              ],
             ),
-            text: 'Chats',
           ),
           Tab(
-            icon: Icon(
-              _currentTabIndex == 1 ? Icons.group : Icons.group_outlined,
-              size: 24,
+            height: 40,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.group_outlined, size: 18),
+                SizedBox(width: 6),
+                Text('Groups'),
+              ],
             ),
-            text: 'Groups',
           ),
           Tab(
-            icon: Icon(
-              _currentTabIndex == 2 ? Icons.call : Icons.call_outlined,
-              size: 24,
+            height: 40,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.call_outlined, size: 18),
+                SizedBox(width: 6),
+                Text('Calls'),
+              ],
             ),
-            text: 'Calls',
           ),
         ],
       ),

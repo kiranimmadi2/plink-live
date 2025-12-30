@@ -294,7 +294,8 @@ class _BusinessNotificationsScreenState extends State<BusinessNotificationsScree
               HapticFeedback.lightImpact();
               onChanged(val);
             },
-            activeColor: const Color(0xFF00D67D),
+            activeTrackColor: const Color(0xFF00D67D).withValues(alpha: 0.5),
+            activeThumbColor: const Color(0xFF00D67D),
           ),
         ],
       ),

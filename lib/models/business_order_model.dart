@@ -419,7 +419,7 @@ class OrderFilters {
   static const String completed = 'Completed';
   static const String cancelled = 'Cancelled';
 
-  static const List<String> all_filters = [
+  static const List<String> allFilters = [
     all,
     newOrders,
     pending,

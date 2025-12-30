@@ -18,7 +18,6 @@ class BusinessHoursScreen extends StatefulWidget {
 
 class _BusinessHoursScreenState extends State<BusinessHoursScreen> {
   final BusinessService _businessService = BusinessService();
-  bool _isLoading = false;
   bool _isSaving = false;
 
   // Day schedules
@@ -330,7 +329,8 @@ class _BusinessHoursScreenState extends State<BusinessHoursScreen> {
                 _schedules[day] = schedule.copyWith(isOpen: value);
               });
             },
-            activeColor: const Color(0xFF00D67D),
+            activeTrackColor: const Color(0xFF00D67D).withValues(alpha: 0.5),
+            activeThumbColor: const Color(0xFF00D67D),
           ),
 
           const Spacer(),

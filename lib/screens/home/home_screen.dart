@@ -2685,11 +2685,14 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Widget _buildInputSection(bool isDarkMode) {
+    // Add padding for the bottom navigation bar (70px bar + padding + safe area)
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
+    final navBarHeight = 100 + bottomPadding;
     return Container(
       padding: EdgeInsets.only(
         left: 20,
         right: 20,
-        bottom: MediaQuery.of(context).padding.bottom + 12,
+        bottom: navBarHeight,
         top: 16,
       ),
       decoration: const BoxDecoration(color: Colors.transparent),

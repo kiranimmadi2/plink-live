@@ -69,9 +69,11 @@ class _BusinessPrivacyScreenState extends State<BusinessPrivacyScreen> {
           ),
         ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
+      body: Stack(
+        children: [
+          SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Profile Visibility Section
@@ -206,6 +208,18 @@ class _BusinessPrivacyScreenState extends State<BusinessPrivacyScreen> {
             const SizedBox(height: 40),
           ],
         ),
+          ),
+          // Loading overlay
+          if (_isSaving)
+            Container(
+              color: Colors.black26,
+              child: const Center(
+                child: CircularProgressIndicator(
+                  color: Color(0xFF00D67D),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -319,7 +333,8 @@ class _BusinessPrivacyScreenState extends State<BusinessPrivacyScreen> {
               HapticFeedback.lightImpact();
               onChanged(val);
             },
-            activeColor: const Color(0xFF00D67D),
+            activeTrackColor: const Color(0xFF00D67D).withValues(alpha: 0.5),
+            activeThumbColor: const Color(0xFF00D67D),
           ),
         ],
       ),

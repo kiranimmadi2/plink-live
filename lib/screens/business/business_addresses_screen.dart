@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../../models/business_model.dart';
 import '../../services/business_service.dart';
 
@@ -240,7 +239,7 @@ class _BusinessAddressesScreenState extends State<BusinessAddressesScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      address.formattedAddress ?? 'No address set',
+                      address.formattedAddress.isNotEmpty ? address.formattedAddress : 'No address set',
                       style: TextStyle(
                         fontSize: 13,
                         color: isDarkMode ? Colors.white54 : Colors.grey[600],

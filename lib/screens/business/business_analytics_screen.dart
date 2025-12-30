@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../models/business_model.dart';
-import '../../services/business_service.dart';
 import '../../widgets/business/glassmorphic_card.dart';
 
 /// Analytics dashboard screen for business
@@ -20,7 +19,7 @@ class BusinessAnalyticsScreen extends StatefulWidget {
 }
 
 class _BusinessAnalyticsScreenState extends State<BusinessAnalyticsScreen> {
-  final BusinessService _businessService = BusinessService();
+  // final BusinessService _businessService = BusinessService(); // TODO: Use for real data
   String _selectedPeriod = '7D';
   bool _isLoading = true;
 

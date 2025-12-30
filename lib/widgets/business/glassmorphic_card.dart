@@ -195,7 +195,6 @@ class GlassmorphicButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final effectiveColor = color ?? const Color(0xFF00D67D);
 
     Widget button = ClipRRect(
@@ -465,7 +464,7 @@ class GlassmorphicToggle extends StatelessWidget {
           Switch(
             value: value,
             onChanged: onChanged,
-            activeColor: effectiveActiveColor,
+            activeThumbColor: effectiveActiveColor,
             activeTrackColor: effectiveActiveColor.withValues(alpha: 0.4),
           ),
         ],
