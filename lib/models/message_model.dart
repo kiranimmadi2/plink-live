@@ -19,6 +19,8 @@ class MessageModel {
   final String? fileName;
   final int? fileSize;
   final String? thumbnailUrl;
+  final String? audioUrl;
+  final int? audioDuration;
   final Map<String, dynamic>? metadata;
   final String? replyToMessageId;
   final List<String>? reactions;
@@ -37,6 +39,8 @@ class MessageModel {
     this.isDeleted = false,
     this.mediaUrl,
     this.thumbnailUrl,
+    this.audioUrl,
+    this.audioDuration,
     this.metadata,
     this.replyToMessageId,
     this.reactions,
@@ -63,6 +67,8 @@ class MessageModel {
       isDeleted: data['isDeleted'] ?? false,
       mediaUrl: data['mediaUrl'],
       thumbnailUrl: data['thumbnailUrl'],
+      audioUrl: data['audioUrl'],
+      audioDuration: data['audioDuration'],
       metadata: data['metadata'],
       replyToMessageId: data['replyToMessageId'],
       reactions: data['reactions'] != null
@@ -90,6 +96,8 @@ class MessageModel {
       'isDeleted': isDeleted,
       'mediaUrl': mediaUrl,
       'thumbnailUrl': thumbnailUrl,
+      'audioUrl': audioUrl,
+      'audioDuration': audioDuration,
       'metadata': metadata,
       'replyToMessageId': replyToMessageId,
       'reactions': reactions,
@@ -113,6 +121,8 @@ class MessageModel {
     bool? isDeleted,
     String? mediaUrl,
     String? thumbnailUrl,
+    String? audioUrl,
+    int? audioDuration,
     Map<String, dynamic>? metadata,
     String? replyToMessageId,
     List<String>? reactions,
@@ -134,6 +144,8 @@ class MessageModel {
       isDeleted: isDeleted ?? this.isDeleted,
       mediaUrl: mediaUrl ?? this.mediaUrl,
       thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,
+      audioUrl: audioUrl ?? this.audioUrl,
+      audioDuration: audioDuration ?? this.audioDuration,
       metadata: metadata ?? this.metadata,
       replyToMessageId: replyToMessageId ?? this.replyToMessageId,
       reactions: reactions ?? this.reactions,

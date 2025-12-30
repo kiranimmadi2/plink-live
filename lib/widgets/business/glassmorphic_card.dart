@@ -14,7 +14,7 @@ class GlassmorphicCard extends StatelessWidget {
   final EdgeInsetsGeometry? margin;
   final double borderRadius;
   final double blur;
-  final double opacity;
+  final double opacity; // Default 0.18 for better visibility on dark backgrounds
   final Color? borderColor;
   final double borderWidth;
   final VoidCallback? onTap;
@@ -28,7 +28,7 @@ class GlassmorphicCard extends StatelessWidget {
     this.margin,
     this.borderRadius = 16,
     this.blur = 15,
-    this.opacity = 0.12,
+    this.opacity = 0.18,
     this.borderColor,
     this.borderWidth = 1,
     this.onTap,
@@ -41,7 +41,7 @@ class GlassmorphicCard extends StatelessWidget {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     final effectiveBorderColor = borderColor ??
-        (isDarkMode ? Colors.white.withValues(alpha: 0.15) : Colors.white.withValues(alpha: 0.5));
+        (isDarkMode ? Colors.white.withValues(alpha: 0.25) : Colors.white.withValues(alpha: 0.5));
 
     Widget card = ClipRRect(
       borderRadius: BorderRadius.circular(borderRadius),
@@ -51,7 +51,7 @@ class GlassmorphicCard extends StatelessWidget {
           padding: padding ?? const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: isDarkMode
-                ? Colors.white.withValues(alpha: opacity)
+                ? Colors.white.withValues(alpha: opacity + 0.08)
                 : Colors.white.withValues(alpha: 0.7),
             borderRadius: BorderRadius.circular(borderRadius),
             border: Border.all(
@@ -101,6 +101,7 @@ class GlassmorphicStatCard extends StatelessWidget {
   final VoidCallback? onTap;
   final String? subtitle;
   final bool compact;
+  final bool forceDarkText;
 
   const GlassmorphicStatCard({
     super.key,
@@ -111,12 +112,11 @@ class GlassmorphicStatCard extends StatelessWidget {
     this.onTap,
     this.subtitle,
     this.compact = false,
+    this.forceDarkText = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-
     return GlassmorphicCard(
       onTap: onTap,
       padding: const EdgeInsets.all(14),
@@ -142,10 +142,10 @@ class GlassmorphicStatCard extends StatelessWidget {
             children: [
               Text(
                 value,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
-                  color: isDarkMode ? Colors.white : Colors.black87,
+                  color: Colors.white,
                 ),
               ),
               if (subtitle != null)
@@ -159,9 +159,9 @@ class GlassmorphicStatCard extends StatelessWidget {
                 ),
               Text(
                 title,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 11,
-                  color: isDarkMode ? Colors.white60 : Colors.grey[600],
+                  color: Colors.white60,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,

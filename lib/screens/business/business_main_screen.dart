@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/business_model.dart';
 import '../../services/business_service.dart';
+import '../../services/auth_service.dart';
+import '../login/choose_account_type_screen.dart';
 import 'business_home_tab.dart';
 import 'business_services_tab.dart';
 import 'business_posts_tab.dart';
@@ -120,7 +122,18 @@ class _BusinessMainScreenState extends ConsumerState<BusinessMainScreen> {
           BusinessProfileTab(
             business: _business!,
             onRefresh: _refreshBusiness,
-            onLogout: () => Navigator.pop(context),
+            onLogout: () async {
+              final navigator = Navigator.of(context);
+              await AuthService().signOut();
+              if (mounted) {
+                navigator.pushAndRemoveUntil(
+                  MaterialPageRoute(
+                    builder: (_) => const ChooseAccountTypeScreen(),
+                  ),
+                  (route) => false,
+                );
+              }
+            },
           ),
         ],
       ),

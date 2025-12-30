@@ -1,22 +1,20 @@
 ﻿import 'dart:ui';
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:timeago/timeago.dart' as timeago;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../services/universal_intent_service.dart';
 import '../../services/location services/location_service.dart';
-import '../../services/account_type_service.dart';
-import '../business/business_setup_screen.dart';
-import '../business/business_main_screen.dart';
 import '../../widgets/other widgets/user_avatar.dart';
 import '../../providers/other providers/theme_provider.dart';
 import '../../res/config/app_colors.dart';
-import '../login/login_screen.dart';
+import '../../res/config/app_assets.dart';
+import '../login/choose_account_type_screen.dart';
 import '../profile/profile_view_screen.dart';
 import '../profile/settings_screen.dart';
+import '../profile/profile_edit_screen.dart';
 import '../chat/enhanced_chat_screen.dart';
 import '../../models/user_profile.dart';
 
@@ -32,14 +30,7 @@ class _ProfileWithHistoryScreenState
     extends ConsumerState<ProfileWithHistoryScreen> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final UniversalIntentService _intentService = UniversalIntentService();
   final LocationService _locationService = LocationService();
-  final AccountTypeService _accountTypeService = AccountTypeService();
-
-  // Account type state
-  AccountType _currentAccountType = AccountType.personal;
-  bool _isAccountTypeLoading = false;
-
   Map<String, dynamic>? _userProfile;
   List<Map<String, dynamic>> _searchHistory = [];
   List<String> _selectedInterests = [];
@@ -61,12 +52,15 @@ class _ProfileWithHistoryScreenState
   String _aboutMe = '';
   final TextEditingController _aboutMeController = TextEditingController();
 
+  // Active status
+  bool _showOnlineStatus = true;
+  bool _isStatusLoading = false;
+
   @override
   void initState() {
     super.initState();
     _loadUserData();
     _setupProfileListener(); // Listen for real-time profile updates
-    _loadAccountType(); // Load account type
 
     // Use addPostFrameCallback to defer location update until after initial frame
     // This prevents blocking the UI during widget initialization
@@ -75,101 +69,6 @@ class _ProfileWithHistoryScreenState
         _updateLocationIfNeeded();
       }
     });
-  }
-
-  Future<void> _loadAccountType() async {
-    final accountType = await _accountTypeService.getCurrentAccountType();
-    if (mounted) {
-      setState(() {
-        _currentAccountType = accountType;
-      });
-    }
-  }
-
-  Future<void> _switchAccountType(AccountType newType) async {
-    if (_isAccountTypeLoading) return;
-
-    setState(() {
-      _isAccountTypeLoading = true;
-    });
-
-    try {
-      final success = await _accountTypeService.upgradeAccountType(newType);
-
-      if (success && mounted) {
-        setState(() {
-          _currentAccountType = newType;
-          _isAccountTypeLoading = false;
-        });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Switched to ${newType.name.replaceFirst(newType.name[0], newType.name[0].toUpperCase())} Account',
-            ),
-            backgroundColor: Colors.green,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-        );
-
-        // Navigate based on account type
-        if (newType == AccountType.business) {
-          final userId = _auth.currentUser?.uid;
-          if (userId != null) {
-            final businessDocs = await _firestore
-                .collection('businesses')
-                .where('userId', isEqualTo: userId)
-                .limit(1)
-                .get();
-
-            if (mounted) {
-              if (businessDocs.docs.isEmpty) {
-                // No business exists, go to setup
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const BusinessSetupScreen()),
-                );
-              } else {
-                // Business exists, go to business main screen
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const BusinessMainScreen()),
-                );
-              }
-            }
-          }
-        } else if (newType == AccountType.personal) {
-          // Already on personal profile screen, no navigation needed
-        }
-      } else {
-        if (mounted) {
-          setState(() {
-            _isAccountTypeLoading = false;
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Failed to switch account type'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isAccountTypeLoading = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
   }
 
   void _setupProfileListener() {
@@ -343,6 +242,8 @@ class _ProfileWithHistoryScreenState
           );
           _aboutMe = userData?['aboutMe'] ?? '';
           _aboutMeController.text = _aboutMe;
+          // Load active status preference
+          _showOnlineStatus = userData?['showOnlineStatus'] ?? true;
 
           // Load activities
           final activitiesData = userData?['activities'] as List<dynamic>?;
@@ -570,6 +471,106 @@ class _ProfileWithHistoryScreenState
             backgroundColor: Colors.red,
           ),
         );
+      }
+    }
+  }
+
+  Future<void> _updateOnlineStatusPreference(bool value) async {
+    setState(() {
+      _isStatusLoading = true;
+    });
+
+    final userId = _auth.currentUser?.uid;
+    if (userId != null) {
+      try {
+        await _firestore.collection('users').doc(userId).update({
+          'showOnlineStatus': value,
+          'isOnline': value ? true : false,
+        });
+        if (mounted) {
+          setState(() {
+            _showOnlineStatus = value;
+            _isStatusLoading = false;
+          });
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: value
+                            ? [
+                                Colors.white.withValues(alpha: 0.25),
+                                Colors.greenAccent.withValues(alpha: 0.15),
+                              ]
+                            : [
+                                Colors.white.withValues(alpha: 0.25),
+                                Colors.orangeAccent.withValues(alpha: 0.15),
+                              ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.2),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          value ? Icons.visibility : Icons.visibility_off,
+                          color: value ? Colors.greenAccent : Colors.orangeAccent,
+                          size: 22,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            value
+                                ? 'Your active status is now visible to others'
+                                : 'Your active status is now hidden',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              behavior: SnackBarBehavior.floating,
+              padding: EdgeInsets.zero,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              margin: const EdgeInsets.only(bottom: 20, left: 16, right: 16),
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() {
+            _isStatusLoading = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to update status: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     }
   }
@@ -844,7 +845,7 @@ class _ProfileWithHistoryScreenState
       if (mounted) {
         Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(builder: (_) => const LoginScreen(accountType: '')),
+          MaterialPageRoute(builder: (_) => const ChooseAccountTypeScreen()),
           (route) => false,
         );
       }
@@ -947,15 +948,12 @@ class _ProfileWithHistoryScreenState
             filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
             child: AppBar(
               elevation: 0,
-              backgroundColor: isGlass
-                  ? Colors.white.withValues(alpha: 0.7)
-                  : (isDarkMode
-                        ? Colors.black.withValues(alpha: 0.9)
-                        : Colors.white.withValues(alpha: 0.95)),
+              backgroundColor: Colors.black.withValues(alpha: 0.3),
               leading: IconButton(
-                icon: Icon(
-                  Icons.arrow_back,
-                  color: isDarkMode ? Colors.white : Colors.black,
+                icon: const Icon(
+                  Icons.arrow_back_ios_new,
+                  color: Colors.white,
+                  size: 20,
                 ),
                 onPressed: () {
                   // Navigate back to home screen (Home tab)
@@ -963,26 +961,16 @@ class _ProfileWithHistoryScreenState
                   Navigator.popUntil(context, (route) => route.isFirst);
                 },
               ),
-              title: Text(
+              centerTitle: true,
+              title: const Text(
                 'Profile',
                 style: TextStyle(
-                  color: isDarkMode ? Colors.white : Colors.black,
+                  color: Colors.white,
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              actions: [
-                IconButton(
-                  icon: Icon(
-                    Icons.settings,
-                    color: isDarkMode ? Colors.white : Colors.black,
-                  ),
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const SettingsScreen()),
-                    );
-                  },
-                ),
+              actions: const [
+                SizedBox(width: 48), // Balance the back button
               ],
             ),
           ),
@@ -990,63 +978,31 @@ class _ProfileWithHistoryScreenState
       ),
       body: Stack(
         children: [
-          // iOS 16 Glassmorphism gradient background
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: isGlass
-                    ? [
-                        const Color(0xFFE3F2FD).withValues(alpha: 0.8),
-                        const Color(0xFFF3E5F5).withValues(alpha: 0.6),
-                        const Color(0xFFE8F5E9).withValues(alpha: 0.4),
-                        const Color(0xFFFFF3E0).withValues(alpha: 0.3),
-                      ]
-                    : isDarkMode
-                    ? [Colors.black, const Color(0xFF1C1C1E)]
-                    : [const Color(0xFFF5F5F7), Colors.white],
-              ),
+          // Background Image (same as Feed screen)
+          Positioned.fill(
+            child: Image.asset(
+              AppAssets.homeBackgroundImage,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                return Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Colors.grey.shade900, Colors.black],
+                    ),
+                  ),
+                );
+              },
             ),
           ),
 
-          // Floating glass circles for depth
-          if (isGlass) ...[
-            Positioned(
-              top: 150,
-              right: -100,
-              child: Container(
-                width: 300,
-                height: 300,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    colors: [
-                      AppColors.iosPurple.withValues(alpha: 0.2),
-                      AppColors.iosPurple.withValues(alpha: 0.0),
-                    ],
-                  ),
-                ),
-              ),
+          // Dark overlay
+          Positioned.fill(
+            child: Container(
+              color: Colors.black.withValues(alpha: 0.6),
             ),
-            Positioned(
-              bottom: 200,
-              left: -100,
-              child: Container(
-                width: 350,
-                height: 350,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    colors: [
-                      AppColors.iosBlue.withValues(alpha: 0.15),
-                      AppColors.iosBlue.withValues(alpha: 0.0),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
+          ),
 
           _isLoading
               ? const Center(child: CircularProgressIndicator())
@@ -1075,346 +1031,375 @@ class _ProfileWithHistoryScreenState
                     SliverToBoxAdapter(
                       child: Column(
                         children: [
-                          const SizedBox(height: kToolbarHeight + 30),
-                          // Profile Header
+                          const SizedBox(height: kToolbarHeight + 60),
+                          // Profile Header - Card with glassmorphism
                           Container(
                             margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                            padding: const EdgeInsets.all(24),
                             decoration: BoxDecoration(
-                              color: isGlass
-                                  ? Colors.white.withValues(alpha: 0.7)
-                                  : (isDarkMode
-                                        ? Colors.grey[900]
-                                        : Colors.white),
-                              borderRadius: BorderRadius.circular(20),
-                              boxShadow: isGlass
-                                  ? []
-                                  : [
-                                      BoxShadow(
-                                        color: Colors.black.withValues(
-                                          alpha: 0.08,
-                                        ),
-                                        blurRadius: 16,
-                                        offset: const Offset(0, 4),
-                                      ),
-                                    ],
-                              border: isGlass
-                                  ? Border.all(
-                                      color: Colors.white.withValues(
-                                        alpha: 0.3,
-                                      ),
-                                      width: 1.5,
-                                    )
-                                  : null,
+                              color: Colors.white.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.1),
+                              ),
                             ),
-                            child: Column(
-                              children: [
-                                Row(
-                                  children: [
-                                    // Profile Photo
-                                    UserAvatar(
-                                      profileImageUrl:
-                                          _userProfile?['profileImageUrl'] ??
-                                          _userProfile?['photoUrl'],
-                                      radius: 50,
-                                      fallbackText:
-                                          _userProfile?['name'] ?? 'User',
-                                    ),
-                                    const SizedBox(width: 20),
-                                    // User Info
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            _userProfile?['name'] ??
-                                                'Unknown User',
-                                            style: TextStyle(
-                                              fontSize: 22,
-                                              fontWeight: FontWeight.w700,
-                                              color: isDarkMode
-                                                  ? Colors.white
-                                                  : Colors.black,
-                                              letterSpacing: 0.3,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 8),
-                                          Row(
-                                            children: [
-                                              Icon(
-                                                Icons.email_outlined,
-                                                size: 16,
-                                                color: isDarkMode
-                                                    ? Colors.grey[400]
-                                                    : Colors.grey[600],
-                                              ),
-                                              const SizedBox(width: 6),
-                                              Expanded(
-                                                child: Text(
-                                                  _userProfile?['email'] ??
-                                                      _auth
-                                                          .currentUser
-                                                          ?.email ??
-                                                      'No email',
-                                                  style: TextStyle(
-                                                    fontSize: 14,
-                                                    color: isDarkMode
-                                                        ? Colors.grey[400]
-                                                        : Colors.grey[600],
-                                                  ),
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 6),
-                                          GestureDetector(
-                                            onTap: () async {
-                                              // Manual location update
-                                              if (!mounted) return;
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(16),
+                              child: BackdropFilter(
+                                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(24),
+                                  child: Column(
+                                    children: [
+                                      // Profile Photo - Centered
+                                      UserAvatar(
+                                        profileImageUrl:
+                                            _userProfile?['profileImageUrl'] ??
+                                            _userProfile?['photoUrl'],
+                                        radius: 60,
+                                        fallbackText:
+                                            _userProfile?['name'] ?? 'User',
+                                      ),
+                                      const SizedBox(height: 20),
 
-                                              ScaffoldMessenger.of(
-                                                context,
-                                              ).showSnackBar(
+                                      // Name - Centered
+                                      Text(
+                                        _userProfile?['name'] ?? 'Unknown User',
+                                        style: const TextStyle(
+                                          fontSize: 28,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+
+                                      const SizedBox(height: 8),
+
+                                      // Email - Centered
+                                      Text(
+                                        _userProfile?['email'] ?? '',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.white.withValues(alpha: 0.7),
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+
+                                      const SizedBox(height: 12),
+
+                                      // Location - Centered
+                                      GestureDetector(
+                                        onTap: () async {
+                                          if (!mounted) return;
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(
+                                              content: Text('Updating location...'),
+                                            ),
+                                          );
+                                          try {
+                                            final success = await _locationService
+                                                .updateUserLocation(silent: false);
+                                            if (!mounted) return;
+                                            if (success) {
+                                              await Future.delayed(
+                                                const Duration(milliseconds: 500),
+                                              );
+                                              if (!mounted) return;
+                                              _loadUserData();
+                                              if (!mounted) return;
+                                              ScaffoldMessenger.of(context).showSnackBar(
                                                 const SnackBar(
-                                                  content: Text(
-                                                    'Updating location...',
-                                                  ),
+                                                  content: Text('Location updated successfully'),
+                                                  backgroundColor: Colors.green,
                                                 ),
                                               );
-
-                                              try {
-                                                // User manually clicked to update location, so NOT silent
-                                                final success =
-                                                    await _locationService
-                                                        .updateUserLocation(
-                                                          silent: false,
-                                                        );
-
-                                                // Check mounted after async operation
-                                                if (!mounted) return;
-
-                                                if (success) {
-                                                  // Short delay for Firestore propagation
-                                                  await Future.delayed(
-                                                    const Duration(
-                                                      milliseconds: 500,
-                                                    ),
-                                                  );
-
-                                                  // Check mounted again after delay
-                                                  if (!mounted) return;
-
-                                                  _loadUserData();
-
-                                                  if (!mounted) return;
-                                                  ScaffoldMessenger.of(
-                                                    // ignore: use_build_context_synchronously
-                                                    context,
-                                                  ).showSnackBar(
-                                                    const SnackBar(
-                                                      content: Text(
-                                                        'Location updated successfully',
-                                                      ),
-                                                      backgroundColor:
-                                                          Colors.green,
-                                                    ),
-                                                  );
-                                                } else {
-                                                  if (!mounted) return;
-                                                  ScaffoldMessenger.of(
-                                                    // ignore: use_build_context_synchronously
-                                                    context,
-                                                  ).showSnackBar(
-                                                    const SnackBar(
-                                                      content: Text(
-                                                        'Could not update location',
-                                                      ),
-                                                      backgroundColor:
-                                                          Colors.red,
-                                                    ),
-                                                  );
-                                                }
-                                              } catch (e) {
-                                                debugPrint(
-                                                  'Error during manual location update: $e',
-                                                );
-                                                if (!mounted) return;
-                                                ScaffoldMessenger.of(
-                                                  // ignore: use_build_context_synchronously
-                                                  context,
-                                                ).showSnackBar(
-                                                  const SnackBar(
-                                                    content: Text(
-                                                      'Location update failed',
-                                                    ),
-                                                    backgroundColor: Colors.red,
-                                                  ),
-                                                );
-                                              }
-                                            },
-                                            child: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                Row(
-                                                  children: [
-                                                    Icon(
-                                                      Icons
-                                                          .location_on_outlined,
-                                                      size: 16,
-                                                      color: isDarkMode
-                                                          ? Colors.grey[400]
-                                                          : Colors.grey[600],
-                                                    ),
-                                                    const SizedBox(width: 6),
-                                                    Flexible(
-                                                      child: Text(
-                                                        _userProfile?['displayLocation'] ??
-                                                            _userProfile?['city'] ??
-                                                            _userProfile?['location'] ??
-                                                            'Tap to set location',
-                                                        style: TextStyle(
-                                                          fontSize: 14,
-                                                          color:
-                                                              (_userProfile?['displayLocation'] ==
-                                                                      null &&
-                                                                  _userProfile?['city'] ==
-                                                                      null &&
-                                                                  _userProfile?['location'] ==
-                                                                      null)
-                                                              ? Theme.of(
-                                                                  context,
-                                                                ).primaryColor
-                                                              : isDarkMode
-                                                              ? Colors.grey[400]
-                                                              : Colors
-                                                                    .grey[600],
-                                                          decoration:
-                                                              (_userProfile?['displayLocation'] ==
-                                                                      null &&
-                                                                  _userProfile?['city'] ==
-                                                                      null &&
-                                                                  _userProfile?['location'] ==
-                                                                      null)
-                                                              ? TextDecoration
-                                                                    .underline
-                                                              : null,
-                                                        ),
-                                                        overflow: TextOverflow
-                                                            .ellipsis,
-                                                        maxLines: 1,
-                                                      ),
-                                                    ),
-                                                  ],
+                                            } else {
+                                              if (!mounted) return;
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                const SnackBar(
+                                                  content: Text('Could not update location'),
+                                                  backgroundColor: Colors.red,
                                                 ),
-                                                // Location freshness indicator
-                                                if (_userProfile?['locationUpdatedAt'] !=
-                                                    null)
-                                                  FutureBuilder<int?>(
-                                                    future: _locationService
-                                                        .getLocationAgeInHours(),
-                                                    builder: (context, snapshot) {
-                                                      if (snapshot.hasData &&
-                                                          snapshot.data !=
-                                                              null) {
-                                                        final hours =
-                                                            snapshot.data!;
-                                                        String timeText;
-                                                        Color indicatorColor;
-
-                                                        if (hours < 1) {
-                                                          timeText =
-                                                              'Updated recently';
-                                                          indicatorColor =
-                                                              Colors.green;
-                                                        } else if (hours < 24) {
-                                                          timeText =
-                                                              'Updated ${hours}h ago';
-                                                          indicatorColor =
-                                                              Colors.green;
-                                                        } else if (hours < 48) {
-                                                          timeText =
-                                                              'Updated 1 day ago';
-                                                          indicatorColor =
-                                                              Colors.orange;
-                                                        } else {
-                                                          final days =
-                                                              (hours / 24)
-                                                                  .floor();
-                                                          timeText =
-                                                              'Updated $days days ago';
-                                                          indicatorColor =
-                                                              Colors.red;
-                                                        }
-
-                                                        return Padding(
-                                                          padding:
-                                                              const EdgeInsets.only(
-                                                                left: 22,
-                                                                top: 4,
-                                                              ),
-                                                          child: Row(
-                                                            children: [
-                                                              Container(
-                                                                width: 7,
-                                                                height: 7,
-                                                                decoration: BoxDecoration(
-                                                                  shape: BoxShape
-                                                                      .circle,
-                                                                  color:
-                                                                      indicatorColor,
-                                                                ),
-                                                              ),
-                                                              const SizedBox(
-                                                                width: 6,
-                                                              ),
-                                                              Text(
-                                                                timeText,
-                                                                style: TextStyle(
-                                                                  fontSize: 12,
-                                                                  color:
-                                                                      isDarkMode
-                                                                      ? Colors
-                                                                            .grey[500]
-                                                                      : Colors
-                                                                            .grey[500],
-                                                                  fontWeight:
-                                                                      FontWeight
-                                                                          .w500,
-                                                                ),
-                                                              ),
-                                                            ],
-                                                          ),
-                                                        );
-                                                      }
-                                                      return const SizedBox.shrink();
-                                                    },
-                                                  ),
-                                              ],
+                                              );
+                                            }
+                                          } catch (e) {
+                                            debugPrint('Error during manual location update: $e');
+                                            if (!mounted) return;
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              const SnackBar(
+                                                content: Text('Location update failed'),
+                                                backgroundColor: Colors.red,
+                                              ),
+                                            );
+                                          }
+                                        },
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            Icon(
+                                              Icons.location_on_rounded,
+                                              color: Colors.white.withValues(alpha: 0.7),
+                                              size: 20,
                                             ),
-                                          ),
-                                        ],
+                                            const SizedBox(width: 8),
+                                            Flexible(
+                                              child: Text(
+                                                _userProfile?['displayLocation'] ??
+                                                    _userProfile?['city'] ??
+                                                    _userProfile?['location'] ??
+                                                    'Tap to set location',
+                                                style: TextStyle(
+                                                  fontSize: 16,
+                                                  color: Colors.white.withValues(alpha: 0.7),
+                                                ),
+                                                textAlign: TextAlign.center,
+                                                maxLines: 2,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
-                              ],
+                              ),
                             ),
                           ),
 
-                          // Profile Detail Sections removed
+                          // Edit Profile Card
+                          Container(
+                            margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.1),
+                              ),
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(16),
+                              child: BackdropFilter(
+                                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                                child: ListTile(
+                                  leading: Container(
+                                    width: 40,
+                                    height: 40,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withValues(alpha: 0.15),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: const Icon(
+                                      Icons.edit,
+                                      color: Colors.white,
+                                      size: 22,
+                                    ),
+                                  ),
+                                  title: const Text(
+                                    'Edit Profile',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  trailing: Icon(
+                                    Icons.arrow_forward_ios,
+                                    color: Colors.white.withValues(alpha: 0.7),
+                                    size: 16,
+                                  ),
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => const ProfileEditScreen(),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ),
+                          ),
 
-                          // Account Type Toggle Section
-                          _buildAccountTypeSection(isDarkMode, isGlass),
+                          // Account Type Card
+                          Container(
+                            margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.1),
+                              ),
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(16),
+                              child: BackdropFilter(
+                                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                                child: Builder(
+                                  builder: (context) {
+                                    final accountType = _userProfile?['accountType']?.toString().toLowerCase() ?? 'personal';
+                                    final isBusiness = accountType == 'business';
+                                    debugPrint('Account Type from Firestore: ${_userProfile?['accountType']} -> isBusiness: $isBusiness');
+                                    return ListTile(
+                                      leading: Container(
+                                        width: 40,
+                                        height: 40,
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withValues(alpha: 0.15),
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                        child: Icon(
+                                          isBusiness ? Icons.business : Icons.person,
+                                          color: Colors.white,
+                                          size: 22,
+                                        ),
+                                      ),
+                                      title: const Text(
+                                        'Account Type',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      trailing: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 6,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withValues(alpha: 0.15),
+                                          borderRadius: BorderRadius.circular(20),
+                                        ),
+                                        child: Text(
+                                          isBusiness ? 'Business' : 'Personal',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ),
+                          ),
+
+                          // Settings Card
+                          Container(
+                            margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.1),
+                              ),
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(16),
+                              child: BackdropFilter(
+                                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                                child: ListTile(
+                                  leading: Container(
+                                    width: 40,
+                                    height: 40,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withValues(alpha: 0.15),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: const Icon(
+                                      Icons.settings,
+                                      color: Colors.white,
+                                      size: 22,
+                                    ),
+                                  ),
+                                  title: const Text(
+                                    'Settings',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  trailing: Icon(
+                                    Icons.arrow_forward_ios,
+                                    color: Colors.white.withValues(alpha: 0.7),
+                                    size: 16,
+                                  ),
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => const SettingsScreen(),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ),
+                          ),
+
+                          // Active Status Card
+                          Container(
+                            margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.1),
+                              ),
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(16),
+                              child: BackdropFilter(
+                                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                                child: ListTile(
+                                  leading: Container(
+                                    width: 40,
+                                    height: 40,
+                                    decoration: BoxDecoration(
+                                      color: _showOnlineStatus
+                                          ? AppColors.iosGreen.withValues(alpha: 0.2)
+                                          : Colors.white.withValues(alpha: 0.15),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Icon(
+                                      _showOnlineStatus
+                                          ? CupertinoIcons.circle_fill
+                                          : CupertinoIcons.circle,
+                                      color: _showOnlineStatus
+                                          ? AppColors.iosGreen
+                                          : Colors.white.withValues(alpha: 0.7),
+                                      size: 22,
+                                    ),
+                                  ),
+                                  title: const Text(
+                                    'Active Status',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  trailing: Transform.scale(
+                                    scale: 0.9,
+                                    child: CupertinoSwitch(
+                                      value: _showOnlineStatus,
+                                      onChanged: _isStatusLoading
+                                          ? null
+                                          : _updateOnlineStatusPreference,
+                                      activeTrackColor: AppColors.iosGreen,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ),
-
-                    // History Content
-                    ..._buildHistorySliver(isDarkMode, isGlass),
                   ],
                 ),
         ],
@@ -1947,361 +1932,6 @@ class _ProfileWithHistoryScreenState
       default:
         return const Color(0xFF00D67D);
     }
-  }
-
-  Widget _buildAccountTypeSection(bool isDarkMode, bool isGlass) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isGlass
-            ? Colors.white.withValues(alpha: 0.7)
-            : (isDarkMode ? Colors.grey[900] : Colors.white),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: isGlass
-            ? []
-            : [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.08),
-                  blurRadius: 16,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-        border: isGlass
-            ? Border.all(
-                color: Colors.white.withValues(alpha: 0.3),
-                width: 1.5,
-              )
-            : null,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: AppColors.iosOrange.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(Icons.swap_horiz_rounded, color: AppColors.iosOrange, size: 18),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                'Account Type',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: isDarkMode ? Colors.white : Colors.black,
-                ),
-              ),
-              const Spacer(),
-              if (_isAccountTypeLoading)
-                const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          // Account Type Toggle Chips
-          Row(
-            children: [
-              Expanded(
-                child: _buildAccountTypeChip(
-                  label: 'Personal',
-                  icon: Icons.person_outline,
-                  isSelected: _currentAccountType == AccountType.personal,
-                  color: AppColors.iosBlue,
-                  isDark: isDarkMode,
-                  onTap: () => _switchAccountType(AccountType.personal),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildAccountTypeChip(
-                  label: 'Business',
-                  icon: Icons.business_center_outlined,
-                  isSelected: _currentAccountType == AccountType.business,
-                  color: AppColors.iosOrange,
-                  isDark: isDarkMode,
-                  onTap: () => _switchAccountType(AccountType.business),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAccountTypeChip({
-    required String label,
-    required IconData icon,
-    required bool isSelected,
-    required Color color,
-    required bool isDark,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: _isAccountTypeLoading ? null : onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? color.withValues(alpha: 0.2)
-              : (isDark ? Colors.grey[800] : Colors.grey[100]),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected ? color : Colors.transparent,
-            width: 2,
-          ),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              color: isSelected ? color : (isDark ? Colors.grey[400] : Colors.grey[600]),
-              size: 24,
-            ),
-            const SizedBox(height: 6),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                color: isSelected ? color : (isDark ? Colors.grey[400] : Colors.grey[600]),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  List<Widget> _buildHistorySliver(bool isDarkMode, bool isGlass) {
-    if (_searchHistory.isEmpty) {
-      return [
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 100),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.history,
-                  size: 60,
-                  color: isDarkMode ? Colors.grey[700] : Colors.grey[300],
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'No search history',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: isDarkMode ? Colors.grey[600] : Colors.grey,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Your searches will appear here',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: isDarkMode ? Colors.grey[700] : Colors.grey[500],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ];
-    }
-
-    return [
-      SliverPadding(
-        padding: const EdgeInsets.all(16),
-        sliver: SliverList(
-          delegate: SliverChildBuilderDelegate((context, index) {
-            final intent = _searchHistory[index];
-            final createdAt = intent['createdAt'];
-            String timeAgo = 'Recently';
-
-            if (createdAt != null && createdAt is Timestamp) {
-              timeAgo = timeago.format(createdAt.toDate());
-            }
-
-            return Dismissible(
-              key: Key(intent['id']),
-              direction: DismissDirection.endToStart,
-              background: Container(
-                alignment: Alignment.centerRight,
-                padding: const EdgeInsets.only(right: 20),
-                color: Colors.red,
-                child: const Icon(Icons.delete, color: Colors.white),
-              ),
-              confirmDismiss: (direction) async {
-                return await showDialog<bool>(
-                  context: context,
-                  builder: (BuildContext context) {
-                    return AlertDialog(
-                      title: const Text('Delete Search History'),
-                      content: Text(
-                        'Are you sure you want to delete "${intent['title'] ?? intent['embeddingText'] ?? 'this search'}"? This action cannot be undone.',
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.of(context).pop(false),
-                          child: const Text('Cancel'),
-                        ),
-                        ElevatedButton(
-                          onPressed: () => Navigator.of(context).pop(true),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red,
-                          ),
-                          child: const Text(
-                            'Delete',
-                            style: TextStyle(color: Colors.white),
-                          ),
-                        ),
-                      ],
-                    );
-                  },
-                );
-              },
-              onDismissed: (direction) async {
-                final success = await _intentService.deleteIntent(intent['id']);
-
-                if (!mounted) return;
-
-                if (success) {
-                  // ignore: use_build_context_synchronously
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Search history deleted successfully'),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
-                  _loadUserData();
-                } else {
-                  // ignore: use_build_context_synchronously
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Failed to delete search history'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                  _loadUserData();
-                }
-              },
-              child: Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: isGlass
-                        ? [
-                            Colors.white.withValues(alpha: 0.7),
-                            Colors.white.withValues(alpha: 0.5),
-                          ]
-                        : isDarkMode
-                        ? [const Color(0xFF2D2D2D), const Color(0xFF252525)]
-                        : [Colors.white, const Color(0xFFFAFAFA)],
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: isGlass
-                        ? Colors.white.withValues(alpha: 0.3)
-                        : (isDarkMode ? Colors.grey[800]! : Colors.grey[200]!),
-                    width: 1.5,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF00D67D).withValues(alpha: 0.1),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                    BoxShadow(
-                      color: Colors.black.withValues(
-                        alpha: isDarkMode ? 0.3 : 0.08,
-                      ),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: BackdropFilter(
-                    filter: isGlass
-                        ? ImageFilter.blur(sigmaX: 10, sigmaY: 10)
-                        : ImageFilter.blur(sigmaX: 0, sigmaY: 0),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Title
-                          Text(
-                            intent['title'] ??
-                                intent['embeddingText'] ??
-                                'Search',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: isDarkMode ? Colors.white : Colors.black,
-                              height: 1.3,
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-
-                          const SizedBox(height: 6),
-
-                          // Time with icon
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.access_time_rounded,
-                                size: 14,
-                                color: isDarkMode
-                                    ? Colors.grey[500]
-                                    : Colors.grey[500],
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                timeAgo,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: isDarkMode
-                                      ? Colors.grey[400]
-                                      : Colors.grey[600],
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            );
-          }, childCount: _searchHistory.length),
-        ),
-      ),
-    ];
-  }
-
-  // ignore: unused_element
-  Widget _buildHistoryTab(bool isDarkMode, bool isGlass) {
-    // This method is kept for compatibility but uses the sliver version
-    return const SizedBox.shrink();
   }
 
   // ignore: unused_element

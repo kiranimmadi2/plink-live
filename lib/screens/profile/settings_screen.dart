@@ -10,13 +10,8 @@ import '../../providers/other providers/theme_provider.dart';
 import '../../providers/other providers/app_providers.dart';
 import '../../res/config/app_colors.dart';
 import '../../services/auth_service.dart';
-import '../../services/account_type_service.dart';
-import '../../models/user_profile.dart';
-import '../business/business_setup_screen.dart';
-import '../business/business_main_screen.dart';
-import 'profile_edit_screen.dart';
 import '../performance_debug_screen.dart';
-import '../login/login_screen.dart';
+import '../login/choose_account_type_screen.dart';
 import '../login/change_password_screen.dart';
 import '../location/location_settings_screen.dart';
 import 'terms_of_service_screen.dart';
@@ -32,17 +27,10 @@ class SettingsScreen extends ConsumerStatefulWidget {
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final AccountTypeService _accountTypeService = AccountTypeService();
 
   // Helper getter for current user ID from provider
   String? get _currentUserId => ref.read(currentUserIdProvider);
-  bool _showOnlineStatus = true;
   bool _discoveryModeEnabled = true;
-  bool _isLoading = false;
-
-  // Account type state
-  AccountType _currentAccountType = AccountType.personal;
-  bool _isAccountTypeLoading = false;
 
   // Notification preferences
   bool _messageNotifications = true;
@@ -54,99 +42,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   void initState() {
     super.initState();
     _loadUserPreferences();
-    _loadAccountType();
-  }
-
-  Future<void> _loadAccountType() async {
-    final accountType = await _accountTypeService.getCurrentAccountType();
-    if (mounted) {
-      setState(() {
-        _currentAccountType = accountType;
-      });
-    }
-  }
-
-  Future<void> _switchAccountType(AccountType newType) async {
-    if (_isAccountTypeLoading) return;
-
-    setState(() {
-      _isAccountTypeLoading = true;
-    });
-
-    try {
-      final success = await _accountTypeService.upgradeAccountType(newType);
-
-      if (success && mounted) {
-        setState(() {
-          _currentAccountType = newType;
-          _isAccountTypeLoading = false;
-        });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Switched to ${newType.name.replaceFirst(newType.name[0], newType.name[0].toUpperCase())} Account',
-            ),
-            backgroundColor: Colors.green,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-        );
-
-        // Navigate based on account type
-        if (newType == AccountType.business) {
-          final businessDocs = await _firestore
-              .collection('businesses')
-              .where('userId', isEqualTo: _currentUserId)
-              .limit(1)
-              .get();
-
-          if (mounted) {
-            if (businessDocs.docs.isEmpty) {
-              // No business exists, go to setup
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const BusinessSetupScreen()),
-              );
-            } else {
-              // Business exists, go to business main screen
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const BusinessMainScreen()),
-              );
-            }
-          }
-        } else if (newType == AccountType.personal) {
-          // Already on personal screen, no navigation needed
-        }
-      } else {
-        if (mounted) {
-          setState(() {
-            _isAccountTypeLoading = false;
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Failed to switch account type'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isAccountTypeLoading = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
   }
 
   Future<void> _loadUserPreferences() async {
@@ -156,7 +51,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       if (doc.exists && mounted) {
         final data = doc.data() ?? {};
         setState(() {
-          _showOnlineStatus = data['showOnlineStatus'] ?? true;
           _discoveryModeEnabled = data['discoveryModeEnabled'] ?? true;
           _messageNotifications = data['messageNotifications'] ?? true;
           _matchNotifications = data['matchNotifications'] ?? true;
@@ -178,55 +72,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Failed to update setting: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
-    }
-  }
-
-  Future<void> _updateOnlineStatusPreference(bool value) async {
-    setState(() {
-      _isLoading = true;
-    });
-
-    final userId = _currentUserId;
-    if (userId != null) {
-      try {
-        await _firestore.collection('users').doc(userId).update({
-          'showOnlineStatus': value,
-          'isOnline': value ? true : false,
-        });
-        if (mounted) {
-          setState(() {
-            _showOnlineStatus = value;
-            _isLoading = false;
-          });
-
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                value
-                    ? 'Your active status is now visible to others'
-                    : 'Your active status is now hidden',
-              ),
-              backgroundColor: value ? Colors.green : Colors.orange,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to update status: $e'),
               backgroundColor: Colors.red,
             ),
           );
@@ -334,120 +179,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               bottom: 16,
             ),
             children: [
-              // Online Status Section
-              _buildSettingsCard(
-                isDark: isDark,
-                isGlass: isGlass,
-                children: [
-                  ListTile(
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    leading: Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            AppColors.iosGreen.withValues(alpha: 0.3),
-                            AppColors.iosBlue.withValues(alpha: 0.3),
-                          ],
-                        ),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(
-                        _showOnlineStatus
-                            ? CupertinoIcons.circle_fill
-                            : CupertinoIcons.circle,
-                        color: _showOnlineStatus
-                            ? AppColors.iosGreen
-                            : Colors.grey,
-                        size: 22,
-                      ),
-                    ),
-                    title: const Text(
-                      'Active Status',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    subtitle: Text(
-                      _showOnlineStatus
-                          ? 'Others can see when you\'re active'
-                          : 'Your activity status is hidden',
-                      style: const TextStyle(fontSize: 13),
-                    ),
-                    trailing: Transform.scale(
-                      scale: 0.9,
-                      child: CupertinoSwitch(
-                        value: _showOnlineStatus,
-                        onChanged: _isLoading
-                            ? null
-                            : _updateOnlineStatusPreference,
-                        activeTrackColor: AppColors.iosGreen,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-
-              // Theme Section
-              _buildSectionHeader(
-                icon: CupertinoIcons.paintbrush_fill,
-                title: 'Appearance',
-                color: AppColors.iosPurple,
-                isDark: isDark,
-              ),
-              const SizedBox(height: 12),
-              _buildSettingsCard(
-                isDark: isDark,
-                isGlass: isGlass,
-                children: [
-                  _buildThemeOption(
-                    context,
-                    title: 'White Theme',
-                    subtitle: 'Clean and bright appearance',
-                    icon: CupertinoIcons.sun_max_fill,
-                    isSelected: isGlass,
-                    onTap: () {
-                      ref
-                          .read(themeProvider.notifier)
-                          .setTheme(AppThemeMode.glassmorphism);
-                      // themeProvider.setTheme(AppThemeMode.glassmorphism);
-                    },
-                  ),
-                  const Divider(height: 1),
-                  _buildThemeOption(
-                    context,
-                    title: 'Dark Mode',
-                    subtitle: 'Easier on the eyes in low light',
-                    icon: CupertinoIcons.moon_fill,
-                    isSelected: isDark,
-                    onTap: () {
-                      ref
-                          .read(themeProvider.notifier)
-                          .setTheme(AppThemeMode.dark);
-                      // themeProvider.setTheme(AppThemeMode.dark);
-                    },
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 24),
-
-              // Account Type Section
-              _buildSectionHeader(
-                icon: CupertinoIcons.rectangle_stack_person_crop_fill,
-                title: 'Account Type',
-                color: AppColors.iosOrange,
-                isDark: isDark,
-              ),
-              const SizedBox(height: 12),
-              _buildAccountTypeCard(isDark: isDark, isGlass: isGlass),
-
-              const SizedBox(height: 24),
-
               // Account Section
               _buildSectionHeader(
                 icon: CupertinoIcons.person_circle_fill,
@@ -460,21 +191,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 isDark: isDark,
                 isGlass: isGlass,
                 children: [
-                  ListTile(
-                    leading: const Icon(Icons.person_outline),
-                    title: const Text('Edit Profile'),
-                    subtitle: const Text('Update your information'),
-                    trailing: const Icon(CupertinoIcons.chevron_forward),
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const ProfileEditScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                  const Divider(height: 1),
                   SwitchListTile(
                     secondary: const Icon(Icons.visibility_outlined),
                     title: const Text('Discoverable on Live Connect'),
@@ -840,165 +556,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  Widget _buildThemeOption(
-    BuildContext context, {
-    required String title,
-    required String subtitle,
-    required IconData icon,
-    required bool isSelected,
-    required VoidCallback onTap,
-  }) {
-    return ListTile(
-      leading: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: isSelected
-              ? AppColors.iosPurple.withValues(alpha: 0.2)
-              : Colors.grey.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Icon(
-          icon,
-          color: isSelected ? AppColors.iosPurple : Colors.grey,
-          size: 20,
-        ),
-      ),
-      title: Text(
-        title,
-        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-      ),
-      subtitle: Text(subtitle),
-      trailing: Radio<bool>(
-        value: true,
-        groupValue: isSelected, // ignore: deprecated_member_use
-        onChanged: (_) => onTap(), // ignore: deprecated_member_use
-        activeColor: AppColors.iosPurple,
-      ),
-      onTap: onTap,
-    );
-  }
-
-  Widget _buildAccountTypeCard({
-    required bool isDark,
-    required bool isGlass,
-  }) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(20),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(
-          sigmaX: isGlass ? 20 : 0,
-          sigmaY: isGlass ? 20 : 0,
-        ),
-        child: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: isGlass
-                  ? [
-                      Colors.white.withValues(alpha: 0.6),
-                      Colors.white.withValues(alpha: 0.3),
-                    ]
-                  : isDark
-                  ? [const Color(0xFF2C2C2E), const Color(0xFF1C1C1E)]
-                  : [Colors.white, Colors.grey[50]!],
-            ),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: isGlass
-                  ? Colors.white.withValues(alpha: 0.3)
-                  : isDark
-                  ? Colors.white.withValues(alpha: 0.1)
-                  : Colors.grey.withValues(alpha: 0.2),
-              width: 1,
-            ),
-          ),
-          child: Column(
-            children: [
-              // Personal Account Option
-              _buildAccountTypeOption(
-                icon: Icons.person_outline,
-                title: 'Personal Account',
-                subtitle: 'For individual buyers and sellers',
-                isSelected: _currentAccountType == AccountType.personal,
-                color: AppColors.iosBlue,
-                isDark: isDark,
-                onTap: () => _switchAccountType(AccountType.personal),
-              ),
-              Divider(height: 1, color: isDark ? Colors.grey[800] : Colors.grey[200]),
-              // Business Account Option
-              _buildAccountTypeOption(
-                icon: Icons.business_center_outlined,
-                title: 'Business Account',
-                subtitle: 'For businesses and organizations',
-                isSelected: _currentAccountType == AccountType.business,
-                color: AppColors.iosOrange,
-                isDark: isDark,
-                onTap: () => _switchAccountType(AccountType.business),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAccountTypeOption({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required bool isSelected,
-    required Color color,
-    required bool isDark,
-    required VoidCallback onTap,
-  }) {
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      leading: Container(
-        width: 44,
-        height: 44,
-        decoration: BoxDecoration(
-          color: isSelected ? color.withValues(alpha: 0.2) : Colors.grey.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Icon(
-          icon,
-          color: isSelected ? color : Colors.grey,
-          size: 24,
-        ),
-      ),
-      title: Text(
-        title,
-        style: TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w600,
-          color: isDark ? Colors.white : Colors.black,
-        ),
-      ),
-      subtitle: Text(
-        subtitle,
-        style: TextStyle(
-          fontSize: 12,
-          color: isDark ? Colors.grey[400] : Colors.grey[600],
-        ),
-      ),
-      trailing: _isAccountTypeLoading
-          ? const SizedBox(
-              width: 24,
-              height: 24,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          : Radio<bool>(
-              value: true,
-              groupValue: isSelected,
-              onChanged: (_) => onTap(),
-              activeColor: color,
-            ),
-      onTap: _isAccountTypeLoading ? null : onTap,
-    );
-  }
-
   // ignore: unused_element
   Widget _buildLogoutButton(BuildContext context, AuthService authService) {
     return ListTile(
@@ -1043,7 +600,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   await authService.signOut();
                   navigator.pushAndRemoveUntil(
                     MaterialPageRoute(
-                      builder: (_) => const LoginScreen(accountType: 'Personal Account'),
+                      builder: (_) => const ChooseAccountTypeScreen(),
                     ),
                     (route) => false,
                   );
@@ -1267,7 +824,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               await authService.signOut();
               navigator.pushAndRemoveUntil(
                 MaterialPageRoute(
-                  builder: (_) => const LoginScreen(accountType: 'Personal Account'),
+                  builder: (_) => const ChooseAccountTypeScreen(),
                 ),
                 (route) => false,
               );
@@ -1329,7 +886,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   if (context.mounted) {
                     Navigator.of(context).pushAndRemoveUntil(
                       MaterialPageRoute(
-                        builder: (_) => const LoginScreen(accountType: 'Personal Account'),
+                        builder: (_) => const ChooseAccountTypeScreen(),
                       ),
                       (route) => false,
                     );

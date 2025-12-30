@@ -2804,7 +2804,7 @@ class _HomeScreenState extends State<HomeScreen>
                                     child: Row(
                                       mainAxisAlignment:
                                           MainAxisAlignment.start,
-                                      children: List.generate(15, (index) {
+                                      children: List.generate(10, (index) {
                                         return AnimatedContainer(
                                           duration: const Duration(
                                             milliseconds: 200,

@@ -24,8 +24,9 @@ import '../../models/user_profile.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   final int? initialIndex;
+  final String? loginAccountType; // Account type from login screen
 
-  const MainNavigationScreen({super.key, this.initialIndex});
+  const MainNavigationScreen({super.key, this.initialIndex, this.loginAccountType});
 
   @override
   State<MainNavigationScreen> createState() => _MainNavigationScreenState();
@@ -56,8 +57,16 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
 
+    // Set initial index based on login account type or initialIndex
     if (widget.initialIndex != null) {
       _currentIndex = widget.initialIndex!;
+    } else if (widget.loginAccountType != null) {
+      // Set initial screen based on account type from login
+      if (widget.loginAccountType == 'Business Account') {
+        _currentIndex = 6; // Business dashboard
+      } else {
+        _currentIndex = 0; // Home screen for Personal
+      }
     }
 
     _listenUnread();
@@ -139,6 +148,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     if (mounted) {
       setState(() {
         _accountType = accountType;
+        // Don't override _currentIndex if loginAccountType or initialIndex was provided
+        // This ensures the login screen's account type selection takes priority
       });
     }
 
