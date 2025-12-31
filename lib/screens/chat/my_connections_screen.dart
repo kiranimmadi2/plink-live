@@ -335,14 +335,16 @@ class _MyConnectionsScreenState extends ConsumerState<MyConnectionsScreen> {
   }
 
   Widget _buildRequestCard(Map<String, dynamic> request, bool isDarkMode) {
-    final senderData = request['senderData'] as Map<String, dynamic>?;
+    final requestId = request['id'] as String?;
     final senderId = request['senderId'] as String?;
 
-    if (senderData == null || senderId == null) return const SizedBox.shrink();
+    if (requestId == null || senderId == null) return const SizedBox.shrink();
 
-    final name = senderData['name'] ?? 'Unknown User';
-    final photoUrl = senderData['photoUrl'] as String?;
-    final bio = senderData['bio'] ?? 'No bio available';
+    // Use data directly from request - senderName and senderPhoto are stored in the request
+    final name = request['senderName'] ?? 'Unknown User';
+    final photoUrl = request['senderPhoto'] as String?;
+    final message = request['message'] as String?;
+    final bio = message ?? 'Wants to connect with you';
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -387,7 +389,7 @@ class _MyConnectionsScreenState extends ConsumerState<MyConnectionsScreen> {
             Row(
               children: [
                 IconButton(
-                  onPressed: () => _rejectRequest(senderId),
+                  onPressed: () => _rejectRequest(requestId),
                   icon: const Icon(Icons.close, color: Colors.red),
                   style: IconButton.styleFrom(
                     backgroundColor: Colors.red.withValues(alpha: 0.1),
@@ -395,7 +397,7 @@ class _MyConnectionsScreenState extends ConsumerState<MyConnectionsScreen> {
                 ),
                 const SizedBox(width: 8),
                 IconButton(
-                  onPressed: () => _acceptRequest(senderId),
+                  onPressed: () => _acceptRequest(requestId),
                   icon: const Icon(Icons.check, color: Color(0xFF00D67D)),
                   style: IconButton.styleFrom(
                     backgroundColor: const Color(
@@ -504,9 +506,9 @@ class _MyConnectionsScreenState extends ConsumerState<MyConnectionsScreen> {
     );
   }
 
-  Future<void> _acceptRequest(String senderId) async {
+  Future<void> _acceptRequest(String requestId) async {
     try {
-      final result = await _connectionService.acceptConnectionRequest(senderId);
+      final result = await _connectionService.acceptConnectionRequest(requestId);
 
       if (mounted) {
         if (result['success'] == true) {
@@ -539,9 +541,9 @@ class _MyConnectionsScreenState extends ConsumerState<MyConnectionsScreen> {
     }
   }
 
-  Future<void> _rejectRequest(String senderId) async {
+  Future<void> _rejectRequest(String requestId) async {
     try {
-      final result = await _connectionService.rejectConnectionRequest(senderId);
+      final result = await _connectionService.rejectConnectionRequest(requestId);
 
       if (mounted) {
         if (result['success'] == true) {

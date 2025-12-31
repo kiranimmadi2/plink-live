@@ -48,6 +48,11 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
   double? _currentUserLat;
   double? _currentUserLon;
 
+  // Location caching - prevent multiple refresh attempts
+  DateTime? _lastLocationRefresh;
+  bool _isRefreshingLocation = false;
+  static const Duration _locationCacheDuration = Duration(seconds: 90);
+
   // Filter options
   final bool _filterByExactLocation = false;
   bool _filterByInterests = false;
@@ -353,7 +358,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
     }
   }
 
-  Future<void> _loadNearbyPeople({bool loadMore = false}) async {
+  Future<void> _loadNearbyPeople({bool loadMore = false, bool forceRefreshLocation = false}) async {
     if (!mounted) return;
 
     // If interest filter is on but no interests selected, return early
@@ -379,25 +384,57 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
 
       final userCity = _userProfile?['city'];
 
-      // ALWAYS get fresh real-time location for accurate distance calculation
-      // This ensures distance is correct when user moves to new location
-      final position = await _locationService.getCurrentLocation(
-        silent: true,
-      );
-      if (position != null && mounted) {
-        setState(() {
-          _currentUserLat = position.latitude;
-          _currentUserLon = position.longitude;
-        });
-        debugPrint(
-          'LiveConnect: Using fresh real-time location: ${position.latitude}, ${position.longitude}',
+      // Check if we need to refresh location (cached for 90 seconds)
+      final now = DateTime.now();
+      final shouldRefreshLocation = forceRefreshLocation ||
+          _currentUserLat == null ||
+          _currentUserLon == null ||
+          _lastLocationRefresh == null ||
+          now.difference(_lastLocationRefresh!) > _locationCacheDuration;
+
+      if (shouldRefreshLocation && !_isRefreshingLocation) {
+        if (mounted) {
+          setState(() {
+            _isRefreshingLocation = true;
+          });
+        }
+        debugPrint('LiveConnect: Refreshing location (cache expired or forced)...');
+
+        final position = await _locationService.getCurrentLocation(
+          silent: true,
         );
+
+        if (position != null && mounted) {
+          setState(() {
+            _currentUserLat = position.latitude;
+            _currentUserLon = position.longitude;
+            _lastLocationRefresh = now;
+            _isRefreshingLocation = false;
+          });
+          debugPrint(
+            'LiveConnect: Location refreshed: ${position.latitude}, ${position.longitude}',
+          );
+        } else {
+          if (_currentUserLat == null || _currentUserLon == null) {
+            // Fall back to profile location only if we have no cached location
+            _currentUserLat = _userProfile?['latitude']?.toDouble();
+            _currentUserLon = _userProfile?['longitude']?.toDouble();
+            if (_currentUserLat != null && _currentUserLon != null) {
+              _lastLocationRefresh = now;
+            }
+            debugPrint(
+              'LiveConnect: Using profile location (real-time unavailable)',
+            );
+          }
+          if (mounted) {
+            setState(() {
+              _isRefreshingLocation = false;
+            });
+          }
+        }
       } else {
-        // Fall back to profile location if real-time location unavailable
-        _currentUserLat = _userProfile?['latitude']?.toDouble();
-        _currentUserLon = _userProfile?['longitude']?.toDouble();
         debugPrint(
-          'LiveConnect: Using profile location (real-time unavailable)',
+          'LiveConnect: Using cached location (${_lastLocationRefresh != null ? now.difference(_lastLocationRefresh!).inSeconds : 0}s old)',
         );
       }
 
@@ -3060,11 +3097,17 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                         ),
                         const SizedBox(width: 12),
                         OutlinedButton.icon(
-                          onPressed: () async {
-                            await _loadNearbyPeople();
+                          onPressed: _isRefreshingLocation ? null : () async {
+                            await _loadNearbyPeople(forceRefreshLocation: true);
                           },
-                          icon: const Icon(Icons.refresh),
-                          label: const Text('Refresh'),
+                          icon: _isRefreshingLocation
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Icon(Icons.refresh),
+                          label: Text(_isRefreshingLocation ? 'Refreshing...' : 'Refresh'),
                           style: OutlinedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 20,
@@ -3166,11 +3209,17 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         OutlinedButton.icon(
-                          onPressed: () async {
-                            await _loadNearbyPeople();
+                          onPressed: _isRefreshingLocation ? null : () async {
+                            await _loadNearbyPeople(forceRefreshLocation: true);
                           },
-                          icon: const Icon(Icons.refresh),
-                          label: const Text('Refresh'),
+                          icon: _isRefreshingLocation
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Icon(Icons.refresh),
+                          label: Text(_isRefreshingLocation ? 'Refreshing...' : 'Refresh'),
                           style: OutlinedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 20,
@@ -3211,7 +3260,7 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
 
     return RefreshIndicator(
       onRefresh: () async {
-        await _loadNearbyPeople();
+        await _loadNearbyPeople(forceRefreshLocation: true);
       },
       color: Theme.of(context).primaryColor,
       child: ListView.builder(

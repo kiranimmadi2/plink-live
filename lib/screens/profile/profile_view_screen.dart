@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/post_model.dart';
 import '../../models/user_profile.dart';
 import '../../res/utils/photo_url_helper.dart';
@@ -568,34 +571,226 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
   void _showMoreOptions() {
     showModalBottomSheet(
       context: context,
+      backgroundColor: const Color(0xFF1C1C1E),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (context) => Container(
         padding: const EdgeInsets.symmetric(vertical: 20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            ListTile(
-              leading: const Icon(Icons.share),
-              title: const Text('Share Profile'),
-              onTap: () {
-                Navigator.pop(context);
-              },
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade600,
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
             ListTile(
-              leading: const Icon(Icons.report, color: Colors.red),
-              title: const Text('Report', style: TextStyle(color: Colors.red)),
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.share, color: Colors.blue),
+              ),
+              title: const Text('Share Profile', style: TextStyle(color: Colors.white)),
+              subtitle: Text(
+                'Share this profile with friends',
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 12),
+              ),
               onTap: () {
                 Navigator.pop(context);
+                _shareProfile();
               },
             ),
+            const SizedBox(height: 8),
             ListTile(
-              leading: const Icon(Icons.block, color: Colors.red),
-              title: const Text('Block', style: TextStyle(color: Colors.red)),
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.report, color: Colors.orange),
+              ),
+              title: const Text('Report User', style: TextStyle(color: Colors.orange)),
+              subtitle: Text(
+                'Report inappropriate behavior',
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 12),
+              ),
               onTap: () {
                 Navigator.pop(context);
+                _reportUser();
               },
             ),
+            const SizedBox(height: 8),
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.red.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.block, color: Colors.red),
+              ),
+              title: const Text('Block User', style: TextStyle(color: Colors.red)),
+              subtitle: Text(
+                'Stop all communication',
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 12),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                _blockUser();
+              },
+            ),
+            const SizedBox(height: 16),
           ],
         ),
+      ),
+    );
+  }
+
+  void _shareProfile() {
+    final name = widget.userProfile.name;
+    final bio = widget.userProfile.bio ?? '';
+    final location = widget.userProfile.location ?? '';
+
+    String shareText = 'Check out $name on Supper!\n';
+    if (bio.isNotEmpty) shareText += '\n$bio\n';
+    if (location.isNotEmpty) shareText += '\nLocation: $location\n';
+    shareText += '\nDownload Supper to connect: https://supper.app';
+
+    Share.share(shareText, subject: 'Check out $name on Supper!');
+  }
+
+  void _reportUser() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1C1C1E),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Report User', style: TextStyle(color: Colors.white)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Why are you reporting ${widget.userProfile.name}?',
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.8)),
+            ),
+            const SizedBox(height: 16),
+            _buildReportOption('Inappropriate content'),
+            _buildReportOption('Spam or scam'),
+            _buildReportOption('Harassment'),
+            _buildReportOption('Fake profile'),
+            _buildReportOption('Other'),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReportOption(String reason) {
+    return ListTile(
+      title: Text(reason, style: TextStyle(color: Colors.white.withValues(alpha: 0.9))),
+      dense: true,
+      onTap: () async {
+        Navigator.pop(context);
+        try {
+          final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+          if (currentUserId == null) return;
+
+          await FirebaseFirestore.instance.collection('reports').add({
+            'reporterId': currentUserId,
+            'reportedUserId': widget.userProfile.uid,
+            'reportedUserName': widget.userProfile.name,
+            'reason': reason,
+            'timestamp': FieldValue.serverTimestamp(),
+            'status': 'pending',
+          });
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Report submitted. Thank you for keeping Supper safe.'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          }
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Failed to submit report: $e'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        }
+      },
+    );
+  }
+
+  void _blockUser() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1C1C1E),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Block User', style: TextStyle(color: Colors.white)),
+        content: Text(
+          'Are you sure you want to block ${widget.userProfile.name}? They won\'t be able to message you or see your profile.',
+          style: TextStyle(color: Colors.white.withValues(alpha: 0.8)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              try {
+                final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+                if (currentUserId == null) return;
+
+                await FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(currentUserId)
+                    .collection('blocked')
+                    .doc(widget.userProfile.uid)
+                    .set({
+                  'name': widget.userProfile.name,
+                  'blockedAt': FieldValue.serverTimestamp(),
+                });
+
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('${widget.userProfile.name} has been blocked.'),
+                      backgroundColor: Colors.orange,
+                    ),
+                  );
+                  Navigator.pop(context); // Go back from profile view
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Failed to block user: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text('Block', style: TextStyle(color: Colors.red)),
+          ),
+        ],
       ),
     );
   }

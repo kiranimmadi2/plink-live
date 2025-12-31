@@ -119,12 +119,6 @@ class _BusinessHomeTabState extends State<BusinessHomeTab> {
 
                       // Analytics Preview
                       _buildAnalyticsPreview(isDarkMode),
-                      const SizedBox(height: 24),
-
-                      // Recent Inquiries Preview
-                      _buildSectionTitle('Recent Inquiries', isDarkMode),
-                      const SizedBox(height: 12),
-                      _buildRecentInquiriesPreview(isDarkMode),
 
                       const SizedBox(height: 100),
                     ],
@@ -435,57 +429,6 @@ class _BusinessHomeTabState extends State<BusinessHomeTab> {
               color: Colors.white54,
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRecentInquiriesPreview(bool isDarkMode) {
-    return GlassmorphicCard(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        children: [
-          if (widget.business.totalOrders == 0)
-            Column(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.05),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: const Icon(
-                    Icons.inbox_outlined,
-                    size: 40,
-                    color: Colors.white24,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'No inquiries yet',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white70,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                const Text(
-                  'Customer inquiries will appear here',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.white38,
-                  ),
-                ),
-              ],
-            )
-          else
-            GlassmorphicButton(
-              icon: Icons.arrow_forward,
-              label: 'View All Inquiries',
-              onTap: () => _navigateToInquiries('All'),
-            ),
         ],
       ),
     );

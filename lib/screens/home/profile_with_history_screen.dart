@@ -15,6 +15,7 @@ import '../login/choose_account_type_screen.dart';
 import '../profile/profile_view_screen.dart';
 import '../profile/settings_screen.dart';
 import '../profile/profile_edit_screen.dart';
+import '../profile/saved_posts_screen.dart';
 import '../chat/enhanced_chat_screen.dart';
 import '../../models/user_profile.dart';
 

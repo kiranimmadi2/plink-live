@@ -16,7 +16,11 @@ import '../login/change_password_screen.dart';
 import '../location/location_settings_screen.dart';
 import 'terms_of_service_screen.dart';
 import 'privacy_policy_screen.dart';
+import 'safety_tips_screen.dart';
+import 'help_center_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:share_plus/share_plus.dart';
+import '../../widgets/coming_soon_widget.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -390,6 +394,122 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
               const SizedBox(height: 24),
 
+              // Coming Soon Section
+              _buildSectionHeader(
+                icon: CupertinoIcons.sparkles,
+                title: 'Coming Soon',
+                color: AppColors.iosPink,
+                isDark: isDark,
+              ),
+              const SizedBox(height: 12),
+              _buildSettingsCard(
+                isDark: isDark,
+                isGlass: isGlass,
+                children: [
+                  ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Colors.amber.withValues(alpha: 0.3), Colors.orange.withValues(alpha: 0.3)],
+                        ),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(Icons.workspace_premium, color: Colors.amber, size: 20),
+                    ),
+                    title: const Text('Premium'),
+                    subtitle: const Text('Unlock exclusive features'),
+                    trailing: _buildComingSoonBadge(),
+                    onTap: () {
+                      showComingSoonDialog(
+                        context,
+                        featureName: 'Premium Subscription',
+                        description: 'Unlock unlimited matches, priority visibility, advanced filters, and ad-free experience.',
+                        icon: Icons.workspace_premium,
+                        color: Colors.amber,
+                      );
+                    },
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Colors.purple.withValues(alpha: 0.3), Colors.pink.withValues(alpha: 0.3)],
+                        ),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(Icons.event, color: Colors.purple, size: 20),
+                    ),
+                    title: const Text('Events'),
+                    subtitle: const Text('Discover local events'),
+                    trailing: _buildComingSoonBadge(),
+                    onTap: () {
+                      showComingSoonDialog(
+                        context,
+                        featureName: 'Events',
+                        description: 'Create and discover local events, meetups, and gatherings in your area.',
+                        icon: Icons.event,
+                        color: Colors.purple,
+                      );
+                    },
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Colors.blue.withValues(alpha: 0.3), Colors.cyan.withValues(alpha: 0.3)],
+                        ),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(Icons.groups, color: Colors.blue, size: 20),
+                    ),
+                    title: const Text('Groups'),
+                    subtitle: const Text('Join interest-based groups'),
+                    trailing: _buildComingSoonBadge(),
+                    onTap: () {
+                      showComingSoonDialog(
+                        context,
+                        featureName: 'Groups',
+                        description: 'Create and join interest-based groups to connect with like-minded people.',
+                        icon: Icons.groups,
+                        color: Colors.blue,
+                      );
+                    },
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Colors.green.withValues(alpha: 0.3), Colors.teal.withValues(alpha: 0.3)],
+                        ),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(Icons.auto_stories, color: Colors.green, size: 20),
+                    ),
+                    title: const Text('Stories'),
+                    subtitle: const Text('Share your moments'),
+                    trailing: _buildComingSoonBadge(),
+                    onTap: () {
+                      showComingSoonDialog(
+                        context,
+                        featureName: 'Stories',
+                        description: 'Share photos and videos that disappear after 24 hours with your connections.',
+                        icon: Icons.auto_stories,
+                        color: Colors.green,
+                      );
+                    },
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 24),
+
               // Support Section
               _buildSectionHeader(
                 icon: CupertinoIcons.question_circle_fill,
@@ -408,7 +528,37 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     subtitle: const Text('Get help and support'),
                     trailing: const Icon(CupertinoIcons.chevron_forward),
                     onTap: () {
-                      // TODO: Help center
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const HelpCenterScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: const Icon(Icons.shield_outlined),
+                    title: const Text('Safety Tips'),
+                    subtitle: const Text('Stay safe while connecting'),
+                    trailing: const Icon(CupertinoIcons.chevron_forward),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const SafetyTipsScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: const Icon(Icons.person_add_outlined),
+                    title: const Text('Invite Friends'),
+                    subtitle: const Text('Share Supper with friends'),
+                    trailing: const Icon(CupertinoIcons.chevron_forward),
+                    onTap: () {
+                      _shareApp();
                     },
                   ),
                   const Divider(height: 1),
@@ -418,7 +568,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     subtitle: const Text('Version 1.0.0'),
                     trailing: const Icon(CupertinoIcons.chevron_forward),
                     onTap: () {
-                      // TODO: About page
+                      _showAboutDialog(context);
                     },
                   ),
                   const Divider(height: 1),
@@ -1269,6 +1419,116 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ],
           );
         },
+      ),
+    );
+  }
+
+  // Coming Soon badge widget
+  Widget _buildComingSoonBadge() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Colors.purple.withValues(alpha: 0.8), Colors.blue.withValues(alpha: 0.8)],
+        ),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: const Text(
+        'SOON',
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
+  // Share app function
+  void _shareApp() {
+    Share.share(
+      'Check out Supper - the AI-powered matching app that connects you with the right people! Download now: https://supper.app',
+      subject: 'Join me on Supper!',
+    );
+  }
+
+  // About dialog
+  void _showAboutDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1C1C1E),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              width: 50,
+              height: 50,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Colors.purple.withValues(alpha: 0.6), Colors.blue.withValues(alpha: 0.6)],
+                ),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.restaurant, color: Colors.white, size: 28),
+            ),
+            const SizedBox(width: 12),
+            const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Supper',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 20,
+                  ),
+                ),
+                Text(
+                  'Version 1.0.0',
+                  style: TextStyle(
+                    color: Colors.grey,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Supper is an AI-powered matching app that connects people for various purposes - marketplace, dating, friendship, jobs, and more.',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.8),
+                fontSize: 14,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Icon(Icons.copyright, size: 16, color: Colors.white.withValues(alpha: 0.5)),
+                const SizedBox(width: 8),
+                Text(
+                  '2024 Supper Inc. All rights reserved.',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.5),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close', style: TextStyle(color: Colors.blue)),
+          ),
+        ],
       ),
     );
   }
