@@ -149,6 +149,50 @@ class ConversationModel {
     return isTyping[userId] ?? false;
   }
 
+  // Business chat helper getters
+  bool get isBusinessChat => metadata?['isBusinessChat'] == true;
+
+  String? get businessId => metadata?['businessId'] as String?;
+
+  String? get businessName => metadata?['businessName'] as String?;
+
+  String? get businessLogo => metadata?['businessLogo'] as String?;
+
+  String? get businessSenderId => metadata?['businessSenderId'] as String?;
+
+  // Get display name with business indicator
+  String getDisplayNameWithBusiness(String currentUserId) {
+    if (isGroup) {
+      return groupName ?? 'Group Chat';
+    }
+
+    final otherUserId = getOtherParticipantId(currentUserId);
+    final name = participantNames[otherUserId] ?? 'Unknown User';
+
+    // If the other participant is a business, show business name
+    if (isBusinessChat && businessSenderId == otherUserId) {
+      return businessName ?? name;
+    }
+
+    return name;
+  }
+
+  // Get photo with business logo fallback
+  String? getDisplayPhotoWithBusiness(String currentUserId) {
+    if (isGroup) {
+      return groupPhoto;
+    }
+
+    final otherUserId = getOtherParticipantId(currentUserId);
+
+    // If the other participant is a business, show business logo
+    if (isBusinessChat && businessSenderId == otherUserId && businessLogo != null) {
+      return businessLogo;
+    }
+
+    return participantPhotos[otherUserId];
+  }
+
   ConversationModel copyWith({
     String? id,
     List<String>? participantIds,

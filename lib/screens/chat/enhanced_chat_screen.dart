@@ -22,6 +22,7 @@ import '../../res/config/app_text_styles.dart';
 import '../../res/config/app_assets.dart';
 import '../../widgets/other widgets/glass_text_field.dart';
 import '../../models/user_profile.dart';
+import '../../models/business_model.dart';
 import '../../res/utils/photo_url_helper.dart';
 import '../../models/message_model.dart';
 import '../../services/notification_service.dart';
@@ -35,12 +36,16 @@ class EnhancedChatScreen extends ConsumerStatefulWidget {
   final UserProfile otherUser;
   final String? initialMessage;
   final String? chatId; // Optional chatId from Live Connect
+  final bool isBusinessChat; // Whether this is a business conversation
+  final BusinessModel? business; // Business info if it's a business chat
 
   const EnhancedChatScreen({
     super.key,
     required this.otherUser,
     this.initialMessage,
     this.chatId, // Accept chatId from Live Connect
+    this.isBusinessChat = false,
+    this.business,
   });
 
   @override
@@ -501,14 +506,57 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        widget.otherUser.name.isNotEmpty
-                            ? widget.otherUser.name
-                            : 'Unknown User',
-                        style: AppTextStyles.bodyLarge.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: isDarkMode ? Colors.white : Colors.black,
-                        ),
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              widget.otherUser.name.isNotEmpty
+                                  ? widget.otherUser.name
+                                  : 'Unknown User',
+                              style: AppTextStyles.bodyLarge.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: isDarkMode ? Colors.white : Colors.black,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          // Business badge indicator
+                          if (widget.isBusinessChat) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF00D67D).withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: const Color(0xFF00D67D).withValues(alpha: 0.5),
+                                ),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.verified,
+                                    color: Color(0xFF00D67D),
+                                    size: 10,
+                                  ),
+                                  SizedBox(width: 2),
+                                  Text(
+                                    'Business',
+                                    style: TextStyle(
+                                      color: Color(0xFF00D67D),
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                       StreamBuilder<DocumentSnapshot>(
                         stream: _conversationId != null
