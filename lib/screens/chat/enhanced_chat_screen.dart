@@ -17,7 +17,6 @@ import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_sound/flutter_sound.dart';
-import 'package:intl/intl.dart';
 import '../../res/config/app_colors.dart';
 import '../../res/config/app_text_styles.dart';
 import '../../res/config/app_assets.dart';
@@ -96,11 +95,6 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
   // Single stream for user status (avoid duplicate queries)
   Stream<DocumentSnapshot>? _userStatusStream;
 
-  // Chat theme - gradient colors for sent message bubbles
-  String _currentTheme = 'default';
-  static const Map<String, List<Color>> chatThemes =
-      AppColors.chatThemeGradients;
-
   // Voice recording variables
   final FlutterSoundRecorder _audioRecorder = FlutterSoundRecorder();
   bool _isRecording = false;
@@ -116,7 +110,6 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
   bool _isPlaying = false;
   double _playbackProgress = 0.0;
   StreamSubscription? _playerSubscription;
-
 
   @override
   void initState() {
@@ -280,56 +273,11 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
         setState(() {
           _conversationId = conversationId;
         });
-
-        // Load chat theme in background (don't await)
-        _loadChatTheme();
       }
     } catch (e) {
       debugPrint('Error initializing conversation: $e');
       if (mounted) {
         SnackBarHelper.showError(context, 'Error loading conversation: $e');
-      }
-    }
-  }
-
-  Future<void> _loadChatTheme() async {
-    if (_conversationId == null) return;
-
-    try {
-      final doc = await _firestore
-          .collection('conversations')
-          .doc(_conversationId!)
-          .get();
-
-      if (doc.exists && mounted) {
-        final data = doc.data();
-        final theme = data?['chatTheme'] as String?;
-        if (theme != null && chatThemes.containsKey(theme)) {
-          setState(() {
-            _currentTheme = theme;
-          });
-        }
-      }
-    } catch (e) {
-      debugPrint('Error loading chat theme: $e');
-    }
-  }
-
-  Future<void> _saveChatTheme(String theme) async {
-    if (_conversationId == null || !mounted) return;
-
-    try {
-      await _firestore.collection('conversations').doc(_conversationId!).update(
-        {'chatTheme': theme},
-      );
-
-      setState(() {
-        _currentTheme = theme;
-      });
-    } catch (e) {
-      debugPrint('Error saving chat theme: $e');
-      if (mounted) {
-        SnackBarHelper.showError(context, 'Failed to save theme');
       }
     }
   }
@@ -738,12 +686,14 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
             text: data['text'] as String?,
             mediaUrl:
                 data['mediaUrl'] as String? ?? data['imageUrl'] as String?,
+            audioUrl: data['audioUrl'] as String?,
+            audioDuration: data['audioDuration'] as int?,
             timestamp: data['timestamp'] != null
                 ? (data['timestamp'] as Timestamp).toDate()
                 : DateTime.now(),
             status: _parseMessageStatusFromInt(
               data['status'],
-              isRead: data['isRead'] == true,
+              isRead: data['read'] == true || data['isRead'] == true,
             ),
             type: _parseMessageType(data['type']),
             replyToMessageId: data['replyToMessageId'] as String?,
@@ -778,12 +728,14 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
                 text: data['text'] as String?,
                 mediaUrl:
                     data['mediaUrl'] as String? ?? data['imageUrl'] as String?,
+                audioUrl: data['audioUrl'] as String?,
+                audioDuration: data['audioDuration'] as int?,
                 timestamp: data['timestamp'] != null
                     ? (data['timestamp'] as Timestamp).toDate()
                     : DateTime.now(),
                 status: _parseMessageStatusFromInt(
                   data['status'],
-                  isRead: data['isRead'] == true,
+                  isRead: data['read'] == true || data['isRead'] == true,
                 ),
                 type: _parseMessageType(data['type']),
                 replyToMessageId: data['replyToMessageId'] as String?,
@@ -857,37 +809,53 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
 
   // Helper to parse message status from int, string, or isRead field
   MessageStatus _parseMessageStatusFromInt(dynamic status, {bool? isRead}) {
+    debugPrint('📩 Parsing status: $status (type: ${status.runtimeType}), isRead: $isRead');
+
     // If isRead is explicitly true, return read status
     if (isRead == true) {
+      debugPrint('📩 Status: READ (from isRead flag)');
       return MessageStatus.read;
     }
 
-    if (status == null) return MessageStatus.sent;
+    if (status == null) {
+      debugPrint('📩 Status: SENT (null status)');
+      return MessageStatus.sent;
+    }
 
     // Handle int status
     if (status is int) {
-      return MessageStatus.values[status.clamp(
-        0,
-        MessageStatus.values.length - 1,
-      )];
+      final result = MessageStatus.values[status.clamp(0, MessageStatus.values.length - 1)];
+      debugPrint('📩 Status: $result (from int $status)');
+      return result;
     }
 
     // Handle string status
     if (status is String) {
+      MessageStatus result;
       switch (status.toLowerCase()) {
         case 'sending':
-          return MessageStatus.sending;
+          result = MessageStatus.sending;
+          break;
         case 'sent':
-          return MessageStatus.sent;
+          result = MessageStatus.sent;
+          break;
         case 'delivered':
-          return MessageStatus.delivered;
+          result = MessageStatus.delivered;
+          break;
         case 'read':
-          return MessageStatus.read;
+          result = MessageStatus.read;
+          break;
         case 'failed':
-          return MessageStatus.failed;
+          result = MessageStatus.failed;
+          break;
+        default:
+          result = MessageStatus.sent;
       }
+      debugPrint('📩 Status: $result (from string "$status")');
+      return result;
     }
 
+    debugPrint('📩 Status: SENT (default fallback)');
     return MessageStatus.sent;
   }
 
@@ -1126,13 +1094,13 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
                         color: Colors.white.withValues(alpha: 0.7),
                         width: 2,
                       ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.15),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
+                      // boxShadow: [
+                      //   BoxShadow(
+                      //     color: Colors.black.withValues(alpha: 0.15),
+                      //     blurRadius: 8,
+                      //     offset: const Offset(0, 2),
+                      //   ),
+                      // ],
                     ),
                     child: CircleAvatar(
                       radius: 16,
@@ -1195,47 +1163,27 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
                                   : 12,
                             ),
                             decoration: BoxDecoration(
-                              gradient: isMe
-                                  ? LinearGradient(
+                              gradient:
+                                  isMe && message.type != MessageType.audio
+                                  ? const LinearGradient(
                                       colors: [
-                                        Colors.blue.withValues(alpha: 0.6),
-                                        Colors.purple.withValues(alpha: 0.4),
+                                        Color(0xFF5856D6),
+                                        Color(0xFF007AFF),
                                       ],
                                       begin: Alignment.topLeft,
                                       end: Alignment.bottomRight,
                                     )
-                                  : LinearGradient(
-                                      colors: [
-                                        Colors.white.withValues(alpha: 0.25),
-                                        Colors.white.withValues(alpha: 0.15),
-                                      ],
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                    ),
-                              border: Border.all(
-                                color: isMe
-                                    ? Colors.blue.withValues(alpha: 0.4)
-                                    : Colors.white.withValues(alpha: 0.3),
-                                width: 1.5,
-                              ),
+                                  : null,
+
                               borderRadius: BorderRadius.only(
-                                topLeft: const Radius.circular(20),
-                                topRight: const Radius.circular(20),
-                                bottomLeft: Radius.circular(isMe ? 20 : 4),
-                                bottomRight: Radius.circular(isMe ? 4 : 20),
+                                topLeft: const Radius.circular(18),
+                                topRight: const Radius.circular(18),
+                                bottomLeft: Radius.circular(isMe ? 18 : 4),
+                                bottomRight: Radius.circular(isMe ? 4 : 18),
                               ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: isMe
-                                      ? Colors.blue.withValues(alpha: 0.3)
-                                      : Colors.black.withValues(alpha: 0.2),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
                             ),
                             child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                              crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                               children: [
                                 if (message.type == MessageType.image &&
                                     message.mediaUrl != null)
@@ -1330,6 +1278,8 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
                                             ),
                                           ),
                                   ),
+                                // Time and status row (skip for audio - it has its own)
+                                if (message.type != MessageType.audio)
                                 Padding(
                                   padding: message.type == MessageType.image
                                       ? const EdgeInsets.only(
@@ -1357,26 +1307,22 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
                                           ),
                                         ),
                                       ],
+                                      // Time
                                       Text(
-                                        formattedTime,
+                                        _formatMessageTime(message.timestamp),
                                         style: TextStyle(
                                           color: isMe
-                                              ? Colors.white.withValues(
-                                                  alpha: 0.65,
-                                                )
+                                              ? Colors.white.withValues(alpha: 0.55)
                                               : (isDarkMode
                                                     ? Colors.grey[500]
                                                     : Colors.grey[600]),
                                           fontSize: 11,
-                                          fontWeight: FontWeight.w400,
                                         ),
                                       ),
+                                      // Status tick (only for my messages)
                                       if (isMe) ...[
                                         const SizedBox(width: 4),
-                                        _buildMessageStatusIcon(
-                                          message.status,
-                                          isMe,
-                                        ),
+                                        _buildMessageStatusIcon(message.status, isMe),
                                       ],
                                     ],
                                   ),
@@ -1438,6 +1384,7 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
   // Build message status icon with premium visuals
   // Single tick = sent, Double tick grey = delivered, Double tick blue = read
   Widget _buildMessageStatusIcon(MessageStatus status, bool isMe) {
+    debugPrint('🔵 Building status icon: $status, isMe: $isMe');
     switch (status) {
       case MessageStatus.sending:
         return SizedBox(
@@ -1813,36 +1760,36 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
       mainAxisSize: MainAxisSize.min,
       children: [
         // Input Area - Premium iMessage style
-          Container(
-            padding: EdgeInsets.only(
-              left: 8,
-              right: 8,
-              top: 8,
-              bottom: _showEmojiPicker
-                  ? 8
-                  : MediaQuery.of(context).padding.bottom + 8,
-            ),
-            decoration: const BoxDecoration(color: Colors.transparent),
-            child: SafeArea(
-              top: false,
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  // Camera/Gallery button - iOS style
-                  GestureDetector(
-                    onTap: _showCameraGalleryOptions,
-                    child: Container(
-                      height: 48,
-                      width: 48,
-                      margin: const EdgeInsets.only(bottom: 0, right: 8),
-                      alignment: Alignment.center,
-                      child: Icon(
-                        Icons.add_circle,
-                        color: Colors.white.withValues(alpha: 0.8),
-                        size: 40,
-                      ),
+        Container(
+          padding: EdgeInsets.only(
+            left: 8,
+            right: 8,
+            top: 8,
+            bottom: _showEmojiPicker
+                ? 8
+                : MediaQuery.of(context).padding.bottom + 8,
+          ),
+          decoration: const BoxDecoration(color: Colors.transparent),
+          child: SafeArea(
+            top: false,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                // Camera/Gallery button - iOS style
+                GestureDetector(
+                  onTap: _showCameraGalleryOptions,
+                  child: Container(
+                    height: 48,
+                    width: 48,
+                    margin: const EdgeInsets.only(bottom: 0, right: 8),
+                    alignment: Alignment.center,
+                    child: Icon(
+                      Icons.add_circle,
+                      color: Colors.white.withValues(alpha: 0.8),
+                      size: 40,
                     ),
                   ),
+                ),
                 // Message input field - Premium rounded design
                 Expanded(
                   child: Container(
@@ -1936,39 +1883,23 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
                       ? GestureDetector(
                           key: const ValueKey('send'),
                           onTap: _sendMessage,
-                          child: Builder(
-                            builder: (context) {
-                              final themeColors =
-                                  chatThemes[_currentTheme] ??
-                                  chatThemes['default']!;
-                              return Container(
-                                height: 36,
-                                width: 36,
-                                margin: const EdgeInsets.only(bottom: 2),
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: themeColors,
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                  ),
-                                  shape: BoxShape.circle,
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: themeColors[0].withValues(
-                                        alpha: 0.4,
-                                      ),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ],
-                                ),
-                                child: const Icon(
-                                  Icons.arrow_upward_rounded,
-                                  color: Colors.white,
-                                  size: 20,
-                                ),
-                              );
-                            },
+                          child: Container(
+                            height: 36,
+                            width: 36,
+                            margin: const EdgeInsets.only(bottom: 2),
+                            decoration: const BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [Color(0xFF5856D6), Color(0xFF007AFF)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.arrow_upward_rounded,
+                              color: Colors.white,
+                              size: 20,
+                            ),
                           ),
                         )
                       : GestureDetector(
@@ -1986,51 +1917,59 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 200),
                             height: 42,
-                            width: _isRecording ? 80 : 42,
+                            width: _isRecording ? 90 : 42,
                             margin: const EdgeInsets.only(bottom: 2),
                             decoration: BoxDecoration(
                               color: _isRecording
                                   ? Colors.red
                                   : Colors.transparent,
-                              borderRadius: BorderRadius.circular(_isRecording ? 21 : 21),
+                              borderRadius: BorderRadius.circular(21),
                               boxShadow: _isRecording
                                   ? [
                                       BoxShadow(
-                                        color: Colors.red.withValues(alpha: 0.4),
+                                        color: Colors.red.withValues(
+                                          alpha: 0.4,
+                                        ),
                                         blurRadius: 8,
                                         spreadRadius: 1,
                                       ),
                                     ]
                                   : null,
                             ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (_isRecording) ...[
-                                  // Recording timer
-                                  Text(
-                                    _formatRecordingTime(_recordingDuration),
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
+                            child: Center(
+                              child: _isRecording
+                                  ? Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        // Recording timer
+                                        Text(
+                                          _formatRecordingTime(
+                                            _recordingDuration,
+                                          ),
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 1),
+                                        // Stop icon
+                                        const Icon(
+                                          Icons.stop_rounded,
+                                          color: Colors.white,
+                                          size: 16,
+                                        ),
+                                      ],
+                                    )
+                                  : Icon(
+                                      Icons.mic_rounded,
+                                      color: Colors.white.withValues(
+                                        alpha: 0.8,
+                                      ),
+                                      size: 28,
                                     ),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  // Stop icon
-                                  const Icon(
-                                    Icons.stop_rounded,
-                                    color: Colors.white,
-                                    size: 20,
-                                  ),
-                                ] else
-                                  Icon(
-                                    Icons.mic_rounded,
-                                    color: Colors.white.withValues(alpha: 0.8),
-                                    size: 28,
-                                  ),
-                              ],
                             ),
                           ),
                         ),
@@ -2599,7 +2538,8 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
             'mediaUrl': originalMessage.mediaUrl,
             'type': originalMessage.type.index,
             'timestamp': FieldValue.serverTimestamp(),
-            'status': 'delivered',
+            'status': MessageStatus.delivered.index, // Double grey tick
+            'read': false,
             'isRead': false,
             'isForwarded': true, // Mark as forwarded
           });
@@ -3090,6 +3030,7 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
             'status': MessageStatus.delivered.index,
             'timestamp': FieldValue.serverTimestamp(),
             'isEdited': false,
+            'read': false,
             'isRead': false,
           });
 
@@ -3210,12 +3151,13 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
         onInitializePlayer: () async {
           if (!_isPlayerInitialized) {
             await _audioPlayer.openPlayer();
+            await _audioPlayer.setSubscriptionDuration(const Duration(milliseconds: 100));
             _isPlayerInitialized = true;
           }
         },
         onSend: () async {
           Navigator.pop(context);
-          await _sendVoiceMessage(path);
+          await _sendVoiceMessage(path, duration);
         },
         onCancel: () {
           Navigator.pop(context);
@@ -3233,7 +3175,7 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
     return '${minutes.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
   }
 
-  Future<void> _sendVoiceMessage(String filePath) async {
+  Future<void> _sendVoiceMessage(String filePath, int audioDuration) async {
     if (_conversationId == null || _currentUserId == null) return;
 
     try {
@@ -3245,8 +3187,43 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
         return;
       }
 
-      // Upload to Firebase Storage
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      // Create message document reference first for immediate UI feedback
+      final messageRef = _firestore
+          .collection('conversations')
+          .doc(_conversationId!)
+          .collection('messages')
+          .doc();
+
+      final now = DateTime.now();
+      final timestamp = now.millisecondsSinceEpoch;
+
+      // Create placeholder message with "sending" status immediately
+      final placeholderData = {
+        'id': messageRef.id,
+        'senderId': _currentUserId,
+        'receiverId': widget.otherUser.uid,
+        'text': '',
+        'audioUrl': '', // Will be updated after upload
+        'audioDuration': audioDuration,
+        'type': MessageType.audio.index,
+        'status': MessageStatus.sending.index,
+        'timestamp': Timestamp.fromDate(now),
+        'read': false,
+      };
+
+      // Set placeholder immediately for instant UI feedback
+      await messageRef.set(placeholderData);
+
+      // Scroll to bottom immediately
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          0,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+
+      // Upload to Firebase Storage in background
       final fileName = 'voice_${_currentUserId}_$timestamp.aac';
       final storageRef = _storage
           .ref()
@@ -3262,58 +3239,35 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
       final snapshot = await uploadTask;
       final audioUrl = await snapshot.ref.getDownloadURL();
 
-      // Create message document
-      final messageRef = _firestore
-          .collection('conversations')
-          .doc(_conversationId!)
-          .collection('messages')
-          .doc();
-
-      final messageData = {
-        'id': messageRef.id,
-        'senderId': _currentUserId,
-        'receiverId': widget.otherUser.uid,
-        'text': '',
+      // Update message with actual audio URL and delivered status
+      await messageRef.update({
         'audioUrl': audioUrl,
-        'audioDuration': _recordingDuration,
-        'type': MessageType.audio.index,
-        'status': MessageStatus.sent.index,
+        'status': MessageStatus.delivered.index, // Double grey tick - delivered to server
         'timestamp': FieldValue.serverTimestamp(),
-        'read': false,
-      };
-
-      await messageRef.set(messageData);
-
-      // Update conversation metadata
-      await _firestore.collection('conversations').doc(_conversationId!).update({
-        'lastMessage': '🎤 Voice message',
-        'lastMessageTime': FieldValue.serverTimestamp(),
-        'lastMessageSenderId': _currentUserId,
       });
 
-      // Send notification to receiver
-      await NotificationService().sendNotificationToUser(
-        userId: widget.otherUser.uid,
-        title: 'New Voice Message',
-        body: 'You received a voice message',
-        type: 'message',
-        data: {'conversationId': _conversationId},
-      );
+      // Run these in parallel for faster completion
+      await Future.wait([
+        // Update conversation metadata
+        _firestore.collection('conversations').doc(_conversationId!).update({
+          'lastMessage': '🎤 Voice message',
+          'lastMessageTime': FieldValue.serverTimestamp(),
+          'lastMessageSenderId': _currentUserId,
+        }),
+        // Send notification to receiver
+        NotificationService().sendNotificationToUser(
+          userId: widget.otherUser.uid,
+          title: 'New Voice Message',
+          body: 'You received a voice message',
+          type: 'message',
+          data: {'conversationId': _conversationId},
+        ),
+        // Delete local file
+        file.delete(),
+      ]);
 
       // Reset recording duration
       _recordingDuration = 0;
-
-      // Delete local file
-      await file.delete();
-
-      // Scroll to bottom
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          0,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
     } catch (e) {
       debugPrint('Error sending voice message: $e');
       if (mounted) {
@@ -3345,20 +3299,24 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
         _isPlayerInitialized = true;
       }
 
-      setState(() {
-        _currentlyPlayingMessageId = messageId;
-        _isPlaying = true;
-        _playbackProgress = 0.0;
-      });
+      // Set fast subscription for smooth waveform animation
+      await _audioPlayer.setSubscriptionDuration(const Duration(milliseconds: 50));
 
-      // Subscribe to playback progress
+      // Subscribe to playback progress BEFORE starting
       _playerSubscription?.cancel();
       _playerSubscription = _audioPlayer.onProgress!.listen((e) {
         if (mounted && e.duration.inMilliseconds > 0) {
           setState(() {
-            _playbackProgress = e.position.inMilliseconds / e.duration.inMilliseconds;
+            _playbackProgress =
+                e.position.inMilliseconds / e.duration.inMilliseconds;
           });
         }
+      });
+
+      setState(() {
+        _currentlyPlayingMessageId = messageId;
+        _isPlaying = true;
+        _playbackProgress = 0.0;
       });
 
       await _audioPlayer.startPlayer(
@@ -3399,125 +3357,161 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
     }
   }
 
-  String _formatDuration(int seconds) {
-    final minutes = seconds ~/ 60;
-    final secs = seconds % 60;
-    return '${minutes.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
-  }
-
   Widget _buildAudioMessagePlayer(MessageModel message, bool isMe) {
-    final isCurrentlyPlaying = _currentlyPlayingMessageId == message.id && _isPlaying;
+    final isSending =
+        message.status == MessageStatus.sending ||
+        (message.audioUrl == null || message.audioUrl!.isEmpty);
+    final isCurrentlyPlaying =
+        _currentlyPlayingMessageId == message.id && _isPlaying;
+    final isThisMessage = _currentlyPlayingMessageId == message.id;
+    final progress = isThisMessage ? _playbackProgress : 0.0;
     final duration = message.audioDuration ?? 0;
-    final progress = _currentlyPlayingMessageId == message.id ? _playbackProgress : 0.0;
 
-    // Waveform bar heights pattern
+    // Format duration
+    String formatDuration(int seconds) {
+      final minutes = seconds ~/ 60;
+      final secs = seconds % 60;
+      return '${minutes.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
+    }
+
+    // Format time
+    final hour = message.timestamp.hour;
+    final minute = message.timestamp.minute.toString().padLeft(2, '0');
+    final period = hour >= 12 ? 'PM' : 'AM';
+    final hour12 = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
+    final timeString = '$hour12:$minute $period';
+
+    // Waveform bar heights pattern (same as popup)
     final heights = [8.0, 14.0, 10.0, 18.0, 12.0, 20.0, 14.0, 16.0, 10.0, 22.0,
                     18.0, 12.0, 20.0, 8.0, 16.0, 14.0, 18.0, 10.0, 14.0, 12.0];
 
-    // Format time for audio message
-    final formattedTime = DateFormat('h:mm a').format(message.timestamp);
-
-    // WhatsApp-style audio player with pill shape
+    // Audio player matching popup style
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: isMe
-            ? Colors.white.withValues(alpha: 0.15)
-            : Colors.grey.shade800,
+        color: Colors.white.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(30),
+        border: Border.all(color: Colors.white12, width: 1),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Play/Pause button
+          // Play/Pause button with gradient
           GestureDetector(
-            onTap: () => _playAudio(message.id, message.audioUrl!),
+            onTap: isSending
+                ? null
+                : () => _playAudio(message.id, message.audioUrl!),
             child: Container(
-              width: 42,
-              height: 42,
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
-                color: isMe ? Colors.white : Colors.green,
+                gradient: isSending
+                    ? null
+                    : const LinearGradient(
+                        colors: [Color(0xFF5856D6), Color(0xFF007AFF)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                color: isSending ? Colors.white.withValues(alpha: 0.2) : null,
                 shape: BoxShape.circle,
+                boxShadow: isSending
+                    ? null
+                    : [
+                        BoxShadow(
+                          color: const Color(0xFF5856D6).withValues(alpha: 0.4),
+                          blurRadius: 8,
+                          spreadRadius: 1,
+                        ),
+                      ],
               ),
-              child: Icon(
-                isCurrentlyPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                color: isMe ? const Color(0xFF007AFF) : Colors.white,
-                size: 26,
-              ),
+              child: isSending
+                  ? const Padding(
+                      padding: EdgeInsets.all(10),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : Icon(
+                      isCurrentlyPlaying
+                          ? Icons.pause_rounded
+                          : Icons.play_arrow_rounded,
+                      color: Colors.white,
+                      size: 28,
+                    ),
             ),
           ),
-          const SizedBox(width: 10),
-          // Waveform and duration
-          SizedBox(
-            width: 120,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Waveform visualization
-                SizedBox(
-                  height: 24,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: List.generate(20, (index) {
-                      final isActive = index / 20 <= progress;
-                      return Container(
-                        width: 3,
-                        height: heights[index],
-                        decoration: BoxDecoration(
-                          color: isMe
-                              ? (isActive ? Colors.white : Colors.white.withValues(alpha: 0.4))
-                              : (isActive ? Colors.green : Colors.grey.shade600),
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      );
-                    }),
+          const SizedBox(width: 12),
+          // Waveform and info
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Waveform
+              SizedBox(
+                width: 120,
+                height: 24,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: List.generate(20, (index) {
+                    final barProgress = index / 20;
+                    final isActive = barProgress <= progress;
+                    return AnimatedContainer(
+                      duration: const Duration(milliseconds: 100),
+                      width: 3,
+                      height: heights[index],
+                      decoration: BoxDecoration(
+                        color: isSending
+                            ? Colors.white.withValues(alpha: 0.3)
+                            : (isActive
+                                  ? const Color(0xFF5856D6)
+                                  : Colors.white24),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    );
+                  }),
+                ),
+              ),
+              const SizedBox(height: 4),
+              // Duration, time and status
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Duration
+                  Text(
+                    isSending ? 'Sending...' : formatDuration(duration),
+                    style: TextStyle(
+                      color: isSending
+                          ? Colors.white.withValues(alpha: 0.6)
+                          : Colors.white70,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                // Duration, time and status row
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Duration
-                    Text(
-                      _formatDuration(duration),
-                      style: TextStyle(
-                        color: isMe
-                            ? Colors.white.withValues(alpha: 0.7)
-                            : Colors.grey.shade400,
-                        fontSize: 11,
-                      ),
+                  const SizedBox(width: 8),
+                  // Time
+                  Text(
+                    timeString,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.5),
+                      fontSize: 10,
                     ),
-                    const SizedBox(width: 6),
-                    // Time
-                    Text(
-                      formattedTime,
-                      style: TextStyle(
-                        color: isMe
-                            ? Colors.white.withValues(alpha: 0.6)
-                            : Colors.grey.shade500,
-                        fontSize: 10,
-                      ),
-                    ),
-                    // Status tick (only for sent messages)
-                    if (isMe) ...[
-                      const SizedBox(width: 3),
-                      _buildMessageStatusIcon(message.status, isMe),
-                    ],
+                  ),
+                  // Status tick (only for sent messages by me, skip if sending - button has loader)
+                  if (isMe && !isSending) ...[
+                    const SizedBox(width: 4),
+                    _buildMessageStatusIcon(message.status, isMe),
                   ],
-                ),
-              ],
-            ),
+                ],
+              ),
+            ],
           ),
           const SizedBox(width: 8),
           // Mic icon
           Icon(
             Icons.mic,
-            color: isMe
-                ? Colors.white.withValues(alpha: 0.5)
-                : Colors.grey.shade500,
-            size: 18,
+            color: isSending ? Colors.orange : Colors.white38,
+            size: 20,
           ),
         ],
       ),
@@ -3580,13 +3574,8 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
             Navigator.pop(context);
             _toggleSearch();
           },
-          onThemeTap: () async {
+          onThemeTap: () {
             Navigator.pop(context);
-            // Wait for navigation to complete before showing theme selector
-            await Future.delayed(const Duration(milliseconds: 300));
-            if (mounted) {
-              _showThemeSelector();
-            }
           },
           onDeleteConversation: () {
             // Close info screen and show dialog on chat screen
@@ -3615,7 +3604,9 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
 
   void _scrollToMessageById(String messageId) {
     // Find the message in the list by ID
-    final targetMessage = _allMessages.where((m) => m.id == messageId).firstOrNull;
+    final targetMessage = _allMessages
+        .where((m) => m.id == messageId)
+        .firstOrNull;
     if (targetMessage != null) {
       _scrollToMessage(targetMessage);
     }
@@ -3806,126 +3797,6 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
     return RichText(text: TextSpan(children: spans));
   }
 
-  void _showThemeSelector() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-
-        return Container(
-          decoration: BoxDecoration(
-            color: isDarkMode ? AppColors.darkCard : Colors.white,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                margin: const EdgeInsets.only(top: 8),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: isDarkMode ? Colors.grey[700] : Colors.grey[300],
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text(
-                  'Chat Theme',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: isDarkMode ? Colors.white : Colors.black,
-                  ),
-                ),
-              ),
-              SizedBox(
-                height: 120,
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: chatThemes.length,
-                  itemBuilder: (context, index) {
-                    final themeName = chatThemes.keys.elementAt(index);
-                    final themeColors = chatThemes[themeName]!;
-                    final isSelected = themeName == _currentTheme;
-
-                    return GestureDetector(
-                      onTap: () {
-                        HapticFeedback.lightImpact();
-                        _saveChatTheme(themeName);
-                        Navigator.pop(context);
-                      },
-                      child: Container(
-                        width: 80,
-                        margin: const EdgeInsets.only(right: 12),
-                        child: Column(
-                          children: [
-                            Container(
-                              width: 60,
-                              height: 60,
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: themeColors,
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                ),
-                                shape: BoxShape.circle,
-                                border: isSelected
-                                    ? Border.all(color: Colors.white, width: 3)
-                                    : null,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: themeColors[0].withValues(
-                                      alpha: 0.4,
-                                    ),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ],
-                              ),
-                              child: isSelected
-                                  ? const Icon(
-                                      Icons.check,
-                                      color: Colors.white,
-                                      size: 28,
-                                    )
-                                  : null,
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              _capitalizeThemeName(themeName),
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: isSelected
-                                    ? FontWeight.w600
-                                    : FontWeight.normal,
-                                color: isDarkMode ? Colors.white : Colors.black,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(height: 24),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  String _capitalizeThemeName(String name) {
-    if (name.isEmpty) return name;
-    return name[0].toUpperCase() + name.substring(1);
-  }
-
   void _showDeleteConversationDialog() {
     showDialog(
       context: context,
@@ -4047,7 +3918,9 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
       }
 
       // Delete the conversation document
-      batch.delete(_firestore.collection('conversations').doc(_conversationId!));
+      batch.delete(
+        _firestore.collection('conversations').doc(_conversationId!),
+      );
 
       await batch.commit();
 
@@ -4337,9 +4210,8 @@ class _ChatInfoScreenState extends State<_ChatInfoScreen> {
                               : Switch(
                                   value: _isMuted,
                                   onChanged: _toggleMute,
-                                  activeTrackColor: AppColors.iosBlue.withValues(
-                                    alpha: 0.5,
-                                  ),
+                                  activeTrackColor: AppColors.iosBlue
+                                      .withValues(alpha: 0.5),
                                   activeThumbColor: AppColors.iosBlue,
                                 ),
                         ),
@@ -4562,14 +4434,17 @@ class _ChatInfoScreenState extends State<_ChatInfoScreen> {
           .collection('blocked_users')
           .doc(widget.otherUser.uid)
           .set({
-        'blockedUserId': widget.otherUser.uid,
-        'blockedUserName': widget.otherUser.name,
-        'blockedUserPhoto': widget.otherUser.profileImageUrl,
-        'blockedAt': FieldValue.serverTimestamp(),
-      });
+            'blockedUserId': widget.otherUser.uid,
+            'blockedUserName': widget.otherUser.name,
+            'blockedUserPhoto': widget.otherUser.profileImageUrl,
+            'blockedAt': FieldValue.serverTimestamp(),
+          });
 
       if (mounted) {
-        SnackBarHelper.showSuccess(context, '${widget.otherUser.name} has been blocked');
+        SnackBarHelper.showSuccess(
+          context,
+          '${widget.otherUser.name} has been blocked',
+        );
         // Go back to chat screen
         Navigator.pop(context); // Close info screen
       }
@@ -5205,7 +5080,8 @@ class _SharedMediaScreenState extends State<_SharedMediaScreen> {
 
       for (final doc in messagesSnapshot.docs) {
         final data = doc.data();
-        final mediaUrl = data['mediaUrl'] as String? ?? data['imageUrl'] as String?;
+        final mediaUrl =
+            data['mediaUrl'] as String? ?? data['imageUrl'] as String?;
         final text = data['text'] as String?;
         final type = data['type'] as int? ?? 0;
         final timestamp = data['timestamp'] as Timestamp?;
@@ -5250,10 +5126,7 @@ class _SharedMediaScreenState extends State<_SharedMediaScreen> {
 
         // Check for links in text
         if (text != null && text.isNotEmpty) {
-          final urlRegex = RegExp(
-            r'https?://[^\s]+',
-            caseSensitive: false,
-          );
+          final urlRegex = RegExp(r'https?://[^\s]+', caseSensitive: false);
           final matches = urlRegex.allMatches(text);
           for (final match in matches) {
             links.add({
@@ -5310,7 +5183,10 @@ class _SharedMediaScreenState extends State<_SharedMediaScreen> {
               children: [
                 // AppBar
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 8,
+                  ),
                   child: Row(
                     children: [
                       IconButton(
@@ -5436,7 +5312,11 @@ class _SharedMediaScreenState extends State<_SharedMediaScreen> {
       children: [
         // Photos section
         if (_mediaItems.isNotEmpty) ...[
-          _buildSectionHeader('Photos', _mediaItems.length, Icons.image_outlined),
+          _buildSectionHeader(
+            'Photos',
+            _mediaItems.length,
+            Icons.image_outlined,
+          ),
           const SizedBox(height: 12),
           _buildMediaGridCompact(),
           const SizedBox(height: 24),
@@ -5454,7 +5334,11 @@ class _SharedMediaScreenState extends State<_SharedMediaScreen> {
 
         // Files section
         if (_docItems.isNotEmpty) ...[
-          _buildSectionHeader('Files', _docItems.length, Icons.insert_drive_file_outlined),
+          _buildSectionHeader(
+            'Files',
+            _docItems.length,
+            Icons.insert_drive_file_outlined,
+          ),
           const SizedBox(height: 12),
           ..._docItems.take(3).map((item) => _buildDocItem(item)),
           if (_docItems.length > 3)
@@ -5486,10 +5370,7 @@ class _SharedMediaScreenState extends State<_SharedMediaScreen> {
           ),
           child: Text(
             '$count',
-            style: const TextStyle(
-              color: Colors.white60,
-              fontSize: 12,
-            ),
+            style: const TextStyle(color: Colors.white60, fontSize: 12),
           ),
         ),
       ],
@@ -5693,10 +5574,7 @@ class _SharedMediaScreenState extends State<_SharedMediaScreen> {
         ),
         title: Text(
           url,
-          style: const TextStyle(
-            color: Color(0xFF2563EB),
-            fontSize: 13,
-          ),
+          style: const TextStyle(color: Color(0xFF2563EB), fontSize: 13),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
@@ -6023,14 +5901,20 @@ class _SharedMediaScreenState extends State<_SharedMediaScreen> {
         // Fallback: copy to clipboard if can't launch
         await Clipboard.setData(ClipboardData(text: url));
         if (mounted) {
-          SnackBarHelper.showWarning(context, 'Could not open link. Copied to clipboard.');
+          SnackBarHelper.showWarning(
+            context,
+            'Could not open link. Copied to clipboard.',
+          );
         }
       }
     } catch (e) {
       // Error fallback: copy to clipboard
       await Clipboard.setData(ClipboardData(text: url));
       if (mounted) {
-        SnackBarHelper.showError(context, 'Failed to open link. Copied to clipboard.');
+        SnackBarHelper.showError(
+          context,
+          'Failed to open link. Copied to clipboard.',
+        );
       }
     }
   }
@@ -6044,7 +5928,9 @@ class _SharedMediaScreenState extends State<_SharedMediaScreen> {
           content: const Text('Document link copied to clipboard'),
           backgroundColor: const Color(0xFF2563EB),
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
         ),
       );
     }
@@ -6061,8 +5947,29 @@ class _SharedMediaScreenState extends State<_SharedMediaScreen> {
     final yesterday = today.subtract(const Duration(days: 1));
     final dateOnly = DateTime(date.year, date.month, date.day);
 
-    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const days = [
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday',
+    ];
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
 
     final dayName = days[date.weekday - 1];
     final monthName = months[date.month - 1];
@@ -6147,10 +6054,7 @@ class _FullScreenMediaViewerState extends State<_FullScreenMediaViewer> {
         ),
         title: Text(
           '${_currentIndex + 1} of ${widget.mediaItems.length}',
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 16,
-          ),
+          style: const TextStyle(color: Colors.white, fontSize: 16),
         ),
         centerTitle: true,
         actions: [
@@ -6196,10 +6100,7 @@ class _FullScreenMediaViewerState extends State<_FullScreenMediaViewer> {
                   const SizedBox(height: 16),
                   const Text(
                     'Video playback coming soon',
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 16,
-                    ),
+                    style: TextStyle(color: Colors.white70, fontSize: 16),
                   ),
                 ],
               ),
@@ -6214,9 +6115,7 @@ class _FullScreenMediaViewerState extends State<_FullScreenMediaViewer> {
                 imageUrl: item['url'],
                 fit: BoxFit.contain,
                 placeholder: (context, url) => const Center(
-                  child: CircularProgressIndicator(
-                    color: Color(0xFF2563EB),
-                  ),
+                  child: CircularProgressIndicator(color: Color(0xFF2563EB)),
                 ),
                 errorWidget: (context, url, error) => const Center(
                   child: Icon(
@@ -6249,8 +6148,18 @@ class _FullScreenMediaViewerState extends State<_FullScreenMediaViewer> {
 
   String _formatTimestamp(DateTime date) {
     final months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     final hour = date.hour > 12 ? date.hour - 12 : date.hour;
     final amPm = date.hour >= 12 ? 'PM' : 'AM';
@@ -6271,7 +6180,9 @@ class _FullScreenMediaViewerState extends State<_FullScreenMediaViewer> {
               content: const Text('Storage permission required'),
               backgroundColor: AppColors.error,
               behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
           );
           return;
@@ -6307,7 +6218,9 @@ class _FullScreenMediaViewerState extends State<_FullScreenMediaViewer> {
             content: const Text('Image saved to gallery'),
             backgroundColor: AppColors.iosGreen,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
           ),
         );
       }
@@ -6318,7 +6231,9 @@ class _FullScreenMediaViewerState extends State<_FullScreenMediaViewer> {
             content: const Text('Failed to save image'),
             backgroundColor: AppColors.error,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
           ),
         );
       }
@@ -6334,7 +6249,9 @@ class _FullScreenMediaViewerState extends State<_FullScreenMediaViewer> {
           content: const Text('Image link copied to clipboard'),
           backgroundColor: const Color(0xFF2563EB),
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
         ),
       );
     }
@@ -6389,19 +6306,23 @@ class _VoicePreviewPopupState extends State<_VoicePreviewPopup> {
         // Initialize player if needed
         await widget.onInitializePlayer();
 
-        setState(() {
-          _isPlaying = true;
-          _playbackProgress = 0.0;
-        });
+        // Set fast subscription for smooth waveform animation
+        await widget.audioPlayer.setSubscriptionDuration(const Duration(milliseconds: 50));
 
-        // Subscribe to progress
+        // Subscribe to progress BEFORE starting
         _playerSubscription?.cancel();
         _playerSubscription = widget.audioPlayer.onProgress!.listen((e) {
           if (mounted && e.duration.inMilliseconds > 0) {
             setState(() {
-              _playbackProgress = e.position.inMilliseconds / e.duration.inMilliseconds;
+              _playbackProgress =
+                  e.position.inMilliseconds / e.duration.inMilliseconds;
             });
           }
+        });
+
+        setState(() {
+          _isPlaying = true;
+          _playbackProgress = 0.0;
         });
 
         await widget.audioPlayer.startPlayer(
@@ -6448,18 +6369,30 @@ class _VoicePreviewPopupState extends State<_VoicePreviewPopup> {
           margin: const EdgeInsets.symmetric(horizontal: 40),
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: Colors.grey.shade900,
-            borderRadius: BorderRadius.circular(20),
+            color: const Color(0xFF1A1A2E),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.white24, width: 1),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.5),
+                blurRadius: 20,
+                spreadRadius: 5,
+              ),
+            ],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               // Audio Player UI - WhatsApp style
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade800,
+                  color: Colors.white.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(30),
+                  border: Border.all(color: Colors.white12, width: 1),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -6470,12 +6403,27 @@ class _VoicePreviewPopupState extends State<_VoicePreviewPopup> {
                       child: Container(
                         width: 44,
                         height: 44,
-                        decoration: const BoxDecoration(
-                          color: Colors.green,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF5856D6), Color(0xFF007AFF)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
                           shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(
+                                0xFF5856D6,
+                              ).withValues(alpha: 0.4),
+                              blurRadius: 8,
+                              spreadRadius: 1,
+                            ),
+                          ],
                         ),
                         child: Icon(
-                          _isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                          _isPlaying
+                              ? Icons.pause_rounded
+                              : Icons.play_arrow_rounded,
                           color: Colors.white,
                           size: 28,
                         ),
@@ -6489,21 +6437,44 @@ class _VoicePreviewPopupState extends State<_VoicePreviewPopup> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          // Waveform visualization
+                          // Waveform visualization with animation
                           SizedBox(
                             height: 24,
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                               children: List.generate(20, (index) {
-                                final isActive = index / 20 <= _playbackProgress;
-                                // Create wave pattern
-                                final heights = [8.0, 14.0, 10.0, 18.0, 12.0, 20.0, 14.0, 16.0, 10.0, 22.0,
-                                                  18.0, 12.0, 20.0, 8.0, 16.0, 14.0, 18.0, 10.0, 14.0, 12.0];
-                                return Container(
+                                final isActive =
+                                    index / 20 <= _playbackProgress;
+                                final heights = [
+                                  8.0,
+                                  14.0,
+                                  10.0,
+                                  18.0,
+                                  12.0,
+                                  20.0,
+                                  14.0,
+                                  16.0,
+                                  10.0,
+                                  22.0,
+                                  18.0,
+                                  12.0,
+                                  20.0,
+                                  8.0,
+                                  16.0,
+                                  14.0,
+                                  18.0,
+                                  10.0,
+                                  14.0,
+                                  12.0,
+                                ];
+                                return AnimatedContainer(
+                                  duration: const Duration(milliseconds: 150),
                                   width: 3,
                                   height: heights[index],
                                   decoration: BoxDecoration(
-                                    color: isActive ? Colors.green : Colors.grey.shade600,
+                                    color: isActive
+                                        ? const Color(0xFF5856D6)
+                                        : Colors.white24,
                                     borderRadius: BorderRadius.circular(2),
                                   ),
                                 );
@@ -6514,8 +6485,8 @@ class _VoicePreviewPopupState extends State<_VoicePreviewPopup> {
                           // Duration text
                           Text(
                             _formatTime(widget.duration),
-                            style: TextStyle(
-                              color: Colors.grey.shade400,
+                            style: const TextStyle(
+                              color: Colors.white70,
                               fontSize: 12,
                             ),
                           ),
@@ -6524,11 +6495,7 @@ class _VoicePreviewPopupState extends State<_VoicePreviewPopup> {
                     ),
                     const SizedBox(width: 8),
                     // Mic icon
-                    Icon(
-                      Icons.mic,
-                      color: Colors.grey.shade500,
-                      size: 20,
-                    ),
+                    const Icon(Icons.mic, color: Colors.white38, size: 20),
                   ],
                 ),
               ),
@@ -6544,17 +6511,34 @@ class _VoicePreviewPopupState extends State<_VoicePreviewPopup> {
                       widget.onCancel();
                     },
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 12,
+                      ),
                       decoration: BoxDecoration(
-                        color: Colors.red.withValues(alpha: 0.2),
+                        color: Colors.red.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(25),
+                        border: Border.all(
+                          color: Colors.red.withValues(alpha: 0.3),
+                          width: 1,
+                        ),
                       ),
                       child: const Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.delete_rounded, color: Colors.red, size: 22),
+                          Icon(
+                            Icons.delete_rounded,
+                            color: Colors.redAccent,
+                            size: 22,
+                          ),
                           SizedBox(width: 6),
-                          Text('Delete', style: TextStyle(color: Colors.red, fontWeight: FontWeight.w500)),
+                          Text(
+                            'Delete',
+                            style: TextStyle(
+                              color: Colors.redAccent,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -6567,17 +6551,43 @@ class _VoicePreviewPopupState extends State<_VoicePreviewPopup> {
                       widget.onSend();
                     },
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 12,
+                      ),
                       decoration: BoxDecoration(
-                        color: Colors.green,
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF5856D6), Color(0xFF007AFF)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
                         borderRadius: BorderRadius.circular(25),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(
+                              0xFF5856D6,
+                            ).withValues(alpha: 0.4),
+                            blurRadius: 8,
+                            spreadRadius: 1,
+                          ),
+                        ],
                       ),
                       child: const Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.send_rounded, color: Colors.white, size: 22),
+                          Icon(
+                            Icons.send_rounded,
+                            color: Colors.white,
+                            size: 22,
+                          ),
                           SizedBox(width: 6),
-                          Text('Send', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
+                          Text(
+                            'Send',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ],
                       ),
                     ),

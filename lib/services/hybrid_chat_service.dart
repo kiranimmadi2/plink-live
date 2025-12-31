@@ -274,7 +274,8 @@ class HybridChatService {
             'fileName': fileName,
             'fileSize': fileSize,
             'timestamp': FieldValue.serverTimestamp(),
-            'status': 'delivered', // Double tick - message reached server
+            'status': 2, // MessageStatus.delivered.index - Double grey tick
+            'read': false,
             'isRead': false,
             'replyToMessageId': replyToMessageId,
             'replyToText': replyToText,
@@ -518,12 +519,12 @@ class HybridChatService {
       await _localDb.markMessagesAsRead(conversationId, currentUserId);
 
       // Get all unread/undelivered messages from other users
-      // Query messages that are either 'sent', 'delivered', or have isRead=false
+      // Query messages that have read=false
       final unreadMessages = await _firestore
           .collection('conversations')
           .doc(conversationId)
           .collection('messages')
-          .where('isRead', isEqualTo: false)
+          .where('read', isEqualTo: false)
           .limit(100)
           .get();
 
@@ -541,9 +542,10 @@ class HybridChatService {
       final batch = _firestore.batch();
       for (var doc in messagesToMarkRead) {
         batch.update(doc.reference, {
+          'read': true,
           'isRead': true,
           'readAt': FieldValue.serverTimestamp(),
-          'status': 'read',
+          'status': 3, // MessageStatus.read.index
         });
       }
 
