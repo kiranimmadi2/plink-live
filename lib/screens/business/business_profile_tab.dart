@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../models/business_model.dart';
-import '../../models/user_profile.dart';
 import '../../services/business_service.dart';
-import '../../services/account_type_service.dart';
 import '../../widgets/business/glassmorphic_card.dart';
 import 'business_setup_screen.dart';
 import 'bank_account_screen.dart';
@@ -32,7 +30,6 @@ class BusinessProfileTab extends StatefulWidget {
 
 class _BusinessProfileTabState extends State<BusinessProfileTab> {
   final BusinessService _businessService = BusinessService();
-  final AccountTypeService _accountTypeService = AccountTypeService();
 
   @override
   Widget build(BuildContext context) {
@@ -82,12 +79,6 @@ class _BusinessProfileTabState extends State<BusinessProfileTab> {
                 _buildSectionTitle('Settings', isDarkMode),
                 const SizedBox(height: 12),
                 _buildSettingsSection(isDarkMode),
-                const SizedBox(height: 24),
-
-                // Account Section
-                _buildSectionTitle('Account', isDarkMode),
-                const SizedBox(height: 12),
-                _buildAccountSection(isDarkMode),
                 const SizedBox(height: 24),
 
                 // Danger Zone
@@ -381,18 +372,6 @@ class _BusinessProfileTabState extends State<BusinessProfileTab> {
     );
   }
 
-  Widget _buildAccountSection(bool isDarkMode) {
-    return GlassmorphicContainer(
-      child: GlassmorphicListTile(
-        icon: Icons.swap_horiz,
-        title: 'Switch to Personal Account',
-        subtitle: 'View your personal profile',
-        iconColor: Colors.indigo,
-        onTap: () => _switchToPersonal(),
-      ),
-    );
-  }
-
   Widget _buildDangerZone(bool isDarkMode) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -531,13 +510,6 @@ class _BusinessProfileTabState extends State<BusinessProfileTab> {
     );
   }
 
-  void _switchToPersonal() async {
-    await _accountTypeService.upgradeAccountType(AccountType.personal);
-    if (mounted) {
-      widget.onLogout();
-    }
-  }
-
   void _confirmDeleteBusiness() {
     showDialog(
       context: context,
@@ -559,7 +531,6 @@ class _BusinessProfileTabState extends State<BusinessProfileTab> {
               Navigator.pop(context);
               final success = await _businessService.deleteBusiness(widget.business.id);
               if (success && mounted) {
-                await _accountTypeService.upgradeAccountType(AccountType.personal);
                 widget.onLogout();
               }
             },

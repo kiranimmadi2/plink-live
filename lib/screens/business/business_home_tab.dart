@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dart:ui';
 import '../../models/business_model.dart';
 import '../../services/business_service.dart';
 import '../../widgets/business/glassmorphic_card.dart';
@@ -7,6 +8,8 @@ import '../../res/config/app_assets.dart';
 import '../../res/config/app_colors.dart';
 import 'business_analytics_screen.dart';
 import 'business_inquiries_screen.dart';
+import 'business_services_tab.dart';
+import 'business_posts_tab.dart';
 
 /// Home tab showing dashboard with stats, online toggle, and quick actions
 class BusinessHomeTab extends StatefulWidget {
@@ -111,6 +114,10 @@ class _BusinessHomeTabState extends State<BusinessHomeTab> {
                     physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.all(16),
                     children: [
+                      // Quick Actions - Services & Posts
+                      _buildQuickActions(isDarkMode),
+                      const SizedBox(height: 24),
+
                       // Stats Grid
                       _buildSectionTitle('Overview', isDarkMode),
                       const SizedBox(height: 12),
@@ -119,12 +126,6 @@ class _BusinessHomeTabState extends State<BusinessHomeTab> {
 
                       // Analytics Preview
                       _buildAnalyticsPreview(isDarkMode),
-                      const SizedBox(height: 24),
-
-                      // Recent Inquiries Preview
-                      _buildSectionTitle('Recent Inquiries', isDarkMode),
-                      const SizedBox(height: 12),
-                      _buildRecentInquiriesPreview(isDarkMode),
 
                       const SizedBox(height: 100),
                     ],
@@ -310,6 +311,161 @@ class _BusinessHomeTabState extends State<BusinessHomeTab> {
     );
   }
 
+  Widget _buildQuickActions(bool isDarkMode) {
+    return Row(
+      children: [
+        // Services Button
+        Expanded(
+          child: _buildQuickActionCard(
+            icon: Icons.inventory_2_outlined,
+            label: 'Services',
+            subtitle: 'Manage your services',
+            gradient: [
+              const Color(0xFF00D67D).withValues(alpha: 0.3),
+              const Color(0xFF00A86B).withValues(alpha: 0.2),
+            ],
+            iconColor: const Color(0xFF00D67D),
+            onTap: () {
+              HapticFeedback.lightImpact();
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => BusinessServicesTab(
+                    business: widget.business,
+                    onRefresh: widget.onRefresh,
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(width: 12),
+        // Posts Button
+        Expanded(
+          child: _buildQuickActionCard(
+            icon: Icons.post_add_outlined,
+            label: 'Posts',
+            subtitle: 'Create & manage posts',
+            gradient: [
+              Colors.blue.withValues(alpha: 0.3),
+              Colors.indigo.withValues(alpha: 0.2),
+            ],
+            iconColor: Colors.blue,
+            onTap: () {
+              HapticFeedback.lightImpact();
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => BusinessPostsTab(
+                    business: widget.business,
+                    onRefresh: widget.onRefresh,
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildQuickActionCard({
+    required IconData icon,
+    required String label,
+    required String subtitle,
+    required List<Color> gradient,
+    required Color iconColor,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: gradient,
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.15),
+                width: 1,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Icon with glow effect
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: iconColor.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(14),
+                    boxShadow: [
+                      BoxShadow(
+                        color: iconColor.withValues(alpha: 0.3),
+                        blurRadius: 12,
+                        spreadRadius: 0,
+                      ),
+                    ],
+                  ),
+                  child: Icon(
+                    icon,
+                    color: iconColor,
+                    size: 26,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                // Label
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                // Subtitle
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.white.withValues(alpha: 0.6),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                // Arrow indicator
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        Icons.arrow_forward_ios,
+                        size: 12,
+                        color: Colors.white.withValues(alpha: 0.7),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildSectionTitle(String title, bool isDarkMode) {
     return Text(
       title,
@@ -435,57 +591,6 @@ class _BusinessHomeTabState extends State<BusinessHomeTab> {
               color: Colors.white54,
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRecentInquiriesPreview(bool isDarkMode) {
-    return GlassmorphicCard(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        children: [
-          if (widget.business.totalOrders == 0)
-            Column(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.05),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: const Icon(
-                    Icons.inbox_outlined,
-                    size: 40,
-                    color: Colors.white24,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'No inquiries yet',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white70,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                const Text(
-                  'Customer inquiries will appear here',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.white38,
-                  ),
-                ),
-              ],
-            )
-          else
-            GlassmorphicButton(
-              icon: Icons.arrow_forward,
-              label: 'View All Inquiries',
-              onTap: () => _navigateToInquiries('All'),
-            ),
         ],
       ),
     );

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 // Replace these with your actual screens
 import 'home_screen.dart';
@@ -50,6 +51,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final LocationService _location = LocationService();
 
+  static const String _screenIndexKey = 'last_screen_index';
+
   @override
   void initState() {
     super.initState();
@@ -58,6 +61,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     // Set initial index based on login account type or initialIndex
     if (widget.initialIndex != null) {
       _currentIndex = widget.initialIndex!;
+      _saveScreenIndex(_currentIndex);
     } else if (widget.loginAccountType != null) {
       // Set initial screen based on account type from login
       if (widget.loginAccountType == 'Business Account') {
@@ -65,6 +69,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
       } else {
         _currentIndex = 0; // Home screen for Personal
       }
+      _saveScreenIndex(_currentIndex);
+    } else {
+      // Load saved screen index (instant, no Firebase needed)
+      _loadSavedScreenIndex();
     }
 
     // Initialize listeners with error handling
@@ -99,6 +107,23 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
       _checkLocation();
     } catch (e) {
       debugPrint('Error in _checkLocation: $e');
+    }
+  }
+
+  // Save screen index locally for instant restore
+  Future<void> _saveScreenIndex(int index) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_screenIndexKey, index);
+  }
+
+  // Load saved screen index instantly
+  Future<void> _loadSavedScreenIndex() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedIndex = prefs.getInt(_screenIndexKey);
+    if (savedIndex != null && mounted) {
+      setState(() {
+        _currentIndex = savedIndex;
+      });
     }
   }
 
@@ -384,6 +409,59 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     }
   }
 
+  // Show Coming Soon dialog for features not yet implemented
+  void _showComingSoon(String featureName) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1C1C1E),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Colors.purple.shade400, Colors.blue.shade400],
+                ),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.rocket_launch, color: Colors.white, size: 24),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Coming Soon',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '$featureName is currently under development.',
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 16),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'We are working hard to bring you this feature. Stay tuned for updates!',
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 14),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Got it', style: TextStyle(color: Colors.blue)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
@@ -393,8 +471,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
         children: [
           _buildScreen(),
 
-          // Bottom Navigation Bar (hide on Feed screen)
-          if (_currentIndex != 7)
+          // Bottom Navigation Bar (hide on Feed, Business, and Professional screens)
+          if (_currentIndex != 7 && _currentIndex != 6 && _currentIndex != 5)
             Positioned(
               left: 0,
               right: 0,
@@ -405,6 +483,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
                 onTap: (index) {
                   HapticFeedback.mediumImpact();
                   setState(() => _currentIndex = index);
+                  _saveScreenIndex(index);
                 },
               ),
             ),
@@ -429,7 +508,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
   }
 }
 
-// Modern Bottom Navigation Bar - 3 tabs with proper styling
+// Modern Bottom Navigation Bar - 4 tabs with proper styling
 class _ModernBottomNavBar extends StatelessWidget {
   final int currentIndex;
   final int unreadCount;
@@ -532,7 +611,7 @@ class _NavItem extends StatelessWidget {
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
@@ -543,7 +622,7 @@ class _NavItem extends StatelessWidget {
               children: [
                 Icon(
                   isSelected ? selectedIcon : icon,
-                  size: 26,
+                  size: 24,
                   color: isSelected
                       ? Colors.white
                       : Colors.white.withValues(alpha: 0.5),
@@ -581,7 +660,7 @@ class _NavItem extends StatelessWidget {
             Text(
               label,
               style: TextStyle(
-                fontSize: 11,
+                fontSize: 10,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
                 color: isSelected
                     ? Colors.white

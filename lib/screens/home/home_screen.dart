@@ -2675,6 +2675,174 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
+  Widget _buildQuickActionsButton(bool isDarkMode) {
+    // Position above the bottom nav bar
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
+    final navBarHeight = 100 + bottomPadding;
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: navBarHeight - 30),
+      child: FloatingActionButton(
+        mini: true,
+        backgroundColor: Colors.blue.withValues(alpha: 0.8),
+        onPressed: _showQuickActionsMenu,
+        child: const Icon(Icons.flash_on, color: Colors.white, size: 20),
+      ),
+    );
+  }
+
+  void _showQuickActionsMenu() {
+    HapticFeedback.mediumImpact();
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        margin: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1C1C1E),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Handle bar
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 20),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade600,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+
+            // Title
+            const Text(
+              'Quick Actions',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Quick action buttons grid
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildQuickActionItem(
+                  icon: Icons.sell,
+                  label: 'Sell Item',
+                  color: Colors.green,
+                  onTap: () {
+                    Navigator.pop(context);
+                    _intentController.text = 'I want to sell ';
+                    FocusScope.of(context).requestFocus(_searchFocusNode);
+                  },
+                ),
+                _buildQuickActionItem(
+                  icon: Icons.shopping_cart,
+                  label: 'Buy Item',
+                  color: Colors.blue,
+                  onTap: () {
+                    Navigator.pop(context);
+                    _intentController.text = 'I want to buy ';
+                    FocusScope.of(context).requestFocus(_searchFocusNode);
+                  },
+                ),
+                _buildQuickActionItem(
+                  icon: Icons.work,
+                  label: 'Find Job',
+                  color: Colors.orange,
+                  onTap: () {
+                    Navigator.pop(context);
+                    _intentController.text = 'Looking for job in ';
+                    FocusScope.of(context).requestFocus(_searchFocusNode);
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildQuickActionItem(
+                  icon: Icons.people,
+                  label: 'Make Friends',
+                  color: Colors.purple,
+                  onTap: () {
+                    Navigator.pop(context);
+                    _intentController.text = 'Looking for friends who like ';
+                    FocusScope.of(context).requestFocus(_searchFocusNode);
+                  },
+                ),
+                _buildQuickActionItem(
+                  icon: Icons.favorite,
+                  label: 'Dating',
+                  color: Colors.pink,
+                  onTap: () {
+                    Navigator.pop(context);
+                    _intentController.text = 'Looking for someone to date ';
+                    FocusScope.of(context).requestFocus(_searchFocusNode);
+                  },
+                ),
+                _buildQuickActionItem(
+                  icon: Icons.search,
+                  label: 'Lost & Found',
+                  color: Colors.teal,
+                  onTap: () {
+                    Navigator.pop(context);
+                    _intentController.text = 'I lost my ';
+                    FocusScope.of(context).requestFocus(_searchFocusNode);
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuickActionItem({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: color.withValues(alpha: 0.3)),
+            ),
+            child: Icon(icon, color: color, size: 28),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.9),
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildInputSection(bool isDarkMode) {
     // Add padding for the bottom navigation bar (70px bar + padding + safe area)
     final bottomPadding = MediaQuery.of(context).padding.bottom;

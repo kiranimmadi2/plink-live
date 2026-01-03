@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/business_model.dart';
+import '../../models/conversation_model.dart';
 import '../../services/business_service.dart';
 import '../../services/auth_service.dart';
+import '../../services/chat services/conversation_service.dart';
 import '../login/choose_account_type_screen.dart';
 import 'business_home_tab.dart';
-import 'business_services_tab.dart';
-import 'business_posts_tab.dart';
+import 'business_messages_tab.dart';
 import 'business_profile_tab.dart';
 import 'business_setup_screen.dart';
 
@@ -22,13 +23,13 @@ class BusinessMainScreen extends ConsumerStatefulWidget {
 class _BusinessMainScreenState extends ConsumerState<BusinessMainScreen> {
   int _currentIndex = 0;
   final BusinessService _businessService = BusinessService();
+  final ConversationService _conversationService = ConversationService();
   BusinessModel? _business;
   bool _isLoading = true;
 
   final List<_NavItem> _navItems = [
     _NavItem(icon: Icons.home_rounded, activeIcon: Icons.home_rounded, label: 'Home'),
-    _NavItem(icon: Icons.inventory_2_outlined, activeIcon: Icons.inventory_2, label: 'Services'),
-    _NavItem(icon: Icons.post_add_outlined, activeIcon: Icons.post_add, label: 'Posts'),
+    _NavItem(icon: Icons.chat_bubble_outline, activeIcon: Icons.chat_bubble, label: 'Messages'),
     _NavItem(icon: Icons.person_outline, activeIcon: Icons.person, label: 'Profile'),
   ];
 
@@ -111,13 +112,8 @@ class _BusinessMainScreenState extends ConsumerState<BusinessMainScreen> {
             onRefresh: _refreshBusiness,
             onSwitchTab: (index) => setState(() => _currentIndex = index),
           ),
-          BusinessServicesTab(
+          BusinessMessagesTab(
             business: _business!,
-            onRefresh: _refreshBusiness,
-          ),
-          BusinessPostsTab(
-            business: _business!,
-            onRefresh: _refreshBusiness,
           ),
           BusinessProfileTab(
             business: _business!,
@@ -162,6 +158,11 @@ class _BusinessMainScreenState extends ConsumerState<BusinessMainScreen> {
               final item = _navItems[index];
               final isSelected = _currentIndex == index;
 
+              // Messages tab (index 1) gets unread badge
+              if (index == 1 && _business != null) {
+                return _buildMessagesNavItem(item, isSelected, isDarkMode);
+              }
+
               return _NavBarItem(
                 icon: isSelected ? item.activeIcon : item.icon,
                 label: item.label,
@@ -176,6 +177,94 @@ class _BusinessMainScreenState extends ConsumerState<BusinessMainScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildMessagesNavItem(_NavItem item, bool isSelected, bool isDarkMode) {
+    return StreamBuilder<List<ConversationModel>>(
+      stream: _conversationService.getBusinessConversations(_business!.id),
+      builder: (context, snapshot) {
+        int unreadCount = 0;
+        if (snapshot.hasData) {
+          for (var conv in snapshot.data!) {
+            unreadCount += conv.getUnreadCount(_business!.userId);
+          }
+        }
+
+        return GestureDetector(
+          onTap: () {
+            HapticFeedback.lightImpact();
+            setState(() => _currentIndex = 1);
+          },
+          behavior: HitTestBehavior.opaque,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: isSelected
+                  ? const Color(0xFF00D67D).withValues(alpha: 0.15)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Icon(
+                      isSelected ? item.activeIcon : item.icon,
+                      size: 24,
+                      color: isSelected
+                          ? const Color(0xFF00D67D)
+                          : (isDarkMode ? Colors.white54 : Colors.grey[600]),
+                    ),
+                    if (unreadCount > 0)
+                      Positioned(
+                        right: -8,
+                        top: -4,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 5,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.red,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          constraints: const BoxConstraints(
+                            minWidth: 16,
+                            minHeight: 16,
+                          ),
+                          child: Text(
+                            unreadCount > 99 ? '99+' : unreadCount.toString(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  item.label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                    color: isSelected
+                        ? const Color(0xFF00D67D)
+                        : (isDarkMode ? Colors.white54 : Colors.grey[600]),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }
