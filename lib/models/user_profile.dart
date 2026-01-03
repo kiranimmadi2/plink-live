@@ -305,10 +305,15 @@ class UserProfile {
 
   factory UserProfile.fromFirestore(DocumentSnapshot doc) {
     Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+    // Get display name - fallback to phone number for phone login users
+    String displayName = data['name'] ?? data['displayName'] ?? '';
+    if (displayName.isEmpty || displayName == 'User') {
+      displayName = data['phone'] ?? '';
+    }
     return UserProfile(
       uid: doc.id,
       id: doc.id,
-      name: data['name'] ?? '',
+      name: displayName,
       email: data['email'] ?? '',
       profileImageUrl: data['profileImageUrl'] ?? data['photoUrl'],
       phone: data['phone'],
@@ -342,10 +347,15 @@ class UserProfile {
   }
 
   static UserProfile fromMap(Map<String, dynamic> data, String userId) {
+    // Get display name - fallback to phone number for phone login users
+    String displayName = data['name'] ?? data['displayName'] ?? '';
+    if (displayName.isEmpty || displayName == 'User') {
+      displayName = data['phone'] ?? '';
+    }
     return UserProfile(
       uid: userId,
       id: userId,
-      name: data['name'] ?? '',
+      name: displayName,
       email: data['email'] ?? '',
       profileImageUrl: data['profileImageUrl'] ?? data['photoUrl'],
       phone: data['phone'],

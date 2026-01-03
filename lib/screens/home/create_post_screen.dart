@@ -374,13 +374,19 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         price = double.tryParse(_priceController.text);
       }
 
+      // Get user name - fallback to phone number for phone login users
+      String userName = userData['name'] ?? userData['displayName'] ?? '';
+      if (userName.isEmpty || userName == 'User') {
+        userName = userData['phone'] ?? 'User';
+      }
+
       // Create post data
       final postData = <String, dynamic>{
         'title': _titleController.text.trim(),
         'description': _descriptionController.text.trim(),
         'originalPrompt': _titleController.text.trim(),
         'userId': currentUser.uid,
-        'userName': userData['name'] ?? userData['displayName'] ?? 'User',
+        'userName': userName,
         'userPhoto':
             userData['photoUrl'] ??
             userData['photoURL'] ??

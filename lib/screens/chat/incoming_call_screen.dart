@@ -3,8 +3,10 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_ringtone_player/flutter_ringtone_player.dart';
 import '../../models/user_profile.dart';
+import '../../models/message_model.dart';
 import '../../res/config/app_colors.dart';
 import '../../res/config/app_text_styles.dart';
 import '../call/voice_call_screen.dart';
@@ -115,20 +117,20 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
         .doc(widget.callId)
         .snapshots()
         .listen((snapshot) {
-      if (!mounted || _isNavigating) return;
+          if (!mounted || _isNavigating) return;
 
-      final data = snapshot.data();
-      if (data == null) {
-        _safeNavigateBack();
-        return;
-      }
+          final data = snapshot.data();
+          if (data == null) {
+            _safeNavigateBack();
+            return;
+          }
 
-      final status = data['status'] as String?;
+          final status = data['status'] as String?;
 
-      if (status == 'ended' || status == 'rejected') {
-        _safeNavigateBack();
-      }
-    });
+          if (status == 'ended' || status == 'rejected') {
+            _safeNavigateBack();
+          }
+        });
   }
 
   void _safeNavigateBack() {
@@ -139,8 +141,12 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
 
   @override
   void dispose() {
-    _stopRingtone();
-    _pulseController.dispose();
+    try {
+      _stopRingtone();
+    } catch (_) {}
+    try {
+      _pulseController.dispose();
+    } catch (_) {}
     _callStatusSubscription?.cancel();
     super.dispose();
   }
@@ -164,31 +170,18 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
       if (!mounted) return;
 
       // Fetch caller's user profile
-      final callerDoc =
-          await _firestore.collection('users').doc(widget.callerId).get();
+      final callerDoc = await _firestore
+          .collection('users')
+          .doc(widget.callerId)
+          .get();
 
       if (!mounted) return;
 
       UserProfile callerProfile;
 
       if (callerDoc.exists) {
-        final data = callerDoc.data()!;
-        callerProfile = UserProfile(
-          uid: widget.callerId,
-          id: widget.callerId,
-          name: data['name'] ?? data['displayName'] ?? widget.callerName,
-          email: data['email'] ?? '',
-          profileImageUrl: data['photoUrl'] ??
-              data['photoURL'] ??
-              data['profileImageUrl'] ??
-              widget.callerPhoto,
-          bio: data['bio'] ?? '',
-          location: data['location'],
-          interests:
-              (data['interests'] as List<dynamic>?)?.cast<String>() ?? [],
-          createdAt: DateTime.now(),
-          lastSeen: DateTime.now(),
-        );
+        // Use fromFirestore to get proper name (with phone fallback)
+        callerProfile = UserProfile.fromFirestore(callerDoc);
       } else {
         callerProfile = UserProfile(
           uid: widget.callerId,
@@ -236,10 +229,81 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
         'rejectedAt': FieldValue.serverTimestamp(),
       });
 
+      // Send missed call message to chat
+      await _sendMissedCallMessage();
+
       _safeNavigateBack();
     } catch (e) {
       debugPrint('Error rejecting call: $e');
       _safeNavigateBack();
+    }
+  }
+
+  /// Send missed call message to chat conversation
+  Future<void> _sendMissedCallMessage() async {
+    try {
+      final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+      if (currentUserId == null) return;
+
+      // Caller is the sender, receiver (current user) is receiving
+      // We use caller's ID as senderId so it shows as "incoming missed call" for receiver
+      final participants = [currentUserId, widget.callerId]..sort();
+      final conversationId = participants.join('_');
+
+      // Check if conversation exists
+      final conversationDoc = await _firestore
+          .collection('conversations')
+          .doc(conversationId)
+          .get();
+      if (!conversationDoc.exists) {
+        await _firestore.collection('conversations').doc(conversationId).set({
+          'participants': participants,
+          'createdAt': FieldValue.serverTimestamp(),
+          'lastMessageTime': FieldValue.serverTimestamp(),
+        });
+      }
+
+      // Use deterministic message ID based on call ID to prevent duplicates
+      // This ensures consistency with VoiceCallScreen's message sending
+      final messageId = 'call_${widget.callId}';
+      final messageRef = _firestore
+          .collection('conversations')
+          .doc(conversationId)
+          .collection('messages')
+          .doc(messageId);
+
+      final now = DateTime.now();
+
+      // Create call message - senderId is CALLER so it shows as incoming for receiver
+      await messageRef.set({
+        'id': messageId,
+        'senderId':
+            widget.callerId, // Caller's ID - so receiver sees it as incoming
+        'receiverId': currentUserId,
+        'chatId': conversationId,
+        'text': 'Missed voice call',
+        'type': MessageType.missedCall.index,
+        'status': MessageStatus.delivered.index,
+        'timestamp': Timestamp.fromDate(now),
+        'isEdited': false,
+        'read': false,
+        'isRead': false,
+        'metadata': {
+          'callId': widget.callId,
+          'duration': 0,
+          'isOutgoing': false,
+          'isMissed': true,
+        },
+      });
+
+      // Update conversation last message
+      await _firestore.collection('conversations').doc(conversationId).update({
+        'lastMessage': '  Missed call',
+        'lastMessageTime': FieldValue.serverTimestamp(),
+        'lastMessageSenderId': widget.callerId,
+      });
+    } catch (e) {
+      // Error sending missed call message
     }
   }
 
@@ -251,18 +315,14 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
         children: [
           // Background gradient
           Container(
-            decoration: const BoxDecoration(
-              gradient: AppColors.splashGradient,
-            ),
+            decoration: const BoxDecoration(gradient: AppColors.splashGradient),
           ),
 
           // Blur effect
           Positioned.fill(
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
-              child: Container(
-                color: AppColors.blackAlpha(alpha: 0.3),
-              ),
+              child: Container(color: AppColors.blackAlpha(alpha: 0.3)),
             ),
           ),
 
@@ -294,14 +354,16 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           border: Border.all(
-                            color:
-                                AppColors.vibrantGreen.withValues(alpha: 0.5),
+                            color: AppColors.vibrantGreen.withValues(
+                              alpha: 0.5,
+                            ),
                             width: 3,
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color:
-                                  AppColors.vibrantGreen.withValues(alpha: 0.3),
+                              color: AppColors.vibrantGreen.withValues(
+                                alpha: 0.3,
+                              ),
                               blurRadius: 20,
                               spreadRadius: 5,
                             ),
@@ -334,9 +396,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
                 // Caller name
                 Text(
                   widget.callerName,
-                  style: AppTextStyles.displayMedium.copyWith(
-                    fontSize: 32,
-                  ),
+                  style: AppTextStyles.displayMedium.copyWith(fontSize: 32),
                 ),
 
                 const SizedBox(height: 8),
@@ -423,11 +483,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
                       ),
                     ),
                   )
-                : Icon(
-                    icon,
-                    color: AppColors.textPrimaryDark,
-                    size: 32,
-                  ),
+                : Icon(icon, color: AppColors.textPrimaryDark, size: 32),
           ),
           const SizedBox(height: 12),
           Text(

@@ -33,9 +33,6 @@ import 'res/utils/memory_manager.dart';
 // FCM background handler
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  debugPrint('Background FCM message: ${message.messageId}');
-  debugPrint('Background FCM data: ${message.data}');
-
   final data = message.data;
   final type = data['type'] as String?;
 
@@ -101,28 +98,7 @@ Future<void> _showCallNotification({
 
 /// Validate that Firebase configuration is loaded from .env
 void _validateFirebaseConfig() {
-  final projectId = dotenv.env['FIREBASE_WEB_PROJECT_ID'];
-  final apiKey =
-      dotenv.env['FIREBASE_ANDROID_API_KEY'] ??
-      dotenv.env['FIREBASE_WEB_API_KEY'];
-
-  if (projectId == null || projectId.isEmpty) {
-    debugPrint('   WARNING: Firebase project ID is missing!');
-    debugPrint(
-      '   Please ensure .env file exists with FIREBASE_WEB_PROJECT_ID',
-    );
-  }
-
-  if (apiKey == null || apiKey.isEmpty) {
-    debugPrint('   WARNING: Firebase API key is missing!');
-    debugPrint(
-      '   Please ensure .env file exists with FIREBASE_ANDROID_API_KEY or FIREBASE_WEB_API_KEY',
-    );
-  }
-
-  if ((projectId?.isNotEmpty ?? false) && (apiKey?.isNotEmpty ?? false)) {
-    debugPrint(' Firebase configuration loaded successfully');
-  }
+  // Validation runs silently - errors will surface during Firebase initialization
 }
 
 void main() async {
@@ -135,9 +111,6 @@ void main() async {
     if (exception.toString().contains('ImageDecoder') ||
         exception.toString().contains('Failed to decode image') ||
         exception.toString().contains('codec')) {
-      debugPrint(
-        '   Image decode error (suppressed): ${details.exceptionAsString()}',
-      );
       return; // Don't propagate
     }
     // For other errors, use default handler
@@ -199,9 +172,7 @@ Future<void> _initializeServicesInBackground() async {
 
   // Initialize Firebase Analytics
   unawaited(
-    AnalyticsService().initialize().catchError((e) {
-      debugPrint('AnalyticsService init error (non-fatal): $e');
-    }),
+    AnalyticsService().initialize().catchError((e) {}),
   );
 
   // Initialize utilities in sequence with small delays to prevent jank
@@ -217,7 +188,6 @@ Future<void> _initializeServicesInBackground() async {
   // Initialize notification service (can run in parallel, but don't block)
   unawaited(
     NotificationService().initialize().catchError((e) {
-      debugPrint('NotificationService init error (non-fatal): $e');
       ErrorTrackingService().captureException(
         e,
         message: 'NotificationService init failed',
@@ -228,9 +198,7 @@ Future<void> _initializeServicesInBackground() async {
   // Initialize connectivity service after a small delay
   await Future.delayed(const Duration(milliseconds: 100));
   unawaited(
-    ConnectivityService().initialize().catchError((e) {
-      debugPrint('ConnectivityService init error (non-fatal): $e');
-    }),
+    ConnectivityService().initialize().catchError((e) {}),
   );
 
   // Log app open event
@@ -314,13 +282,11 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
 
     switch (state) {
       case AppLifecycleState.resumed:
-        debugPrint('AuthWrapper: App resumed - checking location freshness');
         if (_authService.currentUser != null) {
           _locationService.onAppResume();
         }
         break;
       case AppLifecycleState.paused:
-        debugPrint('AuthWrapper: App paused');
         break;
       case AppLifecycleState.inactive:
       case AppLifecycleState.detached:
@@ -339,7 +305,6 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
         }
 
         if (snapshot.hasError) {
-          debugPrint('AuthWrapper: Auth stream error: ${snapshot.error}');
           return _buildErrorScreen(snapshot.error.toString());
         }
 
@@ -441,17 +406,13 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
 
   Future<void> _initializeUserServices() async {
     try {
-      debugPrint('AuthWrapper: Initializing user services...');
-
       try {
         await _profileService.ensureProfileExists().timeout(
           const Duration(seconds: 10),
-          onTimeout: () {
-            debugPrint('   Profile service timed out');
-          },
+          onTimeout: () {},
         );
       } catch (e) {
-        debugPrint('   Profile service error (non-fatal): $e');
+        // Profile service error (non-fatal)
       }
 
       await Future.delayed(const Duration(milliseconds: 100));
@@ -464,10 +425,8 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
       _startNotificationListener();
 
       _runMigrationsInBackground();
-
-      debugPrint('✓ AuthWrapper: User services initialized');
     } catch (e) {
-      debugPrint("User services init failed: $e");
+      // User services init failed
     }
   }
 
@@ -482,15 +441,11 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
               await _notificationService.processNewNotification(notification);
             }
           },
-          onError: (e) {
-            debugPrint('  Notification listener error: $e');
-          },
+          onError: (e) {},
         );
-    debugPrint('✓ Notification listener started');
   }
 
   void _runMigrationsInBackground() {
     // Migration services removed - no longer needed
-    debugPrint('✓ Migrations check skipped (already completed)');
   }
 }

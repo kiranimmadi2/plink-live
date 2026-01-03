@@ -1,5 +1,4 @@
 import 'package:firebase_analytics/firebase_analytics.dart';
-import 'package:flutter/foundation.dart';
 
 /// Centralized analytics service for tracking user events and app usage
 class AnalyticsService {
@@ -15,9 +14,8 @@ class AnalyticsService {
   Future<void> initialize() async {
     try {
       await _analytics.setAnalyticsCollectionEnabled(true);
-      debugPrint('Firebase Analytics initialized');
     } catch (e) {
-      debugPrint('Error initializing Firebase Analytics: $e');
+      // Analytics initialization error
     }
   }
 
@@ -26,7 +24,7 @@ class AnalyticsService {
     try {
       await _analytics.setUserId(id: userId);
     } catch (e) {
-      debugPrint('Error setting user ID: $e');
+      // Error setting user ID
     }
   }
 
@@ -38,7 +36,7 @@ class AnalyticsService {
     try {
       await _analytics.setUserProperty(name: name, value: value);
     } catch (e) {
-      debugPrint('Error setting user property: $e');
+      // Error setting user property
     }
   }
 
@@ -53,7 +51,7 @@ class AnalyticsService {
         screenClass: screenClass,
       );
     } catch (e) {
-      debugPrint('Error logging screen view: $e');
+      // Error logging screen view
     }
   }
 
@@ -62,7 +60,7 @@ class AnalyticsService {
     try {
       await _analytics.logLogin(loginMethod: method);
     } catch (e) {
-      debugPrint('Error logging login: $e');
+      // Error logging login
     }
   }
 
@@ -71,7 +69,7 @@ class AnalyticsService {
     try {
       await _analytics.logSignUp(signUpMethod: method ?? 'email');
     } catch (e) {
-      debugPrint('Error logging sign up: $e');
+      // Error logging sign up
     }
   }
 
@@ -91,7 +89,7 @@ class AnalyticsService {
         },
       );
     } catch (e) {
-      debugPrint('Error logging post created: $e');
+      // Error logging post created
     }
   }
 
@@ -111,7 +109,7 @@ class AnalyticsService {
         },
       );
     } catch (e) {
-      debugPrint('Error logging match found: $e');
+      // Error logging match found
     }
   }
 
@@ -129,7 +127,7 @@ class AnalyticsService {
         },
       );
     } catch (e) {
-      debugPrint('Error logging message sent: $e');
+      // Error logging message sent
     }
   }
 
@@ -147,7 +145,7 @@ class AnalyticsService {
         },
       );
     } catch (e) {
-      debugPrint('Error logging connection request: $e');
+      // Error logging connection request
     }
   }
 
@@ -171,7 +169,7 @@ class AnalyticsService {
         );
       }
     } catch (e) {
-      debugPrint('Error logging search: $e');
+      // Error logging search
     }
   }
 
@@ -189,7 +187,7 @@ class AnalyticsService {
         },
       );
     } catch (e) {
-      debugPrint('Error logging filter applied: $e');
+      // Error logging filter applied
     }
   }
 
@@ -201,7 +199,7 @@ class AnalyticsService {
         parameters: {'feature_name': featureName},
       );
     } catch (e) {
-      debugPrint('Error logging feature used: $e');
+      // Error logging feature used
     }
   }
 
@@ -224,7 +222,7 @@ class AnalyticsService {
         },
       );
     } catch (e) {
-      debugPrint('Error logging error event: $e');
+      // Error logging error event
     }
   }
 
@@ -233,7 +231,7 @@ class AnalyticsService {
     try {
       await _analytics.logAppOpen();
     } catch (e) {
-      debugPrint('Error logging app open: $e');
+      // Error logging app open
     }
   }
 
@@ -245,7 +243,7 @@ class AnalyticsService {
     try {
       await _analytics.logEvent(name: name, parameters: parameters);
     } catch (e) {
-      debugPrint('Error logging event $name: $e');
+      // Error logging event
     }
   }
 }

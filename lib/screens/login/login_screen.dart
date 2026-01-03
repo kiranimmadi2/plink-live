@@ -423,54 +423,68 @@ class _LoginScreenState extends State<LoginScreen>
         }
       }
     } catch (e) {
-      debugPrint('Error checking stored account type: $e');
+      // Error checking stored account type
     }
 
-    // Check for Professional account
-    if (accountType.contains('professional')) {
-      final professionalService = ProfessionalService();
-      final isSetupComplete = await professionalService.isProfessionalSetupComplete();
+    try {
+      // Check for Professional account
+      if (accountType.contains('professional')) {
+        final professionalService = ProfessionalService();
+        final isSetupComplete = await professionalService.isProfessionalSetupComplete();
 
-      if (!isSetupComplete) {
-        if (!mounted) return;
+        if (!isSetupComplete) {
+          if (!mounted) return;
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(
+              builder: (_) => const ProfessionalSetupScreen(),
+            ),
+            (route) => false,
+          );
+          return;
+        }
+      }
+
+      // Check for Business account
+      if (accountType.contains('business')) {
+        final businessService = BusinessService();
+        final isSetupComplete = await businessService.isBusinessSetupComplete();
+
+        if (!isSetupComplete) {
+          if (!mounted) return;
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(
+              builder: (_) => const BusinessSetupScreen(),
+            ),
+            (route) => false,
+          );
+          return;
+        }
+      }
+
+      // Default: go to main navigation with account type
+      if (!mounted) return;
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (_) => MainNavigationScreen(loginAccountType: widget.accountType),
+        ),
+        (route) => false,
+      );
+    } catch (e) {
+      // Fallback: try to navigate to main screen anyway
+      if (mounted) {
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(
-            builder: (_) => const ProfessionalSetupScreen(),
+            builder: (_) => const MainNavigationScreen(),
           ),
           (route) => false,
         );
-        return;
       }
     }
-
-    // Check for Business account
-    if (accountType.contains('business')) {
-      final businessService = BusinessService();
-      final isSetupComplete = await businessService.isBusinessSetupComplete();
-
-      if (!isSetupComplete) {
-        if (!mounted) return;
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(
-            builder: (_) => const BusinessSetupScreen(),
-          ),
-          (route) => false,
-        );
-        return;
-      }
-    }
-
-    // Default: go to main navigation with account type
-    if (!mounted) return;
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(
-        builder: (_) => MainNavigationScreen(loginAccountType: widget.accountType),
-      ),
-      (route) => false,
-    );
   }
 
   Future<void> _signInWithGoogle() async {
+    if (!mounted) return;
+
     setState(() {
       _isLoading = true;
     });

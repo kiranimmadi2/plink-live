@@ -4,11 +4,11 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 import '../models/user_profile.dart';
-import '../screens/home/messenger_chat_screen.dart';
+import '../screens/chat/enhanced_chat_screen.dart';
 import '../screens/chat/incoming_call_screen.dart';
 
 /// Global navigator key for notification navigation
@@ -42,20 +42,17 @@ class NotificationService {
       await _configureFCM();
       await _updateFCMToken();
     } catch (e) {
-      debugPrint('Error initializing notifications: $e');
       // Continue app execution even if notifications fail
     }
   }
 
   Future<void> _requestPermissions() async {
-    final settings = await _fcm.requestPermission(
+    await _fcm.requestPermission(
       alert: true,
       badge: true,
       sound: true,
       provisional: false,
     );
-
-    debugPrint('Notification permissions: ${settings.authorizationStatus}');
   }
 
   Future<void> _configureLocalNotifications() async {
@@ -143,7 +140,7 @@ class NotificationService {
         }
       }
     } catch (e) {
-      debugPrint('Error creating notification channels: $e');
+      // Error creating notification channels
     }
   }
 
@@ -178,10 +175,8 @@ class NotificationService {
             'lastTokenUpdate': FieldValue.serverTimestamp(),
           },
         );
-        debugPrint('FCM token updated successfully');
       }
     } catch (e) {
-      debugPrint('Error updating FCM token: $e');
       // Continue without crashing the app
     }
 
@@ -197,19 +192,15 @@ class NotificationService {
                 'fcmToken': newToken,
                 'lastTokenUpdate': FieldValue.serverTimestamp(),
               });
-          debugPrint('FCM token refreshed successfully');
         }
       } catch (e) {
-        debugPrint('Error refreshing FCM token: $e');
+        // Error refreshing FCM token
       }
     });
   }
 
   /// Handle messages when app is in foreground
   void _handleForegroundMessage(RemoteMessage message) {
-    debugPrint('Foreground message received: ${message.messageId}');
-    debugPrint('Data: ${message.data}');
-
     final data = message.data;
     final type = data['type'] as String?;
 
@@ -235,9 +226,6 @@ class NotificationService {
 
   /// Handle when user taps notification and app opens from background
   void _handleNotificationOpen(RemoteMessage message) {
-    debugPrint('Notification opened: ${message.messageId}');
-    debugPrint('Data: ${message.data}');
-
     final data = message.data;
     _navigateBasedOnNotificationType(data);
   }
@@ -284,7 +272,7 @@ class NotificationService {
         await _navigateToConnections(data);
         break;
       default:
-        debugPrint('Unknown notification type: $type');
+        break;
     }
   }
 
@@ -294,7 +282,6 @@ class NotificationService {
     final senderId = data['senderId'] as String?;
 
     if (conversationId == null || senderId == null) {
-      debugPrint('Missing conversationId or senderId for chat navigation');
       return;
     }
 
@@ -302,7 +289,6 @@ class NotificationService {
       // Fetch sender's profile
       final userDoc = await _firestore.collection('users').doc(senderId).get();
       if (!userDoc.exists) {
-        debugPrint('Sender user not found: $senderId');
         return;
       }
 
@@ -312,15 +298,14 @@ class NotificationService {
       if (navigatorKey.currentState != null) {
         navigatorKey.currentState!.push(
           MaterialPageRoute(
-            builder: (context) => MessengerChatScreen(
+            builder: (context) => EnhancedChatScreen(
               otherUser: otherUser,
-              chatId: conversationId,
             ),
           ),
         );
       }
     } catch (e) {
-      debugPrint('Error navigating to chat: $e');
+      // Error navigating to chat
     }
   }
 
@@ -331,10 +316,7 @@ class NotificationService {
     final callerName = data['callerName'] as String? ?? 'Unknown';
     final callerPhoto = data['callerPhoto'] as String?;
 
-    debugPrint('Navigate to call: $callId');
-
     if (callId == null || callerId == null) {
-      debugPrint('Missing callId or callerId for call navigation');
       return;
     }
 
@@ -355,13 +337,11 @@ class NotificationService {
 
   /// Navigate to inquiries screen (for professionals)
   Future<void> _navigateToInquiries(Map<String, dynamic> data) async {
-    debugPrint('Navigate to inquiries');
     // TODO: Navigate to inquiries screen
   }
 
   /// Navigate to connections/requests screen
   Future<void> _navigateToConnections(Map<String, dynamic> data) async {
-    debugPrint('Navigate to connections');
     // TODO: Navigate to connections screen
   }
 
@@ -416,7 +396,7 @@ class NotificationService {
         final data = jsonDecode(response.payload!) as Map<String, dynamic>;
         _navigateBasedOnNotificationType(data);
       } catch (e) {
-        debugPrint('Error parsing notification payload: $e');
+        // Error parsing notification payload
       }
     }
   }
@@ -454,10 +434,8 @@ class NotificationService {
         'read': false,
         'createdAt': FieldValue.serverTimestamp(),
       });
-
-      debugPrint('Notification sent to user: $userId');
     } catch (e) {
-      debugPrint(' Error sending notification to user: $e');
+      // Error sending notification to user
     }
   }
 
@@ -501,7 +479,7 @@ class NotificationService {
         'read': true,
       });
     } catch (e) {
-      debugPrint('  Error marking notification as read: $e');
+      // Error marking notification as read
     }
   }
 
@@ -539,9 +517,8 @@ class NotificationService {
       }
       await _fcm.deleteToken();
       _fcmToken = null;
-      debugPrint('FCM token cleared');
     } catch (e) {
-      debugPrint('Error clearing FCM token: $e');
+      // Error clearing FCM token
     }
   }
 
@@ -557,7 +534,7 @@ class NotificationService {
             ?.requestPermissions(badge: true);
       }
     } catch (e) {
-      debugPrint('Badge count update not supported on this platform');
+      // Badge count update not supported on this platform
     }
   }
 
@@ -589,7 +566,6 @@ class NotificationService {
 
       return totalUnread;
     } catch (e) {
-      debugPrint('Error getting unread count: $e');
       return 0;
     }
   }
@@ -609,6 +585,5 @@ class NotificationService {
 // Background message handler - must be top-level function
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  debugPrint('Background FCM message: ${message.messageId}');
-  debugPrint('Background FCM data: ${message.data}');
+  // Background FCM message handling
 }

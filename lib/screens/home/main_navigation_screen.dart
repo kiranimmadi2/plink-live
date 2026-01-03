@@ -20,14 +20,16 @@ import '../business/business_main_screen.dart';
 // services
 import '../../services/location services/location_service.dart';
 import '../../services/notification_service.dart';
-import '../../services/account_type_service.dart';
-import '../../models/user_profile.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   final int? initialIndex;
   final String? loginAccountType; // Account type from login screen
 
-  const MainNavigationScreen({super.key, this.initialIndex, this.loginAccountType});
+  const MainNavigationScreen({
+    super.key,
+    this.initialIndex,
+    this.loginAccountType,
+  });
 
   @override
   State<MainNavigationScreen> createState() => _MainNavigationScreenState();
@@ -38,10 +40,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
   int _currentIndex = 0;
   int _unreadMessageCount = 0;
 
-  // Account type for showing appropriate dashboard
-  AccountType _accountType = AccountType.personal;
-  StreamSubscription<AccountType>? _accountTypeSubscription;
-
   // Stream subscription for cleanup
   StreamSubscription<QuerySnapshot>? _unreadSubscription;
   StreamSubscription<QuerySnapshot>? _incomingCallSubscription;
@@ -51,7 +49,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final LocationService _location = LocationService();
-  final AccountTypeService _accountTypeService = AccountTypeService();
 
   @override
   void initState() {
@@ -70,12 +67,39 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
       }
     }
 
-    _listenUnread();
-    _listenForIncomingCalls();
-    _checkAndMarkMissedCalls(); // Check for old unanswered calls
-    _updateStatus(true);
-    _checkLocation();
-    _loadAccountType();
+    // Initialize listeners with error handling
+    _safeInit();
+  }
+
+  void _safeInit() {
+    try {
+      _listenUnread();
+    } catch (e) {
+      debugPrint('Error in _listenUnread: $e');
+    }
+
+    try {
+      _listenForIncomingCalls();
+    } catch (e) {
+      debugPrint('Error in _listenForIncomingCalls: $e');
+    }
+
+    // Run these async operations without blocking
+    _checkAndMarkMissedCalls().catchError((e) {
+      debugPrint('Error in _checkAndMarkMissedCalls: $e');
+    });
+
+    try {
+      _updateStatus(true);
+    } catch (e) {
+      debugPrint('Error in _updateStatus: $e');
+    }
+
+    try {
+      _checkLocation();
+    } catch (e) {
+      debugPrint('Error in _checkLocation: $e');
+    }
   }
 
   // Check for old calls that were never answered and mark them as missed
@@ -85,10 +109,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
 
     try {
       // Get calls where this user is the receiver and status is still calling/ringing
+      // Use simple query to avoid index requirements
       final oldCalls = await _firestore
           .collection('calls')
           .where('receiverId', isEqualTo: user.uid)
-          .where('status', whereIn: ['calling', 'ringing'])
           .get();
 
       final now = DateTime.now();
@@ -96,6 +120,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
 
       for (var doc in oldCalls.docs) {
         final data = doc.data();
+        final status = data['status'] as String?;
+
+        // Only process calls that are still in calling/ringing state
+        if (status != 'calling' && status != 'ringing') continue;
+
         // Use timestamp or createdAt field
         final timestamp = data['timestamp'] ?? data['createdAt'];
         DateTime? callTime;
@@ -141,35 +170,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     );
   }
 
-  void _loadAccountType() async {
-    final user = _auth.currentUser;
-    if (user == null) return;
-
-    final accountType = await _accountTypeService.getCurrentAccountType();
-    if (mounted) {
-      setState(() {
-        _accountType = accountType;
-        // Don't override _currentIndex if loginAccountType or initialIndex was provided
-        // This ensures the login screen's account type selection takes priority
-      });
-    }
-
-    _accountTypeSubscription?.cancel();
-    _accountTypeSubscription = _accountTypeService
-        .watchAccountType(user.uid)
-        .listen((type) {
-          if (mounted) {
-            setState(() => _accountType = type);
-          }
-        });
-  }
-
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _unreadSubscription?.cancel();
     _incomingCallSubscription?.cancel();
-    _accountTypeSubscription?.cancel();
     super.dispose();
   }
 
@@ -180,9 +185,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     _incomingCallSubscription?.cancel();
 
     final currentUserId = user.uid;
-    debugPrint('  ====== CALL LISTENER SETUP ======');
-    debugPrint('  Current user ID: $currentUserId');
-    debugPrint('  User email: ${user.email}');
 
     _incomingCallSubscription = _firestore
         .collection('calls')
@@ -192,58 +194,33 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
         .listen((snapshot) {
           if (!mounted || _isShowingIncomingCall) return;
 
-          debugPrint('  ====== CALL SNAPSHOT ======');
-          debugPrint('  Total calls in snapshot: ${snapshot.docs.length}');
-          debugPrint('  Changes count: ${snapshot.docChanges.length}');
-
           // Get current time for checking call freshness
           final now = DateTime.now();
           final cutoffTime = now.subtract(const Duration(seconds: 30));
 
           for (var change in snapshot.docChanges) {
-            debugPrint('  Change type: ${change.type}');
-
             if (change.type == DocumentChangeType.added) {
               final data = change.doc.data();
-              if (data == null) {
-                debugPrint('  Skipping: null data');
-                continue;
-              }
+              if (data == null) continue;
 
               final callId = change.doc.id;
               final callerId = data['callerId'] as String? ?? '';
               final receiverId = data['receiverId'] as String? ?? '';
 
-              debugPrint('  ====== CALL DETAILS ======');
-              debugPrint('  Call ID: $callId');
-              debugPrint('  Caller ID: $callerId');
-              debugPrint('  Receiver ID: $receiverId');
-              debugPrint('  My User ID: $currentUserId');
-              debugPrint('  Am I caller? ${callerId == currentUserId}');
-              debugPrint('  Am I receiver? ${receiverId == currentUserId}');
-
               // Skip if we've already handled this call
-              if (_handledCallIds.contains(callId)) {
-                debugPrint('    Skipping: already handled');
-                continue;
-              }
+              if (_handledCallIds.contains(callId)) continue;
 
-              // CRITICAL CHECK: Skip if current user is the caller (not the receiver)
+              // Skip if current user is the caller (not the receiver)
               if (callerId == currentUserId) {
-                debugPrint('    Skipping: I am the caller, not receiver');
                 _handledCallIds.add(callId);
                 continue;
               }
 
-              // Double verify: receiver ID must match current user exactly
+              // Verify receiver ID matches current user
               if (receiverId != currentUserId) {
-                debugPrint('    Skipping: receiver ID does not match my ID');
-                debugPrint('  Expected: $currentUserId, Got: $receiverId');
                 _handledCallIds.add(callId);
                 continue;
               }
-
-              debugPrint('    Call is valid for this user!');
 
               // Check call timestamp - ignore old calls and mark as missed
               // Use timestamp or createdAt field
@@ -266,7 +243,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
                 });
 
                 // Show missed call notification
-                final callerNameMissed = data['callerName'] as String? ?? 'Unknown';
+                final callerNameMissed =
+                    data['callerName'] as String? ?? 'Unknown';
                 _showMissedCallNotification(callerNameMissed);
                 continue;
               }

@@ -1,6 +1,5 @@
 ﻿import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
 
 /// ChatService - Handles all chat-related operations
 ///
@@ -44,8 +43,6 @@ class ChatService {
 
     // Join with underscore
     final chatId = '${sortedUids[0]}_${sortedUids[1]}';
-
-    debugPrint('ChatService: Generated chatId=$chatId for users $uid1 and $uid2');
     return chatId;
   }
 
@@ -79,8 +76,6 @@ class ChatService {
     String? otherUserPhoto,
   }) async {
     try {
-      debugPrint('ChatService: getOrCreateChat called for $myUid and $otherUid');
-
       // STEP 1: Generate deterministic chat ID
       final chatId = generateChatId(myUid, otherUid);
 
@@ -92,13 +87,11 @@ class ChatService {
 
       if (chatSnapshot.exists) {
         // Chat already exists - just return the ID
-        debugPrint('ChatService: Chat already exists: $chatId');
         return chatId;
       }
 
       // STEP 3: Chat doesn't exist - create it using TRANSACTION
       // Transactions prevent race conditions when both users click simultaneously
-      debugPrint('ChatService: Creating new chat: $chatId');
 
       await _firestore.runTransaction((transaction) async {
         // Double-check within transaction (another user might have created it)
@@ -154,18 +147,11 @@ class ChatService {
             'isArchived': false,
             'isMuted': false,
           });
-
-          debugPrint('ChatService: Chat created successfully: $chatId');
-        } else {
-          debugPrint(
-            'ChatService: Chat was created by another transaction: $chatId',
-          );
         }
       });
 
       return chatId;
     } catch (e) {
-      debugPrint('ChatService ERROR in getOrCreateChat: $e');
       rethrow;
     }
   }
@@ -216,10 +202,7 @@ class ChatService {
         'lastMessageSenderId': senderId,
         'lastMessageTime': now,
       });
-
-      debugPrint('ChatService: Message sent successfully in chat $chatId');
     } catch (e) {
-      debugPrint('ChatService ERROR in sendMessage: $e');
       rethrow;
     }
   }
@@ -249,7 +232,7 @@ class ChatService {
       // Update unread count for this user
       await chatRef.update({'unreadCount.$userId': 0});
     } catch (e) {
-      debugPrint('ChatService ERROR in markMessagesAsRead: $e');
+      // Silently ignore errors
     }
   }
 
@@ -268,10 +251,7 @@ class ChatService {
 
       // Delete the chat document
       await chatRef.delete();
-
-      debugPrint('ChatService: Chat deleted: $chatId');
     } catch (e) {
-      debugPrint('ChatService ERROR in deleteChat: $e');
       rethrow;
     }
   }

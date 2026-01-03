@@ -2,11 +2,17 @@
     
     <!-- Internet permission for loading network images -->
     <uses-permission android:name="android.permission.INTERNET"/>
-    <!-- Camera permission for taking photos -->
+    <!-- Camera permission for taking photos and recording video -->
     <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-feature android:name="android.hardware.camera" android:required="false"/>
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false"/>
     <!-- Storage permissions for image picker -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29"/>
+    <!-- Android 13+ media permissions -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO"/>
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO"/>
     
     <!-- Location permissions for GPS location (CRITICAL FOR LOCATION TO WORK!) -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>

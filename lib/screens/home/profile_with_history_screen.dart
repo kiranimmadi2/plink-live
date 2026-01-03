@@ -934,9 +934,8 @@ class _ProfileWithHistoryScreenState
 
   @override
   Widget build(BuildContext context) {
-    final themeState = ref.watch(themeProvider);
-    final isDarkMode = themeState.isDarkMode;
-    final isGlass = themeState.isGlassmorphism;
+    // Theme state watched for reactivity
+    ref.watch(themeProvider);
 
     return Scaffold(
       extendBodyBehindAppBar: true,

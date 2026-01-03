@@ -31,6 +31,8 @@ class PostModel {
   final String? ageRange;
   final String? condition;
   final String? brand;
+  final String? userName;
+  final String? userPhoto;
 
   PostModel({
     required this.id,
@@ -61,6 +63,8 @@ class PostModel {
     this.ageRange,
     this.condition,
     this.brand,
+    this.userName,
+    this.userPhoto,
   });
 
   factory PostModel.fromFirestore(DocumentSnapshot doc) {
@@ -102,6 +106,8 @@ class PostModel {
       ageRange: data['ageRange'],
       condition: data['condition'],
       brand: data['brand'],
+      userName: data['userName'],
+      userPhoto: data['userPhoto'],
     );
   }
 
@@ -134,6 +140,8 @@ class PostModel {
       'ageRange': ageRange,
       'condition': condition,
       'brand': brand,
+      'userName': userName,
+      'userPhoto': userPhoto,
       'lastUpdated': FieldValue.serverTimestamp(),
     };
   }

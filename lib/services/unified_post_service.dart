@@ -79,6 +79,14 @@ class UnifiedPostService {
       // Step 4: Extract keywords for search
       final keywords = _extractKeywords('$title $description');
 
+      // Get user name and photo for display
+      // Fallback to phone number for phone login users
+      String? userName = userProfile['name'] ?? userProfile['displayName'];
+      if (userName == null || userName.isEmpty || userName == 'User') {
+        userName = userProfile['phone'];
+      }
+      final userPhoto = userProfile['photoUrl'] ?? userProfile['photoURL'] ?? userProfile['profileImageUrl'];
+
       // Step 5: Create PostModel
       final post = PostModel(
         id: '', // Will be set by Firestore
@@ -108,6 +116,8 @@ class UnifiedPostService {
         clarificationAnswers: clarificationAnswers ?? {},
         viewCount: 0,
         matchedUserIds: [],
+        userName: userName,
+        userPhoto: userPhoto,
       );
 
       // Step 6: Validate post before storing

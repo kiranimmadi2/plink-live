@@ -107,10 +107,6 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
     final images = widget.post?.images ?? [];
     final profileImage = widget.userProfile.profileImageUrl;
 
-    // Debug logging
-    debugPrint('Profile Image URL: $profileImage');
-    debugPrint('Post Images: $images');
-
     // Build the default fallback avatar widget
     Widget buildDefaultAvatar() {
       final initial = widget.userProfile.name.isNotEmpty
@@ -206,7 +202,6 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
     // On web, if all images are Google photos, just show fallback immediately
     // to avoid CORS errors and rate limiting
     if (kIsWeb && !hasNonGoogleImages) {
-      debugPrint('Skipping Google photo loading on web - showing fallback');
       return buildDefaultAvatar();
     }
 
@@ -226,7 +221,6 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
             itemCount: allImages.length,
             itemBuilder: (context, index) {
               final imageUrl = allImages[index];
-              debugPrint('Loading image at index $index: $imageUrl');
 
               // Validate URL before loading
               if (imageUrl.isEmpty) {
@@ -304,8 +298,6 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
                     );
                   },
                   errorBuilder: (context, error, stackTrace) {
-                    debugPrint('Error loading image: $imageUrl');
-                    debugPrint('Error details: $error');
                     // Check for rate limiting (429)
                     if (error.toString().contains('429')) {
                       PhotoUrlHelper.markAsRateLimited(imageUrl);
@@ -325,8 +317,6 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
                   child: const Center(child: CircularProgressIndicator()),
                 ),
                 errorWidget: (context, url, error) {
-                  debugPrint('Error loading image: $url');
-                  debugPrint('Error details: $error');
                   // Check for rate limiting (429)
                   if (error.toString().contains('429')) {
                     PhotoUrlHelper.markAsRateLimited(url);

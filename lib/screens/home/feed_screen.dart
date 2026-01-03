@@ -56,6 +56,9 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
   // Saved posts
   Set<String> _savedPostIds = {};
 
+  // User cache for fetching names
+  final Map<String, Map<String, dynamic>> _userCache = {};
+
   // Voice search
   bool _isListening = false;
   final stt.SpeechToText _speech = stt.SpeechToText();
@@ -407,6 +410,67 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
     } catch (e) {
       debugPrint('Error loading saved posts: $e');
     }
+  }
+
+  /// Fetch user data from Firestore and cache it
+  Future<Map<String, dynamic>?> _getUserData(String userId) async {
+    // Check cache first
+    if (_userCache.containsKey(userId)) {
+      return _userCache[userId];
+    }
+
+    try {
+      final userDoc = await _firestore.collection('users').doc(userId).get();
+      if (userDoc.exists) {
+        final userData = userDoc.data()!;
+        _userCache[userId] = userData;
+        return userData;
+      }
+    } catch (e) {
+      debugPrint('Error fetching user data: $e');
+    }
+    return null;
+  }
+
+  /// Get display name for a post - fetches from user profile if not stored
+  String _getDisplayName(Map<String, dynamic> post, Map<String, dynamic>? userData) {
+    // First try post's stored userName
+    final postUserName = post['userName'] as String?;
+    if (postUserName != null && postUserName.isNotEmpty && postUserName != 'User') {
+      return postUserName;
+    }
+
+    // Then try fetched user data
+    if (userData != null) {
+      // Try name first
+      final name = userData['name'] ?? userData['displayName'];
+      if (name != null && name.toString().isNotEmpty && name.toString() != 'User') {
+        return name.toString();
+      }
+      // Fallback to phone number for phone login users
+      final phone = userData['phone'] as String?;
+      if (phone != null && phone.isNotEmpty) {
+        return phone;
+      }
+    }
+
+    return 'User';
+  }
+
+  /// Get photo URL for a post - fetches from user profile if not stored
+  String? _getPhotoUrl(Map<String, dynamic> post, Map<String, dynamic>? userData) {
+    // First try post's stored userPhoto
+    final postPhoto = post['userPhoto'] as String?;
+    if (postPhoto != null && postPhoto.isNotEmpty) {
+      return postPhoto;
+    }
+
+    // Then try fetched user data
+    if (userData != null) {
+      return userData['photoUrl'] ?? userData['photoURL'] ?? userData['profileImageUrl'];
+    }
+
+    return null;
   }
 
   Future<void> _toggleSavePost(
@@ -955,9 +1019,37 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
         ? images[0].toString()
         : null;
     final price = post['price'];
-    final userName = post['userName'] ?? 'User';
-    final userPhoto = post['userPhoto'];
     final createdAt = post['createdAt'];
+
+    // Check if we need to fetch user data
+    final storedUserName = post['userName'] as String?;
+    final storedUserPhoto = post['userPhoto'] as String?;
+
+    // Get cached data if available
+    final cachedUserData = postUserId != null ? _userCache[postUserId] : null;
+
+    // Determine display name and photo
+    String userName;
+    String? userPhoto;
+
+    if (cachedUserData != null) {
+      userName = _getDisplayName(post, cachedUserData);
+      userPhoto = _getPhotoUrl(post, cachedUserData);
+    } else {
+      userName = storedUserName ?? 'User';
+      userPhoto = storedUserPhoto;
+
+      // Fetch user data in background if name is missing/default
+      if (postUserId != null &&
+          !postUserId.startsWith('dummy_') &&
+          (storedUserName == null || storedUserName.isEmpty || storedUserName == 'User')) {
+        _getUserData(postUserId).then((userData) {
+          if (userData != null && mounted) {
+            setState(() {}); // Trigger rebuild with cached data
+          }
+        });
+      }
+    }
 
     DateTime? time;
     if (createdAt != null && createdAt is Timestamp) {
@@ -1551,24 +1643,8 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
 
       if (!mounted) return;
 
-      final userData = userDoc.data()!;
-      final userProfile = UserProfile(
-        uid: postUserId,
-        id: postUserId,
-        name: userData['name'] ?? userData['displayName'] ?? userName,
-        email: userData['email'] ?? '',
-        profileImageUrl:
-            userData['photoUrl'] ??
-            userData['photoURL'] ??
-            userData['profileImageUrl'] ??
-            userPhoto,
-        bio: userData['bio'] ?? '',
-        location: userData['location'],
-        interests:
-            (userData['interests'] as List<dynamic>?)?.cast<String>() ?? [],
-        createdAt: DateTime.now(),
-        lastSeen: DateTime.now(),
-      );
+      // Use fromFirestore to get proper name (with phone fallback)
+      final userProfile = UserProfile.fromFirestore(userDoc);
 
       // Navigate to voice call screen
       Navigator.pushNamed(
@@ -1751,23 +1827,8 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
 
       if (!userDoc.exists || !mounted) return;
 
-      final userData = userDoc.data()!;
-      final userProfile = UserProfile(
-        uid: postUserId,
-        id: postUserId,
-        name: userData['name'] ?? userData['displayName'] ?? 'User',
-        email: userData['email'] ?? '',
-        profileImageUrl:
-            userData['photoUrl'] ??
-            userData['photoURL'] ??
-            userData['profileImageUrl'],
-        bio: userData['bio'] ?? '',
-        location: userData['location'],
-        interests:
-            (userData['interests'] as List<dynamic>?)?.cast<String>() ?? [],
-        createdAt: DateTime.now(),
-        lastSeen: DateTime.now(),
-      );
+      // Use fromFirestore to get proper name (with phone fallback)
+      final userProfile = UserProfile.fromFirestore(userDoc);
 
       Navigator.push(
         context,

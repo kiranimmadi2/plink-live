@@ -3,7 +3,9 @@ import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/user_profile.dart';
+import '../../models/message_model.dart';
 import '../../widgets/safe_circle_avatar.dart';
 import '../../widgets/floating_particles.dart';
 import '../../services/other services/voice_call_service.dart';
@@ -80,24 +82,118 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
         'status': 'missed',
         'missedAt': FieldValue.serverTimestamp(),
       });
+
+      // Send missed call message to chat (only from caller's side to avoid duplicates)
+      if (widget.isOutgoing) {
+        await _sendCallMessageToChat(isMissed: true, duration: 0);
+      }
     } catch (e) {
-      debugPrint('Error marking call as missed: $e');
+      // Error marking call as missed
     }
 
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Call not answered'),
-          backgroundColor: Colors.orange,
-        ),
-      );
       Navigator.of(context).pop();
+    }
+  }
+
+  /// Send call event message to chat conversation
+  /// Uses deterministic message ID to prevent duplicates if both users try to send
+  Future<void> _sendCallMessageToChat({
+    required bool isMissed,
+    required int duration,
+  }) async {
+    try {
+      final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+      if (currentUserId == null) return;
+
+      // Get or create conversation ID
+      final participants = [currentUserId, widget.otherUser.uid]..sort();
+      final conversationId = participants.join('_');
+
+      // Determine who was the actual caller (the one with isOutgoing = true)
+      // This is important for correct message display
+      final actualCallerId = widget.isOutgoing ? currentUserId : widget.otherUser.uid;
+      final actualReceiverId = widget.isOutgoing ? widget.otherUser.uid : currentUserId;
+
+      // Check if conversation exists
+      final conversationDoc = await _firestore
+          .collection('conversations')
+          .doc(conversationId)
+          .get();
+      if (!conversationDoc.exists) {
+        // Create conversation if it doesn't exist
+        await _firestore.collection('conversations').doc(conversationId).set({
+          'participants': participants,
+          'createdAt': FieldValue.serverTimestamp(),
+          'lastMessageTime': FieldValue.serverTimestamp(),
+        });
+      }
+
+      // Use deterministic message ID based on call ID to prevent duplicates
+      // This allows both caller and receiver to attempt sending without creating duplicates
+      final messageId = 'call_${widget.callId}';
+      final messageRef = _firestore
+          .collection('conversations')
+          .doc(conversationId)
+          .collection('messages')
+          .doc(messageId);
+
+      final now = DateTime.now();
+      final messageType = isMissed
+          ? MessageType.missedCall
+          : MessageType.voiceCall;
+
+      // Format duration for display
+      String callText;
+      if (isMissed) {
+        callText = widget.isOutgoing
+            ? 'Outgoing call - No answer'
+            : 'Missed voice call';
+      } else {
+        final minutes = duration ~/ 60;
+        final seconds = duration % 60;
+        final durationStr =
+            '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+        callText = 'Voice call • $durationStr';
+      }
+
+      // IMPORTANT: senderId is ALWAYS the caller, not necessarily the current user
+      // This ensures the message displays correctly:
+      // - Caller sees it as "outgoing" (isMe = true)
+      // - Receiver sees it as "incoming" (isMe = false)
+      await messageRef.set({
+        'id': messageId,
+        'senderId': actualCallerId,
+        'receiverId': actualReceiverId,
+        'chatId': conversationId,
+        'text': callText,
+        'type': messageType.index,
+        'status': MessageStatus.delivered.index,
+        'timestamp': Timestamp.fromDate(now),
+        'isEdited': false,
+        'read': false,
+        'isRead': false,
+        'metadata': {
+          'callId': widget.callId,
+          'duration': duration,
+          'isOutgoing': widget.isOutgoing,
+          'isMissed': isMissed,
+        },
+      });
+
+      // Update conversation last message
+      await _firestore.collection('conversations').doc(conversationId).update({
+        'lastMessage': isMissed ? '  Missed call' : '  Voice call',
+        'lastMessageTime': FieldValue.serverTimestamp(),
+        'lastMessageSenderId': actualCallerId,
+      });
+    } catch (e) {
+      // Error sending call message
     }
   }
 
   void _setupVoiceCallService() {
     _voiceCallService.onUserJoined = (uid) {
-      debugPrint('VoiceCallScreen: Remote user joined');
       if (mounted) {
         setState(() {
           _webrtcConnected = true;
@@ -106,7 +202,6 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
     };
 
     _voiceCallService.onUserOffline = (uid) {
-      debugPrint('VoiceCallScreen: Remote user offline');
       if (mounted) {
         setState(() {
           _webrtcConnected = false;
@@ -115,33 +210,20 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
     };
 
     _voiceCallService.onError = (message) {
-      debugPrint('VoiceCallScreen: Error - $message');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(message),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      // Error handled silently - no snackbar
+      debugPrint('VoiceCall error: $message');
     };
   }
 
   Future<void> _joinCall() async {
-    debugPrint('VoiceCallScreen: Joining call ${widget.callId}, isOutgoing: ${widget.isOutgoing}');
-
     final success = await _voiceCallService.joinCall(
       widget.callId,
       isCaller: widget.isOutgoing,
     );
 
     if (!success && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Failed to connect audio'),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      // Audio connection failed - handled silently
+      debugPrint('Failed to connect audio');
     }
   }
 
@@ -182,9 +264,19 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
                   'connectedAt': FieldValue.serverTimestamp(),
                 });
               }
-            } else if (status == 'ended' || status == 'declined' || status == 'rejected' || status == 'missed') {
+            } else if (status == 'ended' ||
+                status == 'declined' ||
+                status == 'rejected' ||
+                status == 'missed') {
               _callTimeoutTimer?.cancel();
-              _endCall(showSnackbar: status == 'declined' || status == 'rejected' || status == 'missed');
+              _endCall(
+                wasMissedOrDeclined:
+                    status == 'declined' ||
+                    status == 'rejected' ||
+                    status == 'missed',
+                // Don't send message if rejected - IncomingCallScreen already sent it
+                skipMessage: status == 'rejected',
+              );
             }
           }
         });
@@ -207,32 +299,42 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
     return '${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
   }
 
-  Future<void> _endCall({bool showSnackbar = false}) async {
+  Future<void> _endCall({
+    bool wasMissedOrDeclined = false,
+    bool skipMessage = false,
+  }) async {
     _callTimer?.cancel();
+    _callTimeoutTimer?.cancel();
     _callSubscription?.cancel();
 
     // Leave WebRTC call
     await _voiceCallService.leaveCall();
 
+    // Determine if this was a missed/declined call or completed call
+    final bool wasMissed = wasMissedOrDeclined || _callDuration == 0;
+
     try {
       await _firestore.collection('calls').doc(widget.callId).update({
-        'status': 'ended',
+        'status': wasMissed ? 'missed' : 'ended',
         'endedAt': FieldValue.serverTimestamp(),
         'duration': _callDuration,
       });
+
+      // Send call message to chat from BOTH sides for reliability
+      // Uses deterministic message ID (call_{callId}) to prevent duplicates
+      // This ensures the message is recorded even if one side disconnects
+      // Skip only if rejected - IncomingCallScreen handles that case
+      if (!skipMessage) {
+        await _sendCallMessageToChat(
+          isMissed: wasMissed,
+          duration: _callDuration,
+        );
+      }
     } catch (e) {
-      debugPrint('Error updating call status: $e');
+      // Error updating call status
     }
 
     if (mounted) {
-      if (showSnackbar) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Call was declined'),
-            backgroundColor: Colors.orange,
-          ),
-        );
-      }
       Navigator.of(context).pop();
     }
   }
@@ -258,8 +360,12 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
     _callTimer?.cancel();
     _callTimeoutTimer?.cancel();
     _callSubscription?.cancel();
-    _voiceCallService.leaveCall();
-    _pulseController.dispose();
+    try {
+      _voiceCallService.leaveCall();
+    } catch (_) {}
+    try {
+      _pulseController.dispose();
+    } catch (_) {}
     super.dispose();
   }
 

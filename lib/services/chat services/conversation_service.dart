@@ -294,16 +294,8 @@ class ConversationService {
         throw Exception('Other user not found');
       }
 
-      final otherUserData = otherUserDoc.data()!;
-      final otherUser = UserProfile(
-        uid: otherUserId,
-        name: otherUserData['name'] ?? 'User',
-        email: otherUserData['email'] ?? '',
-        profileImageUrl:
-            otherUserData['profileImageUrl'] ?? otherUserData['photoUrl'],
-        createdAt: DateTime.now(),
-        lastSeen: DateTime.now(),
-      );
+      // Use fromFirestore to get proper name (with phone fallback)
+      final otherUser = UserProfile.fromFirestore(otherUserDoc);
 
       // Create conversation
       await _createConversation(conversationId, currentUserId, otherUser);

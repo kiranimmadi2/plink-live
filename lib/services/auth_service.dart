@@ -1,7 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart';
 import '../res/utils/photo_url_helper.dart';
 
 class AuthService {
@@ -130,40 +129,29 @@ class AuthService {
 
   Future<User?> signInWithGoogle({String? accountType}) async {
     try {
-      debugPrint('   Google Sign In: Starting...');
-
       // Check if already signed in
-      await _googleSignIn.signOut();
-      debugPrint('   Google Sign In: Signed out previous session');
+      try {
+        await _googleSignIn.signOut();
+      } catch (e) {
+        // Error signing out previous session
+      }
 
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-      debugPrint(
-        '   Google Sign In: signIn() completed, user: ${googleUser?.email}',
-      );
 
       if (googleUser == null) {
-        debugPrint('   Google Sign In: User cancelled or no account selected');
         return null;
       }
 
-      debugPrint('   Google Sign In: Getting authentication tokens...');
       final GoogleSignInAuthentication googleAuth =
           await googleUser.authentication;
-      debugPrint(
-        '   Google Sign In: Got tokens - accessToken: ${googleAuth.accessToken != null}, idToken: ${googleAuth.idToken != null}',
-      );
 
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
 
-      debugPrint('   Google Sign In: Signing in to Firebase...');
       final UserCredential result = await _auth.signInWithCredential(
         credential,
-      );
-      debugPrint(
-        '   Google Sign In: Firebase sign in successful - uid: ${result.user?.uid}',
       );
 
       // Save Google profile photo URL to Firestore
@@ -218,7 +206,7 @@ class AuthService {
           try {
             await user.updatePhotoURL(photoUrl);
           } catch (e) {
-            debugPrint('Could not update auth photo URL: $e');
+            // Could not update auth photo URL
           }
         }
       }
@@ -244,8 +232,6 @@ class AuthService {
       }
       throw Exception(message);
     } catch (e) {
-      debugPrint('   Google Sign In ERROR: $e');
-      debugPrint('   Google Sign In ERROR Type: ${e.runtimeType}');
       throw Exception('Google sign-in failed: ${e.toString()}');
     }
   }
@@ -262,16 +248,13 @@ class AuthService {
               'isOnline': false,
               'lastSeen': FieldValue.serverTimestamp(),
             })
-            .catchError((e) {
-              debugPrint('Error updating status on logout: $e');
-            });
+            .catchError((e) {});
       }
 
       // Sign out from Firebase and Google immediately
       await Future.wait([
         _auth.signOut(),
         _googleSignIn.signOut().catchError((e) {
-          debugPrint('Google sign out error (non-fatal): $e');
           return null;
         }),
       ]);
@@ -280,7 +263,6 @@ class AuthService {
       try {
         await _auth.signOut();
       } catch (_) {}
-      debugPrint('Sign out error: $e');
     }
   }
 
@@ -298,13 +280,11 @@ class AuthService {
         timeout: const Duration(seconds: 60),
         verificationCompleted: (PhoneAuthCredential credential) async {
           // Auto-verification (Android only)
-          debugPrint('Phone auto-verified');
           if (onAutoVerify != null) {
             onAutoVerify(credential);
           }
         },
         verificationFailed: (FirebaseAuthException e) {
-          debugPrint('Phone verification failed: ${e.code} - ${e.message}');
           String message;
           switch (e.code) {
             case 'invalid-phone-number':
@@ -333,20 +313,17 @@ class AuthService {
           onError(message);
         },
         codeSent: (String verificationId, int? resendToken) {
-          debugPrint('OTP code sent to $phoneNumber');
           _verificationId = verificationId;
           _resendToken = resendToken;
           onCodeSent(verificationId);
         },
         codeAutoRetrievalTimeout: (String verificationId) {
-          debugPrint('Auto retrieval timeout');
           _verificationId = verificationId;
         },
         forceResendingToken: _resendToken,
       );
       return {'success': true};
     } catch (e) {
-      debugPrint('sendPhoneOTP error: $e');
       onError('Failed to send OTP: ${e.toString()}');
       return {'success': false, 'error': e.toString()};
     }
@@ -634,10 +611,13 @@ class AuthService {
       final accType = _parseAccountType(_pendingAccountType);
       final needsVerification = accType != 'personal';
 
+      // Use phone number as name if displayName is not available
+      final displayName = user.displayName ?? user.phoneNumber ?? 'User';
+
       await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
         'uid': user.uid,
         'phone': user.phoneNumber,
-        'name': user.displayName ?? 'User',
+        'name': displayName,
         'lastSeen': FieldValue.serverTimestamp(),
         if (isNewUser) 'createdAt': FieldValue.serverTimestamp(),
         'isOnline': true,
@@ -660,7 +640,7 @@ class AuthService {
       _pendingAccountType = null;
       _pendingPassword = null;
     } catch (e) {
-      debugPrint('Error updating profile on phone login: $e');
+      // Error updating profile on phone login
     }
   }
 
@@ -691,7 +671,7 @@ class AuthService {
         },
       }, SetOptions(merge: true));
     } catch (e) {
-      debugPrint('Error updating profile on login: $e');
+      // Error updating profile on login
     }
   }
 
@@ -714,7 +694,6 @@ class AuthService {
           .add({'type': 'password_change', 'timestamp': now, 'success': true});
     } catch (e) {
       // Don't fail the password change if logging fails
-      debugPrint('Failed to record password change: $e');
     }
   }
 }

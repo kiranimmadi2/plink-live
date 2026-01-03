@@ -17,6 +17,8 @@ import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_sound/flutter_sound.dart';
+import 'package:video_player/video_player.dart';
+import 'package:chewie/chewie.dart';
 import '../../res/config/app_colors.dart';
 import '../../res/config/app_text_styles.dart';
 import '../../res/config/app_assets.dart';
@@ -95,16 +97,19 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
   // Single stream for user status (avoid duplicate queries)
   Stream<DocumentSnapshot>? _userStatusStream;
 
-  // Voice recording variables
-  final FlutterSoundRecorder _audioRecorder = FlutterSoundRecorder();
+  // Voice recording variables - lazy initialized to prevent crashes
+  FlutterSoundRecorder? _audioRecorder;
   bool _isRecording = false;
   bool _isRecorderInitialized = false;
   String? _recordingPath;
   Timer? _recordingTimer;
   int _recordingDuration = 0;
 
-  // Voice playback variables
-  final FlutterSoundPlayer _audioPlayer = FlutterSoundPlayer();
+  // Video recording flag to prevent multiple simultaneous recordings
+  bool _isRecordingVideo = false;
+
+  // Voice playback variables - lazy initialized to prevent crashes
+  FlutterSoundPlayer? _audioPlayer;
   bool _isPlayerInitialized = false;
   String? _currentlyPlayingMessageId;
   bool _isPlaying = false;
@@ -115,43 +120,51 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
   void initState() {
     super.initState();
 
-    // Cache user ID for use during dispose
-    _cachedUserId = ref.read(currentUserIdProvider);
+    try {
+      // Cache user ID for use during dispose
+      _cachedUserId = ref.read(currentUserIdProvider);
 
-    // Initialize single user status stream
-    _userStatusStream = _firestore
-        .collection('users')
-        .doc(widget.otherUser.uid)
-        .snapshots();
+      // Initialize single user status stream
+      _userStatusStream = _firestore
+          .collection('users')
+          .doc(widget.otherUser.uid)
+          .snapshots();
 
-    WidgetsBinding.instance.addObserver(this);
+      WidgetsBinding.instance.addObserver(this);
 
-    // Initialize conversation IMMEDIATELY for faster loading
-    _initializeConversation();
+      // Initialize conversation IMMEDIATELY for faster loading
+      _initializeConversation();
 
-    _setupAnimations();
-    _scrollController.addListener(_scrollListener);
+      _setupAnimations();
+      _scrollController.addListener(_scrollListener);
 
-    // Defer non-critical tasks to after first frame
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      if (!mounted) return;
+      // Defer non-critical tasks to after first frame
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (!mounted) return;
 
-      _markMessagesAsRead();
+        try {
+          _markMessagesAsRead();
 
-      // If there's an initial message, set it in the message controller
-      if (widget.initialMessage != null) {
-        _messageController.text = widget.initialMessage!;
-        FocusScope.of(context).requestFocus(_messageFocusNode);
-      }
+          // If there's an initial message, set it in the message controller
+          if (widget.initialMessage != null) {
+            _messageController.text = widget.initialMessage!;
+            FocusScope.of(context).requestFocus(_messageFocusNode);
+          }
 
-      // Listen for incoming messages for sound/vibration feedback
-      _listenForIncomingMessages();
+          // Listen for incoming messages for sound/vibration feedback
+          _listenForIncomingMessages();
 
-      // Sync messages from Firebase to local database in background (low priority)
-      Future.delayed(const Duration(milliseconds: 500), () {
-        if (mounted) _syncMessagesInBackground();
+          // Sync messages from Firebase to local database in background (low priority)
+          Future.delayed(const Duration(milliseconds: 500), () {
+            if (mounted) _syncMessagesInBackground();
+          });
+        } catch (e) {
+          // Error in post frame callback
+        }
       });
-    });
+    } catch (e) {
+      // Error in initState
+    }
   }
 
   void _listenForIncomingMessages() {
@@ -284,20 +297,52 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    _messageController.dispose();
-    _messageFocusNode.dispose();
-    _scrollController.dispose();
+    try {
+      WidgetsBinding.instance.removeObserver(this);
+    } catch (_) {}
+
+    try {
+      _messageController.dispose();
+    } catch (_) {}
+
+    try {
+      _messageFocusNode.dispose();
+    } catch (_) {}
+
+    try {
+      _scrollController.dispose();
+    } catch (_) {}
+
     _typingTimer?.cancel();
-    _animationController.dispose();
-    _searchController.dispose();
-    _searchFocusNode.dispose();
-    // Dispose audio recorder
+
+    try {
+      _animationController.dispose();
+    } catch (_) {}
+
+    try {
+      _searchController.dispose();
+    } catch (_) {}
+
+    try {
+      _searchFocusNode.dispose();
+    } catch (_) {}
+
+    // Dispose audio recorder safely
     _recordingTimer?.cancel();
-    _audioRecorder.closeRecorder();
-    // Dispose audio player
+    try {
+      if (_isRecorderInitialized && _audioRecorder != null) {
+        _audioRecorder?.closeRecorder();
+      }
+    } catch (_) {}
+
+    // Dispose audio player safely
     _playerSubscription?.cancel();
-    _audioPlayer.closePlayer();
+    try {
+      if (_isPlayerInitialized && _audioPlayer != null) {
+        _audioPlayer?.closePlayer();
+      }
+    } catch (_) {}
+
     // Update typing status directly without using ref (which is disposed)
     _clearTypingStatusOnDispose();
     super.dispose();
@@ -435,7 +480,7 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
                             !PhotoUrlHelper.isValidUrl(
                               widget.otherUser.profileImageUrl,
                             )
-                            ? Text(widget.otherUser.name[0].toUpperCase())
+                            ? Text(widget.otherUser.name.isNotEmpty ? widget.otherUser.name[0].toUpperCase() : '?')
                             : null,
                       ),
                     ),
@@ -676,33 +721,47 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
         }
 
         // Convert Firestore documents to MessageModel
-        final messages = snapshot.data!.docs.map((doc) {
-          final data = doc.data() as Map<String, dynamic>;
-          return MessageModel(
-            id: doc.id,
-            senderId: data['senderId'] as String? ?? '',
-            receiverId: data['receiverId'] as String? ?? '',
-            chatId: _conversationId!,
-            text: data['text'] as String?,
-            mediaUrl:
-                data['mediaUrl'] as String? ?? data['imageUrl'] as String?,
-            audioUrl: data['audioUrl'] as String?,
-            audioDuration: data['audioDuration'] as int?,
-            timestamp: data['timestamp'] != null
-                ? (data['timestamp'] as Timestamp).toDate()
-                : DateTime.now(),
-            status: _parseMessageStatusFromInt(
-              data['status'],
-              isRead: data['read'] == true || data['isRead'] == true,
-            ),
-            type: _parseMessageType(data['type']),
-            replyToMessageId: data['replyToMessageId'] as String?,
-            isEdited: data['isEdited'] ?? false,
-            reactions: data['reactions'] != null
-                ? List<String>.from(data['reactions'])
-                : null,
-          );
-        }).toList();
+        // Filter out messages deleted for current user (WhatsApp-style "Delete for me")
+        final currentUserId = _currentUserId;
+        final messages = snapshot.data!.docs
+            .where((doc) {
+              final data = doc.data() as Map<String, dynamic>;
+              // Check if message is deleted for current user
+              final deletedFor = data['deletedFor'] as List<dynamic>?;
+              if (deletedFor != null && currentUserId != null) {
+                return !deletedFor.contains(currentUserId);
+              }
+              return true;
+            })
+            .map((doc) {
+              final data = doc.data() as Map<String, dynamic>;
+              final isDeleted = data['isDeleted'] == true;
+              return MessageModel(
+                id: doc.id,
+                senderId: data['senderId'] as String? ?? '',
+                receiverId: data['receiverId'] as String? ?? '',
+                chatId: _conversationId!,
+                text: data['text'] as String?,
+                mediaUrl: isDeleted ? null : (data['mediaUrl'] as String? ?? data['imageUrl'] as String?),
+                audioUrl: isDeleted ? null : data['audioUrl'] as String?,
+                audioDuration: data['audioDuration'] as int?,
+                timestamp: data['timestamp'] != null
+                    ? (data['timestamp'] as Timestamp).toDate()
+                    : DateTime.now(),
+                status: _parseMessageStatusFromInt(
+                  data['status'],
+                  isRead: data['read'] == true || data['isRead'] == true,
+                ),
+                type: _parseMessageType(data['type']),
+                replyToMessageId: data['replyToMessageId'] as String?,
+                isEdited: data['isEdited'] ?? false,
+                isDeleted: isDeleted,
+                reactions: data['reactions'] != null
+                    ? List<String>.from(data['reactions'])
+                    : null,
+              );
+            })
+            .toList();
 
         // Update _allMessages after build using post-frame callback to avoid state mutation in build
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -715,10 +774,19 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
         final allDisplayMessages = <MessageModel>[...messages];
 
         // Add older loaded messages (avoiding duplicates)
+        // Also filter out messages deleted for current user
         for (final doc in _loadedMessages) {
           final data = doc.data() as Map<String, dynamic>;
           final messageId = doc.id;
+
+          // Check if message is deleted for current user
+          final deletedFor = data['deletedFor'] as List<dynamic>?;
+          if (deletedFor != null && currentUserId != null && deletedFor.contains(currentUserId)) {
+            continue; // Skip this message - deleted for current user
+          }
+
           if (!allDisplayMessages.any((m) => m.id == messageId)) {
+            final isDeleted = data['isDeleted'] == true;
             allDisplayMessages.add(
               MessageModel(
                 id: messageId,
@@ -726,9 +794,8 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
                 receiverId: data['receiverId'] as String? ?? '',
                 chatId: _conversationId!,
                 text: data['text'] as String?,
-                mediaUrl:
-                    data['mediaUrl'] as String? ?? data['imageUrl'] as String?,
-                audioUrl: data['audioUrl'] as String?,
+                mediaUrl: isDeleted ? null : (data['mediaUrl'] as String? ?? data['imageUrl'] as String?),
+                audioUrl: isDeleted ? null : data['audioUrl'] as String?,
                 audioDuration: data['audioDuration'] as int?,
                 timestamp: data['timestamp'] != null
                     ? (data['timestamp'] as Timestamp).toDate()
@@ -740,6 +807,7 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
                 type: _parseMessageType(data['type']),
                 replyToMessageId: data['replyToMessageId'] as String?,
                 isEdited: data['isEdited'] ?? false,
+                isDeleted: isDeleted,
                 reactions: data['reactions'] != null
                     ? List<String>.from(data['reactions'])
                     : null,
@@ -809,53 +877,41 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
 
   // Helper to parse message status from int, string, or isRead field
   MessageStatus _parseMessageStatusFromInt(dynamic status, {bool? isRead}) {
-    debugPrint('📩 Parsing status: $status (type: ${status.runtimeType}), isRead: $isRead');
-
     // If isRead is explicitly true, return read status
     if (isRead == true) {
-      debugPrint('📩 Status: READ (from isRead flag)');
       return MessageStatus.read;
     }
 
     if (status == null) {
-      debugPrint('📩 Status: SENT (null status)');
       return MessageStatus.sent;
     }
 
     // Handle int status
     if (status is int) {
-      final result = MessageStatus.values[status.clamp(0, MessageStatus.values.length - 1)];
-      debugPrint('📩 Status: $result (from int $status)');
-      return result;
+      return MessageStatus.values[status.clamp(
+        0,
+        MessageStatus.values.length - 1,
+      )];
     }
 
     // Handle string status
     if (status is String) {
-      MessageStatus result;
       switch (status.toLowerCase()) {
         case 'sending':
-          result = MessageStatus.sending;
-          break;
+          return MessageStatus.sending;
         case 'sent':
-          result = MessageStatus.sent;
-          break;
+          return MessageStatus.sent;
         case 'delivered':
-          result = MessageStatus.delivered;
-          break;
+          return MessageStatus.delivered;
         case 'read':
-          result = MessageStatus.read;
-          break;
+          return MessageStatus.read;
         case 'failed':
-          result = MessageStatus.failed;
-          break;
+          return MessageStatus.failed;
         default:
-          result = MessageStatus.sent;
+          return MessageStatus.sent;
       }
-      debugPrint('📩 Status: $result (from string "$status")');
-      return result;
     }
 
-    debugPrint('📩 Status: SENT (default fallback)');
     return MessageStatus.sent;
   }
 
@@ -1034,8 +1090,16 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
     bool isHighlighted = false,
     String? searchQuery,
   }) {
-    // Format timestamp - show actual time
-    String formattedTime = _formatMessageTime(message.timestamp);
+    // Handle call messages (WhatsApp-style centered call events)
+    if (message.type == MessageType.voiceCall ||
+        message.type == MessageType.missedCall) {
+      return _buildCallMessageBubble(message, isMe, isDarkMode);
+    }
+
+    // Handle deleted messages (WhatsApp-style "This message was deleted")
+    if (message.isDeleted) {
+      return _buildDeletedMessageBubble(message, isMe, isDarkMode);
+    }
 
     return Dismissible(
       key: Key(message.id),
@@ -1120,7 +1184,7 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
                             widget.otherUser.profileImageUrl,
                           )
                           ? Text(
-                              widget.otherUser.name[0].toUpperCase(),
+                              widget.otherUser.name.isNotEmpty ? widget.otherUser.name[0].toUpperCase() : '?',
                               style: const TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
@@ -1155,26 +1219,39 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
                           filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
                           child: Container(
                             padding: EdgeInsets.symmetric(
-                              horizontal: message.type == MessageType.image
+                              horizontal:
+                                  (message.type == MessageType.image ||
+                                      message.type == MessageType.video)
                                   ? 4
                                   : 16,
-                              vertical: message.type == MessageType.image
+                              vertical:
+                                  (message.type == MessageType.image ||
+                                      message.type == MessageType.video)
                                   ? 4
                                   : 12,
                             ),
                             decoration: BoxDecoration(
                               gradient:
-                                  isMe && message.type != MessageType.audio
+                                  isMe &&
+                                      message.type != MessageType.audio &&
+                                      message.type != MessageType.video
                                   ? const LinearGradient(
                                       colors: [
-                                        Color(0xFF5856D6),
-                                        Color(0xFF007AFF),
+                                        Color.fromARGB(255, 116, 114, 248),
+                                        Color.fromARGB(255, 95, 170, 250),
                                       ],
                                       begin: Alignment.topLeft,
                                       end: Alignment.bottomRight,
                                     )
                                   : null,
-
+                              color:
+                                  !isMe &&
+                                      message.type != MessageType.audio &&
+                                      message.type != MessageType.video
+                                  ? (isDarkMode
+                                        ? const Color.fromARGB(255, 46, 44, 44)
+                                        : const Color.fromARGB(255, 68, 65, 65))
+                                  : null, // Dark grey for received text/image only, not audio/video
                               borderRadius: BorderRadius.only(
                                 topLeft: const Radius.circular(18),
                                 topRight: const Radius.circular(18),
@@ -1183,7 +1260,9 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
                               ),
                             ),
                             child: Column(
-                              crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                              crossAxisAlignment: isMe
+                                  ? CrossAxisAlignment.end
+                                  : CrossAxisAlignment.start,
                               children: [
                                 if (message.type == MessageType.image &&
                                     message.mediaUrl != null)
@@ -1230,6 +1309,10 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
                                       ),
                                     ),
                                   ),
+                                // Video message player UI
+                                if (message.type == MessageType.video &&
+                                    message.mediaUrl != null)
+                                  _buildVideoMessagePlayer(message, isMe),
                                 // Audio message player UI
                                 if (message.type == MessageType.audio &&
                                     message.audioUrl != null)
@@ -1237,7 +1320,9 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
                                 if (message.text != null &&
                                     message.text!.isNotEmpty)
                                   Padding(
-                                    padding: message.type == MessageType.image
+                                    padding:
+                                        (message.type == MessageType.image ||
+                                            message.type == MessageType.video)
                                         ? const EdgeInsets.only(
                                             left: 10,
                                             right: 10,
@@ -1280,20 +1365,38 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
                                   ),
                                 // Time and status row (skip for audio - it has its own)
                                 if (message.type != MessageType.audio)
-                                Padding(
-                                  padding: message.type == MessageType.image
-                                      ? const EdgeInsets.only(
-                                          left: 10,
-                                          right: 10,
-                                          bottom: 4,
-                                        )
-                                      : const EdgeInsets.only(top: 3),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      if (message.isEdited == true) ...[
+                                  Padding(
+                                    padding:
+                                        (message.type == MessageType.image ||
+                                            message.type == MessageType.video)
+                                        ? const EdgeInsets.only(
+                                            left: 10,
+                                            right: 10,
+                                            bottom: 4,
+                                          )
+                                        : const EdgeInsets.only(top: 3),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        if (message.isEdited == true) ...[
+                                          Text(
+                                            'edited ',
+                                            style: TextStyle(
+                                              color: isMe
+                                                  ? Colors.white.withValues(
+                                                      alpha: 0.55,
+                                                    )
+                                                  : (isDarkMode
+                                                        ? Colors.grey[500]
+                                                        : Colors.grey[600]),
+                                              fontSize: 11,
+                                              fontStyle: FontStyle.italic,
+                                            ),
+                                          ),
+                                        ],
+                                        // Time
                                         Text(
-                                          'edited ',
+                                          _formatMessageTime(message.timestamp),
                                           style: TextStyle(
                                             color: isMe
                                                 ? Colors.white.withValues(
@@ -1303,30 +1406,19 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
                                                       ? Colors.grey[500]
                                                       : Colors.grey[600]),
                                             fontSize: 11,
-                                            fontStyle: FontStyle.italic,
                                           ),
                                         ),
+                                        // Status tick (only for my messages)
+                                        if (isMe) ...[
+                                          const SizedBox(width: 4),
+                                          _buildMessageStatusIcon(
+                                            message.status,
+                                            isMe,
+                                          ),
+                                        ],
                                       ],
-                                      // Time
-                                      Text(
-                                        _formatMessageTime(message.timestamp),
-                                        style: TextStyle(
-                                          color: isMe
-                                              ? Colors.white.withValues(alpha: 0.55)
-                                              : (isDarkMode
-                                                    ? Colors.grey[500]
-                                                    : Colors.grey[600]),
-                                          fontSize: 11,
-                                        ),
-                                      ),
-                                      // Status tick (only for my messages)
-                                      if (isMe) ...[
-                                        const SizedBox(width: 4),
-                                        _buildMessageStatusIcon(message.status, isMe),
-                                      ],
-                                    ],
+                                    ),
                                   ),
-                                ),
                               ],
                             ),
                           ),
@@ -1384,7 +1476,6 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
   // Build message status icon with premium visuals
   // Single tick = sent, Double tick grey = delivered, Double tick blue = read
   Widget _buildMessageStatusIcon(MessageStatus status, bool isMe) {
-    debugPrint('🔵 Building status icon: $status, isMe: $isMe');
     switch (status) {
       case MessageStatus.sending:
         return SizedBox(
@@ -1687,7 +1778,7 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
                 child:
                     !PhotoUrlHelper.isValidUrl(widget.otherUser.profileImageUrl)
                     ? Text(
-                        widget.otherUser.name[0].toUpperCase(),
+                        widget.otherUser.name.isNotEmpty ? widget.otherUser.name[0].toUpperCase() : '?',
                         style: const TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w600,
@@ -2675,6 +2766,8 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
   }
 
   void _showDeleteConfirmation(MessageModel message) {
+    final isMyMessage = message.senderId == _currentUserId;
+
     showDialog(
       context: context,
       barrierColor: Colors.black54,
@@ -2720,67 +2813,95 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Are you sure you want to delete this message?',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.white70, fontSize: 13),
-                  ),
                   const SizedBox(height: 20),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () => Navigator.pop(context),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(10),
-                              color: Colors.white.withValues(alpha: 0.15),
-                              border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.2),
+
+                  // Delete for me option
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.pop(context);
+                      _deleteMessageForMe(message);
+                    },
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(10),
+                        color: Colors.white.withValues(alpha: 0.1),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.2),
+                        ),
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.person_outline, color: Colors.white70, size: 20),
+                          SizedBox(width: 8),
+                          Text(
+                            'Delete for me',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  // Delete for everyone option (only for sender's own messages)
+                  if (isMyMessage) ...[
+                    const SizedBox(height: 10),
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.pop(context);
+                        _deleteMessageForEveryone(message);
+                      },
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(10),
+                          color: Colors.redAccent.withValues(alpha: 0.8),
+                        ),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.group_outlined, color: Colors.white, size: 20),
+                            SizedBox(width: 8),
+                            Text(
+                              'Delete for everyone',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
-                            child: const Center(
-                              child: Text(
-                                'Cancel',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+
+                  const SizedBox(height: 16),
+
+                  // Cancel button
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: const Center(
+                        child: Text(
+                          'Cancel',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () {
-                            Navigator.pop(context);
-                            _deleteMessage(message);
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(10),
-                              color: Colors.redAccent,
-                            ),
-                            child: const Center(
-                              child: Text(
-                                'Delete',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ],
               ),
@@ -2791,37 +2912,32 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
     );
   }
 
-  Future<void> _deleteMessage(MessageModel message) async {
+  /// Delete message for current user only (WhatsApp-style "Delete for me")
+  /// The message is hidden for current user but still visible to other user
+  Future<void> _deleteMessageForMe(MessageModel message) async {
     try {
-      debugPrint('=== DELETE MESSAGE DEBUG ===');
-      debugPrint('Conversation ID: $_conversationId');
-      debugPrint('Message ID: ${message.id}');
-      debugPrint('Message text: ${message.text}');
-
       if (_conversationId == null || _conversationId!.isEmpty) {
-        debugPrint('ERROR: Conversation ID is null or empty!');
-        SnackBarHelper.showError(
-          context,
-          'Cannot delete: Invalid conversation',
-        );
+        SnackBarHelper.showError(context, 'Cannot delete: Invalid conversation');
         return;
       }
 
       if (message.id.isEmpty) {
-        debugPrint('ERROR: Message ID is empty!');
         SnackBarHelper.showError(context, 'Cannot delete: Invalid message');
         return;
       }
 
-      // First, delete the message
+      final currentUserId = _currentUserId;
+      if (currentUserId == null) return;
+
+      // Add current user to deletedFor array (message is hidden only for this user)
       await _firestore
           .collection('conversations')
           .doc(_conversationId!)
           .collection('messages')
           .doc(message.id)
-          .delete();
-
-      debugPrint('Message deleted from Firestore successfully');
+          .update({
+        'deletedFor': FieldValue.arrayUnion([currentUserId]),
+      });
 
       // Remove from local cached messages to update UI immediately
       _loadedMessages.removeWhere((doc) => doc.id == message.id);
@@ -2830,30 +2946,80 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
       // Force UI rebuild
       if (mounted) {
         setState(() {});
+        SnackBarHelper.showSuccess(context, 'Message deleted');
+      }
+    } catch (e) {
+      debugPrint('Error deleting message for me: $e');
+      if (mounted) {
+        SnackBarHelper.showError(context, 'Failed to delete message: $e');
+      }
+    }
+  }
+
+  /// Delete message for everyone (WhatsApp-style "Delete for everyone")
+  /// The message content is replaced with "This message was deleted"
+  Future<void> _deleteMessageForEveryone(MessageModel message) async {
+    try {
+      if (_conversationId == null || _conversationId!.isEmpty) {
+        SnackBarHelper.showError(context, 'Cannot delete: Invalid conversation');
+        return;
       }
 
-      // Small delay to ensure deletion is processed
-      await Future.delayed(const Duration(milliseconds: 100));
+      if (message.id.isEmpty) {
+        SnackBarHelper.showError(context, 'Cannot delete: Invalid message');
+        return;
+      }
 
-      // Get ALL remaining messages to find the actual last one
+      // Update message to show it was deleted (like WhatsApp)
+      await _firestore
+          .collection('conversations')
+          .doc(_conversationId!)
+          .collection('messages')
+          .doc(message.id)
+          .update({
+        'isDeleted': true,
+        'text': 'This message was deleted',
+        'mediaUrl': null,
+        'audioUrl': null,
+        'deletedAt': FieldValue.serverTimestamp(),
+      });
+
+      // Update last message if this was the last one
+      await _updateLastMessageAfterDelete();
+
+      // Force UI rebuild
+      if (mounted) {
+        setState(() {});
+        SnackBarHelper.showSuccess(context, 'Message deleted for everyone');
+      }
+    } catch (e) {
+      debugPrint('Error deleting message for everyone: $e');
+      if (mounted) {
+        SnackBarHelper.showError(context, 'Failed to delete message: $e');
+      }
+    }
+  }
+
+  /// Update conversation's last message after a deletion
+  Future<void> _updateLastMessageAfterDelete() async {
+    if (_conversationId == null) return;
+
+    try {
+      // Get the most recent non-deleted message
       final allMessages = await _firestore
           .collection('conversations')
           .doc(_conversationId!)
           .collection('messages')
+          .where('isDeleted', isNotEqualTo: true)
+          .orderBy('isDeleted')
           .orderBy('timestamp', descending: true)
+          .limit(1)
           .get();
 
-      debugPrint('Remaining messages count: ${allMessages.docs.length}');
-
-      // Update the conversation's lastMessage fields
       if (allMessages.docs.isNotEmpty) {
-        // Find the most recent message
         final lastMessageDoc = allMessages.docs.first;
         final lastMessageData = lastMessageDoc.data();
 
-        debugPrint('Last message data: $lastMessageData');
-
-        // Determine the last message text based on message type
         String lastMessageText = '';
         final messageType = lastMessageData['type'] ?? 0;
 
@@ -2871,36 +3037,14 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
           lastMessageText = lastMessageData['text'] ?? '';
         }
 
-        debugPrint('Updating conversation with last message: $lastMessageText');
-
-        // Force update with merge to ensure it happens
-        await _firestore.collection('conversations').doc(_conversationId!).set({
+        await _firestore.collection('conversations').doc(_conversationId!).update({
           'lastMessage': lastMessageText,
-          'lastMessageTime':
-              lastMessageData['timestamp'] ?? FieldValue.serverTimestamp(),
+          'lastMessageTime': lastMessageData['timestamp'] ?? FieldValue.serverTimestamp(),
           'lastMessageSenderId': lastMessageData['senderId'],
-        }, SetOptions(merge: true));
-
-        debugPrint('Conversation updated successfully');
-      } else {
-        debugPrint('No messages left, clearing conversation');
-
-        // No messages left, clear the last message fields
-        await _firestore.collection('conversations').doc(_conversationId!).set({
-          'lastMessage': '',
-          'lastMessageTime': FieldValue.serverTimestamp(),
-          'lastMessageSenderId': '',
-        }, SetOptions(merge: true));
-      }
-
-      if (mounted) {
-        SnackBarHelper.showSuccess(context, 'Message deleted');
+        });
       }
     } catch (e) {
-      debugPrint('Error deleting message: $e');
-      if (mounted) {
-        SnackBarHelper.showError(context, 'Failed to delete message: $e');
-      }
+      debugPrint('Error updating last message: $e');
     }
   }
 
@@ -2936,22 +3080,40 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Camera option
+                      // Camera Photo option
                       _buildPopupOption(
                         icon: Icons.camera_alt,
-                        label: 'Camera',
+                        label: 'Take Photo',
                         onTap: () {
                           Navigator.pop(context);
                           _takePhoto();
                         },
                       ),
-                      // Gallery option
+                      // Camera Video option
+                      _buildPopupOption(
+                        icon: Icons.videocam,
+                        label: 'Record Video',
+                        onTap: () {
+                          Navigator.pop(context);
+                          _recordVideo();
+                        },
+                      ),
+                      // Gallery Photo option
                       _buildPopupOption(
                         icon: Icons.image,
-                        label: 'Gallery',
+                        label: 'Photo from Gallery',
                         onTap: () {
                           Navigator.pop(context);
                           _pickImage();
+                        },
+                      ),
+                      // Gallery Video option
+                      _buildPopupOption(
+                        icon: Icons.video_library,
+                        label: 'Video from Gallery',
+                        onTap: () {
+                          Navigator.pop(context);
+                          _pickVideo();
                         },
                       ),
                     ],
@@ -2968,9 +3130,9 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
   void _pickImage() async {
     final XFile? image = await _imagePicker.pickImage(
       source: ImageSource.gallery,
-      imageQuality: 95, // High quality to prevent blur
-      maxWidth: 1920, // Max width for optimization
-      maxHeight: 1920, // Max height for optimization
+      imageQuality: 70, // Optimized for faster upload while maintaining quality
+      maxWidth: 1280, // Reduced for faster upload
+      maxHeight: 1280, // Reduced for faster upload
     );
 
     if (image != null) {
@@ -2986,9 +3148,9 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
   void _takePhoto() async {
     final XFile? photo = await _imagePicker.pickImage(
       source: ImageSource.camera,
-      imageQuality: 95, // High quality to prevent blur
-      maxWidth: 1920, // Max width for optimization
-      maxHeight: 1920, // Max height for optimization
+      imageQuality: 70, // Optimized for faster upload while maintaining quality
+      maxWidth: 1280, // Reduced for faster upload
+      maxHeight: 1280, // Reduced for faster upload
     );
 
     if (photo != null) {
@@ -3001,14 +3163,509 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
     }
   }
 
+  void _recordVideo() async {
+    // Use a flag to prevent multiple simultaneous calls
+    if (_isRecordingVideo) return;
+    _isRecordingVideo = true;
+
+    try {
+      // Request camera permission first
+      final cameraStatus = await Permission.camera.request();
+      if (!cameraStatus.isGranted) {
+        _isRecordingVideo = false;
+        if (mounted) {
+          SnackBarHelper.showError(
+            context,
+            'Camera permission required to record video',
+          );
+        }
+        return;
+      }
+
+      // Request microphone permission for audio in video
+      final micStatus = await Permission.microphone.request();
+      if (!micStatus.isGranted) {
+        _isRecordingVideo = false;
+        if (mounted) {
+          SnackBarHelper.showError(
+            context,
+            'Microphone permission required to record video with audio',
+          );
+        }
+        return;
+      }
+
+      if (!mounted) {
+        _isRecordingVideo = false;
+        return;
+      }
+
+      String? videoPath;
+      try {
+        final video = await _imagePicker.pickVideo(
+          source: ImageSource.camera,
+          maxDuration: const Duration(seconds: 30),
+          preferredCameraDevice: CameraDevice.rear,
+        );
+        videoPath = video?.path;
+      } on PlatformException catch (e) {
+        debugPrint('Platform exception: $e');
+        _isRecordingVideo = false;
+        if (mounted) {
+          SnackBarHelper.showError(context, 'Camera error: ${e.message}');
+        }
+        return;
+      } catch (cameraError) {
+        debugPrint('Camera error: $cameraError');
+        _isRecordingVideo = false;
+        if (mounted) {
+          SnackBarHelper.showError(
+            context,
+            'Camera not available. Please try again.',
+          );
+        }
+        return;
+      }
+
+      // Critical: Wait for camera to fully release before any file operations
+      await Future.delayed(const Duration(milliseconds: 1000));
+
+      _isRecordingVideo = false;
+
+      if (!mounted) return;
+
+      if (videoPath != null && videoPath.isNotEmpty) {
+        final videoFile = File(videoPath);
+
+        // Small delay before accessing file
+        await Future.delayed(const Duration(milliseconds: 200));
+
+        // Check if file exists and is valid
+        bool fileExists = false;
+        try {
+          fileExists = await videoFile.exists();
+        } catch (e) {
+          debugPrint('File check error: $e');
+        }
+
+        if (!fileExists) {
+          if (mounted) {
+            SnackBarHelper.showError(
+              context,
+              'Video recording failed. Please try again.',
+            );
+          }
+          return;
+        }
+
+        // Check file size before processing
+        int fileSize = 0;
+        try {
+          fileSize = await videoFile.length();
+        } catch (e) {
+          debugPrint('File size check error: $e');
+          if (mounted) {
+            SnackBarHelper.showError(context, 'Error reading video file.');
+          }
+          return;
+        }
+
+        final fileSizeMB = fileSize / (1024 * 1024);
+
+        if (fileSizeMB > 50) {
+          if (mounted) {
+            SnackBarHelper.showError(
+              context,
+              'Video too large (${fileSizeMB.toStringAsFixed(1)}MB). Please record a shorter video.',
+            );
+          }
+          return;
+        }
+
+        if (fileSizeMB == 0) {
+          if (mounted) {
+            SnackBarHelper.showError(
+              context,
+              'Video recording failed. Empty file.',
+            );
+          }
+          return;
+        }
+
+        if (mounted) {
+          _uploadAndSendVideo(videoFile);
+        }
+      }
+
+      // Restore focus to message input
+      if (mounted) {
+        FocusScope.of(context).requestFocus(_messageFocusNode);
+      }
+    } catch (e) {
+      _isRecordingVideo = false;
+      debugPrint('Video recording error: $e');
+      if (mounted) {
+        SnackBarHelper.showError(
+          context,
+          'Failed to record video. Please try again.',
+        );
+      }
+    }
+  }
+
+  void _pickVideo() async {
+    try {
+      final XFile? video = await _imagePicker.pickVideo(
+        source: ImageSource.gallery,
+        maxDuration: const Duration(seconds: 30), // Max 30 seconds
+      );
+
+      if (!mounted) return;
+
+      if (video != null) {
+        final videoFile = File(video.path);
+
+        // Small delay before file operations
+        await Future.delayed(const Duration(milliseconds: 200));
+
+        // Check if file exists
+        bool fileExists = false;
+        try {
+          fileExists = await videoFile.exists();
+        } catch (e) {
+          debugPrint('File exists check error: $e');
+        }
+
+        if (!fileExists) {
+          if (mounted) {
+            SnackBarHelper.showError(context, 'Video file not found');
+          }
+          return;
+        }
+
+        // Check file size before upload
+        int fileSize = 0;
+        try {
+          fileSize = await videoFile.length();
+        } catch (e) {
+          debugPrint('File size check error: $e');
+          if (mounted) {
+            SnackBarHelper.showError(context, 'Error reading video file');
+          }
+          return;
+        }
+
+        final fileSizeMB = fileSize / (1024 * 1024);
+
+        if (fileSizeMB > 25) {
+          if (mounted) {
+            SnackBarHelper.showError(
+              context,
+              'Video too large (${fileSizeMB.toStringAsFixed(1)}MB). Max size is 25MB.',
+            );
+          }
+          return;
+        }
+
+        if (fileSizeMB == 0) {
+          if (mounted) {
+            SnackBarHelper.showError(context, 'Video file is empty');
+          }
+          return;
+        }
+
+        if (mounted) {
+          _uploadAndSendVideo(videoFile);
+        }
+      }
+
+      // Restore focus to message input
+      if (mounted) {
+        FocusScope.of(context).requestFocus(_messageFocusNode);
+      }
+    } catch (e) {
+      debugPrint('Video pick error: $e');
+      if (mounted) {
+        SnackBarHelper.showError(
+          context,
+          'Failed to pick video. Please try again.',
+        );
+      }
+    }
+  }
+
+  void _uploadAndSendVideo(File videoFile) async {
+    if (!mounted) return;
+    if (_conversationId == null || _currentUserId == null) return;
+
+    // Store values locally to avoid accessing widget after unmount
+    final conversationId = _conversationId!;
+    final currentUserId = _currentUserId!;
+    String otherUserId;
+    try {
+      otherUserId = widget.otherUser.uid;
+    } catch (e) {
+      return;
+    }
+
+    DocumentReference? messageRef;
+
+    try {
+      // Check if file exists first
+      bool fileExists = false;
+      try {
+        fileExists = await videoFile.exists();
+      } catch (e) {
+        if (mounted) {
+          SnackBarHelper.showError(context, 'Error accessing video file');
+        }
+        return;
+      }
+
+      if (!fileExists) {
+        if (mounted) {
+          SnackBarHelper.showError(context, 'Video file not found');
+        }
+        return;
+      }
+
+      // Check file size - limit to 25MB for stability
+      int fileSize = 0;
+      try {
+        fileSize = await videoFile.length();
+      } catch (e) {
+        debugPrint('Error getting file size: $e');
+        if (mounted) {
+          SnackBarHelper.showError(context, 'Error reading video file');
+        }
+        return;
+      }
+
+      final fileSizeMB = fileSize / (1024 * 1024);
+
+      if (fileSizeMB > 25) {
+        if (mounted) {
+          SnackBarHelper.showError(
+            context,
+            'Video too large (${fileSizeMB.toStringAsFixed(1)}MB). Max size is 25MB.',
+          );
+        }
+        return;
+      }
+
+      if (fileSizeMB == 0) {
+        if (mounted) {
+          SnackBarHelper.showError(context, 'Video file is empty');
+        }
+        return;
+      }
+
+      if (!mounted) return;
+
+      // Create message document reference first for immediate UI feedback
+      messageRef = _firestore
+          .collection('conversations')
+          .doc(conversationId)
+          .collection('messages')
+          .doc();
+
+      final now = DateTime.now();
+      final timestamp = now.millisecondsSinceEpoch;
+
+      // Create placeholder message with "sending" status immediately
+      final placeholderData = {
+        'id': messageRef.id,
+        'senderId': currentUserId,
+        'receiverId': otherUserId,
+        'chatId': conversationId,
+        'text': '',
+        'type': MessageType.video.index,
+        'mediaUrl': '', // Will be updated after upload
+        'status': MessageStatus.sending.index,
+        'timestamp': Timestamp.fromDate(now),
+        'isEdited': false,
+        'read': false,
+        'isRead': false,
+      };
+
+      // Set placeholder immediately for instant UI feedback
+      try {
+        await messageRef.set(placeholderData);
+      } catch (e) {
+        debugPrint('Error creating placeholder message: $e');
+        if (mounted) {
+          SnackBarHelper.showError(context, 'Failed to send video');
+        }
+        return;
+      }
+
+      // Scroll to bottom immediately
+      if (mounted && _scrollController.hasClients) {
+        _scrollController.animateTo(
+          0,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+
+      // Small delay to let UI update
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      if (!mounted) return;
+
+      // Upload to Firebase Storage
+      final storageRef = _storage.ref().child(
+        'chat_videos/$conversationId/video_$timestamp.mp4',
+      );
+
+      String downloadUrl;
+      try {
+        final uploadTask = storageRef.putFile(
+          videoFile,
+          SettableMetadata(contentType: 'video/mp4'),
+        );
+
+        // Wait for upload to complete
+        final snapshot = await uploadTask;
+        downloadUrl = await snapshot.ref.getDownloadURL();
+      } catch (e) {
+        debugPrint('Video upload error: $e');
+        // Update message status to failed
+        try {
+          await messageRef.update({'status': MessageStatus.failed.index});
+        } catch (_) {}
+        if (mounted) {
+          SnackBarHelper.showError(
+            context,
+            'Video upload failed. Please try again.',
+          );
+        }
+        return;
+      }
+
+      if (!mounted) return;
+
+      // Update message with actual video URL and delivered status
+      try {
+        await messageRef.update({
+          'mediaUrl': downloadUrl,
+          'status': MessageStatus.delivered.index,
+          'timestamp': FieldValue.serverTimestamp(),
+        });
+      } catch (e) {
+        debugPrint('Error updating message: $e');
+      }
+
+      // Run these in background - don't await to prevent crashes
+      try {
+        final currentUserProfile = mounted
+            ? ref.read(currentUserProfileProvider).valueOrNull
+            : null;
+        final currentUserName = currentUserProfile?.name ?? 'Someone';
+
+        // Update conversation metadata
+        _firestore
+            .collection('conversations')
+            .doc(conversationId)
+            .update({
+              'lastMessage': '🎬 Video',
+              'lastMessageTime': FieldValue.serverTimestamp(),
+              'lastMessageSenderId': currentUserId,
+              'unreadCount.$otherUserId': FieldValue.increment(1),
+            })
+            .catchError((_) {});
+
+        // Send push notification for video (fire and forget)
+        NotificationService()
+            .sendNotificationToUser(
+              userId: otherUserId,
+              title: 'New Video from $currentUserName',
+              body: '🎬 Video',
+              type: 'message',
+              data: {'conversationId': conversationId},
+            )
+            .catchError((_) {});
+      } catch (e) {
+        debugPrint('Error updating conversation: $e');
+      }
+
+      // Delete local temp file after successful upload (in background)
+      Future.delayed(const Duration(seconds: 2), () async {
+        try {
+          if (videoFile.path.contains('cache') && await videoFile.exists()) {
+            await videoFile.delete();
+          }
+        } catch (_) {
+          // Ignore file deletion errors
+        }
+      });
+    } catch (e) {
+      debugPrint('Video send error: $e');
+      // Try to mark message as failed if it was created
+      if (messageRef != null) {
+        try {
+          await messageRef.update({'status': MessageStatus.failed.index});
+        } catch (_) {}
+      }
+      if (mounted) {
+        SnackBarHelper.showError(
+          context,
+          'Failed to send video. Please try again.',
+        );
+      }
+    }
+  }
+
   void _uploadAndSendImage(File imageFile) async {
     if (_conversationId == null || _currentUserId == null || !mounted) return;
 
     try {
+      // Create message document reference first for immediate UI feedback
+      final messageRef = _firestore
+          .collection('conversations')
+          .doc(_conversationId!)
+          .collection('messages')
+          .doc();
+
+      final now = DateTime.now();
+      final timestamp = now.millisecondsSinceEpoch;
+
+      // Create placeholder message with "sending" status immediately
+      final placeholderData = {
+        'id': messageRef.id,
+        'senderId': _currentUserId,
+        'receiverId': widget.otherUser.uid,
+        'chatId': _conversationId,
+        'text': '',
+        'type': MessageType.image.index,
+        'mediaUrl': '', // Will be updated after upload
+        'status': MessageStatus.sending.index,
+        'timestamp': Timestamp.fromDate(now),
+        'isEdited': false,
+        'read': false,
+        'isRead': false,
+      };
+
+      // Set placeholder immediately for instant UI feedback
+      await messageRef.set(placeholderData);
+
+      // Scroll to bottom immediately
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          0,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+
+      // Upload to Firebase Storage
       final storageRef = _storage.ref().child(
-        'chat_images/${DateTime.now().millisecondsSinceEpoch}.jpg',
+        'chat_images/${_conversationId!}/image_$timestamp.jpg',
       );
-      final uploadTask = storageRef.putFile(imageFile);
+      final uploadTask = storageRef.putFile(
+        imageFile,
+        SettableMetadata(contentType: 'image/jpeg'),
+      );
       final snapshot = await uploadTask;
 
       if (!mounted) return;
@@ -3016,49 +3673,38 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
 
       if (!mounted) return;
 
-      await _firestore
-          .collection('conversations')
-          .doc(_conversationId!)
-          .collection('messages')
-          .add({
-            'senderId': _currentUserId,
-            'receiverId': widget.otherUser.uid,
-            'chatId': _conversationId,
-            'text': '',
-            'type': MessageType.image.index,
-            'mediaUrl': downloadUrl,
-            'status': MessageStatus.delivered.index,
-            'timestamp': FieldValue.serverTimestamp(),
-            'isEdited': false,
-            'read': false,
-            'isRead': false,
-          });
+      // Update message with actual image URL and delivered status
+      await messageRef.update({
+        'mediaUrl': downloadUrl,
+        'status': MessageStatus.delivered.index,
+        'timestamp': FieldValue.serverTimestamp(),
+      });
 
-      await _firestore
-          .collection('conversations')
-          .doc(_conversationId!)
-          .update({
-            'lastMessage': ' Photo',
-            'lastMessageTime': FieldValue.serverTimestamp(),
-            'lastMessageSenderId': _currentUserId,
-            'unreadCount.${widget.otherUser.uid}': FieldValue.increment(1),
-          });
+      // Run these in parallel for faster completion
+      final currentUserProfile = ref
+          .read(currentUserProfileProvider)
+          .valueOrNull;
+      final currentUserName = currentUserProfile?.name ?? 'Someone';
 
-      // Send push notification for image
-      if (mounted) {
-        final currentUserProfile = ref
-            .read(currentUserProfileProvider)
-            .valueOrNull;
-        final currentUserName = currentUserProfile?.name ?? 'Someone';
-
+      await Future.wait([
+        // Update conversation metadata
+        _firestore.collection('conversations').doc(_conversationId!).update({
+          'lastMessage': '📷 Photo',
+          'lastMessageTime': FieldValue.serverTimestamp(),
+          'lastMessageSenderId': _currentUserId,
+          'unreadCount.${widget.otherUser.uid}': FieldValue.increment(1),
+        }),
+        // Send push notification for image
         NotificationService().sendNotificationToUser(
           userId: widget.otherUser.uid,
           title: 'New Photo from $currentUserName',
-          body: ' Photo',
+          body: '📷 Photo',
           type: 'message',
           data: {'conversationId': _conversationId},
-        );
-      }
+        ),
+        // Delete local file if it's a temp file
+        if (imageFile.path.contains('cache')) imageFile.delete(),
+      ]);
     } catch (e) {
       if (!mounted) return;
       // ignore: use_build_context_synchronously
@@ -3081,9 +3727,18 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
       }
 
       // Initialize recorder if not already
-      if (!_isRecorderInitialized) {
-        await _audioRecorder.openRecorder();
-        _isRecorderInitialized = true;
+      if (!_isRecorderInitialized || _audioRecorder == null) {
+        try {
+          _audioRecorder = FlutterSoundRecorder();
+          await _audioRecorder!.openRecorder();
+          _isRecorderInitialized = true;
+        } catch (e) {
+          debugPrint('Error opening recorder: $e');
+          if (mounted) {
+            SnackBarHelper.showError(context, 'Failed to initialize recorder');
+          }
+          return;
+        }
       }
 
       // Get temporary directory for recording
@@ -3091,10 +3746,12 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       _recordingPath = '${tempDir.path}/voice_message_$timestamp.aac';
 
-      // Start recording
-      await _audioRecorder.startRecorder(
+      // Start recording with optimized bitrate for faster upload
+      await _audioRecorder!.startRecorder(
         toFile: _recordingPath!,
         codec: Codec.aacADTS,
+        bitRate: 64000, // 64kbps - good quality voice, smaller file size
+        sampleRate: 22050, // 22kHz - sufficient for voice
       );
 
       setState(() {
@@ -3127,15 +3784,28 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
 
     final duration = _recordingDuration;
 
-    // Stop recorder and get path
-    final path = await _audioRecorder.stopRecorder();
+    // Stop recorder and get path safely
+    String? path;
+    try {
+      path = await _audioRecorder?.stopRecorder();
+    } catch (e) {
+      debugPrint('Error stopping recorder: $e');
+    }
 
-    setState(() {
-      _isRecording = false;
-      _recordingDuration = 0;
-    });
+    if (mounted) {
+      setState(() {
+        _isRecording = false;
+        _recordingDuration = 0;
+      });
+    }
 
     if (path == null || path.isEmpty) return;
+
+    // Store non-nullable reference for use in closures
+    final audioPath = path;
+
+    // Initialize player if needed
+    _audioPlayer ??= FlutterSoundPlayer();
 
     // Show small centered popup with audio preview
     if (!mounted) return;
@@ -3144,25 +3814,27 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
       context: context,
       barrierColor: Colors.black54,
       builder: (context) => _VoicePreviewPopup(
-        audioPath: path,
+        audioPath: audioPath,
         duration: duration,
-        audioPlayer: _audioPlayer,
+        audioPlayer: _audioPlayer!,
         isPlayerInitialized: _isPlayerInitialized,
         onInitializePlayer: () async {
-          if (!_isPlayerInitialized) {
-            await _audioPlayer.openPlayer();
-            await _audioPlayer.setSubscriptionDuration(const Duration(milliseconds: 100));
+          if (!_isPlayerInitialized && _audioPlayer != null) {
+            await _audioPlayer!.openPlayer();
+            await _audioPlayer!.setSubscriptionDuration(
+              const Duration(milliseconds: 100),
+            );
             _isPlayerInitialized = true;
           }
         },
         onSend: () async {
           Navigator.pop(context);
-          await _sendVoiceMessage(path, duration);
+          await _sendVoiceMessage(audioPath, duration);
         },
         onCancel: () {
           Navigator.pop(context);
           try {
-            File(path).deleteSync();
+            File(audioPath).deleteSync();
           } catch (_) {}
         },
       ),
@@ -3242,7 +3914,9 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
       // Update message with actual audio URL and delivered status
       await messageRef.update({
         'audioUrl': audioUrl,
-        'status': MessageStatus.delivered.index, // Double grey tick - delivered to server
+        'status': MessageStatus
+            .delivered
+            .index, // Double grey tick - delivered to server
         'timestamp': FieldValue.serverTimestamp(),
       });
 
@@ -3279,9 +3953,12 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
   // Audio playback methods
   Future<void> _playAudio(String messageId, String audioUrl) async {
     try {
+      // Initialize player if null
+      _audioPlayer ??= FlutterSoundPlayer();
+
       // If same message is playing, toggle pause/resume
       if (_currentlyPlayingMessageId == messageId && _isPlaying) {
-        await _audioPlayer.pausePlayer();
+        await _audioPlayer!.pausePlayer();
         setState(() {
           _isPlaying = false;
         });
@@ -3290,21 +3967,23 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
 
       // If different message or not playing, stop current and play new
       if (_isPlaying) {
-        await _audioPlayer.stopPlayer();
+        await _audioPlayer!.stopPlayer();
       }
 
       // Initialize player if needed
       if (!_isPlayerInitialized) {
-        await _audioPlayer.openPlayer();
+        await _audioPlayer!.openPlayer();
         _isPlayerInitialized = true;
       }
 
       // Set fast subscription for smooth waveform animation
-      await _audioPlayer.setSubscriptionDuration(const Duration(milliseconds: 50));
+      await _audioPlayer!.setSubscriptionDuration(
+        const Duration(milliseconds: 50),
+      );
 
       // Subscribe to playback progress BEFORE starting
       _playerSubscription?.cancel();
-      _playerSubscription = _audioPlayer.onProgress!.listen((e) {
+      _playerSubscription = _audioPlayer!.onProgress!.listen((e) {
         if (mounted && e.duration.inMilliseconds > 0) {
           setState(() {
             _playbackProgress =
@@ -3319,7 +3998,7 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
         _playbackProgress = 0.0;
       });
 
-      await _audioPlayer.startPlayer(
+      await _audioPlayer!.startPlayer(
         fromURI: audioUrl,
         codec: Codec.aacADTS,
         whenFinished: () {
@@ -3344,17 +4023,329 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
     }
   }
 
-  Future<void> _stopAudio() async {
-    try {
-      await _audioPlayer.stopPlayer();
-      setState(() {
-        _isPlaying = false;
-        _currentlyPlayingMessageId = null;
-        _playbackProgress = 0.0;
-      });
-    } catch (e) {
-      debugPrint('Error stopping audio: $e');
+  Widget _buildVideoMessagePlayer(MessageModel message, bool isMe) {
+    final isSending =
+        message.status == MessageStatus.sending ||
+        (message.mediaUrl == null || message.mediaUrl!.isEmpty);
+
+    return GestureDetector(
+      onTap: isSending
+          ? null
+          : () {
+              // Open video in full screen player
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) =>
+                      _VideoPlayerScreen(videoUrl: message.mediaUrl!),
+                ),
+              );
+            },
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxHeight: 200, maxWidth: 220),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(14),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // Video thumbnail placeholder
+              Container(
+                width: 220,
+                height: 180,
+                decoration: BoxDecoration(
+                  color: Colors.black87,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: isSending
+                    ? const Center(
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.white70,
+                          ),
+                        ),
+                      )
+                    : const Icon(
+                        Icons.videocam,
+                        color: Colors.white38,
+                        size: 50,
+                      ),
+              ),
+              // Play button overlay
+              if (!isSending)
+                Container(
+                  width: 60,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF5856D6), Color(0xFF007AFF)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF007AFF).withValues(alpha: 0.3),
+                        blurRadius: 12,
+                        spreadRadius: 2,
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.play_arrow_rounded,
+                    color: Colors.white,
+                    size: 36,
+                  ),
+                ),
+              // Video label
+              Positioned(
+                bottom: 8,
+                left: 8,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.black54,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.videocam, color: Colors.white, size: 14),
+                      SizedBox(width: 4),
+                      Text(
+                        'Video',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Build deleted message bubble (WhatsApp-style "This message was deleted")
+  Widget _buildDeletedMessageBubble(
+    MessageModel message,
+    bool isMe,
+    bool isDarkMode,
+  ) {
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: 6,
+        left: isMe ? 60 : 12,
+        right: isMe ? 12 : 60,
+      ),
+      child: Row(
+        mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: isDarkMode
+                  ? Colors.grey.shade800.withValues(alpha: 0.5)
+                  : Colors.grey.shade300.withValues(alpha: 0.7),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: isDarkMode
+                    ? Colors.grey.shade700.withValues(alpha: 0.5)
+                    : Colors.grey.shade400.withValues(alpha: 0.5),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.block,
+                  size: 14,
+                  color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'This message was deleted',
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                    fontSize: 13,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Build call message bubble like regular chat messages (right for outgoing, left for incoming)
+  Widget _buildCallMessageBubble(
+    MessageModel message,
+    bool isMe,
+    bool isDarkMode,
+  ) {
+    final isMissed = message.type == MessageType.missedCall;
+
+    // isMe means current user was the CALLER (senderId = current user)
+    // !isMe means current user was the RECEIVER
+
+    // Determine call text based on who's viewing
+    String callText;
+    if (isMissed) {
+      if (isMe) {
+        // Caller viewing their outgoing missed call
+        callText = 'Outgoing call - No answer';
+      } else {
+        // Receiver viewing their missed incoming call
+        callText = 'Missed voice call';
+      }
+    } else {
+      // Answered call - extract duration from stored text or metadata
+      final storedText = message.text ?? '';
+      if (storedText.contains('•')) {
+        // Use the duration part from stored text
+        callText = storedText;
+      } else {
+        callText = 'Voice call';
+      }
     }
+
+    // Determine icon and color based on call type and who made/received the call
+    // isMe = true means current user made the call (outgoing)
+    // isMe = false means current user received the call (incoming)
+    IconData callIcon;
+    Color iconColor;
+
+    if (isMissed) {
+      // Missed call - phone_missed icon (red)
+      callIcon = Icons.phone_missed;
+      iconColor = Colors.red;
+    } else if (isMe) {
+      // Outgoing call that was answered - arrow going up-right (green)
+      callIcon = Icons.call_made;
+      iconColor = Colors.green;
+    } else {
+      // Incoming call that was answered - arrow going down-left (green)
+      callIcon = Icons.call_received;
+      iconColor = Colors.green;
+    }
+
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: 6,
+        left: isMe ? 60 : 16,
+        right: isMe ? 16 : 60,
+      ),
+      child: Row(
+        mainAxisAlignment: isMe
+            ? MainAxisAlignment.end
+            : MainAxisAlignment.start,
+        children: [
+          GestureDetector(
+            onTap: () => _startAudioCall(),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                gradient: isMe
+                    ? const LinearGradient(
+                        colors: [
+                          Color.fromARGB(255, 116, 114, 248),
+                          Color.fromARGB(255, 95, 170, 250),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      )
+                    : null,
+                color: !isMe
+                    ? (isDarkMode
+                          ? const Color.fromARGB(255, 46, 46, 46)
+                          : const Color.fromARGB(255, 39, 39, 39))
+                    : null,
+                borderRadius: BorderRadius.only(
+                  topLeft: const Radius.circular(18),
+                  topRight: const Radius.circular(18),
+                  bottomLeft: Radius.circular(isMe ? 18 : 4),
+                  bottomRight: Radius.circular(isMe ? 4 : 18),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Phone icon with arrow
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: isMe
+                          ? Colors.white.withValues(alpha: 0.2)
+                          : iconColor.withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      callIcon,
+                      size: 16,
+                      color: isMe ? Colors.white : iconColor,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  // Call text and time
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        callText,
+                        style: TextStyle(
+                          color: isMe
+                              ? Colors.white
+                              : (isDarkMode ? Colors.white : Colors.black87),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            _formatMessageTime(message.timestamp),
+                            style: TextStyle(
+                              color: isMe
+                                  ? Colors.white.withValues(alpha: 0.7)
+                                  : (isDarkMode
+                                        ? Colors.grey[500]
+                                        : Colors.grey[600]),
+                              fontSize: 11,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          // Call back icon
+                          Icon(
+                            Icons.call,
+                            size: 14,
+                            color: isMe
+                                ? Colors.white.withValues(alpha: 0.8)
+                                : Colors.green,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildAudioMessagePlayer(MessageModel message, bool isMe) {
@@ -3382,10 +4373,30 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
     final timeString = '$hour12:$minute $period';
 
     // Waveform bar heights pattern (same as popup)
-    final heights = [8.0, 14.0, 10.0, 18.0, 12.0, 20.0, 14.0, 16.0, 10.0, 22.0,
-                    18.0, 12.0, 20.0, 8.0, 16.0, 14.0, 18.0, 10.0, 14.0, 12.0];
+    final heights = [
+      8.0,
+      14.0,
+      10.0,
+      18.0,
+      12.0,
+      20.0,
+      14.0,
+      16.0,
+      10.0,
+      22.0,
+      18.0,
+      12.0,
+      20.0,
+      8.0,
+      16.0,
+      14.0,
+      18.0,
+      10.0,
+      14.0,
+      12.0,
+    ];
 
-    // Audio player matching popup style
+    // Audio player matching popup style - same for sent and received
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
@@ -3524,33 +4535,40 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
 
   void _startAudioCall() async {
     final currentUserProfile = ref.read(currentUserProfileProvider).valueOrNull;
-
-    debugPrint('  ====== INITIATING CALL ======');
-    debugPrint('  Caller ID (me): $_currentUserId');
-    debugPrint('  Receiver ID (other): ${widget.otherUser.uid}');
-    debugPrint('  Caller name: ${currentUserProfile?.name ?? 'Unknown'}');
-    debugPrint('  Receiver name: ${widget.otherUser.name}');
+    final callerName = currentUserProfile?.name ?? 'Someone';
 
     // Create a call document in Firestore
     final callDoc = await _firestore.collection('calls').add({
       'callerId': _currentUserId,
       'receiverId': widget.otherUser.uid,
-      'callerName': currentUserProfile?.name ?? 'Unknown',
+      'callerName': callerName,
       'callerPhoto': currentUserProfile?.photoUrl,
       'receiverName': widget.otherUser.name,
       'receiverPhoto': widget.otherUser.photoUrl,
+      'participants': [_currentUserId, widget.otherUser.uid], // Required for Calls tab query
       'status': 'calling',
       'type': 'audio',
-      'timestamp':
-          FieldValue.serverTimestamp(), // Used for checking call freshness
+      'timestamp': FieldValue.serverTimestamp(),
       'createdAt': FieldValue.serverTimestamp(),
     });
 
-    debugPrint('  Call document created: ${callDoc.id}');
-
     if (!mounted) return;
 
-    // Navigate to voice call screen
+    // Send call notification to receiver (don't await - fire and forget for speed)
+    NotificationService().sendNotificationToUser(
+      userId: widget.otherUser.uid,
+      title: 'Incoming Call',
+      body: '$callerName is calling you',
+      type: 'call',
+      data: {
+        'callId': callDoc.id,
+        'callerId': _currentUserId,
+        'callerName': callerName,
+        'callerPhoto': currentUserProfile?.photoUrl,
+      },
+    );
+
+    // Navigate to voice call screen immediately
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -4498,7 +5516,6 @@ class _ForwardMessageScreenState extends State<_ForwardMessageScreen> {
   Future<void> _initSpeech() async {
     _speechEnabled = await _speech.initialize(
       onStatus: (status) {
-        debugPrint('Speech status: $status');
         if (status == 'done' || status == 'notListening') {
           if (mounted && _isListening) {
             _stopVoiceSearch();
@@ -4506,7 +5523,6 @@ class _ForwardMessageScreenState extends State<_ForwardMessageScreen> {
         }
       },
       onError: (error) {
-        debugPrint('Speech error: $error');
         if (mounted) {
           setState(() {
             _isListening = false;
@@ -4526,7 +5542,6 @@ class _ForwardMessageScreenState extends State<_ForwardMessageScreen> {
     // Request microphone permission first
     final micStatus = await Permission.microphone.request();
     if (!micStatus.isGranted) {
-      debugPrint('Microphone permission denied');
       if (mounted) {
         SnackBarHelper.showError(
           context,
@@ -4539,11 +5554,8 @@ class _ForwardMessageScreenState extends State<_ForwardMessageScreen> {
     // Check if speech is available
     if (!_speechEnabled) {
       _speechEnabled = await _speech.initialize(
-        onStatus: (status) {
-          debugPrint('Speech status: $status');
-        },
+        onStatus: (status) {},
         onError: (error) {
-          debugPrint('Speech error: ${error.errorMsg}');
           if (mounted && _isListening) {
             _silenceTimer?.cancel();
             setState(() {
@@ -4553,7 +5565,6 @@ class _ForwardMessageScreenState extends State<_ForwardMessageScreen> {
         },
       );
       if (!_speechEnabled) {
-        debugPrint('Speech recognition not available');
         return;
       }
     }
@@ -4688,9 +5699,14 @@ class _ForwardMessageScreenState extends State<_ForwardMessageScreen> {
 
   void _toggleSelection(Map<String, dynamic> contact) {
     setState(() {
+      // Get display name - fallback to phone for phone login users
+      String displayName = contact['name'] ?? contact['displayName'] ?? '';
+      if (displayName.isEmpty || displayName == 'User') {
+        displayName = contact['phone'] ?? 'User';
+      }
       final userProfile = UserProfile(
         uid: contact['uid'],
-        name: contact['name'],
+        name: displayName,
         email: contact['email'] ?? '',
         profileImageUrl: contact['photoUrl'],
         createdAt: DateTime.now(),
@@ -6307,7 +7323,9 @@ class _VoicePreviewPopupState extends State<_VoicePreviewPopup> {
         await widget.onInitializePlayer();
 
         // Set fast subscription for smooth waveform animation
-        await widget.audioPlayer.setSubscriptionDuration(const Duration(milliseconds: 50));
+        await widget.audioPlayer.setSubscriptionDuration(
+          const Duration(milliseconds: 50),
+        );
 
         // Subscribe to progress BEFORE starting
         _playerSubscription?.cancel();
@@ -6597,6 +7615,135 @@ class _VoicePreviewPopupState extends State<_VoicePreviewPopup> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Full screen video player screen
+class _VideoPlayerScreen extends StatefulWidget {
+  final String videoUrl;
+
+  const _VideoPlayerScreen({required this.videoUrl});
+
+  @override
+  State<_VideoPlayerScreen> createState() => _VideoPlayerScreenState();
+}
+
+class _VideoPlayerScreenState extends State<_VideoPlayerScreen> {
+  VideoPlayerController? _videoPlayerController;
+  ChewieController? _chewieController;
+  bool _isLoading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializePlayer();
+  }
+
+  Future<void> _initializePlayer() async {
+    try {
+      final controller = VideoPlayerController.networkUrl(
+        Uri.parse(widget.videoUrl),
+      );
+      _videoPlayerController = controller;
+
+      await controller.initialize();
+
+      if (!mounted) return;
+
+      _chewieController = ChewieController(
+        videoPlayerController: controller,
+        autoPlay: true,
+        looping: false,
+        aspectRatio: controller.value.aspectRatio,
+        allowFullScreen: true,
+        allowMuting: true,
+        showControls: true,
+        materialProgressColors: ChewieProgressColors(
+          playedColor: const Color(0xFF007AFF),
+          handleColor: const Color(0xFF007AFF),
+          backgroundColor: Colors.grey.shade800,
+          bufferedColor: Colors.grey.shade600,
+        ),
+        placeholder: Container(
+          color: Colors.black,
+          child: const Center(
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF007AFF)),
+            ),
+          ),
+        ),
+        errorBuilder: (context, errorMessage) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline, color: Colors.red, size: 48),
+                const SizedBox(height: 16),
+                Text(
+                  'Error playing video',
+                  style: TextStyle(color: Colors.grey[400]),
+                ),
+              ],
+            ),
+          );
+        },
+      );
+
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _error = 'Failed to load video';
+        });
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    try {
+      _videoPlayerController?.dispose();
+    } catch (_) {}
+    try {
+      _chewieController?.dispose();
+    } catch (_) {}
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text('Video', style: TextStyle(color: Colors.white)),
+      ),
+      body: Center(
+        child: _isLoading
+            ? const CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF007AFF)),
+              )
+            : _error != null
+            ? Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error_outline, color: Colors.red, size: 48),
+                  const SizedBox(height: 16),
+                  Text(_error!, style: TextStyle(color: Colors.grey[400])),
+                ],
+              )
+            : _chewieController != null
+            ? Chewie(controller: _chewieController!)
+            : const SizedBox.shrink(),
       ),
     );
   }

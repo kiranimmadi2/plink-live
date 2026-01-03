@@ -130,9 +130,15 @@ class ExtendedUserProfile {
       verificationStatus = VerificationStatus.fromString(map['verification']['status']);
     }
 
+    // Get display name - fallback to phone number for phone login users
+    String displayName = map['name'] ?? map['displayName'] ?? '';
+    if (displayName.isEmpty || displayName == 'User' || displayName == 'Unknown') {
+      displayName = map['phone'] ?? 'Unknown';
+    }
+
     return ExtendedUserProfile(
       uid: uid,
-      name: map['name'] ?? 'Unknown',
+      name: displayName,
       photoUrl: map['photoUrl'],
       city: map['city'],
       location: map['location'] ?? map['displayLocation'],

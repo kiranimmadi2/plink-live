@@ -49,8 +49,12 @@ class _ConversationsScreenState extends State<ConversationsScreen>
 
   @override
   void dispose() {
-    _tabController.dispose();
-    _searchController.dispose();
+    try {
+      _tabController.dispose();
+    } catch (_) {}
+    try {
+      _searchController.dispose();
+    } catch (_) {}
     super.dispose();
   }
 
@@ -195,7 +199,11 @@ class _ConversationsScreenState extends State<ConversationsScreen>
               if (snapshot.hasData && snapshot.data!.exists) {
                 final userData = snapshot.data!.data() as Map<String, dynamic>?;
                 photoUrl = userData?['photoUrl'] as String?;
-                userName = userData?['name'] as String? ?? 'User';
+                userName = userData?['name'] as String? ?? userData?['displayName'] as String? ?? 'User';
+                // Fallback to phone number for phone login users
+                if (userName == 'User' || userName.isEmpty) {
+                  userName = userData?['phone'] as String? ?? 'User';
+                }
               }
 
               // 2. Fallback to cache
@@ -577,7 +585,12 @@ class _ConversationsScreenState extends State<ConversationsScreen>
 
     // Get user data from cache (prefetched earlier)
     final userData = _userCache[otherUserId];
-    final displayName = userData?['name'] ?? 'Unknown User';
+    // Get display name - fallback to phone number for phone login users
+    String displayName = userData?['name'] ?? userData?['displayName'] ?? '';
+    if (displayName.isEmpty || displayName == 'User') {
+      displayName = userData?['phone'] ?? 'Unknown User';
+    }
+    if (displayName.isEmpty) displayName = 'Unknown User';
     final photoUrl = userData?['photoUrl'];
     final fixedPhotoUrl = PhotoUrlHelper.fixGooglePhotoUrl(photoUrl);
     final initial = displayName.isNotEmpty ? displayName[0].toUpperCase() : '?';
@@ -852,7 +865,12 @@ class _ConversationsScreenState extends State<ConversationsScreen>
     if (otherUserId.isNotEmpty && _userCache.containsKey(otherUserId)) {
       final cachedUser = _userCache[otherUserId]!;
       if (displayName == 'Unknown User') {
-        displayName = cachedUser['name'] ?? 'Unknown User';
+        // Get display name - fallback to phone number for phone login users
+        String cachedName = cachedUser['name'] ?? cachedUser['displayName'] ?? '';
+        if (cachedName.isEmpty || cachedName == 'User') {
+          cachedName = cachedUser['phone'] ?? 'Unknown User';
+        }
+        displayName = cachedName.isNotEmpty ? cachedName : 'Unknown User';
       }
       displayPhoto ??= cachedUser['photoUrl'];
     }
