@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'base/priceable_mixin.dart';
 
 /// Pricing type for services
 enum PricingType {
@@ -147,7 +148,7 @@ class ServiceModel {
     }
 
     final priceStr = price!.toStringAsFixed(price! % 1 == 0 ? 0 : 2);
-    final currencySymbol = _getCurrencySymbol(currency);
+    final currencySymbol = Priceable.getCurrencySymbol(currency);
 
     switch (pricingType) {
       case PricingType.fixed:
@@ -158,27 +159,6 @@ class ServiceModel {
         return 'From $currencySymbol$priceStr';
       case PricingType.negotiable:
         return 'Negotiable';
-    }
-  }
-
-  String _getCurrencySymbol(String currency) {
-    switch (currency.toUpperCase()) {
-      case 'USD':
-        return '\$';
-      case 'EUR':
-        return '€';
-      case 'GBP':
-        return '£';
-      case 'INR':
-        return '₹';
-      case 'JPY':
-        return '¥';
-      case 'AUD':
-        return 'A\$';
-      case 'CAD':
-        return 'C\$';
-      default:
-        return '$currency ';
     }
   }
 
