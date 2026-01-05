@@ -61,8 +61,11 @@ class LiveConnectFilterState {
 
 /// LIVE CONNECT FILTER NOTIFIER
 
-class LiveConnectFilterNotifier extends StateNotifier<LiveConnectFilterState> {
-  LiveConnectFilterNotifier() : super(const LiveConnectFilterState());
+class LiveConnectFilterNotifier extends Notifier<LiveConnectFilterState> {
+  @override
+  LiveConnectFilterState build() {
+    return const LiveConnectFilterState();
+  }
 
   void setFilterByInterests(bool value) {
     state = state.copyWith(filterByInterests: value);
@@ -117,11 +120,9 @@ class LiveConnectFilterNotifier extends StateNotifier<LiveConnectFilterState> {
 
 /// Provider for Live Connect filters
 final liveConnectFilterProvider =
-    StateNotifierProvider<LiveConnectFilterNotifier, LiveConnectFilterState>((
-      ref,
-    ) {
-      return LiveConnectFilterNotifier();
-    });
+    NotifierProvider<LiveConnectFilterNotifier, LiveConnectFilterState>(
+      LiveConnectFilterNotifier.new,
+    );
 
 /// NEARBY PEOPLE STATE
 
@@ -167,11 +168,15 @@ class NearbyPeopleState {
 
 /// NEARBY PEOPLE NOTIFIER
 
-class NearbyPeopleNotifier extends StateNotifier<NearbyPeopleState> {
-  final String? currentUserId;
+class NearbyPeopleNotifier extends Notifier<NearbyPeopleState> {
   static const int _pageSize = 20;
 
-  NearbyPeopleNotifier(this.currentUserId) : super(const NearbyPeopleState());
+  @override
+  NearbyPeopleState build() {
+    return const NearbyPeopleState();
+  }
+
+  String? get currentUserId => ref.watch(currentUserIdProvider);
 
   /// Load initial users
   Future<void> loadInitial() async {
@@ -261,19 +266,18 @@ class NearbyPeopleNotifier extends StateNotifier<NearbyPeopleState> {
   }
 
   /// Remove a person from the list
-  void removePerson(String userId) {
+  void removePerson(String odlalud) {
     state = state.copyWith(
-      people: state.people.where((p) => p['uid'] != userId).toList(),
+      people: state.people.where((p) => p['uid'] != odlalud).toList(),
     );
   }
 }
 
 /// Provider for nearby people
 final nearbyPeopleProvider =
-    StateNotifierProvider<NearbyPeopleNotifier, NearbyPeopleState>((ref) {
-      final userId = ref.watch(currentUserIdProvider);
-      return NearbyPeopleNotifier(userId);
-    });
+    NotifierProvider<NearbyPeopleNotifier, NearbyPeopleState>(
+      NearbyPeopleNotifier.new,
+    );
 
 /// CONNECTION STATUS CACHE
 
@@ -302,17 +306,19 @@ class ConnectionStatusCacheState {
   }
 }
 
-class ConnectionStatusCacheNotifier
-    extends StateNotifier<ConnectionStatusCacheState> {
-  ConnectionStatusCacheNotifier() : super(const ConnectionStatusCacheState());
-
-  void setConnected(String userId, bool value) {
-    state = state.copyWith(isConnected: {...state.isConnected, userId: value});
+class ConnectionStatusCacheNotifier extends Notifier<ConnectionStatusCacheState> {
+  @override
+  ConnectionStatusCacheState build() {
+    return const ConnectionStatusCacheState();
   }
 
-  void setRequestStatus(String userId, String? status) {
+  void setConnected(String odlalud, bool value) {
+    state = state.copyWith(isConnected: {...state.isConnected, odlalud: value});
+  }
+
+  void setRequestStatus(String odlalud, String? status) {
     state = state.copyWith(
-      requestStatus: {...state.requestStatus, userId: status},
+      requestStatus: {...state.requestStatus, odlalud: status},
     );
   }
 
@@ -320,28 +326,28 @@ class ConnectionStatusCacheNotifier
     state = state.copyWith(myConnections: connections);
   }
 
-  void addConnection(String userId) {
-    if (!state.myConnections.contains(userId)) {
+  void addConnection(String odlalud) {
+    if (!state.myConnections.contains(odlalud)) {
       state = state.copyWith(
-        myConnections: [...state.myConnections, userId],
-        isConnected: {...state.isConnected, userId: true},
+        myConnections: [...state.myConnections, odlalud],
+        isConnected: {...state.isConnected, odlalud: true},
       );
     }
   }
 
-  void removeConnection(String userId) {
+  void removeConnection(String odlalud) {
     state = state.copyWith(
-      myConnections: state.myConnections.where((id) => id != userId).toList(),
-      isConnected: {...state.isConnected, userId: false},
+      myConnections: state.myConnections.where((id) => id != odlalud).toList(),
+      isConnected: {...state.isConnected, odlalud: false},
     );
   }
 
-  bool isUserConnected(String userId) {
-    return state.isConnected[userId] ?? state.myConnections.contains(userId);
+  bool isUserConnected(String odlalud) {
+    return state.isConnected[odlalud] ?? state.myConnections.contains(odlalud);
   }
 
-  String? getRequestStatus(String userId) {
-    return state.requestStatus[userId];
+  String? getRequestStatus(String odlalud) {
+    return state.requestStatus[odlalud];
   }
 
   void clearCache() {
@@ -351,17 +357,55 @@ class ConnectionStatusCacheNotifier
 
 /// Provider for connection status cache
 final connectionStatusCacheProvider =
-    StateNotifierProvider<
-      ConnectionStatusCacheNotifier,
-      ConnectionStatusCacheState
-    >((ref) {
-      return ConnectionStatusCacheNotifier();
-    });
+    NotifierProvider<ConnectionStatusCacheNotifier, ConnectionStatusCacheState>(
+      ConnectionStatusCacheNotifier.new,
+    );
 
 /// SELECTED INTERESTS PROVIDER
 
+/// State for selected interests
+class SelectedInterestsState {
+  final List<String> interests;
+
+  const SelectedInterestsState({this.interests = const []});
+
+  SelectedInterestsState copyWith({List<String>? interests}) {
+    return SelectedInterestsState(interests: interests ?? this.interests);
+  }
+}
+
+class SelectedInterestsNotifier extends Notifier<SelectedInterestsState> {
+  @override
+  SelectedInterestsState build() {
+    return const SelectedInterestsState();
+  }
+
+  void setInterests(List<String> interests) {
+    state = state.copyWith(interests: interests);
+  }
+
+  void addInterest(String interest) {
+    if (!state.interests.contains(interest)) {
+      state = state.copyWith(interests: [...state.interests, interest]);
+    }
+  }
+
+  void removeInterest(String interest) {
+    state = state.copyWith(
+      interests: state.interests.where((i) => i != interest).toList(),
+    );
+  }
+
+  void clear() {
+    state = const SelectedInterestsState();
+  }
+}
+
 /// Provider for user's selected interests
-final selectedInterestsProvider = StateProvider<List<String>>((ref) => []);
+final selectedInterestsProvider =
+    NotifierProvider<SelectedInterestsNotifier, SelectedInterestsState>(
+      SelectedInterestsNotifier.new,
+    );
 
 /// AVAILABLE INTERESTS
 

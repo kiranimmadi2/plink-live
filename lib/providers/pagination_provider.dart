@@ -55,7 +55,7 @@ class PaginationState<T> {
 /// PAGINATION NOTIFIER
 
 /// Generic pagination notifier for Firestore collections
-class PaginationNotifier<T> extends StateNotifier<PaginationState<T>> {
+class PaginationNotifier<T> extends Notifier<PaginationState<T>> {
   final int pageSize;
   final Query Function() queryBuilder;
   final T Function(DocumentSnapshot doc) fromDocument;
@@ -64,7 +64,12 @@ class PaginationNotifier<T> extends StateNotifier<PaginationState<T>> {
     required this.queryBuilder,
     required this.fromDocument,
     this.pageSize = 20,
-  }) : super(const PaginationState());
+  });
+
+  @override
+  PaginationState<T> build() {
+    return const PaginationState();
+  }
 
   /// Load initial data
   Future<void> loadInitial() async {
@@ -193,19 +198,27 @@ class StreamPaginationState<T> {
 
 /// Pagination notifier for real-time Firestore streams
 /// Increases limit to load more items while maintaining stream
-class StreamPaginationNotifier<T>
-    extends StateNotifier<StreamPaginationState<T>> {
+class StreamPaginationNotifier<T> extends Notifier<StreamPaginationState<T>> {
   final int initialLimit;
   final int loadMoreIncrement;
   final Query Function(int limit) queryBuilder;
   final T Function(DocumentSnapshot doc) fromDocument;
+  bool _isActive = true;
 
   StreamPaginationNotifier({
     required this.queryBuilder,
     required this.fromDocument,
     this.initialLimit = 20,
     this.loadMoreIncrement = 20,
-  }) : super(StreamPaginationState(currentLimit: initialLimit));
+  });
+
+  @override
+  StreamPaginationState<T> build() {
+    ref.onDispose(() {
+      _isActive = false;
+    });
+    return StreamPaginationState(currentLimit: initialLimit);
+  }
 
   /// Get the stream with current limit
   Stream<List<T>> getStream() {
@@ -213,7 +226,7 @@ class StreamPaginationNotifier<T>
       final items = snapshot.docs.map((doc) => fromDocument(doc)).toList();
 
       // Update hasMore based on results
-      if (mounted) {
+      if (_isActive) {
         final hasMore = snapshot.docs.length >= state.currentLimit;
         if (state.hasMore != hasMore) {
           state = state.copyWith(hasMore: hasMore);
@@ -235,7 +248,7 @@ class StreamPaginationNotifier<T>
 
     // The stream will automatically update with new limit
     Future.delayed(const Duration(milliseconds: 500), () {
-      if (mounted) {
+      if (_isActive) {
         state = state.copyWith(isLoading: false);
       }
     });
@@ -262,40 +275,79 @@ extension PaginationQueryExtension on Query {
 
 /// FACTORY FUNCTIONS
 
-/// Create a pagination provider for a specific query
-StateNotifierProvider<PaginationNotifier<T>, PaginationState<T>>
-createPaginationProvider<T>({
-  required Query Function() queryBuilder,
-  required T Function(DocumentSnapshot doc) fromDocument,
-  int pageSize = 20,
-}) {
-  return StateNotifierProvider<PaginationNotifier<T>, PaginationState<T>>((
-    ref,
-  ) {
-    return PaginationNotifier<T>(
-      queryBuilder: queryBuilder,
-      fromDocument: fromDocument,
-      pageSize: pageSize,
-    );
-  });
-}
+/// Simple pagination notifier factory class
+class SimplePaginationNotifier<T> extends Notifier<PaginationState<T>> {
+  final int pageSize;
+  final Query Function() queryBuilder;
+  final T Function(DocumentSnapshot doc) fromDocument;
 
-/// Create a family pagination provider (with parameter)
-StateNotifierProviderFamily<PaginationNotifier<T>, PaginationState<T>, String>
-createPaginationProviderFamily<T>({
-  required Query Function(String param) queryBuilder,
-  required T Function(DocumentSnapshot doc) fromDocument,
-  int pageSize = 20,
-}) {
-  return StateNotifierProvider.family<
-    PaginationNotifier<T>,
-    PaginationState<T>,
-    String
-  >((ref, param) {
-    return PaginationNotifier<T>(
-      queryBuilder: () => queryBuilder(param),
-      fromDocument: fromDocument,
-      pageSize: pageSize,
-    );
+  SimplePaginationNotifier({
+    required this.queryBuilder,
+    required this.fromDocument,
+    this.pageSize = 20,
   });
+
+  @override
+  PaginationState<T> build() {
+    return const PaginationState();
+  }
+
+  Future<void> loadInitial() async {
+    if (state.isLoading) return;
+
+    state = state.copyWith(
+      isLoading: true,
+      error: null,
+      clearLastDocument: true,
+    );
+
+    try {
+      final query = queryBuilder().limit(pageSize);
+      final snapshot = await query.get();
+
+      final items = snapshot.docs.map((doc) => fromDocument(doc)).toList();
+
+      state = state.copyWith(
+        items: items,
+        isLoading: false,
+        hasMore: snapshot.docs.length >= pageSize,
+        lastDocument: snapshot.docs.isNotEmpty ? snapshot.docs.last : null,
+      );
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+    }
+  }
+
+  Future<void> loadMore() async {
+    if (!state.canLoadMore || state.lastDocument == null) return;
+
+    state = state.copyWith(isLoadingMore: true, error: null);
+
+    try {
+      final query = queryBuilder()
+          .startAfterDocument(state.lastDocument!)
+          .limit(pageSize);
+      final snapshot = await query.get();
+
+      final newItems = snapshot.docs.map((doc) => fromDocument(doc)).toList();
+
+      state = state.copyWith(
+        items: [...state.items, ...newItems],
+        isLoadingMore: false,
+        hasMore: snapshot.docs.length >= pageSize,
+        lastDocument: snapshot.docs.isNotEmpty ? snapshot.docs.last : null,
+      );
+    } catch (e) {
+      state = state.copyWith(isLoadingMore: false, error: e.toString());
+    }
+  }
+
+  Future<void> refresh() async {
+    state = const PaginationState();
+    await loadInitial();
+  }
+
+  void clear() {
+    state = const PaginationState();
+  }
 }

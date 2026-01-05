@@ -41,8 +41,11 @@ class HomeProcessingState {
 
 /// HOME PROCESSING NOTIFIER
 
-class HomeProcessingNotifier extends StateNotifier<HomeProcessingState> {
-  HomeProcessingNotifier() : super(const HomeProcessingState());
+class HomeProcessingNotifier extends Notifier<HomeProcessingState> {
+  @override
+  HomeProcessingState build() {
+    return const HomeProcessingState();
+  }
 
   void setProcessing(bool value) {
     state = state.copyWith(isProcessing: value);
@@ -71,9 +74,9 @@ class HomeProcessingNotifier extends StateNotifier<HomeProcessingState> {
 
 /// Provider for home processing state
 final homeProcessingProvider =
-    StateNotifierProvider<HomeProcessingNotifier, HomeProcessingState>((ref) {
-      return HomeProcessingNotifier();
-    });
+    NotifierProvider<HomeProcessingNotifier, HomeProcessingState>(
+      HomeProcessingNotifier.new,
+    );
 
 /// MATCHES STATE
 
@@ -107,12 +110,16 @@ class MatchesState {
 
 /// MATCHES NOTIFIER
 
-class MatchesNotifier extends StateNotifier<MatchesState> {
-  final UniversalIntentService _intentService;
-  final PhotoCacheService _photoCache;
+class MatchesNotifier extends Notifier<MatchesState> {
+  late final UniversalIntentService _intentService;
+  late final PhotoCacheService _photoCache;
 
-  MatchesNotifier(this._intentService, this._photoCache)
-    : super(const MatchesState());
+  @override
+  MatchesState build() {
+    _intentService = UniversalIntentService();
+    _photoCache = PhotoCacheService();
+    return const MatchesState();
+  }
 
   /// Process intent and find matches
   Future<void> processIntent(String intent) async {
@@ -131,11 +138,11 @@ class MatchesNotifier extends StateNotifier<MatchesState> {
         // Cache photo URLs
         for (final match in matches) {
           final userProfile = match['userProfile'] ?? {};
-          final userId = match['userId'];
+          final odlalud = match['userId'];
           final photoUrl = userProfile['photoUrl'];
 
-          if (userId != null && photoUrl != null) {
-            _photoCache.cachePhotoUrl(userId, photoUrl);
+          if (odlalud != null && photoUrl != null) {
+            _photoCache.cachePhotoUrl(odlalud, photoUrl);
           }
         }
 
@@ -162,19 +169,17 @@ class MatchesNotifier extends StateNotifier<MatchesState> {
   }
 
   /// Remove a match by user ID
-  void removeMatch(String userId) {
+  void removeMatch(String odlalud) {
     state = state.copyWith(
-      matches: state.matches.where((m) => m['userId'] != userId).toList(),
+      matches: state.matches.where((m) => m['userId'] != odlalud).toList(),
     );
   }
 }
 
 /// Provider for matches
-final matchesProvider = StateNotifierProvider<MatchesNotifier, MatchesState>((
-  ref,
-) {
-  return MatchesNotifier(UniversalIntentService(), PhotoCacheService());
-});
+final matchesProvider = NotifierProvider<MatchesNotifier, MatchesState>(
+  MatchesNotifier.new,
+);
 
 /// CONVERSATION STATE
 
@@ -210,20 +215,20 @@ class ConversationState {
 
 /// CONVERSATION NOTIFIER
 
-class ConversationNotifier extends StateNotifier<ConversationState> {
-  ConversationNotifier()
-    : super(
-        ConversationState(
-          messages: [
-            ConversationMessage(
-              text:
-                  'Hi! I\'m your Supper assistant. What would you like to find today?',
-              isUser: false,
-              timestamp: DateTime.now(),
-            ),
-          ],
+class ConversationNotifier extends Notifier<ConversationState> {
+  @override
+  ConversationState build() {
+    return ConversationState(
+      messages: [
+        ConversationMessage(
+          text:
+              'Hi! I\'m your Supper assistant. What would you like to find today?',
+          isUser: false,
+          timestamp: DateTime.now(),
         ),
-      );
+      ],
+    );
+  }
 
   /// Add a user message
   void addUserMessage(String text) {
@@ -262,9 +267,9 @@ class ConversationNotifier extends StateNotifier<ConversationState> {
 
 /// Provider for conversation
 final conversationProvider =
-    StateNotifierProvider<ConversationNotifier, ConversationState>((ref) {
-      return ConversationNotifier();
-    });
+    NotifierProvider<ConversationNotifier, ConversationState>(
+      ConversationNotifier.new,
+    );
 
 /// SUGGESTIONS PROVIDER
 
@@ -277,9 +282,35 @@ const List<String> _defaultSuggestions = [
   "Selling my old laptop",
 ];
 
+/// State for suggestions
+class SuggestionsState {
+  final List<String> suggestions;
+
+  const SuggestionsState({this.suggestions = const []});
+
+  SuggestionsState copyWith({List<String>? suggestions}) {
+    return SuggestionsState(suggestions: suggestions ?? this.suggestions);
+  }
+}
+
+class SuggestionsNotifier extends Notifier<SuggestionsState> {
+  @override
+  SuggestionsState build() {
+    return SuggestionsState(suggestions: _defaultSuggestions.take(3).toList());
+  }
+
+  void setSuggestions(List<String> suggestions) {
+    state = state.copyWith(suggestions: suggestions);
+  }
+
+  void reset() {
+    state = SuggestionsState(suggestions: _defaultSuggestions.take(3).toList());
+  }
+}
+
 /// Provider for search suggestions
-final suggestionsProvider = StateProvider<List<String>>(
-  (ref) => _defaultSuggestions.take(3).toList(),
+final suggestionsProvider = NotifierProvider<SuggestionsNotifier, SuggestionsState>(
+  SuggestionsNotifier.new,
 );
 
 /// Provider to filter suggestions based on query

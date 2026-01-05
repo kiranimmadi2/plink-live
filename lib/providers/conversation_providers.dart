@@ -32,9 +32,11 @@ class ConversationsScreenState {
 
 /// CONVERSATIONS SCREEN NOTIFIER
 
-class ConversationsScreenNotifier
-    extends StateNotifier<ConversationsScreenState> {
-  ConversationsScreenNotifier() : super(const ConversationsScreenState());
+class ConversationsScreenNotifier extends Notifier<ConversationsScreenState> {
+  @override
+  ConversationsScreenState build() {
+    return const ConversationsScreenState();
+  }
 
   void setSearching(bool value) {
     state = state.copyWith(isSearching: value);
@@ -66,12 +68,9 @@ class ConversationsScreenNotifier
 
 /// Provider for conversations screen UI state
 final conversationsScreenProvider =
-    StateNotifierProvider<
-      ConversationsScreenNotifier,
-      ConversationsScreenState
-    >((ref) {
-      return ConversationsScreenNotifier();
-    });
+    NotifierProvider<ConversationsScreenNotifier, ConversationsScreenState>(
+      ConversationsScreenNotifier.new,
+    );
 
 /// CONVERSATIONS STREAM PROVIDER
 
@@ -179,8 +178,11 @@ class ParticipantCacheState {
   }
 }
 
-class ParticipantCacheNotifier extends StateNotifier<ParticipantCacheState> {
-  ParticipantCacheNotifier() : super(const ParticipantCacheState());
+class ParticipantCacheNotifier extends Notifier<ParticipantCacheState> {
+  @override
+  ParticipantCacheState build() {
+    return const ParticipantCacheState();
+  }
 
   void cacheParticipant(String odlalud, Map<String, dynamic> data) {
     state = state.copyWith(cache: {...state.cache, odlalud: data});
@@ -221,11 +223,9 @@ class ParticipantCacheNotifier extends StateNotifier<ParticipantCacheState> {
 
 /// Provider for participant data cache
 final participantCacheProvider =
-    StateNotifierProvider<ParticipantCacheNotifier, ParticipantCacheState>((
-      ref,
-    ) {
-      return ParticipantCacheNotifier();
-    });
+    NotifierProvider<ParticipantCacheNotifier, ParticipantCacheState>(
+      ParticipantCacheNotifier.new,
+    );
 
 /// UNREAD COUNT PROVIDER
 

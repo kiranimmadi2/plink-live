@@ -89,10 +89,13 @@ class MyConnectionsState {
   }
 }
 
-class MyConnectionsNotifier extends StateNotifier<MyConnectionsState> {
-  final String? userId;
+class MyConnectionsNotifier extends Notifier<MyConnectionsState> {
+  @override
+  MyConnectionsState build() {
+    return const MyConnectionsState();
+  }
 
-  MyConnectionsNotifier(this.userId) : super(const MyConnectionsState());
+  String? get userId => ref.watch(currentUserIdProvider);
 
   /// Load connections from user document
   Future<void> loadConnections() async {
@@ -182,10 +185,9 @@ class MyConnectionsNotifier extends StateNotifier<MyConnectionsState> {
 
 /// Provider for my connections
 final myConnectionsProvider =
-    StateNotifierProvider<MyConnectionsNotifier, MyConnectionsState>((ref) {
-      final userId = ref.watch(currentUserIdProvider);
-      return MyConnectionsNotifier(userId);
-    });
+    NotifierProvider<MyConnectionsNotifier, MyConnectionsState>(
+      MyConnectionsNotifier.new,
+    );
 
 /// Provider for connections count
 final connectionsCountProvider = Provider<int>((ref) {
@@ -211,8 +213,11 @@ class RequestActionState {
   bool isProcessing(String requestId) => processingIds.contains(requestId);
 }
 
-class RequestActionNotifier extends StateNotifier<RequestActionState> {
-  RequestActionNotifier() : super(const RequestActionState());
+class RequestActionNotifier extends Notifier<RequestActionState> {
+  @override
+  RequestActionState build() {
+    return const RequestActionState();
+  }
 
   void startProcessing(String requestId) {
     state = state.copyWith(processingIds: {...state.processingIds, requestId});
@@ -235,6 +240,6 @@ class RequestActionNotifier extends StateNotifier<RequestActionState> {
 
 /// Provider for request action state
 final requestActionProvider =
-    StateNotifierProvider<RequestActionNotifier, RequestActionState>((ref) {
-      return RequestActionNotifier();
-    });
+    NotifierProvider<RequestActionNotifier, RequestActionState>(
+      RequestActionNotifier.new,
+    );

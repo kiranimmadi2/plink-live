@@ -48,16 +48,18 @@ class UserProfileState {
 
 /// USER PROFILE NOTIFIER
 
-class UserProfileNotifier extends StateNotifier<UserProfileState> {
-  final String? userId;
-
-  UserProfileNotifier(this.userId)
-    : super(const UserProfileState(isLoading: true)) {
-    // Auto-load profile when notifier is created
+class UserProfileNotifier extends Notifier<UserProfileState> {
+  @override
+  UserProfileState build() {
+    final userId = ref.watch(currentUserIdProvider);
     if (userId != null) {
-      loadProfile();
+      // Schedule loading after build
+      Future.microtask(() => loadProfile());
     }
+    return const UserProfileState(isLoading: true);
   }
+
+  String? get userId => ref.read(currentUserIdProvider);
 
   /// Load user profile from Firestore
   Future<void> loadProfile() async {
@@ -136,10 +138,9 @@ class UserProfileNotifier extends StateNotifier<UserProfileState> {
 
 /// Provider for user profile
 final userProfileProvider =
-    StateNotifierProvider<UserProfileNotifier, UserProfileState>((ref) {
-      final userId = ref.watch(currentUserIdProvider);
-      return UserProfileNotifier(userId);
-    });
+    NotifierProvider<UserProfileNotifier, UserProfileState>(
+      UserProfileNotifier.new,
+    );
 
 /// SEARCH HISTORY STATE
 
@@ -168,19 +169,19 @@ class SearchHistoryState {
   }
 }
 
-class SearchHistoryNotifier extends StateNotifier<SearchHistoryState> {
-  final String? userId;
-
-  SearchHistoryNotifier(this.userId)
-    : super(const SearchHistoryState(isLoading: true)) {
-    // Auto-load history when notifier is created
+class SearchHistoryNotifier extends Notifier<SearchHistoryState> {
+  @override
+  SearchHistoryState build() {
+    final userId = ref.watch(currentUserIdProvider);
     if (userId != null) {
-      loadHistory();
-    } else {
-      // No user, set loading to false
-      state = state.copyWith(isLoading: false);
+      // Schedule loading after build
+      Future.microtask(() => loadHistory());
+      return const SearchHistoryState(isLoading: true);
     }
+    return const SearchHistoryState();
   }
+
+  String? get userId => ref.read(currentUserIdProvider);
 
   /// Load search history from Firestore
   Future<void> loadHistory() async {
@@ -232,10 +233,9 @@ class SearchHistoryNotifier extends StateNotifier<SearchHistoryState> {
 
 /// Provider for search history
 final searchHistoryProvider =
-    StateNotifierProvider<SearchHistoryNotifier, SearchHistoryState>((ref) {
-      final userId = ref.watch(currentUserIdProvider);
-      return SearchHistoryNotifier(userId);
-    });
+    NotifierProvider<SearchHistoryNotifier, SearchHistoryState>(
+      SearchHistoryNotifier.new,
+    );
 
 /// USER POSTS PROVIDER
 
@@ -292,8 +292,11 @@ class ProfileEditState {
   }
 }
 
-class ProfileEditNotifier extends StateNotifier<ProfileEditState> {
-  ProfileEditNotifier() : super(const ProfileEditState());
+class ProfileEditNotifier extends Notifier<ProfileEditState> {
+  @override
+  ProfileEditState build() {
+    return const ProfileEditState();
+  }
 
   void setConnectionTypes(List<String> types) {
     state = state.copyWith(selectedConnectionTypes: types);
@@ -350,6 +353,6 @@ class ProfileEditNotifier extends StateNotifier<ProfileEditState> {
 
 /// Provider for profile edit form state
 final profileEditProvider =
-    StateNotifierProvider<ProfileEditNotifier, ProfileEditState>((ref) {
-      return ProfileEditNotifier();
-    });
+    NotifierProvider<ProfileEditNotifier, ProfileEditState>(
+      ProfileEditNotifier.new,
+    );

@@ -23,12 +23,13 @@ class ThemeState {
 // AppColors is now imported from '../config/app_colors.dart'
 
 // Theme notifier
-class ThemeNotifier extends StateNotifier<ThemeState> {
+class ThemeNotifier extends Notifier<ThemeState> {
   static const String _themeKey = 'app_theme_mode';
 
-  ThemeNotifier() : super(const ThemeState()) {
-    _updateSystemUI();
+  @override
+  ThemeState build() {
     _loadTheme();
+    return const ThemeState();
   }
 
   Future<void> _loadTheme() async {
@@ -442,9 +443,9 @@ class ThemeNotifier extends StateNotifier<ThemeState> {
 }
 
 // Riverpod provider
-final themeProvider = StateNotifierProvider<ThemeNotifier, ThemeState>((ref) {
-  return ThemeNotifier();
-});
+final themeProvider = NotifierProvider<ThemeNotifier, ThemeState>(
+  ThemeNotifier.new,
+);
 
 // Legacy compatibility - for gradual migration
 // ignore: deprecated_member_use_from_same_package
