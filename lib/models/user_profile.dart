@@ -243,6 +243,7 @@ class UserProfile {
   final String uid;
   final String id;
   final String name;
+  final String? username; // Unique username like @johndoe
   final String email;
   final String? profileImageUrl;
   final String? phone;
@@ -269,17 +270,22 @@ class UserProfile {
   // Add photoUrl getter for backward compatibility
   String? get photoUrl => profileImageUrl;
 
+  // Username display getter (with @ prefix)
+  String? get displayUsername => username != null ? '@$username' : null;
+
   // Helper getters
   bool get isProfessional => accountType == AccountType.professional;
   bool get isBusiness => accountType == AccountType.business;
   bool get isPersonal => accountType == AccountType.personal;
   bool get isVerifiedAccount => verification.status == VerificationStatus.verified;
   bool get isPendingVerification => verification.status == VerificationStatus.pending;
+  bool get hasUsername => username != null && username!.isNotEmpty;
 
   UserProfile({
     required this.uid,
     String? id,
     required this.name,
+    this.username,
     required this.email,
     this.profileImageUrl,
     this.phone,
@@ -314,6 +320,7 @@ class UserProfile {
       uid: doc.id,
       id: doc.id,
       name: displayName,
+      username: data['username'],
       email: data['email'] ?? '',
       profileImageUrl: data['profileImageUrl'] ?? data['photoUrl'],
       phone: data['phone'],
@@ -356,6 +363,7 @@ class UserProfile {
       uid: userId,
       id: userId,
       name: displayName,
+      username: data['username'],
       email: data['email'] ?? '',
       profileImageUrl: data['profileImageUrl'] ?? data['photoUrl'],
       phone: data['phone'],
@@ -391,6 +399,7 @@ class UserProfile {
   Map<String, dynamic> toFirestore() {
     return {
       'name': name,
+      'username': username,
       'email': email,
       'profileImageUrl': profileImageUrl,
       'photoUrl': profileImageUrl, // Also save as photoUrl for compatibility
@@ -423,6 +432,7 @@ class UserProfile {
     String? uid,
     String? id,
     String? name,
+    String? username,
     String? email,
     String? profileImageUrl,
     String? phone,
@@ -448,6 +458,7 @@ class UserProfile {
       uid: uid ?? this.uid,
       id: id ?? this.id,
       name: name ?? this.name,
+      username: username ?? this.username,
       email: email ?? this.email,
       profileImageUrl: profileImageUrl ?? this.profileImageUrl,
       phone: phone ?? this.phone,
