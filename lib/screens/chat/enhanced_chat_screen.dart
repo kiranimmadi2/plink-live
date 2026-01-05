@@ -3607,7 +3607,7 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
       // Run these in background - don't await to prevent crashes
       try {
         final currentUserProfile = mounted
-            ? ref.read(currentUserProfileProvider).valueOrNull
+            ? ref.read(currentUserProfileProvider).asData?.value
             : null;
         final currentUserName = currentUserProfile?.name ?? 'Someone';
 
@@ -3731,7 +3731,7 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
       // Run these in parallel for faster completion
       final currentUserProfile = ref
           .read(currentUserProfileProvider)
-          .valueOrNull;
+          .asData?.value;
       final currentUserName = currentUserProfile?.name ?? 'Someone';
 
       await Future.wait([
@@ -4582,7 +4582,7 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
   }
 
   void _startAudioCall() async {
-    final currentUserProfile = ref.read(currentUserProfileProvider).valueOrNull;
+    final currentUserProfile = ref.read(currentUserProfileProvider).asData?.value;
     final callerName = currentUserProfile?.name ?? 'Someone';
 
     // Create a call document in Firestore

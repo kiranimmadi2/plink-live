@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import '../../models/business_model.dart';
 import '../../models/business_category_config.dart';
 import '../../services/business_service.dart';
@@ -244,10 +245,39 @@ class _BusinessSetupScreenState extends ConsumerState<BusinessSetupScreen>
     setState(() => _isLoading = true);
 
     try {
-      // Upload logo if selected
+      // Quick network connectivity check
+      final connectivityResult = await Connectivity().checkConnectivity();
+      if (connectivityResult.contains(ConnectivityResult.none)) {
+        _showError('No internet connection. Please connect and try again.');
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      // Real internet connectivity test (checks if we can actually reach the internet)
+      try {
+        final result = await InternetAddress.lookup('google.com')
+            .timeout(const Duration(seconds: 5));
+        if (result.isEmpty || result[0].rawAddress.isEmpty) {
+          throw const SocketException('No internet');
+        }
+      } on SocketException catch (_) {
+        _showError('No internet connection. Please check your network and try again.');
+        setState(() => _isLoading = false);
+        return;
+      } on TimeoutException catch (_) {
+        _showError('Network is slow. Please check your connection and try again.');
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      // Upload logo if selected (with timeout)
       String? logoUrl;
       if (_logoFile != null) {
-        logoUrl = await _businessService.uploadLogo(_logoFile!);
+        logoUrl = await _businessService.uploadLogo(_logoFile!)
+            .timeout(
+              const Duration(seconds: 30),
+              onTimeout: () => throw TimeoutException('Logo upload timed out'),
+            );
       } else if (_isEditing) {
         // Keep existing logo if no new one selected
         logoUrl = widget.existingBusiness!.logo;
@@ -322,14 +352,21 @@ class _BusinessSetupScreenState extends ConsumerState<BusinessSetupScreen>
 
       bool success;
       if (_isEditing) {
-        // Update existing business
+        // Update existing business (with timeout)
         success = await _businessService.updateBusiness(
           widget.existingBusiness!.id,
           business,
+        ).timeout(
+          const Duration(seconds: 15),
+          onTimeout: () => throw TimeoutException('Update timed out. Please check your connection.'),
         );
       } else {
-        // Create new business
-        final businessId = await _businessService.createBusiness(business);
+        // Create new business (with timeout)
+        final businessId = await _businessService.createBusiness(business)
+            .timeout(
+              const Duration(seconds: 15),
+              onTimeout: () => throw TimeoutException('Creation timed out. Please check your connection.'),
+            );
         success = businessId != null;
       }
 
@@ -360,9 +397,20 @@ class _BusinessSetupScreenState extends ConsumerState<BusinessSetupScreen>
             ? 'Failed to update business. Please try again.'
             : 'Failed to create business. Please try again.');
       }
+    } on TimeoutException catch (e) {
+      debugPrint('Timeout saving business: $e');
+      _showError('Connection timed out. Please check your internet and try again.');
+    } on SocketException catch (_) {
+      _showError('No internet connection. Please check your network.');
     } catch (e) {
       debugPrint('Error saving business: $e');
-      _showError('An error occurred. Please try again.');
+      if (e.toString().contains('network') ||
+          e.toString().contains('connection') ||
+          e.toString().contains('resolve')) {
+        _showError('Network error. Please check your internet connection.');
+      } else {
+        _showError('An error occurred. Please try again.');
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/business_model.dart';
 import '../../models/business_category_config.dart';
 import '../../models/conversation_model.dart';
+import '../../config/category_ui_config.dart';
 import '../../services/business_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/chat services/conversation_service.dart';

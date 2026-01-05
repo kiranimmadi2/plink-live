@@ -43,12 +43,17 @@ class BusinessModel {
   final String? gstNumber;
   final String? licenseNumber;
 
+  // Item statistics (denormalized for fast display)
+  final int itemCount;
+  final List<Map<String, dynamic>> featuredItems; // Max 6 items for quick display
+
   // Order statistics
   final int totalOrders;
   final int pendingOrders;
   final int completedOrders;
   final int cancelledOrders;
   final int todayOrders;
+  final int activeBookings;
 
   // Earnings
   final double totalEarnings;
@@ -94,11 +99,14 @@ class BusinessModel {
     this.secondaryPhone,
     this.gstNumber,
     this.licenseNumber,
+    this.itemCount = 0,
+    this.featuredItems = const [],
     this.totalOrders = 0,
     this.pendingOrders = 0,
     this.completedOrders = 0,
     this.cancelledOrders = 0,
     this.todayOrders = 0,
+    this.activeBookings = 0,
     this.totalEarnings = 0.0,
     this.monthlyEarnings = 0.0,
     this.todayEarnings = 0.0,
@@ -152,11 +160,17 @@ class BusinessModel {
       secondaryPhone: map['secondaryPhone'],
       gstNumber: map['gstNumber'],
       licenseNumber: map['licenseNumber'],
+      itemCount: map['itemCount'] ?? 0,
+      featuredItems: (map['featuredItems'] as List<dynamic>?)
+              ?.map((e) => Map<String, dynamic>.from(e as Map))
+              .toList() ??
+          [],
       totalOrders: map['totalOrders'] ?? 0,
       pendingOrders: map['pendingOrders'] ?? 0,
       completedOrders: map['completedOrders'] ?? 0,
       cancelledOrders: map['cancelledOrders'] ?? 0,
       todayOrders: map['todayOrders'] ?? 0,
+      activeBookings: map['activeBookings'] ?? 0,
       totalEarnings: (map['totalEarnings'] ?? 0).toDouble(),
       monthlyEarnings: (map['monthlyEarnings'] ?? 0).toDouble(),
       todayEarnings: (map['todayEarnings'] ?? 0).toDouble(),
@@ -210,11 +224,14 @@ class BusinessModel {
       'secondaryPhone': secondaryPhone,
       'gstNumber': gstNumber,
       'licenseNumber': licenseNumber,
+      'itemCount': itemCount,
+      'featuredItems': featuredItems,
       'totalOrders': totalOrders,
       'pendingOrders': pendingOrders,
       'completedOrders': completedOrders,
       'cancelledOrders': cancelledOrders,
       'todayOrders': todayOrders,
+      'activeBookings': activeBookings,
       'totalEarnings': totalEarnings,
       'monthlyEarnings': monthlyEarnings,
       'todayEarnings': todayEarnings,
@@ -258,11 +275,14 @@ class BusinessModel {
     String? secondaryPhone,
     String? gstNumber,
     String? licenseNumber,
+    int? itemCount,
+    List<Map<String, dynamic>>? featuredItems,
     int? totalOrders,
     int? pendingOrders,
     int? completedOrders,
     int? cancelledOrders,
     int? todayOrders,
+    int? activeBookings,
     double? totalEarnings,
     double? monthlyEarnings,
     double? todayEarnings,
@@ -304,11 +324,14 @@ class BusinessModel {
       secondaryPhone: secondaryPhone ?? this.secondaryPhone,
       gstNumber: gstNumber ?? this.gstNumber,
       licenseNumber: licenseNumber ?? this.licenseNumber,
+      itemCount: itemCount ?? this.itemCount,
+      featuredItems: featuredItems ?? this.featuredItems,
       totalOrders: totalOrders ?? this.totalOrders,
       pendingOrders: pendingOrders ?? this.pendingOrders,
       completedOrders: completedOrders ?? this.completedOrders,
       cancelledOrders: cancelledOrders ?? this.cancelledOrders,
       todayOrders: todayOrders ?? this.todayOrders,
+      activeBookings: activeBookings ?? this.activeBookings,
       totalEarnings: totalEarnings ?? this.totalEarnings,
       monthlyEarnings: monthlyEarnings ?? this.monthlyEarnings,
       todayEarnings: todayEarnings ?? this.todayEarnings,
