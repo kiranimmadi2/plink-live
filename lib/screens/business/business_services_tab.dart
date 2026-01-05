@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../../models/business_model.dart';
 import '../../models/business_post_model.dart';
 import '../../services/business_service.dart';
+import '../../widgets/business/business_widgets.dart';
 
 /// Services/Products tab for managing business offerings
 class BusinessServicesTab extends StatefulWidget {
@@ -127,40 +128,18 @@ class _BusinessServicesTabState extends State<BusinessServicesTab>
   Widget _buildFilterChips(bool isDarkMode) {
     return Container(
       height: 50,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        itemCount: _filters.length,
-        itemBuilder: (context, index) {
-          final filter = _filters[index];
-          final isSelected = _selectedFilter == filter;
-
-          return Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: FilterChip(
-              label: Text(filter),
-              selected: isSelected,
-              onSelected: (selected) {
-                HapticFeedback.lightImpact();
-                setState(() => _selectedFilter = filter);
-              },
-              selectedColor: const Color(0xFF00D67D).withValues(alpha: 0.2),
-              checkmarkColor: const Color(0xFF00D67D),
-              labelStyle: TextStyle(
-                color: isSelected
-                    ? const Color(0xFF00D67D)
-                    : (isDarkMode ? Colors.white70 : Colors.grey[700]),
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-              ),
-              backgroundColor: isDarkMode ? const Color(0xFF2D2D44) : Colors.grey[100],
-              side: BorderSide(
-                color: isSelected
-                    ? const Color(0xFF00D67D)
-                    : (isDarkMode ? Colors.white24 : Colors.grey[300]!),
-              ),
-            ),
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: BusinessFilterBar(
+        chips: _filters.map((filter) {
+          return BusinessFilterChip(
+            label: filter,
+            isSelected: _selectedFilter == filter,
+            onTap: () => setState(() => _selectedFilter = filter),
+            icon: filter == 'Products'
+                ? Icons.shopping_bag_outlined
+                : (filter == 'Services' ? Icons.handyman_outlined : null),
           );
-        },
+        }).toList(),
       ),
     );
   }
@@ -297,7 +276,7 @@ class _BusinessServicesTabState extends State<BusinessServicesTab>
           if (id != null && mounted) {
             widget.onRefresh();
             if (!mounted) return;
-            ScaffoldMessenger.of(context).showSnackBar(
+            ScaffoldMessenger.of(this.context).showSnackBar(
               SnackBar(content: Text('${listing.type == 'product' ? 'Product' : 'Service'} added successfully')),
             );
           }
@@ -319,7 +298,7 @@ class _BusinessServicesTabState extends State<BusinessServicesTab>
           if (success && mounted) {
             widget.onRefresh();
             if (!mounted) return;
-            ScaffoldMessenger.of(context).showSnackBar(
+            ScaffoldMessenger.of(this.context).showSnackBar(
               const SnackBar(content: Text('Listing updated successfully')),
             );
           }
@@ -356,11 +335,11 @@ class _BusinessServicesTabState extends State<BusinessServicesTab>
           TextButton(
             onPressed: () async {
               Navigator.pop(context);
-              final success = await _businessService.deleteListing(listing.id);
+              final success = await _businessService.deleteListing(widget.business.id, listing.id);
               if (success && mounted) {
                 widget.onRefresh();
                 if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
+                ScaffoldMessenger.of(this.context).showSnackBar(
                   const SnackBar(content: Text('Listing deleted')),
                 );
               }
@@ -374,6 +353,7 @@ class _BusinessServicesTabState extends State<BusinessServicesTab>
 
   void _toggleAvailability(BusinessListing listing) async {
     final success = await _businessService.toggleListingAvailability(
+      widget.business.id,
       listing.id,
       !listing.isAvailable,
     );
@@ -518,43 +498,9 @@ class _ServiceCard extends StatelessWidget {
                             ),
                           ),
                           const Spacer(),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: listing.isAvailable
-                                  ? Colors.green.withValues(alpha: 0.1)
-                                  : Colors.red.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  listing.isAvailable
-                                      ? Icons.check_circle
-                                      : Icons.cancel,
-                                  size: 14,
-                                  color: listing.isAvailable
-                                      ? Colors.green
-                                      : Colors.red,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  listing.isAvailable ? 'Available' : 'Unavailable',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w500,
-                                    color: listing.isAvailable
-                                        ? Colors.green
-                                        : Colors.red,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
+                          listing.isAvailable
+                              ? StatusBadge.available(showIcon: true)
+                              : StatusBadge.inactive(showIcon: true),
                         ],
                       ),
                     ],

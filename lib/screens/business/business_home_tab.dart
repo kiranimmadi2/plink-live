@@ -1,17 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:ui';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:timeago/timeago.dart' as timeago;
 import '../../models/business_model.dart';
+import '../../models/business_dashboard_config.dart';
 import '../../services/business_service.dart';
-import '../../widgets/business/glassmorphic_card.dart';
 import '../../res/config/app_assets.dart';
 import '../../res/config/app_colors.dart';
 import 'business_analytics_screen.dart';
 import 'business_inquiries_screen.dart';
-import 'business_services_tab.dart';
-import 'business_posts_tab.dart';
+import 'gallery_screen.dart';
 
-/// Home tab showing dashboard with stats, online toggle, and quick actions
+/// Category-aware home tab showing dynamic dashboard based on business type
 class BusinessHomeTab extends StatefulWidget {
   final BusinessModel business;
   final VoidCallback onRefresh;
@@ -31,11 +32,15 @@ class BusinessHomeTab extends StatefulWidget {
 class _BusinessHomeTabState extends State<BusinessHomeTab> {
   final BusinessService _businessService = BusinessService();
   bool _isOnline = false;
+  late CategoryGroup _categoryGroup;
+  DashboardData _dashboardData = const DashboardData();
 
   @override
   void initState() {
     super.initState();
     _isOnline = widget.business.isOnline;
+    _categoryGroup = getCategoryGroup(widget.business.category);
+    _loadDashboardData();
   }
 
   @override
@@ -44,6 +49,25 @@ class _BusinessHomeTabState extends State<BusinessHomeTab> {
     if (oldWidget.business.isOnline != widget.business.isOnline) {
       _isOnline = widget.business.isOnline;
     }
+    if (oldWidget.business.category != widget.business.category) {
+      _categoryGroup = getCategoryGroup(widget.business.category);
+    }
+  }
+
+  Future<void> _loadDashboardData() async {
+    // Load dashboard data from business model for now
+    // In production, this would fetch real-time data from Firestore
+    setState(() {
+      _dashboardData = DashboardData(
+        totalOrders: widget.business.totalOrders,
+        pendingOrders: widget.business.pendingOrders,
+        completedOrders: widget.business.completedOrders,
+        todayOrders: widget.business.todayOrders,
+        todayRevenue: widget.business.todayEarnings,
+        weekRevenue: widget.business.monthlyEarnings,
+        monthRevenue: widget.business.totalEarnings,
+      );
+    });
   }
 
   Future<void> _toggleOnlineStatus() async {
@@ -73,11 +97,9 @@ class _BusinessHomeTabState extends State<BusinessHomeTab> {
 
   @override
   Widget build(BuildContext context) {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-
     return Stack(
       children: [
-        // Background Image (same as Feed screen)
+        // Background Image
         Positioned.fill(
           child: Image.asset(
             AppAssets.homeBackgroundImage,
@@ -96,10 +118,10 @@ class _BusinessHomeTabState extends State<BusinessHomeTab> {
         SafeArea(
           child: Column(
             children: [
-              // Header (same style as Feed screen)
-              _buildAppBarHeader(),
+              // Header
+              _buildHeader(),
 
-              // Divider line
+              // Divider
               Container(
                 height: 0.5,
                 color: Colors.white.withValues(alpha: 0.2),
@@ -108,24 +130,37 @@ class _BusinessHomeTabState extends State<BusinessHomeTab> {
               // Scrollable content
               Expanded(
                 child: RefreshIndicator(
-                  onRefresh: () async => widget.onRefresh(),
+                  onRefresh: () async {
+                    await _loadDashboardData();
+                    widget.onRefresh();
+                  },
                   color: const Color(0xFF00D67D),
                   child: ListView(
                     physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.all(16),
                     children: [
-                      // Quick Actions - Services & Posts
-                      _buildQuickActions(isDarkMode),
-                      const SizedBox(height: 24),
-
-                      // Stats Grid
-                      _buildSectionTitle('Overview', isDarkMode),
+                      // Today's Snapshot - Category-aware stats
+                      _buildSectionTitle(
+                        BusinessDashboardConfig.getStatsTitle(_categoryGroup),
+                      ),
                       const SizedBox(height: 12),
-                      _buildStatsGrid(isDarkMode),
+                      _buildStatsGrid(),
                       const SizedBox(height: 24),
 
-                      // Analytics Preview
-                      _buildAnalyticsPreview(isDarkMode),
+                      // Quick Actions - Category-specific
+                      _buildSectionTitle('Quick Actions'),
+                      const SizedBox(height: 12),
+                      _buildQuickActions(),
+                      const SizedBox(height: 24),
+
+                      // Recent Activity
+                      _buildSectionTitle('Recent Activity', showSeeAll: true),
+                      const SizedBox(height: 12),
+                      _buildRecentActivity(),
+                      const SizedBox(height: 24),
+
+                      // Performance Card
+                      _buildPerformanceCard(),
 
                       const SizedBox(height: 100),
                     ],
@@ -139,31 +174,48 @@ class _BusinessHomeTabState extends State<BusinessHomeTab> {
     );
   }
 
-  /// Simple header like Feed screen
-  Widget _buildAppBarHeader() {
+  Widget _buildHeader() {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
       child: Row(
         children: [
           // Business logo
-          Container(
-            width: 32,
-            height: 32,
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.circle,
-            ),
-            child: ClipOval(
-              child: widget.business.logo != null
-                  ? Image.network(
-                      widget.business.logo!,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => _buildLogoPlaceholder(),
-                    )
-                  : _buildLogoPlaceholder(),
+          GestureDetector(
+            onTap: () {
+              HapticFeedback.lightImpact();
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => GalleryScreen(business: widget.business),
+                ),
+              );
+            },
+            child: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.2),
+                    blurRadius: 8,
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: widget.business.logo != null
+                    ? Image.network(
+                        widget.business.logo!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => _buildLogoPlaceholder(),
+                      )
+                    : _buildLogoPlaceholder(),
+              ),
             ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 12),
 
           // Business name and location
           Expanded(
@@ -174,7 +226,7 @@ class _BusinessHomeTabState extends State<BusinessHomeTab> {
                 Text(
                   widget.business.businessName,
                   style: const TextStyle(
-                    fontSize: 16,
+                    fontSize: 17,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
                   ),
@@ -193,7 +245,7 @@ class _BusinessHomeTabState extends State<BusinessHomeTab> {
                       child: Text(
                         _getLocationText(),
                         style: const TextStyle(
-                          fontSize: 11,
+                          fontSize: 12,
                           color: Colors.white54,
                         ),
                         maxLines: 1,
@@ -207,23 +259,34 @@ class _BusinessHomeTabState extends State<BusinessHomeTab> {
           ),
 
           // Online/Offline toggle
-          _buildOnlineToggleCompact(),
+          _buildOnlineToggle(),
 
           const SizedBox(width: 8),
 
           // Notification button
-          GestureDetector(
-            onTap: () {
-              HapticFeedback.lightImpact();
-              // TODO: Show notifications
-            },
-            child: const Icon(
-              Icons.notifications_outlined,
-              color: Colors.white,
-              size: 22,
-            ),
-          ),
+          _buildNotificationButton(),
         ],
+      ),
+    );
+  }
+
+  Widget _buildLogoPlaceholder() {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        color: const Color(0xFF00D67D),
+      ),
+      child: Center(
+        child: Text(
+          widget.business.businessName.isNotEmpty
+              ? widget.business.businessName[0].toUpperCase()
+              : 'B',
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
       ),
     );
   }
@@ -242,35 +305,13 @@ class _BusinessHomeTabState extends State<BusinessHomeTab> {
     return parts.isNotEmpty ? parts.join(', ') : 'Location not set';
   }
 
-  Widget _buildLogoPlaceholder() {
-    return Container(
-      decoration: const BoxDecoration(
-        shape: BoxShape.circle,
-        color: Color(0xFF00D67D),
-      ),
-      child: Center(
-        child: Text(
-          widget.business.businessName.isNotEmpty
-              ? widget.business.businessName[0].toUpperCase()
-              : 'B',
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// Compact online/offline toggle for AppBar
-  Widget _buildOnlineToggleCompact() {
+  Widget _buildOnlineToggle() {
     return GestureDetector(
       onTap: _toggleOnlineStatus,
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Status dot
+          // Status dot with glow
           AnimatedContainer(
             duration: const Duration(milliseconds: 300),
             width: 8,
@@ -282,15 +323,14 @@ class _BusinessHomeTabState extends State<BusinessHomeTab> {
                   ? [
                       BoxShadow(
                         color: const Color(0xFF00D67D).withValues(alpha: 0.6),
-                        blurRadius: 4,
-                        spreadRadius: 1,
+                        blurRadius: 6,
+                        spreadRadius: 2,
                       ),
                     ]
                   : null,
             ),
           ),
           const SizedBox(width: 6),
-          // Status text
           Text(
             _isOnline ? 'Online' : 'Offline',
             style: TextStyle(
@@ -300,10 +340,9 @@ class _BusinessHomeTabState extends State<BusinessHomeTab> {
             ),
           ),
           const SizedBox(width: 4),
-          // Toggle icon - bigger size
           Icon(
             _isOnline ? Icons.toggle_on : Icons.toggle_off,
-            size: 44,
+            size: 40,
             color: _isOnline ? const Color(0xFF00D67D) : Colors.white54,
           ),
         ],
@@ -311,74 +350,109 @@ class _BusinessHomeTabState extends State<BusinessHomeTab> {
     );
   }
 
-  Widget _buildQuickActions(bool isDarkMode) {
-    return Row(
+  Widget _buildNotificationButton() {
+    return Stack(
       children: [
-        // Services Button
-        Expanded(
-          child: _buildQuickActionCard(
-            icon: Icons.inventory_2_outlined,
-            label: 'Services',
-            subtitle: 'Manage your services',
-            gradient: [
-              const Color(0xFF00D67D).withValues(alpha: 0.3),
-              const Color(0xFF00A86B).withValues(alpha: 0.2),
-            ],
-            iconColor: const Color(0xFF00D67D),
-            onTap: () {
-              HapticFeedback.lightImpact();
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => BusinessServicesTab(
-                    business: widget.business,
-                    onRefresh: widget.onRefresh,
-                  ),
-                ),
-              );
-            },
+        GestureDetector(
+          onTap: () {
+            HapticFeedback.lightImpact();
+            // TODO: Navigate to notifications
+          },
+          child: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(
+              Icons.notifications_outlined,
+              color: Colors.white,
+              size: 22,
+            ),
           ),
         ),
-        const SizedBox(width: 12),
-        // Posts Button
-        Expanded(
-          child: _buildQuickActionCard(
-            icon: Icons.post_add_outlined,
-            label: 'Posts',
-            subtitle: 'Create & manage posts',
-            gradient: [
-              Colors.blue.withValues(alpha: 0.3),
-              Colors.indigo.withValues(alpha: 0.2),
-            ],
-            iconColor: Colors.blue,
-            onTap: () {
-              HapticFeedback.lightImpact();
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => BusinessPostsTab(
-                    business: widget.business,
-                    onRefresh: widget.onRefresh,
-                  ),
-                ),
-              );
-            },
+        // Notification badge
+        Positioned(
+          right: 4,
+          top: 4,
+          child: Container(
+            width: 8,
+            height: 8,
+            decoration: const BoxDecoration(
+              color: Color(0xFFEF5350),
+              shape: BoxShape.circle,
+            ),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildQuickActionCard({
-    required IconData icon,
+  Widget _buildSectionTitle(String title, {bool showSeeAll = false}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+        if (showSeeAll)
+          GestureDetector(
+            onTap: () {
+              HapticFeedback.lightImpact();
+              // TODO: Navigate to activity history
+            },
+            child: Text(
+              'See All',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: const Color(0xFF00D67D).withValues(alpha: 0.9),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildStatsGrid() {
+    final stats = BusinessDashboardConfig.getStats(_categoryGroup);
+
+    return GridView.count(
+      crossAxisCount: 2,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisSpacing: 12,
+      mainAxisSpacing: 12,
+      childAspectRatio: 1.3,
+      children: stats.map((stat) {
+        return _buildStatCard(
+          label: stat.label,
+          value: stat.getValue(_dashboardData),
+          icon: stat.icon,
+          color: stat.color,
+          onTap: () => _handleStatTap(stat.route),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildStatCard({
     required String label,
-    required String subtitle,
-    required List<Color> gradient,
-    required Color iconColor,
-    required VoidCallback onTap,
+    required String value,
+    required IconData icon,
+    required Color color,
+    VoidCallback? onTap,
   }) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: () {
+        HapticFeedback.lightImpact();
+        onTap?.call();
+      },
       child: ClipRRect(
         borderRadius: BorderRadius.circular(20),
         child: BackdropFilter(
@@ -387,7 +461,10 @@ class _BusinessHomeTabState extends State<BusinessHomeTab> {
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: gradient,
+                colors: [
+                  color.withValues(alpha: 0.25),
+                  color.withValues(alpha: 0.1),
+                ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -399,60 +476,31 @@ class _BusinessHomeTabState extends State<BusinessHomeTab> {
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // Icon with glow effect
                 Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: iconColor.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(14),
-                    boxShadow: [
-                      BoxShadow(
-                        color: iconColor.withValues(alpha: 0.3),
-                        blurRadius: 12,
-                        spreadRadius: 0,
-                      ),
-                    ],
+                    color: color.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(
-                    icon,
-                    color: iconColor,
-                    size: 26,
-                  ),
+                  child: Icon(icon, color: color, size: 22),
                 ),
-                const SizedBox(height: 14),
-                // Label
-                Text(
-                  label,
-                  style: const TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                // Subtitle
-                Text(
-                  subtitle,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.white.withValues(alpha: 0.6),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                // Arrow indicator
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
+                    Text(
+                      value,
+                      style: const TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
                       ),
-                      child: Icon(
-                        Icons.arrow_forward_ios,
-                        size: 12,
+                    ),
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 13,
                         color: Colors.white.withValues(alpha: 0.7),
                       ),
                     ),
@@ -466,60 +514,288 @@ class _BusinessHomeTabState extends State<BusinessHomeTab> {
     );
   }
 
-  Widget _buildSectionTitle(String title, bool isDarkMode) {
-    return Text(
-      title,
-      style: const TextStyle(
-        fontSize: 18,
-        fontWeight: FontWeight.bold,
-        color: Colors.white,
+  Widget _buildQuickActions() {
+    final actions = BusinessDashboardConfig.getQuickActions(_categoryGroup);
+
+    return SizedBox(
+      height: 105,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: actions.length,
+        separatorBuilder: (context, index) => const SizedBox(width: 12),
+        itemBuilder: (context, index) {
+          final action = actions[index];
+          return _buildQuickActionItem(
+            label: action.label,
+            subtitle: action.subtitle,
+            icon: action.icon,
+            color: action.color,
+            onTap: () => _handleQuickAction(action.route),
+          );
+        },
       ),
     );
   }
 
-  Widget _buildStatsGrid(bool isDarkMode) {
-    return GridView.count(
-      crossAxisCount: 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisSpacing: 12,
-      mainAxisSpacing: 12,
-      childAspectRatio: 1.15,
-      children: [
-        GlassmorphicStatCard(
-          title: 'Total Inquiries',
-          value: '${widget.business.totalOrders}',
-          icon: Icons.inbox_outlined,
-          accentColor: const Color(0xFF00D67D),
-          onTap: () => _navigateToInquiries('All'),
+  Widget _buildQuickActionItem({
+    required String label,
+    required String subtitle,
+    required IconData icon,
+    required Color color,
+    VoidCallback? onTap,
+  }) {
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        onTap?.call();
+      },
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Container(
+            width: 130,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  color.withValues(alpha: 0.2),
+                  color.withValues(alpha: 0.1),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.15),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(icon, color: color, size: 20),
+                    ),
+                    Icon(
+                      Icons.arrow_forward_ios,
+                      size: 12,
+                      color: Colors.white.withValues(alpha: 0.5),
+                    ),
+                  ],
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.white.withValues(alpha: 0.6),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ),
-        GlassmorphicStatCard(
-          title: 'New',
-          value: '${widget.business.pendingOrders}',
-          icon: Icons.mark_email_unread_outlined,
-          accentColor: Colors.orange,
-          onTap: () => _navigateToInquiries('New'),
-        ),
-        GlassmorphicStatCard(
-          title: 'Responded',
-          value: '${widget.business.completedOrders}',
-          icon: Icons.check_circle_outline,
-          accentColor: Colors.blue,
-          onTap: () => _navigateToInquiries('Responded'),
-        ),
-        GlassmorphicStatCard(
-          title: 'Today',
-          value: '${widget.business.todayOrders}',
-          icon: Icons.today,
-          accentColor: Colors.purple,
-          onTap: () => _navigateToInquiries('Today'),
-        ),
-      ],
+      ),
     );
   }
 
-  Widget _buildAnalyticsPreview(bool isDarkMode) {
-    return GlassmorphicCard(
+  Widget _buildRecentActivity() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('businesses')
+          .doc(widget.business.id)
+          .collection('activity')
+          .orderBy('timestamp', descending: true)
+          .limit(4)
+          .snapshots(),
+      builder: (context, snapshot) {
+        // Show sample data if no activity yet
+        final activities = snapshot.hasData && snapshot.data!.docs.isNotEmpty
+            ? snapshot.data!.docs
+            : null;
+
+        if (activities == null) {
+          return _buildSampleActivityList();
+        }
+
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.1),
+                ),
+              ),
+              child: ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: activities.length,
+                separatorBuilder: (context, index) => Divider(
+                  height: 1,
+                  color: Colors.white.withValues(alpha: 0.1),
+                ),
+                itemBuilder: (context, activityIndex) {
+                  final activity = activities[activityIndex].data() as Map<String, dynamic>;
+                  return _buildActivityItem(
+                    icon: _getActivityIcon(activity['type'] ?? ''),
+                    color: _getActivityColor(activity['type'] ?? ''),
+                    title: activity['title'] ?? 'Activity',
+                    subtitle: activity['subtitle'] ?? '',
+                    time: _formatActivityTime(activity['timestamp']),
+                  );
+                },
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSampleActivityList() {
+    final sampleActivities = [
+      {
+        'icon': Icons.circle,
+        'color': const Color(0xFF00D67D),
+        'title': 'Business is online',
+        'subtitle': 'Ready to receive orders',
+        'time': 'Just now',
+      },
+      {
+        'icon': Icons.storefront_outlined,
+        'color': const Color(0xFF42A5F5),
+        'title': 'Profile updated',
+        'subtitle': 'Business details saved',
+        'time': '2h ago',
+      },
+    ];
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.1),
+            ),
+          ),
+          child: ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: sampleActivities.length,
+            separatorBuilder: (context, index) => Divider(
+              height: 1,
+              color: Colors.white.withValues(alpha: 0.1),
+            ),
+            itemBuilder: (context, sampleIndex) {
+              final activity = sampleActivities[sampleIndex];
+              return _buildActivityItem(
+                icon: activity['icon'] as IconData,
+                color: activity['color'] as Color,
+                title: activity['title'] as String,
+                subtitle: activity['subtitle'] as String,
+                time: activity['time'] as String,
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActivityItem({
+    required IconData icon,
+    required Color color,
+    required String title,
+    required String subtitle,
+    required String time,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: color, size: 18),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.white,
+                  ),
+                ),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.white.withValues(alpha: 0.6),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Text(
+            time,
+            style: TextStyle(
+              fontSize: 11,
+              color: Colors.white.withValues(alpha: 0.5),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPerformanceCard() {
+    final weekRevenue = _dashboardData.weekRevenue;
+    final previousWeek = weekRevenue * 0.85; // Mock previous week
+    final percentChange = previousWeek > 0
+        ? ((weekRevenue - previousWeek) / previousWeek * 100).round()
+        : 0;
+    final isPositive = percentChange >= 0;
+
+    return GestureDetector(
       onTap: () {
         HapticFeedback.lightImpact();
         Navigator.push(
@@ -529,82 +805,259 @@ class _BusinessHomeTabState extends State<BusinessHomeTab> {
           ),
         );
       },
-      showGlow: true,
-      glowColor: const Color(0xFF00D67D),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(14),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Container(
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  const Color(0xFF00D67D).withValues(alpha: 0.3),
-                  Colors.blue.withValues(alpha: 0.2),
+                  const Color(0xFF00D67D).withValues(alpha: 0.2),
+                  const Color(0xFF42A5F5).withValues(alpha: 0.1),
                 ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: const Color(0xFF00D67D).withValues(alpha: 0.3),
+                color: Colors.white.withValues(alpha: 0.15),
               ),
             ),
-            child: const Icon(
-              Icons.analytics_outlined,
-              color: Color(0xFF00D67D),
-              size: 26,
-            ),
-          ),
-          const SizedBox(width: 16),
-          const Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'View Analytics',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF00D67D).withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.trending_up,
+                        color: Color(0xFF00D67D),
+                        size: 22,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Text(
+                      'This Week',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: isPositive
+                            ? const Color(0xFF00D67D).withValues(alpha: 0.2)
+                            : const Color(0xFFEF5350).withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            isPositive ? Icons.arrow_upward : Icons.arrow_downward,
+                            size: 14,
+                            color: isPositive ? const Color(0xFF00D67D) : const Color(0xFFEF5350),
+                          ),
+                          const SizedBox(width: 2),
+                          Text(
+                            '$percentChange%',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: isPositive ? const Color(0xFF00D67D) : const Color(0xFFEF5350),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      '₹${_formatAmount(weekRevenue)}',
+                      style: const TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Text(
+                        'Revenue',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.white.withValues(alpha: 0.6),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                // Progress bar
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: 0.75,
+                    backgroundColor: Colors.white.withValues(alpha: 0.1),
+                    valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF00D67D)),
+                    minHeight: 8,
                   ),
                 ),
-                SizedBox(height: 4),
-                Text(
-                  'See insights about your business',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.white54,
-                  ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '75% of weekly goal',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.white.withValues(alpha: 0.6),
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        Text(
+                          'View Analytics',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: const Color(0xFF00D67D).withValues(alpha: 0.9),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(
+                          Icons.arrow_forward_ios,
+                          size: 12,
+                          color: const Color(0xFF00D67D).withValues(alpha: 0.9),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: const Color(0xFF00D67D).withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Icon(
-              Icons.arrow_forward_ios,
-              size: 14,
-              color: Colors.white54,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
 
-  void _navigateToInquiries(String filter) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => BusinessInquiriesScreen(
-          business: widget.business,
-          initialFilter: filter,
-        ),
-      ),
-    );
+  void _handleStatTap(String? route) {
+    if (route == null) return;
+
+    switch (route) {
+      case 'orders':
+      case 'inquiries':
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => BusinessInquiriesScreen(
+              business: widget.business,
+              initialFilter: 'All',
+            ),
+          ),
+        );
+        break;
+      case 'analytics':
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => BusinessAnalyticsScreen(business: widget.business),
+          ),
+        );
+        break;
+      default:
+        // Navigate to appropriate screen or switch tab
+        break;
+    }
+  }
+
+  void _handleQuickAction(String route) {
+    switch (route) {
+      case 'orders':
+      case 'appointments':
+      case 'bookings':
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => BusinessInquiriesScreen(
+              business: widget.business,
+              initialFilter: 'All',
+            ),
+          ),
+        );
+        break;
+      case 'menu':
+      case 'products':
+      case 'services':
+      case 'rooms':
+        widget.onSwitchTab(1); // Switch to services/products tab
+        break;
+      default:
+        // Handle other routes
+        break;
+    }
+  }
+
+  IconData _getActivityIcon(String type) {
+    switch (type) {
+      case 'order':
+        return Icons.shopping_bag_outlined;
+      case 'message':
+        return Icons.chat_bubble_outline;
+      case 'review':
+        return Icons.star_outline;
+      case 'booking':
+        return Icons.calendar_today_outlined;
+      default:
+        return Icons.circle;
+    }
+  }
+
+  Color _getActivityColor(String type) {
+    switch (type) {
+      case 'order':
+        return const Color(0xFF00D67D);
+      case 'message':
+        return const Color(0xFF42A5F5);
+      case 'review':
+        return const Color(0xFFFFA726);
+      case 'booking':
+        return const Color(0xFF7E57C2);
+      default:
+        return const Color(0xFF00D67D);
+    }
+  }
+
+  String _formatActivityTime(dynamic timestamp) {
+    if (timestamp == null) return '';
+    if (timestamp is Timestamp) {
+      return timeago.format(timestamp.toDate(), locale: 'en_short');
+    }
+    return '';
+  }
+
+  String _formatAmount(double amount) {
+    if (amount >= 100000) {
+      return '${(amount / 100000).toStringAsFixed(1)}L';
+    } else if (amount >= 1000) {
+      return '${(amount / 1000).toStringAsFixed(1)}K';
+    }
+    return amount.toStringAsFixed(0);
   }
 }

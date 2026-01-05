@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'business_category_config.dart';
 
 /// Business profile model for business accounts
 class BusinessModel {
@@ -9,6 +10,11 @@ class BusinessModel {
   final String businessType;
   final String? industry;
   final String? description;
+
+  // New category system
+  final BusinessCategory? category;
+  final String? subType;
+  final Map<String, dynamic>? categoryData;
   final String? tagline;
   final String? logo;
   final String? coverImage;
@@ -49,6 +55,10 @@ class BusinessModel {
   final double monthlyEarnings;
   final double todayEarnings;
 
+  // Stats reset tracking (for Cloud Function scheduled resets)
+  final DateTime? lastDailyReset;
+  final DateTime? lastMonthlyReset;
+
   // Bank details
   final BankAccount? bankAccount;
 
@@ -60,6 +70,9 @@ class BusinessModel {
     required this.businessType,
     this.industry,
     this.description,
+    this.category,
+    this.subType,
+    this.categoryData,
     this.tagline,
     this.logo,
     this.coverImage,
@@ -89,6 +102,8 @@ class BusinessModel {
     this.totalEarnings = 0.0,
     this.monthlyEarnings = 0.0,
     this.todayEarnings = 0.0,
+    this.lastDailyReset,
+    this.lastMonthlyReset,
     this.bankAccount,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -109,6 +124,11 @@ class BusinessModel {
       businessType: map['businessType'] ?? 'Other',
       industry: map['industry'],
       description: map['description'],
+      category: BusinessCategoryExtension.fromString(map['category']),
+      subType: map['subType'],
+      categoryData: map['categoryData'] != null
+          ? Map<String, dynamic>.from(map['categoryData'])
+          : null,
       tagline: map['tagline'],
       logo: map['logo'],
       coverImage: map['coverImage'],
@@ -140,6 +160,12 @@ class BusinessModel {
       totalEarnings: (map['totalEarnings'] ?? 0).toDouble(),
       monthlyEarnings: (map['monthlyEarnings'] ?? 0).toDouble(),
       todayEarnings: (map['todayEarnings'] ?? 0).toDouble(),
+      lastDailyReset: map['lastDailyReset'] != null
+          ? (map['lastDailyReset'] as Timestamp).toDate()
+          : null,
+      lastMonthlyReset: map['lastMonthlyReset'] != null
+          ? (map['lastMonthlyReset'] as Timestamp).toDate()
+          : null,
       bankAccount: map['bankAccount'] != null
           ? BankAccount.fromMap(map['bankAccount'])
           : null,
@@ -160,6 +186,9 @@ class BusinessModel {
       'businessType': businessType,
       'industry': industry,
       'description': description,
+      'category': category?.id,
+      'subType': subType,
+      'categoryData': categoryData,
       'tagline': tagline,
       'logo': logo,
       'coverImage': coverImage,
@@ -189,6 +218,8 @@ class BusinessModel {
       'totalEarnings': totalEarnings,
       'monthlyEarnings': monthlyEarnings,
       'todayEarnings': todayEarnings,
+      'lastDailyReset': lastDailyReset != null ? Timestamp.fromDate(lastDailyReset!) : null,
+      'lastMonthlyReset': lastMonthlyReset != null ? Timestamp.fromDate(lastMonthlyReset!) : null,
       'bankAccount': bankAccount?.toMap(),
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
@@ -203,6 +234,9 @@ class BusinessModel {
     String? businessType,
     String? industry,
     String? description,
+    BusinessCategory? category,
+    String? subType,
+    Map<String, dynamic>? categoryData,
     String? tagline,
     String? logo,
     String? coverImage,
@@ -232,6 +266,8 @@ class BusinessModel {
     double? totalEarnings,
     double? monthlyEarnings,
     double? todayEarnings,
+    DateTime? lastDailyReset,
+    DateTime? lastMonthlyReset,
     BankAccount? bankAccount,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -244,6 +280,9 @@ class BusinessModel {
       businessType: businessType ?? this.businessType,
       industry: industry ?? this.industry,
       description: description ?? this.description,
+      category: category ?? this.category,
+      subType: subType ?? this.subType,
+      categoryData: categoryData ?? this.categoryData,
       tagline: tagline ?? this.tagline,
       logo: logo ?? this.logo,
       coverImage: coverImage ?? this.coverImage,
@@ -273,6 +312,8 @@ class BusinessModel {
       totalEarnings: totalEarnings ?? this.totalEarnings,
       monthlyEarnings: monthlyEarnings ?? this.monthlyEarnings,
       todayEarnings: todayEarnings ?? this.todayEarnings,
+      lastDailyReset: lastDailyReset ?? this.lastDailyReset,
+      lastMonthlyReset: lastMonthlyReset ?? this.lastMonthlyReset,
       bankAccount: bankAccount ?? this.bankAccount,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -288,6 +329,35 @@ class BusinessModel {
       description != null &&
       description!.isNotEmpty &&
       contact.phone != null;
+
+  /// Check if daily stats need to be reset (fallback if Cloud Function hasn't run)
+  bool get needsDailyReset {
+    if (lastDailyReset == null) return true;
+    final now = DateTime.now();
+    final lastReset = lastDailyReset!;
+    // Check if last reset was before today (midnight)
+    final todayMidnight = DateTime(now.year, now.month, now.day);
+    return lastReset.isBefore(todayMidnight);
+  }
+
+  /// Check if monthly stats need to be reset (fallback if Cloud Function hasn't run)
+  bool get needsMonthlyReset {
+    if (lastMonthlyReset == null) return true;
+    final now = DateTime.now();
+    final lastReset = lastMonthlyReset!;
+    // Check if last reset was before this month's first day
+    final thisMonthFirst = DateTime(now.year, now.month, 1);
+    return lastReset.isBefore(thisMonthFirst);
+  }
+
+  /// Get effective today's orders (returns 0 if daily reset is needed)
+  int get effectiveTodayOrders => needsDailyReset ? 0 : todayOrders;
+
+  /// Get effective today's earnings (returns 0 if daily reset is needed)
+  double get effectiveTodayEarnings => needsDailyReset ? 0.0 : todayEarnings;
+
+  /// Get effective monthly earnings (returns 0 if monthly reset is needed)
+  double get effectiveMonthlyEarnings => needsMonthlyReset ? 0.0 : monthlyEarnings;
 }
 
 /// Business contact information

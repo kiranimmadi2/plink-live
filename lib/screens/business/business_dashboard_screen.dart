@@ -1685,7 +1685,7 @@ class _BusinessDashboardScreenState extends ConsumerState<BusinessDashboardScree
           TextButton(
             onPressed: () async {
               Navigator.pop(context);
-              final success = await _businessService.deleteListing(listing.id);
+              final success = await _businessService.deleteListing(_business!.id, listing.id);
               if (success && mounted) {
                 _loadBusinessData();
                 if (!mounted) return;
@@ -1704,6 +1704,7 @@ class _BusinessDashboardScreenState extends ConsumerState<BusinessDashboardScree
 
   void _toggleListingAvailability(BusinessListing listing) async {
     final success = await _businessService.toggleListingAvailability(
+      _business!.id,
       listing.id,
       !listing.isAvailable,
     );

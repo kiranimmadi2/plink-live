@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/business_model.dart';
+import '../../models/business_category_config.dart';
 import '../../models/conversation_model.dart';
 import '../../services/business_service.dart';
 import '../../services/auth_service.dart';
@@ -11,6 +12,14 @@ import 'business_home_tab.dart';
 import 'business_messages_tab.dart';
 import 'business_profile_tab.dart';
 import 'business_setup_screen.dart';
+import 'business_services_tab.dart';
+// Category-specific tabs
+import 'hospitality/rooms_tab.dart';
+import 'hospitality/bookings_tab.dart';
+import 'food/menu_tab.dart';
+import 'food/orders_tab.dart';
+import 'retail/products_tab.dart';
+import 'appointments/appointments_tab.dart';
 
 /// Main business screen with bottom navigation
 class BusinessMainScreen extends ConsumerStatefulWidget {
@@ -27,11 +36,173 @@ class _BusinessMainScreenState extends ConsumerState<BusinessMainScreen> {
   BusinessModel? _business;
   bool _isLoading = true;
 
-  final List<_NavItem> _navItems = [
-    _NavItem(icon: Icons.home_rounded, activeIcon: Icons.home_rounded, label: 'Home'),
-    _NavItem(icon: Icons.chat_bubble_outline, activeIcon: Icons.chat_bubble, label: 'Messages'),
-    _NavItem(icon: Icons.person_outline, activeIcon: Icons.person, label: 'Profile'),
-  ];
+  /// Get navigation items based on business category
+  List<_NavItem> get _navItems {
+    final category = _business?.category;
+
+    // Base items always present
+    final items = <_NavItem>[
+      _NavItem(icon: Icons.home_rounded, activeIcon: Icons.home_rounded, label: 'Home'),
+    ];
+
+    // Add category-specific tabs
+    switch (category) {
+      case BusinessCategory.hospitality:
+        items.addAll([
+          _NavItem(icon: Icons.hotel_outlined, activeIcon: Icons.hotel, label: 'Rooms'),
+          _NavItem(icon: Icons.calendar_today_outlined, activeIcon: Icons.calendar_today, label: 'Bookings'),
+        ]);
+        break;
+      case BusinessCategory.foodBeverage:
+        items.addAll([
+          _NavItem(icon: Icons.restaurant_menu_outlined, activeIcon: Icons.restaurant_menu, label: 'Menu'),
+          _NavItem(icon: Icons.receipt_long_outlined, activeIcon: Icons.receipt_long, label: 'Orders'),
+        ]);
+        break;
+      case BusinessCategory.retail:
+      case BusinessCategory.grocery:
+        items.addAll([
+          _NavItem(icon: Icons.inventory_2_outlined, activeIcon: Icons.inventory_2, label: 'Products'),
+        ]);
+        break;
+      case BusinessCategory.beautyWellness:
+      case BusinessCategory.healthcare:
+      case BusinessCategory.fitness:
+      case BusinessCategory.education:
+      case BusinessCategory.homeServices:
+      case BusinessCategory.petServices:
+        // Services-based businesses with appointments
+        items.addAll([
+          _NavItem(icon: Icons.build_outlined, activeIcon: Icons.build, label: 'Services'),
+          _NavItem(icon: Icons.calendar_month_outlined, activeIcon: Icons.calendar_month, label: 'Bookings'),
+        ]);
+        break;
+      case BusinessCategory.technology:
+      case BusinessCategory.legal:
+      case BusinessCategory.professional:
+      case BusinessCategory.artCreative:
+      case BusinessCategory.construction:
+      case BusinessCategory.automotive:
+      case BusinessCategory.realEstate:
+      case BusinessCategory.travelTourism:
+      case BusinessCategory.entertainment:
+      case BusinessCategory.financial:
+      case BusinessCategory.transportation:
+      case BusinessCategory.agriculture:
+      case BusinessCategory.manufacturing:
+      case BusinessCategory.weddingEvents:
+        // Other service categories - services only
+        items.addAll([
+          _NavItem(icon: Icons.miscellaneous_services_outlined, activeIcon: Icons.miscellaneous_services, label: 'Services'),
+        ]);
+        break;
+      default:
+        // Default for businesses without category
+        break;
+    }
+
+    // Messages and Profile always at the end
+    items.addAll([
+      _NavItem(icon: Icons.chat_bubble_outline, activeIcon: Icons.chat_bubble, label: 'Messages'),
+      _NavItem(icon: Icons.person_outline, activeIcon: Icons.person, label: 'Profile'),
+    ]);
+
+    return items;
+  }
+
+  /// Get the index for messages tab (varies based on category)
+  int get _messagesTabIndex => _navItems.length - 2;
+
+  /// Build tab children based on business category
+  List<Widget> _buildTabChildren() {
+    final category = _business?.category;
+    final children = <Widget>[
+      // Home tab is always first
+      BusinessHomeTab(
+        business: _business!,
+        onRefresh: _refreshBusiness,
+        onSwitchTab: (index) => setState(() => _currentIndex = index),
+      ),
+    ];
+
+    // Add category-specific tabs
+    switch (category) {
+      case BusinessCategory.hospitality:
+        children.addAll([
+          RoomsTab(business: _business!, onRefresh: _refreshBusiness),
+          BookingsTab(business: _business!, onRefresh: _refreshBusiness),
+        ]);
+        break;
+      case BusinessCategory.foodBeverage:
+        children.addAll([
+          MenuTab(business: _business!, onRefresh: _refreshBusiness),
+          OrdersTab(business: _business!, onRefresh: _refreshBusiness),
+        ]);
+        break;
+      case BusinessCategory.retail:
+      case BusinessCategory.grocery:
+        children.addAll([
+          ProductsTab(business: _business!, onRefresh: _refreshBusiness),
+        ]);
+        break;
+      case BusinessCategory.beautyWellness:
+      case BusinessCategory.healthcare:
+      case BusinessCategory.fitness:
+      case BusinessCategory.education:
+      case BusinessCategory.homeServices:
+      case BusinessCategory.petServices:
+        // Services-based businesses with appointments
+        children.addAll([
+          BusinessServicesTab(business: _business!, onRefresh: _refreshBusiness),
+          AppointmentsTab(business: _business!, onRefresh: _refreshBusiness),
+        ]);
+        break;
+      case BusinessCategory.technology:
+      case BusinessCategory.legal:
+      case BusinessCategory.professional:
+      case BusinessCategory.artCreative:
+      case BusinessCategory.construction:
+      case BusinessCategory.automotive:
+      case BusinessCategory.realEstate:
+      case BusinessCategory.travelTourism:
+      case BusinessCategory.entertainment:
+      case BusinessCategory.financial:
+      case BusinessCategory.transportation:
+      case BusinessCategory.agriculture:
+      case BusinessCategory.manufacturing:
+      case BusinessCategory.weddingEvents:
+        // Other services-based businesses
+        children.addAll([
+          BusinessServicesTab(business: _business!, onRefresh: _refreshBusiness),
+        ]);
+        break;
+      default:
+        break;
+    }
+
+    // Messages and Profile always at the end
+    children.addAll([
+      BusinessMessagesTab(business: _business!),
+      BusinessProfileTab(
+        business: _business!,
+        onRefresh: _refreshBusiness,
+        onLogout: () async {
+          final navigator = Navigator.of(context);
+          await AuthService().signOut();
+          if (mounted) {
+            navigator.pushAndRemoveUntil(
+              MaterialPageRoute(
+                builder: (_) => const ChooseAccountTypeScreen(),
+              ),
+              (route) => false,
+            );
+          }
+        },
+      ),
+    ]);
+
+    return children;
+  }
 
   @override
   void initState() {
@@ -47,6 +218,8 @@ class _BusinessMainScreenState extends ConsumerState<BusinessMainScreen> {
       setState(() {
         _business = business;
         _isLoading = false;
+        // Reset to home tab when business loads to avoid index out of bounds
+        _currentIndex = 0;
       });
     }
   }
@@ -102,36 +275,15 @@ class _BusinessMainScreenState extends ConsumerState<BusinessMainScreen> {
       );
     }
 
+    final tabChildren = _buildTabChildren();
+    // Ensure index is within bounds
+    final safeIndex = _currentIndex.clamp(0, tabChildren.length - 1);
+
     return Scaffold(
       backgroundColor: isDarkMode ? const Color(0xFF1A1A2E) : Colors.grey[50],
       body: IndexedStack(
-        index: _currentIndex,
-        children: [
-          BusinessHomeTab(
-            business: _business!,
-            onRefresh: _refreshBusiness,
-            onSwitchTab: (index) => setState(() => _currentIndex = index),
-          ),
-          BusinessMessagesTab(
-            business: _business!,
-          ),
-          BusinessProfileTab(
-            business: _business!,
-            onRefresh: _refreshBusiness,
-            onLogout: () async {
-              final navigator = Navigator.of(context);
-              await AuthService().signOut();
-              if (mounted) {
-                navigator.pushAndRemoveUntil(
-                  MaterialPageRoute(
-                    builder: (_) => const ChooseAccountTypeScreen(),
-                  ),
-                  (route) => false,
-                );
-              }
-            },
-          ),
-        ],
+        index: safeIndex,
+        children: tabChildren,
       ),
       bottomNavigationBar: _buildBottomNavBar(isDarkMode),
     );
@@ -158,8 +310,8 @@ class _BusinessMainScreenState extends ConsumerState<BusinessMainScreen> {
               final item = _navItems[index];
               final isSelected = _currentIndex == index;
 
-              // Messages tab (index 1) gets unread badge
-              if (index == 1 && _business != null) {
+              // Messages tab gets unread badge
+              if (index == _messagesTabIndex && _business != null) {
                 return _buildMessagesNavItem(item, isSelected, isDarkMode);
               }
 
@@ -194,7 +346,7 @@ class _BusinessMainScreenState extends ConsumerState<BusinessMainScreen> {
         return GestureDetector(
           onTap: () {
             HapticFeedback.lightImpact();
-            setState(() => _currentIndex = 1);
+            setState(() => _currentIndex = _messagesTabIndex);
           },
           behavior: HitTestBehavior.opaque,
           child: AnimatedContainer(
