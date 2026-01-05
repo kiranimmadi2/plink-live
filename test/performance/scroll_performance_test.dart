@@ -16,12 +16,11 @@ void main() {
   SharedPreferences.setMockInitialValues({});
 
   setUpAll(() async {
-    dotenv.testLoad(fileInput: '''
-FIREBASE_ANDROID_API_KEY=test_key
-FIREBASE_WEB_API_KEY=test_key
-FIREBASE_WEB_PROJECT_ID=test_project
-''');
-    
+    // Set environment variables for testing
+    dotenv.env['FIREBASE_ANDROID_API_KEY'] = 'test_key';
+    dotenv.env['FIREBASE_WEB_API_KEY'] = 'test_key';
+    dotenv.env['FIREBASE_WEB_PROJECT_ID'] = 'test_project';
+
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );

@@ -13,9 +13,10 @@
  */
 
 const { initializeApp } = require("firebase-admin/app");
-const { getFirestore } = require("firebase-admin/firestore");
+const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { getMessaging } = require("firebase-admin/messaging");
 const { onDocumentCreated } = require("firebase-functions/v2/firestore");
+const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { logger } = require("firebase-functions");
 
 // Initialize Firebase Admin
@@ -458,5 +459,269 @@ exports.onConnectionRequestCreated = onDocumentCreated(
       `Connection request notification sent to ${recipientId} from ${senderId}`
     );
     return null;
+  }
+);
+
+// ============================================================
+// BUSINESS STATS SCHEDULED FUNCTIONS
+// ============================================================
+
+/**
+ * DAILY STATS RESET
+ *
+ * Runs every day at midnight (00:00) in UTC.
+ * Resets todayOrders and todayEarnings for all businesses.
+ *
+ * Also archives the previous day's stats to business_daily_stats collection
+ * for historical reporting.
+ */
+exports.resetDailyBusinessStats = onSchedule(
+  {
+    schedule: "0 0 * * *", // Every day at midnight UTC
+    timeZone: "UTC",
+    retryCount: 3,
+  },
+  async (event) => {
+    logger.info("Starting daily business stats reset...");
+
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const dateKey = yesterday.toISOString().split("T")[0]; // YYYY-MM-DD
+
+    try {
+      // Get all active businesses
+      const businessesSnapshot = await db
+        .collection("businesses")
+        .where("isActive", "==", true)
+        .get();
+
+      logger.info(`Found ${businessesSnapshot.size} active businesses to reset`);
+
+      const batchSize = 500; // Firestore batch limit
+      let batch = db.batch();
+      let operationCount = 0;
+      let totalReset = 0;
+
+      for (const businessDoc of businessesSnapshot.docs) {
+        const businessData = businessDoc.data();
+        const businessId = businessDoc.id;
+
+        // Archive yesterday's stats before resetting
+        const todayOrders = businessData.todayOrders || 0;
+        const todayEarnings = businessData.todayEarnings || 0;
+
+        // Only archive if there was activity
+        if (todayOrders > 0 || todayEarnings > 0) {
+          const dailyStatsRef = db
+            .collection("business_daily_stats")
+            .doc(businessId)
+            .collection("days")
+            .doc(dateKey);
+
+          batch.set(dailyStatsRef, {
+            date: dateKey,
+            orders: todayOrders,
+            earnings: todayEarnings,
+            archivedAt: FieldValue.serverTimestamp(),
+          });
+          operationCount++;
+        }
+
+        // Reset daily stats
+        batch.update(businessDoc.ref, {
+          todayOrders: 0,
+          todayEarnings: 0,
+          lastDailyReset: FieldValue.serverTimestamp(),
+        });
+        operationCount++;
+        totalReset++;
+
+        // Commit batch if reaching limit
+        if (operationCount >= batchSize - 10) {
+          await batch.commit();
+          batch = db.batch();
+          operationCount = 0;
+          logger.info(`Committed batch, reset ${totalReset} businesses so far`);
+        }
+      }
+
+      // Commit remaining operations
+      if (operationCount > 0) {
+        await batch.commit();
+      }
+
+      logger.info(`Daily stats reset complete. Reset ${totalReset} businesses.`);
+      return null;
+    } catch (error) {
+      logger.error("Error resetting daily business stats:", error);
+      throw error; // Retry on failure
+    }
+  }
+);
+
+/**
+ * MONTHLY STATS RESET
+ *
+ * Runs on the 1st of every month at 00:05 UTC.
+ * Resets monthlyEarnings for all businesses.
+ *
+ * Also archives the previous month's stats for historical reporting.
+ */
+exports.resetMonthlyBusinessStats = onSchedule(
+  {
+    schedule: "5 0 1 * *", // 1st of every month at 00:05 UTC
+    timeZone: "UTC",
+    retryCount: 3,
+  },
+  async (event) => {
+    logger.info("Starting monthly business stats reset...");
+
+    const lastMonth = new Date();
+    lastMonth.setMonth(lastMonth.getMonth() - 1);
+    const monthKey = `${lastMonth.getFullYear()}-${String(lastMonth.getMonth() + 1).padStart(2, "0")}`; // YYYY-MM
+
+    try {
+      // Get all active businesses
+      const businessesSnapshot = await db
+        .collection("businesses")
+        .where("isActive", "==", true)
+        .get();
+
+      logger.info(`Found ${businessesSnapshot.size} active businesses for monthly reset`);
+
+      const batchSize = 500;
+      let batch = db.batch();
+      let operationCount = 0;
+      let totalReset = 0;
+
+      for (const businessDoc of businessesSnapshot.docs) {
+        const businessData = businessDoc.data();
+        const businessId = businessDoc.id;
+
+        // Archive last month's stats
+        const monthlyEarnings = businessData.monthlyEarnings || 0;
+
+        if (monthlyEarnings > 0) {
+          const monthlyStatsRef = db
+            .collection("business_monthly_stats")
+            .doc(businessId)
+            .collection("months")
+            .doc(monthKey);
+
+          batch.set(monthlyStatsRef, {
+            month: monthKey,
+            earnings: monthlyEarnings,
+            totalOrders: businessData.totalOrders || 0,
+            completedOrders: businessData.completedOrders || 0,
+            cancelledOrders: businessData.cancelledOrders || 0,
+            archivedAt: FieldValue.serverTimestamp(),
+          });
+          operationCount++;
+        }
+
+        // Reset monthly stats
+        batch.update(businessDoc.ref, {
+          monthlyEarnings: 0,
+          lastMonthlyReset: FieldValue.serverTimestamp(),
+        });
+        operationCount++;
+        totalReset++;
+
+        // Commit batch if reaching limit
+        if (operationCount >= batchSize - 10) {
+          await batch.commit();
+          batch = db.batch();
+          operationCount = 0;
+          logger.info(`Committed batch, reset ${totalReset} businesses so far`);
+        }
+      }
+
+      // Commit remaining operations
+      if (operationCount > 0) {
+        await batch.commit();
+      }
+
+      logger.info(`Monthly stats reset complete. Reset ${totalReset} businesses.`);
+      return null;
+    } catch (error) {
+      logger.error("Error resetting monthly business stats:", error);
+      throw error;
+    }
+  }
+);
+
+/**
+ * BUSINESS ORDER NOTIFICATION
+ *
+ * Triggers when a new order is created for a business.
+ * Sends notification to the business owner.
+ *
+ * Path: business_orders/{orderId}
+ */
+exports.onBusinessOrderCreated = onDocumentCreated(
+  "business_orders/{orderId}",
+  async (event) => {
+    const orderData = event.data.data();
+    const orderId = event.params.orderId;
+
+    logger.info(`New business order created: ${orderId}`);
+
+    const businessId = orderData.businessId;
+    if (!businessId) {
+      logger.warn("No business ID in order, skipping notification");
+      return null;
+    }
+
+    try {
+      // Get business to find owner
+      const businessDoc = await db.collection("businesses").doc(businessId).get();
+      if (!businessDoc.exists) {
+        logger.warn(`Business ${businessId} not found`);
+        return null;
+      }
+
+      const businessData = businessDoc.data();
+      const ownerId = businessData.userId;
+
+      // Get owner's FCM token
+      const ownerToken = await getUserFcmToken(ownerId);
+      if (!ownerToken) {
+        logger.warn(`No FCM token for business owner ${ownerId}`);
+        return null;
+      }
+
+      // Get customer name
+      const customerName = orderData.customerName || await getUserName(orderData.customerId);
+
+      // Prepare notification
+      const orderTotal = orderData.totalAmount || 0;
+      const formattedTotal = new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: orderData.currency || "USD",
+      }).format(orderTotal);
+
+      await sendNotification(
+        ownerToken,
+        {
+          title: "New Order Received!",
+          body: `${customerName} placed an order for ${formattedTotal}`,
+        },
+        {
+          type: "business_order",
+          orderId: orderId,
+          businessId: businessId,
+          customerId: orderData.customerId || "",
+          customerName: customerName,
+          amount: orderTotal.toString(),
+          click_action: "FLUTTER_NOTIFICATION_CLICK",
+        }
+      );
+
+      logger.info(`Order notification sent to business owner ${ownerId}`);
+      return null;
+    } catch (error) {
+      logger.error("Error sending order notification:", error);
+      return null;
+    }
   }
 );
