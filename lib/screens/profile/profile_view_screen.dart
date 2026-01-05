@@ -392,6 +392,18 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
               ),
             ],
           ),
+          // Username display
+          if (widget.userProfile.hasUsername) ...[
+            const SizedBox(height: 4),
+            Text(
+              widget.userProfile.displayUsername!,
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey.shade600,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
           // Account type badge row
           if (widget.userProfile.accountType != AccountType.personal) ...[
             const SizedBox(height: 12),

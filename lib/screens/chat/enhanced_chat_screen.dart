@@ -2375,7 +2375,7 @@ class _EnhancedChatScreenState extends ConsumerState<EnhancedChatScreen>
       // Send push notification to the other user
       final currentUserProfile = ref
           .read(currentUserProfileProvider)
-          .valueOrNull;
+          .value;
       final currentUserName = currentUserProfile?.name ?? 'Someone';
 
       NotificationService().sendNotificationToUser(

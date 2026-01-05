@@ -381,13 +381,38 @@ class GeocodingService {
 
   /// Search for location by text query (for search functionality)
   static Future<List<Map<String, dynamic>>> searchLocation(String query) async {
+    if (query.trim().isEmpty) return [];
+
+    try {
+      // Try Nominatim first
+      final nominatimResults = await _searchNominatim(query);
+      if (nominatimResults.isNotEmpty) {
+        return nominatimResults;
+      }
+
+      // Fallback to Photon API
+      final photonResults = await _searchPhoton(query);
+      if (photonResults.isNotEmpty) {
+        return photonResults;
+      }
+
+      return [];
+    } catch (e) {
+      debugPrint('GeocodingService: Search error: $e');
+      return [];
+    }
+  }
+
+  /// Search using OpenStreetMap Nominatim API
+  static Future<List<Map<String, dynamic>>> _searchNominatim(String query) async {
     try {
       final url = Uri.parse(
         '${AppAssets.osmSearch}'
         '?q=${Uri.encodeComponent(query)}'
         '&format=json'
         '&addressdetails=1'
-        '&limit=5',
+        '&limit=10'
+        '&dedupe=1',
       );
 
       final response = await http
@@ -406,24 +431,143 @@ class GeocodingService {
         return results.map((result) {
           final address = result['address'] ?? {};
 
+          // Get area - try multiple fields
+          String area = address['suburb'] ??
+              address['neighbourhood'] ??
+              address['village'] ??
+              address['hamlet'] ??
+              address['locality'] ??
+              address['road'] ??
+              '';
+
+          // Get city - try multiple fields
+          String city = address['city'] ??
+              address['town'] ??
+              address['village'] ??
+              address['municipality'] ??
+              address['district'] ??
+              address['county'] ??
+              '';
+
+          // Get state
+          String state = address['state'] ??
+              address['state_district'] ??
+              address['province'] ??
+              address['region'] ??
+              '';
+
+          // Get postal code
+          String pincode = address['postcode'] ?? '';
+
+          // Get country
+          String country = address['country'] ?? '';
+
+          // Build display name
+          String displayName = result['display_name'] ?? '';
+          List<String> displayParts = displayName.split(',').take(3).toList();
+          String display = displayParts.join(', ').trim();
+
           return {
-            'formatted': result['display_name'] ?? '',
-            'area': address['suburb'] ?? address['neighbourhood'] ?? '',
-            'city': address['city'] ?? address['town'] ?? '',
-            'state': address['state'] ?? '',
-            'pincode': address['postcode'] ?? '',
-            'country': address['country'] ?? '',
-            'latitude': double.tryParse(result['lat'] ?? '0') ?? 0.0,
-            'longitude': double.tryParse(result['lon'] ?? '0') ?? 0.0,
-            'display':
-                result['display_name']?.split(',').take(3).join(',') ?? '',
+            'formatted': displayName,
+            'area': area,
+            'city': city,
+            'state': state,
+            'pincode': pincode,
+            'country': country,
+            'latitude': double.tryParse(result['lat']?.toString() ?? '0') ?? 0.0,
+            'longitude': double.tryParse(result['lon']?.toString() ?? '0') ?? 0.0,
+            'display': display.isNotEmpty ? display : displayName,
           };
         }).toList();
       }
 
       return [];
     } catch (e) {
-      debugPrint('GeocodingService: Search error: $e');
+      debugPrint('GeocodingService: Nominatim search error: $e');
+      return [];
+    }
+  }
+
+  /// Search using Photon API (free, no rate limits, powered by OSM)
+  static Future<List<Map<String, dynamic>>> _searchPhoton(String query) async {
+    try {
+      final url = Uri.parse(
+        'https://photon.komoot.io/api/'
+        '?q=${Uri.encodeComponent(query)}'
+        '&limit=10',
+      );
+
+      final response = await http
+          .get(url)
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final List<dynamic> features = data['features'] ?? [];
+
+        return features.map((feature) {
+          final properties = feature['properties'] ?? {};
+          final geometry = feature['geometry'] ?? {};
+          final coordinates = geometry['coordinates'] ?? [0.0, 0.0];
+
+          // Get area
+          String area = properties['street'] ??
+              properties['locality'] ??
+              properties['district'] ??
+              '';
+
+          // Get city
+          String city = properties['city'] ??
+              properties['town'] ??
+              properties['village'] ??
+              properties['county'] ??
+              '';
+
+          // Get state
+          String state = properties['state'] ?? properties['region'] ?? '';
+
+          // Get postal code
+          String pincode = properties['postcode'] ?? '';
+
+          // Get country
+          String country = properties['country'] ?? '';
+
+          // Build display name
+          String name = properties['name'] ?? '';
+          List<String> parts = [
+            if (name.isNotEmpty) name,
+            if (area.isNotEmpty && area != name) area,
+            if (city.isNotEmpty && city != name && city != area) city,
+          ];
+          String display = parts.join(', ');
+
+          // Build formatted address
+          List<String> formattedParts = [
+            if (name.isNotEmpty) name,
+            if (area.isNotEmpty) area,
+            if (city.isNotEmpty) city,
+            if (state.isNotEmpty) state,
+            if (country.isNotEmpty) country,
+          ];
+          String formatted = formattedParts.join(', ');
+
+          return {
+            'formatted': formatted,
+            'area': area.isNotEmpty ? area : name,
+            'city': city,
+            'state': state,
+            'pincode': pincode,
+            'country': country,
+            'latitude': coordinates.length > 1 ? (coordinates[1] as num).toDouble() : 0.0,
+            'longitude': coordinates.length > 0 ? (coordinates[0] as num).toDouble() : 0.0,
+            'display': display.isNotEmpty ? display : formatted,
+          };
+        }).toList();
+      }
+
+      return [];
+    } catch (e) {
+      debugPrint('GeocodingService: Photon search error: $e');
       return [];
     }
   }

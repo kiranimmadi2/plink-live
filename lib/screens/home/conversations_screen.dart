@@ -300,7 +300,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
             fontSize: 16,
           ),
           decoration: InputDecoration(
-            hintText: 'Search',
+            hintText: 'Search by name or @username',
             hintStyle: TextStyle(
               color: isDarkMode ? Colors.grey[600] : Colors.grey[500],
               fontSize: 16,
@@ -402,6 +402,11 @@ class _ConversationsScreenState extends State<ConversationsScreen>
       return const Center(child: Text('Please login to see conversations'));
     }
 
+    // If searching in Chats tab, show search results (conversations + users)
+    if (_searchQuery.isNotEmpty && !isGroup) {
+      return _buildSearchResults(isDarkMode, currentUserId);
+    }
+
     return StreamBuilder<QuerySnapshot>(
       stream: _firestore
           .collection('conversations')
@@ -429,20 +434,10 @@ class _ConversationsScreenState extends State<ConversationsScreen>
         for (var doc in snapshot.data!.docs) {
           try {
             final conv = ConversationModel.fromFirestore(doc);
-
-            // Filter by group or direct chat
             if (conv.isGroup != isGroup) continue;
 
-            if (_searchQuery.isEmpty) {
-              conversations.add(conv);
-            } else {
-              final displayName = conv.getDisplayName(currentUserId);
-              if (displayName.toLowerCase().contains(_searchQuery)) {
-                conversations.add(conv);
-              }
-            }
+            conversations.add(conv);
 
-            // Collect user IDs for prefetching (only for direct chats)
             if (!conv.isGroup) {
               final otherUserId = conv.getOtherParticipantId(currentUserId);
               if (otherUserId.isNotEmpty && !_userCache.containsKey(otherUserId)) {
@@ -454,12 +449,12 @@ class _ConversationsScreenState extends State<ConversationsScreen>
           }
         }
 
-        // OPTIMIZATION: Prefetch all user data in parallel (non-blocking)
+        // Prefetch in background
         if (userIdsToPrefetch.isNotEmpty) {
           _prefetchUsers(userIdsToPrefetch);
         }
 
-        // Sort by lastMessageTime (client-side to avoid index requirement)
+        // Sort by lastMessageTime
         conversations.sort((a, b) {
           if (a.lastMessageTime == null) return 1;
           if (b.lastMessageTime == null) return -1;
@@ -479,6 +474,307 @@ class _ConversationsScreenState extends State<ConversationsScreen>
           },
         );
       },
+    );
+  }
+
+  /// Build search results - shows existing conversations + users from search
+  Widget _buildSearchResults(bool isDarkMode, String currentUserId) {
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: _searchUsersAndConversations(currentUserId),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (snapshot.hasError) {
+          return _buildErrorState(isDarkMode, snapshot.error.toString());
+        }
+
+        final results = snapshot.data ?? [];
+
+        if (results.isEmpty) {
+          return _buildNoSearchResults(isDarkMode);
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.only(top: 8),
+          itemCount: results.length,
+          itemBuilder: (context, index) {
+            final item = results[index];
+            if (item['type'] == 'conversation') {
+              return _buildConversationTile(
+                item['data'] as ConversationModel,
+                isDarkMode,
+              );
+            } else {
+              return _buildUserSearchResult(
+                item['data'] as Map<String, dynamic>,
+                item['userId'] as String,
+                isDarkMode,
+              );
+            }
+          },
+        );
+      },
+    );
+  }
+
+  /// Search for users and conversations matching the query
+  Future<List<Map<String, dynamic>>> _searchUsersAndConversations(
+    String currentUserId,
+  ) async {
+    final results = <Map<String, dynamic>>[];
+    final seenUserIds = <String>{};
+
+    // Clean search query for username search
+    final searchQueryClean = _searchQuery.startsWith('@')
+        ? _searchQuery.substring(1)
+        : _searchQuery;
+
+    // First, search existing conversations
+    try {
+      final convSnapshot = await _firestore
+          .collection('conversations')
+          .where('participants', arrayContains: currentUserId)
+          .limit(50)
+          .get();
+
+      for (var doc in convSnapshot.docs) {
+        try {
+          final conv = ConversationModel.fromFirestore(doc);
+          if (conv.isGroup) continue;
+
+          final otherUserId = conv.getOtherParticipantId(currentUserId);
+          if (otherUserId.isEmpty) continue;
+
+          // Get user data
+          Map<String, dynamic>? userData = _userCache[otherUserId];
+          if (userData == null) {
+            final userDoc = await _firestore.collection('users').doc(otherUserId).get();
+            if (userDoc.exists) {
+              userData = userDoc.data()!;
+              _userCache[otherUserId] = userData;
+            }
+          }
+
+          if (userData != null) {
+            final name = (userData['name'] ?? '').toString().toLowerCase();
+            final username = (userData['username'] ?? '').toString().toLowerCase();
+
+            // Check if matches search
+            if (name.contains(_searchQuery) ||
+                (username.isNotEmpty && username.contains(searchQueryClean))) {
+              seenUserIds.add(otherUserId);
+              results.add({
+                'type': 'conversation',
+                'data': conv,
+                'userId': otherUserId,
+              });
+            }
+          }
+        } catch (e) {
+          debugPrint('Error processing conversation: $e');
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching conversations: $e');
+    }
+
+    // Then, search ALL users by name
+    try {
+      // Try nameLower field first
+      var nameQuery = await _firestore
+          .collection('users')
+          .where('nameLower', isGreaterThanOrEqualTo: _searchQuery)
+          .where('nameLower', isLessThan: '${_searchQuery}z')
+          .limit(20)
+          .get();
+
+      // If no results, try with capitalized name
+      if (nameQuery.docs.isEmpty) {
+        final capitalizedQuery = _searchQuery.isNotEmpty
+            ? _searchQuery[0].toUpperCase() + _searchQuery.substring(1)
+            : _searchQuery;
+        nameQuery = await _firestore
+            .collection('users')
+            .where('name', isGreaterThanOrEqualTo: capitalizedQuery)
+            .where('name', isLessThan: '${capitalizedQuery}z')
+            .limit(20)
+            .get();
+      }
+
+      for (var doc in nameQuery.docs) {
+        if (doc.id != currentUserId && !seenUserIds.contains(doc.id)) {
+          seenUserIds.add(doc.id);
+          final userData = doc.data();
+          _userCache[doc.id] = userData;
+          results.add({
+            'type': 'user',
+            'data': userData,
+            'userId': doc.id,
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error searching by name: $e');
+    }
+
+    // Search ALL users by username
+    if (searchQueryClean.isNotEmpty) {
+      try {
+        final usernameQuery = await _firestore
+            .collection('users')
+            .where('username', isGreaterThanOrEqualTo: searchQueryClean)
+            .where('username', isLessThan: '${searchQueryClean}z')
+            .limit(20)
+            .get();
+
+        for (var doc in usernameQuery.docs) {
+          if (doc.id != currentUserId && !seenUserIds.contains(doc.id)) {
+            seenUserIds.add(doc.id);
+            final userData = doc.data();
+            _userCache[doc.id] = userData;
+            results.add({
+              'type': 'user',
+              'data': userData,
+              'userId': doc.id,
+            });
+          }
+        }
+      } catch (e) {
+        debugPrint('Error searching by username: $e');
+      }
+    }
+
+    return results;
+  }
+
+  /// Build a user search result tile (for users not yet chatted with)
+  Widget _buildUserSearchResult(
+    Map<String, dynamic> userData,
+    String userId,
+    bool isDarkMode,
+  ) {
+    final name = userData['name'] ?? 'Unknown';
+    final username = userData['username'] as String?;
+    final photoUrl = userData['photoUrl'];
+    final fixedPhotoUrl = PhotoUrlHelper.fixGooglePhotoUrl(photoUrl);
+    final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      decoration: BoxDecoration(
+        color: isDarkMode
+            ? Colors.white.withValues(alpha: 0.1)
+            : Colors.white.withValues(alpha: 0.7),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDarkMode
+              ? Colors.white.withValues(alpha: 0.08)
+              : Colors.grey.withValues(alpha: 0.15),
+          width: 1,
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () => _openChatWithUser(userData, userId),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                _buildUserAvatar(
+                  photoUrl: fixedPhotoUrl,
+                  initial: initial,
+                  radius: 26,
+                  context: context,
+                  uniqueId: userId,
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        formatDisplayName(name),
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: isDarkMode ? Colors.white : Colors.black,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        username != null && username.isNotEmpty
+                            ? '@$username'
+                            : 'Tap to message',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: username != null && username.isNotEmpty
+                              ? Theme.of(context).primaryColor
+                              : (isDarkMode ? Colors.grey[500] : Colors.grey[600]),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.chat_bubble_outline,
+                  color: isDarkMode ? Colors.grey[500] : Colors.grey[600],
+                  size: 20,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Open chat with a user from search results
+  void _openChatWithUser(Map<String, dynamic> userData, String userId) {
+    HapticFeedback.lightImpact();
+    final userProfile = UserProfile.fromMap(userData, userId);
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EnhancedChatScreen(otherUser: userProfile),
+      ),
+    );
+  }
+
+  /// Build no search results state
+  Widget _buildNoSearchResults(bool isDarkMode) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.search_off,
+            size: 80,
+            color: isDarkMode ? Colors.grey[700] : Colors.grey[300],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'No results found',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: isDarkMode ? Colors.white : Colors.black,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Try a different name or @username',
+            style: TextStyle(
+              fontSize: 14,
+              color: isDarkMode ? Colors.grey[600] : Colors.grey,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
     );
   }
 
@@ -536,7 +832,7 @@ class _ConversationsScreenState extends State<ConversationsScreen>
         return FutureBuilder<void>(
           future: _prefetchUsers(userIds),
           builder: (context, prefetchSnapshot) {
-            // Filter by search query using cached names
+            // Filter by search query using cached names and usernames
             final filteredCalls = _searchQuery.isEmpty
                 ? calls
                 : calls.where((doc) {
@@ -546,7 +842,13 @@ class _ConversationsScreenState extends State<ConversationsScreen>
                     final otherUserId = callerId == currentUserId ? receiverId : callerId;
                     final userData = _userCache[otherUserId];
                     final name = (userData?['name'] ?? '').toString().toLowerCase();
-                    return name.contains(_searchQuery);
+                    final username = (userData?['username'] ?? '').toString().toLowerCase();
+                    // Handle @ prefix in search query
+                    final searchQueryClean = _searchQuery.startsWith('@')
+                        ? _searchQuery.substring(1)
+                        : _searchQuery;
+                    return name.contains(_searchQuery) ||
+                        (username.isNotEmpty && username.contains(searchQueryClean));
                   }).toList();
 
             if (filteredCalls.isEmpty) {

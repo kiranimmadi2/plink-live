@@ -1059,6 +1059,22 @@ class _ProfileWithHistoryScreenState
                                         textAlign: TextAlign.center,
                                       ),
 
+                                      // Username - Centered (if exists)
+                                      if (_userProfile?['username'] != null &&
+                                          _userProfile!['username'].toString().isNotEmpty)
+                                        Padding(
+                                          padding: const EdgeInsets.only(top: 4),
+                                          child: Text(
+                                            '@${_userProfile!['username']}',
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              color: Colors.white.withValues(alpha: 0.8),
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                            textAlign: TextAlign.center,
+                                          ),
+                                        ),
+
                                       const SizedBox(height: 8),
 
                                       // Email - Centered

@@ -1,13 +1,15 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import 'dart:async';
 import '../../res/config/app_colors.dart';
 import '../../services/auth_service.dart';
 import '../../services/user_manager.dart';
+import '../../services/username_service.dart';
 import '../../services/location services/location_service.dart';
 
 class ProfileEditScreen extends StatefulWidget {
@@ -27,16 +29,25 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
 
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
+  final _usernameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _locationController = TextEditingController();
   final _bioController = TextEditingController();
+  final UsernameService _usernameService = UsernameService();
 
   User? user;
   String? _currentPhotoUrl;
+  String? _currentUsername;
   File? _selectedImage;
   bool _isLoading = false;
   bool _isUpdating = false;
   bool _isUpdatingLocation = false;
+
+  // Username validation state
+  bool _isCheckingUsername = false;
+  bool _isUsernameAvailable = true;
+  String? _usernameError;
+  Timer? _usernameDebounce;
 
   // Additional profile fields
   String? _selectedGender;
@@ -141,6 +152,8 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
 
       if (profileData != null) {
         _nameController.text = profileData['name'] ?? '';
+        _usernameController.text = profileData['username'] ?? '';
+        _currentUsername = profileData['username'];
         _phoneController.text = profileData['phone'] ?? '';
         _locationController.text =
             profileData['city'] ?? profileData['location'] ?? '';
@@ -224,9 +237,38 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   Future<void> _updateProfile() async {
     if (!_formKey.currentState!.validate() || user == null) return;
 
+    // Check if username has errors
+    if (_usernameError != null && _usernameController.text.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_usernameError!),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     setState(() => _isUpdating = true);
 
     try {
+      // Handle username claim if changed
+      final newUsername = _usernameController.text.trim().toLowerCase();
+      if (newUsername.isNotEmpty && newUsername != _currentUsername) {
+        final result = await _usernameService.claimUsername(newUsername);
+        if (!result.success) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(result.error ?? 'Failed to claim username'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+          setState(() => _isUpdating = false);
+          return;
+        }
+      }
+
       // Handle photo upload if new image selected
       String? photoUrl = _currentPhotoUrl ?? user!.photoURL;
 
@@ -265,9 +307,11 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       }
 
       // Update Firestore directly
+      final nameTrimmed = _nameController.text.trim();
       await _firestore.collection('users').doc(user!.uid).set({
         'uid': user!.uid,
-        'name': _nameController.text.trim(),
+        'name': nameTrimmed,
+        'nameLower': nameTrimmed.toLowerCase(), // For case-insensitive search
         'email': user!.email ?? '',
         'photoUrl': photoUrl,
         'phone': _phoneController.text.trim(),
@@ -518,12 +562,66 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     }
   }
 
+  /// Check username availability with debounce
+  void _checkUsernameAvailability(String username) {
+    _usernameDebounce?.cancel();
+
+    if (username.isEmpty) {
+      setState(() {
+        _usernameError = null;
+        _isUsernameAvailable = true;
+        _isCheckingUsername = false;
+      });
+      return;
+    }
+
+    // Validate format first
+    final formatError = _usernameService.validateUsernameFormat(username.toLowerCase());
+    if (formatError != null) {
+      setState(() {
+        _usernameError = formatError;
+        _isUsernameAvailable = false;
+        _isCheckingUsername = false;
+      });
+      return;
+    }
+
+    // Check if same as current username
+    if (username.toLowerCase() == _currentUsername?.toLowerCase()) {
+      setState(() {
+        _usernameError = null;
+        _isUsernameAvailable = true;
+        _isCheckingUsername = false;
+      });
+      return;
+    }
+
+    setState(() {
+      _isCheckingUsername = true;
+      _usernameError = null;
+    });
+
+    // Debounce the availability check
+    _usernameDebounce = Timer(const Duration(milliseconds: 500), () async {
+      final available = await _usernameService.isUsernameAvailable(username.toLowerCase());
+      if (mounted) {
+        setState(() {
+          _isCheckingUsername = false;
+          _isUsernameAvailable = available;
+          _usernameError = available ? null : 'This username is already taken';
+        });
+      }
+    });
+  }
+
   @override
   void dispose() {
     _nameController.dispose();
+    _usernameController.dispose();
     _phoneController.dispose();
     _locationController.dispose();
     _bioController.dispose();
+    _usernameDebounce?.cancel();
     super.dispose();
   }
 
@@ -614,6 +712,45 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                         }
                         return null;
                       },
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Username Field
+                    TextFormField(
+                      controller: _usernameController,
+                      decoration: InputDecoration(
+                        labelText: 'Username',
+                        prefixIcon: const Icon(Icons.alternate_email),
+                        border: const OutlineInputBorder(),
+                        hintText: 'johndoe',
+                        helperText: 'Lowercase letters, numbers, and underscores only',
+                        suffixIcon: _isCheckingUsername
+                            ? const Padding(
+                                padding: EdgeInsets.all(12.0),
+                                child: SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                ),
+                              )
+                            : _usernameController.text.isEmpty
+                                ? null
+                                : Icon(
+                                    _isUsernameAvailable
+                                        ? Icons.check_circle
+                                        : Icons.cancel,
+                                    color: _isUsernameAvailable
+                                        ? Colors.green
+                                        : Colors.red,
+                                  ),
+                        errorText: _usernameError,
+                      ),
+                      onChanged: _checkUsernameAvailability,
+                      textInputAction: TextInputAction.next,
+                      autocorrect: false,
+                      enableSuggestions: false,
                     ),
                     const SizedBox(height: 16),
 

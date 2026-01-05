@@ -50,37 +50,39 @@ class _MyConnectionsScreenState extends ConsumerState<MyConnectionsScreen> {
   }
 
   Widget _buildPendingRequestsSection(bool isDarkMode) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDarkMode ? const Color(0xFF2A2A2A) : Colors.grey[100],
-        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(24)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream: _connectionService.getPendingRequestsStream(),
+      builder: (context, snapshot) {
+        final requests = snapshot.data ?? [];
+        final count = requests.length;
+
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isDarkMode ? const Color(0xFF2A2A2A) : Colors.grey[100],
+            borderRadius: const BorderRadius.vertical(bottom: Radius.circular(24)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(
-                Icons.pending_outlined,
-                color: Color(0xFF9C27B0),
-                size: 24,
-              ),
-              const SizedBox(width: 12),
-              const Text(
-                'Pending Requests',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-              const Spacer(),
-              StreamBuilder<List<Map<String, dynamic>>>(
-                stream: _connectionService.getPendingRequestsStream(),
-                builder: (context, snapshot) {
-                  final count = snapshot.data?.length ?? 0;
-                  return Container(
+              Row(
+                children: [
+                  const Icon(
+                    Icons.pending_outlined,
+                    color: Color(0xFF9C27B0),
+                    size: 24,
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Pending Requests',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: isDarkMode ? Colors.white : Colors.black,
+                    ),
+                  ),
+                  const Spacer(),
+                  Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 12,
                       vertical: 6,
@@ -97,89 +99,69 @@ class _MyConnectionsScreenState extends ConsumerState<MyConnectionsScreen> {
                         fontSize: 14,
                       ),
                     ),
-                  );
-                },
+                  ),
+                ],
               ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          StreamBuilder<List<Map<String, dynamic>>>(
-            stream: _connectionService.getPendingRequestsStream(),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(24),
+              if (snapshot.connectionState == ConnectionState.waiting)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 16),
+                  child: Center(
                     child: CircularProgressIndicator(color: Color(0xFF9C27B0)),
                   ),
-                );
-              }
-
-              if (snapshot.hasError) {
-                return Container(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    children: [
-                      Icon(
-                        Icons.error_outline,
-                        size: 48,
-                        color: Colors.red[300],
+                )
+              else if (snapshot.hasError)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  child: Center(
+                    child: Text(
+                      'Failed to load requests',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: isDarkMode ? Colors.grey[400] : Colors.grey[700],
                       ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'Failed to load requests',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: isDarkMode
-                              ? Colors.grey[400]
-                              : Colors.grey[700],
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                );
-              }
-
-              final requests = snapshot.data ?? [];
-
-              if (requests.isEmpty) {
-                return Container(
-                  padding: const EdgeInsets.all(32),
-                  child: Column(
-                    children: [
-                      Icon(
-                        Icons.pending_outlined,
-                        size: 60,
-                        color: isDarkMode ? Colors.grey[700] : Colors.grey[400],
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'No pending requests',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: isDarkMode
-                              ? Colors.grey[500]
-                              : Colors.grey[600],
+                )
+              else if (requests.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 20),
+                  child: Center(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.check_circle_outline,
+                          size: 20,
+                          color: isDarkMode ? Colors.grey[600] : Colors.grey[400],
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 8),
+                        Text(
+                          'No pending requests',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: isDarkMode ? Colors.grey[500] : Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                );
-              }
-
-              return ListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: requests.length,
-                itemBuilder: (context, index) {
-                  final request = requests[index];
-                  return _buildRequestCard(request, isDarkMode);
-                },
-              );
-            },
+                )
+              else ...[
+                const SizedBox(height: 16),
+                ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: requests.length,
+                  itemBuilder: (context, index) {
+                    final request = requests[index];
+                    return _buildRequestCard(request, isDarkMode);
+                  },
+                ),
+              ],
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -189,143 +171,138 @@ class _MyConnectionsScreenState extends ConsumerState<MyConnectionsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              const Icon(Icons.people, color: Color(0xFF00D67D), size: 24),
-              const SizedBox(width: 12),
-              const Text(
-                'My Connections',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-              const Spacer(),
-              FutureBuilder<int>(
-                future: _connectionService.getConnectionsCount(),
-                builder: (context, snapshot) {
-                  final count = snapshot.data ?? 0;
-                  return Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF00D67D),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      '$count',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
           FutureBuilder<List<String>>(
             future: _connectionService.getUserConnections(),
             builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(24),
-                    child: CircularProgressIndicator(color: Color(0xFF00D67D)),
-                  ),
-                );
-              }
-
-              if (snapshot.hasError) {
-                return Container(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    children: [
-                      Icon(
-                        Icons.error_outline,
-                        size: 48,
-                        color: Colors.red[300],
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'Failed to load connections',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: isDarkMode
-                              ? Colors.grey[400]
-                              : Colors.grey[700],
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }
-
               final connectionIds = snapshot.data ?? [];
+              final count = connectionIds.length;
 
-              if (connectionIds.isEmpty) {
-                return Container(
-                  padding: const EdgeInsets.all(32),
-                  child: Column(
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
                     children: [
-                      Icon(
-                        Icons.people_outline,
-                        size: 80,
-                        color: isDarkMode ? Colors.grey[700] : Colors.grey[400],
-                      ),
-                      const SizedBox(height: 16),
+                      const Icon(Icons.people, color: Color(0xFF00D67D), size: 24),
+                      const SizedBox(width: 12),
                       Text(
-                        'No connections yet',
+                        'My Connections',
                         style: TextStyle(
-                          fontSize: 18,
+                          fontSize: 20,
                           fontWeight: FontWeight.bold,
-                          color: isDarkMode
-                              ? Colors.grey[400]
-                              : Colors.grey[600],
+                          color: isDarkMode ? Colors.white : Colors.black,
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Start connecting with people on Live Connect!',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: isDarkMode
-                              ? Colors.grey[600]
-                              : Colors.grey[500],
+                      const Spacer(),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF00D67D),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '$count',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
                         ),
                       ),
                     ],
                   ),
-                );
-              }
+                  const SizedBox(height: 16),
+                  if (snapshot.connectionState == ConnectionState.waiting)
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(24),
+                        child: CircularProgressIndicator(color: Color(0xFF00D67D)),
+                      ),
+                    )
+                  else if (snapshot.hasError)
+                    Container(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.error_outline,
+                            size: 48,
+                            color: Colors.red[300],
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'Failed to load connections',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: isDarkMode
+                                  ? Colors.grey[400]
+                                  : Colors.grey[700],
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else if (connectionIds.isEmpty)
+                    Container(
+                      padding: const EdgeInsets.all(32),
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.people_outline,
+                            size: 80,
+                            color: isDarkMode ? Colors.grey[700] : Colors.grey[400],
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'No connections yet',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: isDarkMode
+                                  ? Colors.grey[400]
+                                  : Colors.grey[600],
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Start connecting with people on Live Connect!',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: isDarkMode
+                                  ? Colors.grey[600]
+                                  : Colors.grey[500],
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: connectionIds.length,
+                      itemBuilder: (context, index) {
+                        final userId = connectionIds[index];
+                        return FutureBuilder<DocumentSnapshot>(
+                          future: _firestore.collection('users').doc(userId).get(),
+                          builder: (context, userSnapshot) {
+                            if (!userSnapshot.hasData) {
+                              return const SizedBox.shrink();
+                            }
 
-              return ListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: connectionIds.length,
-                itemBuilder: (context, index) {
-                  final userId = connectionIds[index];
-                  return FutureBuilder<DocumentSnapshot>(
-                    future: _firestore.collection('users').doc(userId).get(),
-                    builder: (context, userSnapshot) {
-                      if (!userSnapshot.hasData) {
-                        return const SizedBox.shrink();
-                      }
+                            final userData =
+                                userSnapshot.data!.data() as Map<String, dynamic>?;
+                            if (userData == null) return const SizedBox.shrink();
 
-                      final userData =
-                          userSnapshot.data!.data() as Map<String, dynamic>?;
-                      if (userData == null) return const SizedBox.shrink();
-
-                      return _buildConnectionCard(userId, userData, isDarkMode);
-                    },
-                  );
-                },
+                            return _buildConnectionCard(userId, userData, isDarkMode);
+                          },
+                        );
+                      },
+                    ),
+                ],
               );
             },
           ),
@@ -420,7 +397,16 @@ class _MyConnectionsScreenState extends ConsumerState<MyConnectionsScreen> {
   ) {
     final name = userData['name'] ?? 'Unknown User';
     final photoUrl = userData['photoUrl'] as String?;
-    final bio = userData['bio'] ?? 'No bio available';
+    final username = userData['username'] as String?;
+    final location = userData['location'] ?? userData['city'];
+
+    // Show @username if available, otherwise location, otherwise nothing
+    String? subtitle;
+    if (username != null && username.isNotEmpty) {
+      subtitle = '@$username';
+    } else if (location != null && location.toString().isNotEmpty) {
+      subtitle = location.toString();
+    }
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -442,23 +428,27 @@ class _MyConnectionsScreenState extends ConsumerState<MyConnectionsScreen> {
                 children: [
                   Text(
                     name,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                      color: isDarkMode ? Colors.white : Colors.black,
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    bio,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: username != null
+                            ? const Color(0xFF00D67D)
+                            : (isDarkMode ? Colors.grey[400] : Colors.grey[600]),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 8),
+                  ],
+                  const SizedBox(height: 6),
                   const Text(
                     'Connected',
                     style: TextStyle(
@@ -470,32 +460,35 @@ class _MyConnectionsScreenState extends ConsumerState<MyConnectionsScreen> {
                 ],
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 8),
             Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 IconButton(
                   onPressed: () => _openChat(userId, userData),
                   icon: const Icon(
                     Icons.message_outlined,
                     color: Color(0xFF00D67D),
+                    size: 22,
                   ),
                   tooltip: 'Message',
                   style: IconButton.styleFrom(
-                    backgroundColor: const Color(
-                      0xFF00D67D,
-                    ).withValues(alpha: 0.1),
+                    backgroundColor: const Color(0xFF00D67D).withValues(alpha: 0.1),
+                    padding: const EdgeInsets.all(10),
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
                 IconButton(
                   onPressed: () => _removeConnection(userId, name),
-                  icon: const Icon(
+                  icon: Icon(
                     Icons.person_remove_outlined,
-                    color: Colors.red,
+                    color: Colors.red[400],
+                    size: 22,
                   ),
                   tooltip: 'Remove Connection',
                   style: IconButton.styleFrom(
                     backgroundColor: Colors.red.withValues(alpha: 0.1),
+                    padding: const EdgeInsets.all(10),
                   ),
                 ),
               ],

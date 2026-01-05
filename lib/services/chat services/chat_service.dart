@@ -169,6 +169,7 @@ class ChatService {
         .collection('conversations')
         .where('participants', arrayContains: userId)
         .orderBy('lastMessageTime', descending: true)
+        .limit(50) // Prevent unbounded queries for users with many chats
         .snapshots();
   }
 
