@@ -3,8 +3,19 @@
 import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, kIsWeb, TargetPlatform;
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 
+/// Firebase configuration using compile-time environment variables.
+///
+/// Pass configuration via --dart-define flags:
+/// flutter run \
+///   --dart-define=FIREBASE_WEB_API_KEY=xxx \
+///   --dart-define=FIREBASE_WEB_AUTH_DOMAIN=xxx \
+///   --dart-define=FIREBASE_WEB_PROJECT_ID=xxx \
+///   --dart-define=FIREBASE_WEB_STORAGE_BUCKET=xxx \
+///   --dart-define=FIREBASE_WEB_MESSAGING_SENDER_ID=xxx \
+///   --dart-define=FIREBASE_WEB_APP_ID=xxx \
+///   --dart-define=FIREBASE_ANDROID_API_KEY=xxx \
+///   --dart-define=FIREBASE_ANDROID_APP_ID=xxx
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
@@ -28,59 +39,59 @@ class DefaultFirebaseOptions {
     }
   }
 
-  static FirebaseOptions get web => FirebaseOptions(
-        apiKey: dotenv.env['FIREBASE_WEB_API_KEY'] ?? '',
-        authDomain: dotenv.env['FIREBASE_WEB_AUTH_DOMAIN'] ?? '',
-        projectId: dotenv.env['FIREBASE_WEB_PROJECT_ID'] ?? '',
-        storageBucket: dotenv.env['FIREBASE_WEB_STORAGE_BUCKET'] ?? '',
-        messagingSenderId: dotenv.env['FIREBASE_WEB_MESSAGING_SENDER_ID'] ?? '',
-        appId: dotenv.env['FIREBASE_WEB_APP_ID'] ?? '',
-      );
+  static const FirebaseOptions web = FirebaseOptions(
+    apiKey: String.fromEnvironment('FIREBASE_WEB_API_KEY'),
+    authDomain: String.fromEnvironment('FIREBASE_WEB_AUTH_DOMAIN'),
+    projectId: String.fromEnvironment('FIREBASE_WEB_PROJECT_ID'),
+    storageBucket: String.fromEnvironment('FIREBASE_WEB_STORAGE_BUCKET'),
+    messagingSenderId: String.fromEnvironment('FIREBASE_WEB_MESSAGING_SENDER_ID'),
+    appId: String.fromEnvironment('FIREBASE_WEB_APP_ID'),
+  );
 
-  static FirebaseOptions get android => FirebaseOptions(
-        apiKey: dotenv.env['FIREBASE_ANDROID_API_KEY'] ?? '',
-        appId: dotenv.env['FIREBASE_ANDROID_APP_ID'] ?? '',
-        messagingSenderId: dotenv.env['FIREBASE_WEB_MESSAGING_SENDER_ID'] ?? '',
-        projectId: dotenv.env['FIREBASE_WEB_PROJECT_ID'] ?? '',
-        storageBucket: dotenv.env['FIREBASE_WEB_STORAGE_BUCKET'] ?? '',
-      );
+  static const FirebaseOptions android = FirebaseOptions(
+    apiKey: String.fromEnvironment('FIREBASE_ANDROID_API_KEY'),
+    appId: String.fromEnvironment('FIREBASE_ANDROID_APP_ID'),
+    messagingSenderId: String.fromEnvironment('FIREBASE_WEB_MESSAGING_SENDER_ID'),
+    projectId: String.fromEnvironment('FIREBASE_WEB_PROJECT_ID'),
+    storageBucket: String.fromEnvironment('FIREBASE_WEB_STORAGE_BUCKET'),
+  );
 
   // Placeholder configurations for other platforms
   // These will use the same configuration as Android for now
   // You can update these when you add support for these platforms
-  static FirebaseOptions get ios => FirebaseOptions(
-        apiKey: dotenv.env['FIREBASE_IOS_API_KEY'] ?? '',
-        appId: dotenv.env['FIREBASE_IOS_APP_ID'] ?? '',
-        messagingSenderId: dotenv.env['FIREBASE_WEB_MESSAGING_SENDER_ID'] ?? '',
-        projectId: dotenv.env['FIREBASE_WEB_PROJECT_ID'] ?? '',
-        storageBucket: dotenv.env['FIREBASE_WEB_STORAGE_BUCKET'] ?? '',
-        iosBundleId: dotenv.env['FIREBASE_IOS_BUNDLE_ID'] ?? '',
-      );
+  static const FirebaseOptions ios = FirebaseOptions(
+    apiKey: String.fromEnvironment('FIREBASE_IOS_API_KEY'),
+    appId: String.fromEnvironment('FIREBASE_IOS_APP_ID'),
+    messagingSenderId: String.fromEnvironment('FIREBASE_WEB_MESSAGING_SENDER_ID'),
+    projectId: String.fromEnvironment('FIREBASE_WEB_PROJECT_ID'),
+    storageBucket: String.fromEnvironment('FIREBASE_WEB_STORAGE_BUCKET'),
+    iosBundleId: String.fromEnvironment('FIREBASE_IOS_BUNDLE_ID'),
+  );
 
-  static FirebaseOptions get macos => FirebaseOptions(
-        apiKey: dotenv.env['FIREBASE_IOS_API_KEY'] ?? '',
-        appId: dotenv.env['FIREBASE_IOS_APP_ID'] ?? '',
-        messagingSenderId: dotenv.env['FIREBASE_WEB_MESSAGING_SENDER_ID'] ?? '',
-        projectId: dotenv.env['FIREBASE_WEB_PROJECT_ID'] ?? '',
-        storageBucket: dotenv.env['FIREBASE_WEB_STORAGE_BUCKET'] ?? '',
-        iosBundleId: dotenv.env['FIREBASE_IOS_BUNDLE_ID'] ?? '',
-      );
+  static const FirebaseOptions macos = FirebaseOptions(
+    apiKey: String.fromEnvironment('FIREBASE_IOS_API_KEY'),
+    appId: String.fromEnvironment('FIREBASE_IOS_APP_ID'),
+    messagingSenderId: String.fromEnvironment('FIREBASE_WEB_MESSAGING_SENDER_ID'),
+    projectId: String.fromEnvironment('FIREBASE_WEB_PROJECT_ID'),
+    storageBucket: String.fromEnvironment('FIREBASE_WEB_STORAGE_BUCKET'),
+    iosBundleId: String.fromEnvironment('FIREBASE_IOS_BUNDLE_ID'),
+  );
 
-  static FirebaseOptions get windows => FirebaseOptions(
-        apiKey: dotenv.env['FIREBASE_ANDROID_API_KEY'] ?? '',
-        appId: dotenv.env['FIREBASE_WEB_APP_ID'] ?? '',
-        messagingSenderId: dotenv.env['FIREBASE_WEB_MESSAGING_SENDER_ID'] ?? '',
-        projectId: dotenv.env['FIREBASE_WEB_PROJECT_ID'] ?? '',
-        authDomain: dotenv.env['FIREBASE_WEB_AUTH_DOMAIN'] ?? '',
-        storageBucket: dotenv.env['FIREBASE_WEB_STORAGE_BUCKET'] ?? '',
-      );
+  static const FirebaseOptions windows = FirebaseOptions(
+    apiKey: String.fromEnvironment('FIREBASE_ANDROID_API_KEY'),
+    appId: String.fromEnvironment('FIREBASE_WEB_APP_ID'),
+    messagingSenderId: String.fromEnvironment('FIREBASE_WEB_MESSAGING_SENDER_ID'),
+    projectId: String.fromEnvironment('FIREBASE_WEB_PROJECT_ID'),
+    authDomain: String.fromEnvironment('FIREBASE_WEB_AUTH_DOMAIN'),
+    storageBucket: String.fromEnvironment('FIREBASE_WEB_STORAGE_BUCKET'),
+  );
 
-  static FirebaseOptions get linux => FirebaseOptions(
-        apiKey: dotenv.env['FIREBASE_ANDROID_API_KEY'] ?? '',
-        appId: dotenv.env['FIREBASE_WEB_APP_ID'] ?? '',
-        messagingSenderId: dotenv.env['FIREBASE_WEB_MESSAGING_SENDER_ID'] ?? '',
-        projectId: dotenv.env['FIREBASE_WEB_PROJECT_ID'] ?? '',
-        authDomain: dotenv.env['FIREBASE_WEB_AUTH_DOMAIN'] ?? '',
-        storageBucket: dotenv.env['FIREBASE_WEB_STORAGE_BUCKET'] ?? '',
-      );
+  static const FirebaseOptions linux = FirebaseOptions(
+    apiKey: String.fromEnvironment('FIREBASE_ANDROID_API_KEY'),
+    appId: String.fromEnvironment('FIREBASE_WEB_APP_ID'),
+    messagingSenderId: String.fromEnvironment('FIREBASE_WEB_MESSAGING_SENDER_ID'),
+    projectId: String.fromEnvironment('FIREBASE_WEB_PROJECT_ID'),
+    authDomain: String.fromEnvironment('FIREBASE_WEB_AUTH_DOMAIN'),
+    storageBucket: String.fromEnvironment('FIREBASE_WEB_STORAGE_BUCKET'),
+  );
 }

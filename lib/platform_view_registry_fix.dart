@@ -1,6 +1,5 @@
 // ignore_for_file: avoid_web_libraries_in_flutter, depend_on_referenced_packages
 // Platform-specific fix for web compilation issues
-library platform_view_registry_fix;
 
 import 'dart:ui_web' as ui_web;
 // ignore: unused_import

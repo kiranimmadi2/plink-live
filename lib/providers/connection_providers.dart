@@ -32,7 +32,7 @@ final pendingRequestsCountProvider = Provider<int>((ref) {
   return requestsAsync.when(
     data: (requests) => requests.length,
     loading: () => 0,
-    error: (_, __) => 0,
+    error: (_, _) => 0,
   );
 });
 

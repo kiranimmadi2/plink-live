@@ -8,7 +8,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:supper/screens/login/onboarding_screen.dart';
 
@@ -118,19 +117,23 @@ void main() async {
     FlutterError.presentError(details);
   };
 
-  // Load environment variables
-  await dotenv.load(fileName: ".env");
-
   // Initialize Sentry for error tracking (wraps the entire app)
   await ErrorTrackingService.initialize(() async {
     // Validate Firebase configuration
     _validateFirebaseConfig();
 
-    // Initialize Firebase only once
-    if (Firebase.apps.isEmpty) {
-      await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform,
-      );
+    // Initialize Firebase only once (handles hot restart gracefully)
+    try {
+      if (Firebase.apps.isEmpty) {
+        await Firebase.initializeApp(
+          options: DefaultFirebaseOptions.currentPlatform,
+        );
+      }
+    } catch (e) {
+      // Firebase already initialized - this is fine during hot restart
+      if (!e.toString().contains('duplicate-app')) {
+        rethrow;
+      }
     }
 
     await SystemChrome.setPreferredOrientations([

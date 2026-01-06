@@ -296,7 +296,7 @@ class BookingModel {
   String get formattedDeliveryFee => CurrencyUtils.format(deliveryFee, currency);
 
   /// Total item count
-  int get itemCount => items.fold(0, (sum, item) => sum + item.quantity);
+  int get itemCount => items.fold(0, (total, item) => total + item.quantity);
 
   /// First item (for display)
   BookingItem? get firstItem => items.isNotEmpty ? items.first : null;

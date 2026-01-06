@@ -372,12 +372,23 @@ service cloud.firestore {
     // NOTIFICATIONS COLLECTION
     // ============================================================
     match /notifications/{userId} {
+      // Only the target user can read their notifications
       allow read: if isOwner(userId);
-      allow write: if isAuthenticated();
+      // Only authenticated users can write to notifications targeted at specific users
+      // The write must include a valid senderId that matches the authenticated user
+      allow create: if isAuthenticated() &&
+        request.resource.data.senderId == request.auth.uid;
+      // Only the target user can update/delete their notifications
+      allow update, delete: if isOwner(userId);
 
       match /items/{notificationId} {
+        // Only the target user can read their notification items
         allow read: if isOwner(userId);
-        allow create: if isAuthenticated();
+        // Authenticated users can create notifications for others
+        // but must identify themselves as the sender
+        allow create: if isAuthenticated() &&
+          request.resource.data.senderId == request.auth.uid;
+        // Only the target user can update or delete their notifications
         allow update, delete: if isOwner(userId);
       }
     }

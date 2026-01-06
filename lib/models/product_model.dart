@@ -502,7 +502,7 @@ class ProductOrderModel {
   }
 
   /// Get total items count
-  int get totalItems => items.fold(0, (sum, item) => sum + item.quantity);
+  int get totalItems => items.fold(0, (total, item) => total + item.quantity);
 }
 
 /// Order item for product orders
