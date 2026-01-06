@@ -586,8 +586,8 @@ class _AddPortfolioSheetState extends State<AddPortfolioSheet> {
                   fit: BoxFit.cover,
                   width: double.infinity,
                   height: double.infinity,
-                  placeholder: (_, __) => Container(color: Colors.grey[300]),
-                  errorWidget: (_, __, ___) => Container(
+                  placeholder: (_, _) => Container(color: Colors.grey[300]),
+                  errorWidget: (_, _, _) => Container(
                     color: Colors.grey[300],
                     child: const Icon(Icons.error),
                   ),

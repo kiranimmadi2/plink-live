@@ -61,13 +61,13 @@ class BusinessCard extends StatelessWidget {
                       CachedNetworkImage(
                         imageUrl: business.coverImage!,
                         fit: BoxFit.cover,
-                        placeholder: (_, __) => Container(
+                        placeholder: (_, _) => Container(
                           color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
                           child: const Center(
                             child: CircularProgressIndicator(strokeWidth: 2),
                           ),
                         ),
-                        errorWidget: (_, __, ___) => _buildPlaceholderCover(isDarkMode),
+                        errorWidget: (_, _, _) => _buildPlaceholderCover(isDarkMode),
                       )
                     else
                       _buildPlaceholderCover(isDarkMode),
@@ -445,12 +445,12 @@ class BusinessCard extends StatelessWidget {
           width: size,
           height: size,
           fit: BoxFit.cover,
-          placeholder: (_, __) => Container(
+          placeholder: (_, _) => Container(
             width: size,
             height: size,
             color: Colors.grey[300],
           ),
-          errorWidget: (_, __, ___) => _buildLogoPlaceholder(isDarkMode, size),
+          errorWidget: (_, _, _) => _buildLogoPlaceholder(isDarkMode, size),
         ),
       );
     }
@@ -613,10 +613,10 @@ class ListingCard extends StatelessWidget {
                       CachedNetworkImage(
                         imageUrl: listing.images.first,
                         fit: BoxFit.cover,
-                        placeholder: (_, __) => Container(
+                        placeholder: (_, _) => Container(
                           color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
                         ),
-                        errorWidget: (_, __, ___) => Container(
+                        errorWidget: (_, _, _) => Container(
                           color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
                           child: const Icon(Icons.image_not_supported),
                         ),

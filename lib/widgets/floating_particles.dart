@@ -43,12 +43,6 @@ class _FloatingParticlesState extends State<FloatingParticles>
       duration: const Duration(seconds: 60),
       vsync: this,
     )..repeat();
-
-    _controller.addListener(() {
-      setState(() {
-        _updateParticles();
-      });
-    });
   }
 
   void _initializeParticles() {
@@ -87,12 +81,20 @@ class _FloatingParticlesState extends State<FloatingParticles>
 
   @override
   Widget build(BuildContext context) {
-    return CustomPaint(
-      painter: _ParticlesPainter(
-        particles: _particles,
-        animationValue: _controller.value,
-      ),
-      size: Size.infinite,
+    // Use AnimatedBuilder instead of addListener + setState
+    // This avoids rebuilding the entire widget tree 60x/second
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        _updateParticles();
+        return CustomPaint(
+          painter: _ParticlesPainter(
+            particles: _particles,
+            animationValue: _controller.value,
+          ),
+          size: Size.infinite,
+        );
+      },
     );
   }
 }

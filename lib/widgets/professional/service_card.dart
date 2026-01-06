@@ -65,11 +65,11 @@ class ServiceCard extends StatelessWidget {
                       CachedNetworkImage(
                         imageUrl: service.images.first,
                         fit: BoxFit.cover,
-                        placeholder: (_, __) => Container(
+                        placeholder: (_, _) => Container(
                           color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
                           child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
                         ),
-                        errorWidget: (_, __, ___) => Container(
+                        errorWidget: (_, _, _) => Container(
                           color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
                           child: Icon(Icons.image_not_supported,
                               color: Colors.grey[400], size: 40),
@@ -362,12 +362,12 @@ class ServiceCard extends StatelessWidget {
                   width: 60,
                   height: 60,
                   fit: BoxFit.cover,
-                  placeholder: (_, __) => Container(
+                  placeholder: (_, _) => Container(
                     width: 60,
                     height: 60,
                     color: Colors.grey[300],
                   ),
-                  errorWidget: (_, __, ___) => Container(
+                  errorWidget: (_, _, _) => Container(
                     width: 60,
                     height: 60,
                     color: Colors.grey[300],

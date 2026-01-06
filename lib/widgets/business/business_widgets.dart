@@ -1,6 +1,5 @@
-/// Barrel file for business widgets.
-/// Import this single file to access all business-related widgets.
-library business_widgets;
+// Barrel file for business widgets.
+// Import this single file to access all business-related widgets.
 
 export 'business_empty_state.dart';
 export 'business_filter_chip.dart';

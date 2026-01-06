@@ -502,8 +502,8 @@ class _AddServiceSheetState extends State<AddServiceSheet> {
               ? CachedNetworkImage(
                   imageUrl: imageUrl,
                   fit: BoxFit.cover,
-                  placeholder: (_, __) => Container(color: Colors.grey[300]),
-                  errorWidget: (_, __, ___) => Container(
+                  placeholder: (_, _) => Container(color: Colors.grey[300]),
+                  errorWidget: (_, _, _) => Container(
                     color: Colors.grey[300],
                     child: const Icon(Icons.error),
                   ),

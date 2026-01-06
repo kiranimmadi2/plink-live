@@ -62,13 +62,13 @@ class PortfolioCard extends StatelessWidget {
                       CachedNetworkImage(
                         imageUrl: item.coverImage!,
                         fit: BoxFit.cover,
-                        placeholder: (_, __) => Container(
+                        placeholder: (_, _) => Container(
                           color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
                           child: const Center(
                             child: CircularProgressIndicator(strokeWidth: 2),
                           ),
                         ),
-                        errorWidget: (_, __, ___) => Container(
+                        errorWidget: (_, _, _) => Container(
                           color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
                           child: Icon(Icons.image_not_supported,
                               color: Colors.grey[400]),
@@ -209,13 +209,13 @@ class PortfolioCard extends StatelessWidget {
                       ? CachedNetworkImage(
                           imageUrl: item.images.first,
                           fit: BoxFit.cover,
-                          placeholder: (_, __) => Container(
+                          placeholder: (_, _) => Container(
                             color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
                             child: const Center(
                               child: CircularProgressIndicator(strokeWidth: 2),
                             ),
                           ),
-                          errorWidget: (_, __, ___) => Container(
+                          errorWidget: (_, _, _) => Container(
                             color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
                             child: Icon(Icons.image_not_supported,
                                 color: Colors.grey[400], size: 40),
@@ -355,10 +355,10 @@ class PortfolioCard extends StatelessWidget {
             imageUrl: item.images.first,
             fit: BoxFit.cover,
             height: double.infinity,
-            placeholder: (_, __) => Container(
+            placeholder: (_, _) => Container(
               color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
             ),
-            errorWidget: (_, __, ___) => Container(
+            errorWidget: (_, _, _) => Container(
               color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
             ),
           ),
@@ -374,10 +374,10 @@ class PortfolioCard extends StatelessWidget {
                     imageUrl: item.images[1],
                     fit: BoxFit.cover,
                     width: double.infinity,
-                    placeholder: (_, __) => Container(
+                    placeholder: (_, _) => Container(
                       color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
                     ),
-                    errorWidget: (_, __, ___) => Container(
+                    errorWidget: (_, _, _) => Container(
                       color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
                     ),
                   ),
@@ -391,10 +391,10 @@ class PortfolioCard extends StatelessWidget {
                       CachedNetworkImage(
                         imageUrl: item.images[2],
                         fit: BoxFit.cover,
-                        placeholder: (_, __) => Container(
+                        placeholder: (_, _) => Container(
                           color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
                         ),
-                        errorWidget: (_, __, ___) => Container(
+                        errorWidget: (_, _, _) => Container(
                           color: isDarkMode ? Colors.grey[800] : Colors.grey[200],
                         ),
                       ),
@@ -591,7 +591,7 @@ class PortfolioImagePreview extends StatelessWidget {
                     width: 80,
                     height: 80,
                     fit: BoxFit.cover,
-                    placeholder: (_, __) => Container(
+                    placeholder: (_, _) => Container(
                       width: 80,
                       height: 80,
                       color: Colors.grey[300],
@@ -599,7 +599,7 @@ class PortfolioImagePreview extends StatelessWidget {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       ),
                     ),
-                    errorWidget: (_, __, ___) => Container(
+                    errorWidget: (_, _, _) => Container(
                       width: 80,
                       height: 80,
                       color: Colors.grey[300],
