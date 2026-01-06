@@ -2286,7 +2286,7 @@ class _BusinessSetupScreenState extends ConsumerState<BusinessSetupScreen> {
             child: ElevatedButton(
               onPressed: _isLoading || !canContinue ? null : _nextStep,
               style: ElevatedButton.styleFrom(
-                backgroundColor: canContinue ? _primaryColor : Colors.grey[300],
+                backgroundColor: canContinue ? _accentColor : Colors.grey[300],
                 foregroundColor: Colors.white,
                 disabledBackgroundColor: Colors.grey[300],
                 padding: const EdgeInsets.symmetric(vertical: 16),
