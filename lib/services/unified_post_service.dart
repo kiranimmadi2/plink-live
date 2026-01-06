@@ -508,6 +508,7 @@ Examples:
           .where('userId', isEqualTo: userId)
           .where('isActive', isEqualTo: true)
           .orderBy('createdAt', descending: true)
+          .limit(50) // Limit to prevent unbounded queries
           .get();
 
       return querySnapshot.docs
@@ -551,6 +552,7 @@ Examples:
         .where('userId', isEqualTo: userId)
         .where('isActive', isEqualTo: true)
         .orderBy('createdAt', descending: true)
+        .limit(50) // Limit to prevent unbounded queries
         .snapshots()
         .map((snapshot) {
           return snapshot.docs

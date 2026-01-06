@@ -42,6 +42,7 @@ class RealtimeMatchingService {
         .where('userId', isNotEqualTo: currentUserId)
         .where('createdAt', isGreaterThan: Timestamp.now())
         .where('isActive', isEqualTo: true)
+        .limit(50) // Limit to prevent unbounded queries
         .snapshots()
         .listen((snapshot) async {
           for (var change in snapshot.docChanges) {
@@ -286,6 +287,7 @@ Return "true" if they complement each other, "false" otherwise.
         .where('userId', isEqualTo: userId)
         .where('isRead', isEqualTo: false)
         .orderBy('timestamp', descending: true)
+        .limit(50) // Limit to prevent unbounded queries
         .snapshots()
         .map((snapshot) {
           return snapshot.docs.map((doc) {
@@ -322,16 +324,18 @@ class BackgroundMatcher {
     // This would be called periodically or triggered by Cloud Functions
     final firestore = FirebaseFirestore.instance;
 
-    // Get all active intents
-    final intents = await firestore
-        .collection('intents')
+    // Get all active posts (using posts collection - single source of truth)
+    final posts = await firestore
+        .collection('posts')
+        .where('isActive', isEqualTo: true)
         .where('expiresAt', isGreaterThan: Timestamp.now())
+        .limit(500) // Limit batch size for performance
         .get();
 
     // Process in batches to avoid memory issues
     const batchSize = 100;
-    for (int i = 0; i < intents.docs.length; i += batchSize) {
-      final batch = intents.docs.skip(i).take(batchSize).toList();
+    for (int i = 0; i < posts.docs.length; i += batchSize) {
+      final batch = posts.docs.skip(i).take(batchSize).toList();
       await _processBatch(batch);
     }
   }

@@ -582,8 +582,6 @@ class NotificationService {
   String? get fcmToken => _fcmToken;
 }
 
-// Background message handler - must be top-level function
-@pragma('vm:entry-point')
-Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // Background FCM message handling
-}
+// Note: The background message handler is defined in main.dart
+// It must be a top-level function and is registered there via
+// FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler)

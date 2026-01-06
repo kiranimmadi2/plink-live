@@ -367,10 +367,14 @@ class BusinessListingService {
           .collection('businesses')
           .doc(businessId)
           .collection('menu_categories')
-          .orderBy('sortOrder')
           .limit(100)
           .get();
-      return snapshot.docs.map((doc) => MenuCategoryModel.fromFirestore(doc)).toList();
+      final categories = snapshot.docs
+          .map((doc) => MenuCategoryModel.fromFirestore(doc))
+          .toList();
+      // Sort client-side to avoid Firestore index requirement
+      categories.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+      return categories;
     } catch (e) {
       debugPrint('Error getting menu categories: $e');
       return [];
@@ -383,11 +387,20 @@ class BusinessListingService {
         .collection('businesses')
         .doc(businessId)
         .collection('menu_categories')
-        .orderBy('sortOrder')
         .limit(100)
         .snapshots()
-        .map((snapshot) =>
-            snapshot.docs.map((doc) => MenuCategoryModel.fromFirestore(doc)).toList());
+        .map((snapshot) {
+          final categories = snapshot.docs
+              .map((doc) => MenuCategoryModel.fromFirestore(doc))
+              .toList();
+          // Sort client-side to avoid Firestore index requirement
+          categories.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+          return categories;
+        })
+        .handleError((error) {
+          debugPrint('Error watching menu categories: $error');
+          return <MenuCategoryModel>[];
+        });
   }
 
   /// Create a menu item
@@ -470,8 +483,13 @@ class BusinessListingService {
         query = query.where('categoryId', isEqualTo: categoryId);
       }
 
-      final snapshot = await query.orderBy('sortOrder').limit(100).get();
-      return snapshot.docs.map((doc) => MenuItemModel.fromFirestore(doc)).toList();
+      final snapshot = await query.limit(100).get();
+      final items = snapshot.docs
+          .map((doc) => MenuItemModel.fromFirestore(doc))
+          .toList();
+      // Sort client-side to avoid Firestore index requirement
+      items.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+      return items;
     } catch (e) {
       debugPrint('Error getting menu items: $e');
       return [];
@@ -489,8 +507,17 @@ class BusinessListingService {
       query = query.where('categoryId', isEqualTo: categoryId);
     }
 
-    return query.orderBy('sortOrder').limit(100).snapshots().map((snapshot) =>
-        snapshot.docs.map((doc) => MenuItemModel.fromFirestore(doc)).toList());
+    return query.limit(100).snapshots().map((snapshot) {
+      final items = snapshot.docs
+          .map((doc) => MenuItemModel.fromFirestore(doc))
+          .toList();
+      // Sort client-side to avoid Firestore index requirement
+      items.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+      return items;
+    }).handleError((error) {
+      debugPrint('Error watching menu items: $error');
+      return <MenuItemModel>[];
+    });
   }
 
   /// Toggle menu item availability

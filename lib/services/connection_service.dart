@@ -343,6 +343,7 @@ class ConnectionService {
         .where('receiverId', isEqualTo: currentUserId)
         .where('status', isEqualTo: 'pending')
         .orderBy('createdAt', descending: true)
+        .limit(50) // Limit to prevent unbounded queries
         .snapshots()
         .map((snapshot) {
           return snapshot.docs.map((doc) {
@@ -363,6 +364,7 @@ class ConnectionService {
         .where('senderId', isEqualTo: currentUserId)
         .where('status', isEqualTo: 'pending')
         .orderBy('createdAt', descending: true)
+        .limit(50) // Limit to prevent unbounded queries
         .snapshots()
         .map((snapshot) {
           return snapshot.docs.map((doc) {

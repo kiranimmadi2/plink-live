@@ -2,7 +2,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 /// Centralized error tracking service using Sentry
 class ErrorTrackingService {
@@ -12,8 +11,9 @@ class ErrorTrackingService {
 
   bool _isInitialized = false;
 
-  /// Get Sentry DSN from environment variables
-  static String get _sentryDsn => dotenv.env['SENTRY_DSN'] ?? '';
+  /// Get Sentry DSN from compile-time environment variable
+  /// Pass via: --dart-define=SENTRY_DSN=your_dsn
+  static const String _sentryDsn = String.fromEnvironment('SENTRY_DSN');
 
   /// Check if Sentry is configured
   static bool get isConfigured => _sentryDsn.isNotEmpty;

@@ -68,7 +68,7 @@ class ChatService {
   /// @param otherUid Other user's UID
   /// @param otherUserName Other user's name (for display)
   /// @param otherUserPhoto Other user's photo URL (for display)
-  /// @return Future<String> The chat ID
+  /// @return `Future<String>` The chat ID
   Future<String> getOrCreateChat(
     String myUid,
     String otherUid, {

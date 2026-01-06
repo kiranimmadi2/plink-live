@@ -30,22 +30,23 @@ class UniversalIntentService {
     return await processIntentAndMatch(text);
   }
 
-  // Find matches for a given intent
+  // Find matches for a given intent using posts collection (single source of truth)
   Future<List<Map<String, dynamic>>> findMatches(
     Map<String, dynamic> intent,
   ) async {
-    // Use the intent to find matches
-    final intents = await FirebaseFirestore.instance
-        .collection('intents')
+    // Query posts collection instead of deprecated intents collection
+    final posts = await FirebaseFirestore.instance
+        .collection('posts')
+        .where('isActive', isEqualTo: true)
         .where('expiresAt', isGreaterThan: Timestamp.now())
-        .limit(20)
+        .limit(50) // Limit to prevent unbounded queries
         .get();
 
     List<Map<String, dynamic>> matches = [];
     final intentEmbedding = intent['embedding'] as List<double>?;
 
     if (intentEmbedding != null) {
-      for (var doc in intents.docs) {
+      for (var doc in posts.docs) {
         final data = doc.data();
         final docEmbedding = List<double>.from(data['embedding'] ?? []);
 

@@ -1,19 +1,15 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import '../models/appointment_model.dart';
 
 /// Service for managing appointments for service-based businesses
 class AppointmentService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   // Singleton pattern
   static final AppointmentService _instance = AppointmentService._internal();
   factory AppointmentService() => _instance;
   AppointmentService._internal();
-
-  String? get _currentUserId => _auth.currentUser?.uid;
 
   // Collection references
   CollectionReference<Map<String, dynamic>> _appointmentsCollection(String businessId) {
@@ -575,7 +571,7 @@ class AppointmentService {
       // Calculate revenue
       final completedRevenue = appointments
           .where((a) => a.status == AppointmentStatus.completed && a.price != null)
-          .fold<double>(0, (sum, a) => sum + (a.price ?? 0));
+          .fold<double>(0, (total, a) => total + (a.price ?? 0));
 
       return {
         'total': appointments.length,
@@ -675,7 +671,7 @@ class AppointmentService {
       final snapshot = await _appointmentsCollection(businessId)
           .orderBy('customerName')
           .startAt([query])
-          .endAt([query + '\uf8ff'])
+          .endAt(['$query\uf8ff'])
           .limit(limit)
           .get();
 

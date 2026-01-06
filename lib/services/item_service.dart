@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import '../models/item_model.dart';
 
 /// Unified Item Service with caching for ALL item types
@@ -137,7 +138,7 @@ class ItemService {
 
       return docRef.id;
     } catch (e) {
-      print('Error creating item: $e');
+      debugPrint('Error creating item: $e');
       return null;
     }
   }
@@ -161,7 +162,7 @@ class ItemService {
 
       return true;
     } catch (e) {
-      print('Error updating item: $e');
+      debugPrint('Error updating item: $e');
       return false;
     }
   }
@@ -185,7 +186,7 @@ class ItemService {
 
       return true;
     } catch (e) {
-      print('Error deleting item: $e');
+      debugPrint('Error deleting item: $e');
       return false;
     }
   }
@@ -209,7 +210,7 @@ class ItemService {
 
       return true;
     } catch (e) {
-      print('Error toggling item availability: $e');
+      debugPrint('Error toggling item availability: $e');
       return false;
     }
   }
@@ -259,7 +260,7 @@ class ItemService {
 
       return true;
     } catch (e) {
-      print('Error toggling featured: $e');
+      debugPrint('Error toggling featured: $e');
       return false;
     }
   }
@@ -282,7 +283,7 @@ class ItemService {
 
       return true;
     } catch (e) {
-      print('Error updating stock: $e');
+      debugPrint('Error updating stock: $e');
       return false;
     }
   }
@@ -317,7 +318,7 @@ class ItemService {
 
       return true;
     } catch (e) {
-      print('Error decreasing stock: $e');
+      debugPrint('Error decreasing stock: $e');
       return false;
     }
   }
@@ -362,7 +363,7 @@ class ItemService {
       _categoriesCache.remove(businessId);
       return docRef.id;
     } catch (e) {
-      print('Error creating category: $e');
+      debugPrint('Error creating category: $e');
       return null;
     }
   }
@@ -380,7 +381,7 @@ class ItemService {
       _categoriesCache.remove(businessId);
       return true;
     } catch (e) {
-      print('Error updating category: $e');
+      debugPrint('Error updating category: $e');
       return false;
     }
   }
@@ -398,7 +399,7 @@ class ItemService {
       _categoriesCache.remove(businessId);
       return true;
     } catch (e) {
-      print('Error deleting category: $e');
+      debugPrint('Error deleting category: $e');
       return false;
     }
   }
@@ -490,7 +491,7 @@ class ItemService {
       _invalidateBusinessCache(businessId);
       return true;
     } catch (e) {
-      print('Error reordering items: $e');
+      debugPrint('Error reordering items: $e');
       return false;
     }
   }
@@ -514,7 +515,7 @@ class ItemService {
       _invalidateBusinessCache(businessId);
       return true;
     } catch (e) {
-      print('Error bulk toggling availability: $e');
+      debugPrint('Error bulk toggling availability: $e');
       return false;
     }
   }
@@ -534,7 +535,7 @@ class ItemService {
         'itemCount': FieldValue.increment(itemCountDelta),
       });
     } catch (e) {
-      print('Error updating business stats: $e');
+      debugPrint('Error updating business stats: $e');
     }
   }
 

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import '../models/booking_model.dart';
 
 /// Unified Booking Service for ALL booking types
@@ -195,7 +196,7 @@ class BookingService {
 
       return docRef.id;
     } catch (e) {
-      print('Error creating booking: $e');
+      debugPrint('Error creating booking: $e');
       return null;
     }
   }
@@ -257,7 +258,7 @@ class BookingService {
 
       return true;
     } catch (e) {
-      print('Error updating booking status: $e');
+      debugPrint('Error updating booking status: $e');
       return false;
     }
   }
@@ -280,7 +281,7 @@ class BookingService {
 
       return true;
     } catch (e) {
-      print('Error updating booking: $e');
+      debugPrint('Error updating booking: $e');
       return false;
     }
   }
@@ -532,7 +533,7 @@ class BookingService {
         await _firestore.collection('businesses').doc(businessId).update(updates);
       }
     } catch (e) {
-      print('Error updating business stats: $e');
+      debugPrint('Error updating business stats: $e');
     }
   }
 

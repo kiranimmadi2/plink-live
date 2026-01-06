@@ -39,29 +39,47 @@ class VoiceCallService {
   Function()? onJoinChannelSuccess;
   Function()? onLeaveChannel;
 
+  // TURN server credentials from compile-time environment variables
+  // Pass via: --dart-define=TURN_SERVER_URL=turn:your-server.com:443
+  //           --dart-define=TURN_USERNAME=your-username
+  //           --dart-define=TURN_CREDENTIAL=your-credential
+  static const String _turnServerUrl = String.fromEnvironment(
+    'TURN_SERVER_URL',
+    defaultValue: 'turn:openrelay.metered.ca:443',
+  );
+  static const String _turnUsername = String.fromEnvironment(
+    'TURN_USERNAME',
+    defaultValue: 'openrelayproject',
+  );
+  static const String _turnCredential = String.fromEnvironment(
+    'TURN_CREDENTIAL',
+    defaultValue: 'openrelayproject',
+  );
+
   // WebRTC configuration with multiple TURN servers for better connectivity
-  final Map<String, dynamic> _configuration = {
+  Map<String, dynamic> get _configuration => {
     'iceServers': [
       {'urls': 'stun:stun.l.google.com:19302'},
       {'urls': 'stun:stun1.l.google.com:19302'},
       {'urls': 'stun:stun2.l.google.com:19302'},
       {'urls': 'stun:stun3.l.google.com:19302'},
       {'urls': 'stun:stun4.l.google.com:19302'},
-      // Free TURN servers for NAT traversal
+      // TURN server for NAT traversal - credentials from environment
+      {
+        'urls': _turnServerUrl,
+        'username': _turnUsername,
+        'credential': _turnCredential,
+      },
+      // Additional TURN endpoints using same credentials
       {
         'urls': 'turn:openrelay.metered.ca:80',
-        'username': 'openrelayproject',
-        'credential': 'openrelayproject',
-      },
-      {
-        'urls': 'turn:openrelay.metered.ca:443',
-        'username': 'openrelayproject',
-        'credential': 'openrelayproject',
+        'username': _turnUsername,
+        'credential': _turnCredential,
       },
       {
         'urls': 'turn:openrelay.metered.ca:443?transport=tcp',
-        'username': 'openrelayproject',
-        'credential': 'openrelayproject',
+        'username': _turnUsername,
+        'credential': _turnCredential,
       },
     ],
     'sdpSemantics': 'unified-plan',
