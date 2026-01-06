@@ -10,12 +10,10 @@ import '../../services/location services/location_service.dart';
 import '../../widgets/other widgets/user_avatar.dart';
 import '../../providers/other providers/theme_provider.dart';
 import '../../res/config/app_colors.dart';
-import '../../res/config/app_assets.dart';
 import '../login/choose_account_type_screen.dart';
 import '../profile/profile_view_screen.dart';
 import '../profile/settings_screen.dart';
 import '../profile/profile_edit_screen.dart';
-import '../profile/saved_posts_screen.dart';
 import '../chat/enhanced_chat_screen.dart';
 import '../../models/user_profile.dart';
 
@@ -964,31 +962,7 @@ class _ProfileWithHistoryScreenState
       ),
       body: Stack(
         children: [
-          // Background Image (same as Feed screen)
-          Positioned.fill(
-            child: Image.asset(
-              AppAssets.homeBackgroundImage,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) {
-                return Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [Colors.grey.shade900, Colors.black],
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-
-          // Dark overlay
-          Positioned.fill(
-            child: Container(
-              color: Colors.black.withValues(alpha: 0.6),
-            ),
-          ),
+          // Video background is provided by SharedVideoBackground in MainNavigationScreen
 
           _isLoading
               ? const Center(child: CircularProgressIndicator())

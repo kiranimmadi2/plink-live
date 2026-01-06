@@ -202,7 +202,7 @@ class _SavedPostsScreenState extends State<SavedPostsScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          post.title ?? post.originalPrompt,
+                          post.title.isNotEmpty ? post.title : post.originalPrompt,
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 16,
@@ -212,9 +212,9 @@ class _SavedPostsScreenState extends State<SavedPostsScreen> {
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 4),
-                        if (post.description != null) ...[
+                        if (post.description.isNotEmpty) ...[
                           Text(
-                            post.description!,
+                            post.description,
                             style: TextStyle(
                               color: Colors.white.withValues(alpha: 0.7),
                               fontSize: 14,
@@ -276,7 +276,7 @@ class _SavedPostsScreenState extends State<SavedPostsScreen> {
 
   IconData _getPostIcon(PostModel post) {
     final intent = post.intentAnalysis;
-    if (intent == null) return Icons.article_outlined;
+    if (intent.isEmpty) return Icons.article_outlined;
 
     final domain = intent['domain']?.toString().toLowerCase() ?? '';
     if (domain.contains('marketplace') || domain.contains('buy') || domain.contains('sell')) {

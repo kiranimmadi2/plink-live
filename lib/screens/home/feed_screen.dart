@@ -8,7 +8,6 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:permission_handler/permission_handler.dart';
-import '../../res/config/app_assets.dart';
 import '../../res/config/app_colors.dart';
 import '../../res/config/app_text_styles.dart';
 import '../../res/utils/photo_url_helper.dart';
@@ -750,22 +749,11 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.backgroundDark,
+      backgroundColor: Colors.transparent,
       extendBodyBehindAppBar: true,
       body: Stack(
         children: [
-          // Background Image
-          Positioned.fill(
-            child: Image.asset(
-              AppAssets.homeBackgroundImage,
-              fit: BoxFit.cover,
-              width: double.infinity,
-              height: double.infinity,
-            ),
-          ),
-
-          // Dark overlay
-          Positioned.fill(child: Container(color: AppColors.darkOverlay())),
+          // Video background is provided by SharedVideoBackground in MainNavigationScreen
 
           // Main content
           SafeArea(

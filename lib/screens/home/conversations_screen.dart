@@ -111,7 +111,6 @@ class _ConversationsScreenState extends State<ConversationsScreen>
       extendBodyBehindAppBar: true,
       backgroundColor: Colors.transparent,
       body: AppBackground(
-        showParticles: true,
         overlayOpacity: 0.6,
         child: SafeArea(
           child: Column(

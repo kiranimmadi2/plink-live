@@ -315,7 +315,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
               return CachedNetworkImage(
                 imageUrl: imageUrl,
                 fit: BoxFit.cover,
-                placeholder: (_, __) => Container(
+                placeholder: (_, _) => Container(
                   color: Colors.grey.shade200,
                   child: const Center(child: CircularProgressIndicator()),
                 ),
@@ -659,7 +659,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
 
   void _shareProfile() {
     final name = widget.userProfile.name;
-    final bio = widget.userProfile.bio ?? '';
+    final bio = widget.userProfile.bio;
     final location = widget.userProfile.location ?? '';
 
     String shareText = 'Check out $name on Supper!\n';
@@ -667,7 +667,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
     if (location.isNotEmpty) shareText += '\nLocation: $location\n';
     shareText += '\nDownload Supper to connect: https://supper.app';
 
-    Share.share(shareText, subject: 'Check out $name on Supper!');
+    SharePlus.instance.share(ShareParams(text: shareText, subject: 'Check out $name on Supper!'));
   }
 
   void _reportUser() {

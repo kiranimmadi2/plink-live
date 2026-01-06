@@ -18,6 +18,9 @@ import '../chat/incoming_call_screen.dart';
 import '../professional/professional_dashboard_screen.dart';
 import '../business/business_main_screen.dart';
 
+// Video background for personal accounts
+import '../../widgets/video_background.dart';
+
 // services
 import '../../services/location services/location_service.dart';
 import '../../services/notification_service.dart';
@@ -409,100 +412,59 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     }
   }
 
-  // Show Coming Soon dialog for features not yet implemented
-  void _showComingSoon(String featureName) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1C1C1E),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Colors.purple.shade400, Colors.blue.shade400],
-                ),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(Icons.rocket_launch, color: Colors.white, size: 24),
-            ),
-            const SizedBox(width: 12),
-            const Expanded(
-              child: Text(
-                'Coming Soon',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-              ),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '$featureName is currently under development.',
-              style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 16),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'We are working hard to bring you this feature. Stay tuned for updates!',
-              style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 14),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Got it', style: TextStyle(color: Colors.blue)),
-          ),
-        ],
-      ),
-    );
-  }
+  /// Check if current index is a personal account screen
+  bool get _isPersonalAccount =>
+      _currentIndex == 0 ||
+      _currentIndex == 1 ||
+      _currentIndex == 2 ||
+      _currentIndex == 3 ||
+      _currentIndex == 7;
 
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
 
     return Scaffold(
-      body: Stack(
-        children: [
-          _buildScreen(),
+      body: SharedVideoBackground(
+        showVideo: _isPersonalAccount,
+        assetPath: 'assets/videos/bgv.mp4',
+        child: Stack(
+          children: [
+            _buildScreen(),
 
-          // Bottom Navigation Bar (hide on Feed, Business, and Professional screens)
-          if (_currentIndex != 7 && _currentIndex != 6 && _currentIndex != 5)
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: _ModernBottomNavBar(
-                currentIndex: _currentIndex,
-                unreadCount: _unreadMessageCount,
-                onTap: (index) {
-                  HapticFeedback.mediumImpact();
-                  setState(() => _currentIndex = index);
-                  _saveScreenIndex(index);
-                },
+            // Bottom Navigation Bar (hide on Feed, Business, and Professional screens)
+            if (_currentIndex != 7 && _currentIndex != 6 && _currentIndex != 5)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: _ModernBottomNavBar(
+                  currentIndex: _currentIndex,
+                  unreadCount: _unreadMessageCount,
+                  onTap: (index) {
+                    HapticFeedback.mediumImpact();
+                    setState(() => _currentIndex = index);
+                    _saveScreenIndex(index);
+                  },
+                ),
               ),
-            ),
 
-          // Swipe gesture detector for Feed
-          if (_currentIndex == 0)
-            Positioned(
-              left: 0,
-              top: 0,
-              height: size.height - 100,
-              width: 100,
-              child: _SwipeDetector(
-                onSwipeRight: () {
-                  HapticFeedback.mediumImpact();
-                  setState(() => _currentIndex = 7);
-                },
+            // Swipe gesture detector for Feed
+            if (_currentIndex == 0)
+              Positioned(
+                left: 0,
+                top: 0,
+                height: size.height - 100,
+                width: 100,
+                child: _SwipeDetector(
+                  onSwipeRight: () {
+                    HapticFeedback.mediumImpact();
+                    setState(() => _currentIndex = 7);
+                  },
+                ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }

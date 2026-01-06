@@ -2477,7 +2477,6 @@ class _LiveConnectTabScreenState extends ConsumerState<LiveConnectTabScreen> {
         ),
       ),
       body: AppBackground(
-        showParticles: true,
         overlayOpacity: 0.4,
         child: Stack(
           children: [

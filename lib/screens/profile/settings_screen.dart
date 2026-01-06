@@ -1446,10 +1446,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   // Share app function
   void _shareApp() {
-    Share.share(
-      'Check out Supper - the AI-powered matching app that connects you with the right people! Download now: https://supper.app',
+    SharePlus.instance.share(ShareParams(
+      text: 'Check out Supper - the AI-powered matching app that connects you with the right people! Download now: https://supper.app',
       subject: 'Join me on Supper!',
-    );
+    ));
   }
 
   // About dialog

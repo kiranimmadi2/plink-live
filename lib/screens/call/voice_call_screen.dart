@@ -7,7 +7,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/user_profile.dart';
 import '../../models/message_model.dart';
 import '../../widgets/safe_circle_avatar.dart';
-import '../../widgets/floating_particles.dart';
 import '../../services/other services/voice_call_service.dart';
 
 class VoiceCallScreen extends StatefulWidget {
@@ -402,8 +401,6 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
             ),
           ),
 
-          // Floating particles
-          const Positioned.fill(child: FloatingParticles(particleCount: 12)),
 
           // Main content
           SafeArea(

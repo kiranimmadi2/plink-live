@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../models/bank_account_model.dart';
@@ -785,7 +784,7 @@ class _AddBankAccountScreenState extends State<AddBankAccountScreen>
           Switch.adaptive(
             value: _isPrimary,
             onChanged: (value) => setState(() => _isPrimary = value),
-            activeColor: const Color(0xFF34C759),
+            activeTrackColor: const Color(0xFF34C759),
           ),
         ],
       ),
