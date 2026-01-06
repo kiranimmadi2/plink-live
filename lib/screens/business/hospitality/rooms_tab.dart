@@ -515,14 +515,12 @@ class _RoomCard extends StatelessWidget {
                       '${room.availableRooms}/${room.totalRooms} Available',
                       isDarkMode,
                     ),
-                    if (room.bedType != null) ...[
-                      const SizedBox(width: 12),
-                      _buildInfoChip(
-                        Icons.bed_outlined,
-                        room.bedType!.displayName,
-                        isDarkMode,
-                      ),
-                    ],
+                    const SizedBox(width: 12),
+                    _buildInfoChip(
+                      Icons.bed_outlined,
+                      room.bedType.displayName,
+                      isDarkMode,
+                    ),
                   ],
                 ),
                 if (room.amenities.isNotEmpty) ...[

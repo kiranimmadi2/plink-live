@@ -185,7 +185,7 @@ class _BusinessDashboardScreenState extends ConsumerState<BusinessDashboardScree
           Image.network(
             _business!.coverImage!,
             fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => Container(
+            errorBuilder: (_, _, _) => Container(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,

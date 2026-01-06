@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'dart:ui';
 import '../../../models/appointment_model.dart';
 import '../../../models/business_model.dart';
 import '../../../services/appointment_service.dart';
@@ -521,11 +520,11 @@ class _AppointmentsTabState extends State<AppointmentsTab> {
             final id = await _appointmentService.createAppointment(appointment);
             if (id != null && mounted) {
               widget.onRefresh();
-              ScaffoldMessenger.of(this.context).showSnackBar(
+              ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Appointment scheduled successfully')),
               );
             } else if (mounted) {
-              ScaffoldMessenger.of(this.context).showSnackBar(
+              ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text('Failed to schedule appointment. Time slot may be unavailable.'),
                   backgroundColor: Colors.red,
@@ -579,11 +578,11 @@ class _AppointmentsTabState extends State<AppointmentsTab> {
             );
             if (success && mounted) {
               widget.onRefresh();
-              ScaffoldMessenger.of(this.context).showSnackBar(
+              ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Appointment updated successfully')),
               );
             } else if (mounted) {
-              ScaffoldMessenger.of(this.context).showSnackBar(
+              ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text('Failed to update appointment'),
                   backgroundColor: Colors.red,

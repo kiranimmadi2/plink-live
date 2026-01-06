@@ -503,7 +503,7 @@ class _RoomFormScreenState extends State<RoomFormScreen> {
               HapticFeedback.lightImpact();
               setState(() => _isAvailable = value);
             },
-            activeColor: const Color(0xFF00D67D),
+            activeThumbColor: const Color(0xFF00D67D),
           ),
         ],
       ),

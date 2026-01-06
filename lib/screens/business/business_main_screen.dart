@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/business_model.dart';
 import '../../models/business_category_config.dart';
 import '../../models/conversation_model.dart';
-import '../../config/category_ui_config.dart';
 import '../../services/business_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/chat services/conversation_service.dart';
@@ -304,7 +303,7 @@ class _BusinessMainScreenState extends ConsumerState<BusinessMainScreen> {
       ),
       child: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: List.generate(_navItems.length, (index) {
@@ -352,12 +351,12 @@ class _BusinessMainScreenState extends ConsumerState<BusinessMainScreen> {
           behavior: HitTestBehavior.opaque,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
               color: isSelected
                   ? const Color(0xFF00D67D).withValues(alpha: 0.15)
                   : Colors.transparent,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(10),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -367,7 +366,7 @@ class _BusinessMainScreenState extends ConsumerState<BusinessMainScreen> {
                   children: [
                     Icon(
                       isSelected ? item.activeIcon : item.icon,
-                      size: 24,
+                      size: 20,
                       color: isSelected
                           ? const Color(0xFF00D67D)
                           : (isDarkMode ? Colors.white54 : Colors.grey[600]),
@@ -402,11 +401,11 @@ class _BusinessMainScreenState extends ConsumerState<BusinessMainScreen> {
                       ),
                   ],
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 2),
                 Text(
                   item.label,
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 10,
                     fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                     color: isSelected
                         ? const Color(0xFF00D67D)
@@ -456,28 +455,28 @@ class _NavBarItem extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
           color: isSelected
               ? const Color(0xFF00D67D).withValues(alpha: 0.15)
               : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(10),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               icon,
-              size: 24,
+              size: 20,
               color: isSelected
                   ? const Color(0xFF00D67D)
                   : (isDarkMode ? Colors.white54 : Colors.grey[600]),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 2),
             Text(
               label,
               style: TextStyle(
-                fontSize: 12,
+                fontSize: 10,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                 color: isSelected
                     ? const Color(0xFF00D67D)

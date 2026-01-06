@@ -726,7 +726,7 @@ class _StatusToggle extends StatelessWidget {
               HapticFeedback.lightImpact();
               onChanged(val);
             },
-            activeColor: activeColor,
+            activeThumbColor: activeColor,
           ),
         ],
       ),

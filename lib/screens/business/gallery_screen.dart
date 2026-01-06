@@ -404,13 +404,13 @@ class _GalleryScreenState extends State<GalleryScreen> {
             width: 56,
             height: 56,
             fit: BoxFit.cover,
-            placeholder: (_, __) => Container(
+            placeholder: (_, _) => Container(
               width: 56,
               height: 56,
               color: isDarkMode ? Colors.white10 : Colors.grey[200],
               child: const Icon(Icons.image, color: Colors.grey),
             ),
-            errorWidget: (_, __, ___) => Container(
+            errorWidget: (_, _, _) => Container(
               width: 56,
               height: 56,
               color: isDarkMode ? Colors.white10 : Colors.grey[200],
@@ -472,7 +472,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
               CachedNetworkImage(
                 imageUrl: _images[index],
                 fit: BoxFit.cover,
-                placeholder: (_, __) => Container(
+                placeholder: (_, _) => Container(
                   color: isDarkMode ? Colors.white10 : Colors.grey[200],
                   child: const Center(
                     child: CircularProgressIndicator(
@@ -481,7 +481,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
                     ),
                   ),
                 ),
-                errorWidget: (_, __, ___) => Container(
+                errorWidget: (_, _, _) => Container(
                   color: isDarkMode ? Colors.white10 : Colors.grey[200],
                   child: const Icon(Icons.broken_image, color: Colors.grey),
                 ),
@@ -633,10 +633,10 @@ class _FullScreenImageViewState extends State<_FullScreenImageView> {
               child: CachedNetworkImage(
                 imageUrl: widget.images[index],
                 fit: BoxFit.contain,
-                placeholder: (_, __) => const Center(
+                placeholder: (_, _) => const Center(
                   child: CircularProgressIndicator(color: Color(0xFF00D67D)),
                 ),
-                errorWidget: (_, __, ___) => const Icon(
+                errorWidget: (_, _, _) => const Icon(
                   Icons.broken_image,
                   color: Colors.grey,
                   size: 64,

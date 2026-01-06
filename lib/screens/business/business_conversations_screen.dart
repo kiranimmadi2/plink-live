@@ -116,8 +116,8 @@ class _BusinessConversationsScreenState
                   ? CachedNetworkImage(
                       imageUrl: widget.business.logo!,
                       fit: BoxFit.cover,
-                      placeholder: (_, __) => _buildLogoPlaceholder(),
-                      errorWidget: (_, __, ___) => _buildLogoPlaceholder(),
+                      placeholder: (_, _) => _buildLogoPlaceholder(),
+                      errorWidget: (_, _, _) => _buildLogoPlaceholder(),
                     )
                   : _buildLogoPlaceholder(),
             ),
@@ -497,8 +497,8 @@ class _BusinessConversationsScreenState
         width: 48,
         height: 48,
         fit: BoxFit.cover,
-        placeholder: (_, __) => buildFallback(),
-        errorWidget: (_, __, ___) => buildFallback(),
+        placeholder: (_, _) => buildFallback(),
+        errorWidget: (_, _, _) => buildFallback(),
       ),
     );
   }

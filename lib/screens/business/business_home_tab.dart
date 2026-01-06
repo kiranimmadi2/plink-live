@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'dart:ui';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import '../../models/business_model.dart';
@@ -12,7 +11,7 @@ import 'business_analytics_screen.dart';
 import 'business_inquiries_screen.dart';
 import 'gallery_screen.dart';
 
-/// Category-aware home tab showing dynamic dashboard based on business type
+/// Redesigned business home tab with clean, professional UI
 class BusinessHomeTab extends StatefulWidget {
   final BusinessModel business;
   final VoidCallback onRefresh;
@@ -55,8 +54,6 @@ class _BusinessHomeTabState extends State<BusinessHomeTab> {
   }
 
   Future<void> _loadDashboardData() async {
-    // Load dashboard data from business model for now
-    // In production, this would fetch real-time data from Firestore
     setState(() {
       _dashboardData = DashboardData(
         totalOrders: widget.business.totalOrders,
@@ -81,7 +78,9 @@ class _BusinessHomeTabState extends State<BusinessHomeTab> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(newStatus ? 'You are now online' : 'You are now offline'),
-            backgroundColor: newStatus ? Colors.green : Colors.grey[700],
+            backgroundColor: newStatus ? const Color(0xFF00D67D) : Colors.grey[700],
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
         );
       }
@@ -99,75 +98,59 @@ class _BusinessHomeTabState extends State<BusinessHomeTab> {
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        // Background Image
+        // Background
         Positioned.fill(
           child: Image.asset(
             AppAssets.homeBackgroundImage,
             fit: BoxFit.cover,
-            width: double.infinity,
-            height: double.infinity,
           ),
         ),
-
-        // Dark overlay
         Positioned.fill(
           child: Container(color: AppColors.darkOverlay()),
         ),
 
         // Main content
         SafeArea(
-          child: Column(
-            children: [
-              // Header
-              _buildHeader(),
+          child: RefreshIndicator(
+            onRefresh: () async {
+              await _loadDashboardData();
+              widget.onRefresh();
+            },
+            color: const Color(0xFF00D67D),
+            child: CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              slivers: [
+                // Header
+                SliverToBoxAdapter(child: _buildHeader()),
 
-              // Divider
-              Container(
-                height: 0.5,
-                color: Colors.white.withValues(alpha: 0.2),
-              ),
+                // Content
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+                  sliver: SliverList(
+                    delegate: SliverChildListDelegate([
+                      // Welcome Card with Status
+                      _buildWelcomeCard(),
+                      const SizedBox(height: 20),
 
-              // Scrollable content
-              Expanded(
-                child: RefreshIndicator(
-                  onRefresh: () async {
-                    await _loadDashboardData();
-                    widget.onRefresh();
-                  },
-                  color: const Color(0xFF00D67D),
-                  child: ListView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.all(16),
-                    children: [
-                      // Today's Snapshot - Category-aware stats
-                      _buildSectionTitle(
-                        BusinessDashboardConfig.getStatsTitle(_categoryGroup),
-                      ),
-                      const SizedBox(height: 12),
-                      _buildStatsGrid(),
-                      const SizedBox(height: 24),
+                      // Key Metrics Row
+                      _buildMetricsSection(),
+                      const SizedBox(height: 20),
 
-                      // Quick Actions - Category-specific
-                      _buildSectionTitle('Quick Actions'),
-                      const SizedBox(height: 12),
-                      _buildQuickActions(),
-                      const SizedBox(height: 24),
+                      // Quick Actions
+                      _buildQuickActionsSection(),
+                      const SizedBox(height: 20),
+
+                      // Revenue Overview
+                      _buildRevenueCard(),
+                      const SizedBox(height: 20),
 
                       // Recent Activity
-                      _buildSectionTitle('Recent Activity', showSeeAll: true),
-                      const SizedBox(height: 12),
-                      _buildRecentActivity(),
-                      const SizedBox(height: 24),
-
-                      // Performance Card
-                      _buildPerformanceCard(),
-
-                      const SizedBox(height: 100),
-                    ],
+                      _buildActivitySection(),
+                    ]),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ],
@@ -175,11 +158,11 @@ class _BusinessHomeTabState extends State<BusinessHomeTab> {
   }
 
   Widget _buildHeader() {
-    return Container(
+    return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
       child: Row(
         children: [
-          // Business logo
+          // Business Logo
           GestureDetector(
             onTap: () {
               HapticFeedback.lightImpact();
@@ -191,15 +174,16 @@ class _BusinessHomeTabState extends State<BusinessHomeTab> {
               );
             },
             child: Container(
-              width: 40,
-              height: 40,
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: const Color(0xFF00D67D),
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.2),
+                    color: const Color(0xFF00D67D).withValues(alpha: 0.3),
                     blurRadius: 8,
+                    offset: const Offset(0, 2),
                   ),
                 ],
               ),
@@ -209,7 +193,7 @@ class _BusinessHomeTabState extends State<BusinessHomeTab> {
                     ? Image.network(
                         widget.business.logo!,
                         fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) => _buildLogoPlaceholder(),
+                        errorBuilder: (_, __, ___) => _buildLogoPlaceholder(),
                       )
                     : _buildLogoPlaceholder(),
               ),
@@ -217,16 +201,15 @@ class _BusinessHomeTabState extends State<BusinessHomeTab> {
           ),
           const SizedBox(width: 12),
 
-          // Business name and location
+          // Business Info
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
                   widget.business.businessName,
                   style: const TextStyle(
-                    fontSize: 17,
+                    fontSize: 18,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
                   ),
@@ -235,21 +218,17 @@ class _BusinessHomeTabState extends State<BusinessHomeTab> {
                 ),
                 Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.location_on,
                       size: 12,
-                      color: Colors.white54,
+                      color: Colors.white.withValues(alpha: 0.6),
                     ),
                     const SizedBox(width: 2),
-                    Expanded(
-                      child: Text(
-                        _getLocationText(),
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.white54,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                    Text(
+                      _getLocationText(),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.white.withValues(alpha: 0.6),
                       ),
                     ),
                   ],
@@ -257,35 +236,21 @@ class _BusinessHomeTabState extends State<BusinessHomeTab> {
               ],
             ),
           ),
-
-          // Online/Offline toggle
-          _buildOnlineToggle(),
-
-          const SizedBox(width: 8),
-
-          // Notification button
-          _buildNotificationButton(),
         ],
       ),
     );
   }
 
   Widget _buildLogoPlaceholder() {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        color: const Color(0xFF00D67D),
-      ),
-      child: Center(
-        child: Text(
-          widget.business.businessName.isNotEmpty
-              ? widget.business.businessName[0].toUpperCase()
-              : 'B',
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
+    return Center(
+      child: Text(
+        widget.business.businessName.isNotEmpty
+            ? widget.business.businessName[0].toUpperCase()
+            : 'B',
+        style: const TextStyle(
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
         ),
       ),
     );
@@ -294,157 +259,212 @@ class _BusinessHomeTabState extends State<BusinessHomeTab> {
   String _getLocationText() {
     final address = widget.business.address;
     if (address == null) return 'Location not set';
-
     final parts = <String>[];
-    if (address.city != null && address.city!.isNotEmpty) {
-      parts.add(address.city!);
-    }
-    if (address.state != null && address.state!.isNotEmpty) {
-      parts.add(address.state!);
-    }
+    if (address.city != null && address.city!.isNotEmpty) parts.add(address.city!);
+    if (address.state != null && address.state!.isNotEmpty) parts.add(address.state!);
     return parts.isNotEmpty ? parts.join(', ') : 'Location not set';
   }
 
-  Widget _buildOnlineToggle() {
-    return GestureDetector(
-      onTap: _toggleOnlineStatus,
+  Widget _buildWelcomeCard() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            const Color(0xFF2D2D44).withValues(alpha: 0.9),
+            const Color(0xFF1A1A2E).withValues(alpha: 0.9),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.1),
+        ),
+      ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
         children: [
-          // Status dot with glow
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: _isOnline ? const Color(0xFF00D67D) : Colors.grey,
-              boxShadow: _isOnline
-                  ? [
-                      BoxShadow(
-                        color: const Color(0xFF00D67D).withValues(alpha: 0.6),
-                        blurRadius: 6,
-                        spreadRadius: 2,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _getGreeting(),
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.white.withValues(alpha: 0.7),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Your business dashboard',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // Online Status Toggle
+                GestureDetector(
+                  onTap: _toggleOnlineStatus,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: _isOnline
+                          ? const Color(0xFF00D67D).withValues(alpha: 0.2)
+                          : Colors.grey.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: _isOnline
+                            ? const Color(0xFF00D67D).withValues(alpha: 0.5)
+                            : Colors.grey.withValues(alpha: 0.3),
                       ),
-                    ]
-                  : null,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: _isOnline ? const Color(0xFF00D67D) : Colors.grey,
+                            boxShadow: _isOnline
+                                ? [
+                                    BoxShadow(
+                                      color: const Color(0xFF00D67D).withValues(alpha: 0.6),
+                                      blurRadius: 6,
+                                    ),
+                                  ]
+                                : null,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          _isOnline ? 'Online' : 'Offline',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: _isOnline ? const Color(0xFF00D67D) : Colors.grey,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(
+                          _isOnline ? Icons.toggle_on : Icons.toggle_off,
+                          size: 24,
+                          color: _isOnline ? const Color(0xFF00D67D) : Colors.grey,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(width: 6),
-          Text(
-            _isOnline ? 'Online' : 'Offline',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: _isOnline ? const Color(0xFF00D67D) : Colors.white70,
-            ),
-          ),
-          const SizedBox(width: 4),
-          Icon(
-            _isOnline ? Icons.toggle_on : Icons.toggle_off,
-            size: 40,
-            color: _isOnline ? const Color(0xFF00D67D) : Colors.white54,
+          // Notification Bell
+          Stack(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.notifications_outlined,
+                  color: Colors.white,
+                  size: 24,
+                ),
+              ),
+              if (_dashboardData.pendingOrders > 0)
+                Positioned(
+                  right: 0,
+                  top: 0,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFEF5350),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Text(
+                      _dashboardData.pendingOrders > 9 ? '9+' : '${_dashboardData.pendingOrders}',
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _buildNotificationButton() {
-    return Stack(
-      children: [
-        GestureDetector(
-          onTap: () {
-            HapticFeedback.lightImpact();
-            // TODO: Navigate to notifications
-          },
-          child: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Icon(
-              Icons.notifications_outlined,
-              color: Colors.white,
-              size: 22,
-            ),
-          ),
-        ),
-        // Notification badge
-        Positioned(
-          right: 4,
-          top: 4,
-          child: Container(
-            width: 8,
-            height: 8,
-            decoration: const BoxDecoration(
-              color: Color(0xFFEF5350),
-              shape: BoxShape.circle,
-            ),
-          ),
-        ),
-      ],
-    );
+  String _getGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Good morning!';
+    if (hour < 17) return 'Good afternoon!';
+    return 'Good evening!';
   }
 
-  Widget _buildSectionTitle(String title, {bool showSeeAll = false}) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  Widget _buildMetricsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 18,
+        const Text(
+          'Today\'s Overview',
+          style: TextStyle(
+            fontSize: 16,
             fontWeight: FontWeight.bold,
             color: Colors.white,
           ),
         ),
-        if (showSeeAll)
-          GestureDetector(
-            onTap: () {
-              HapticFeedback.lightImpact();
-              // TODO: Navigate to activity history
-            },
-            child: Text(
-              'See All',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: const Color(0xFF00D67D).withValues(alpha: 0.9),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _buildMetricCard(
+                icon: Icons.shopping_bag_outlined,
+                value: '${_dashboardData.todayOrders}',
+                label: 'Orders',
+                color: const Color(0xFF00D67D),
+                onTap: () => _navigateToInquiries(),
               ),
             ),
-          ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildMetricCard(
+                icon: Icons.currency_rupee,
+                value: _formatCompactAmount(_dashboardData.todayRevenue),
+                label: 'Revenue',
+                color: const Color(0xFF42A5F5),
+                onTap: () => _navigateToAnalytics(),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildMetricCard(
+                icon: Icons.pending_actions_outlined,
+                value: '${_dashboardData.pendingOrders}',
+                label: 'Pending',
+                color: const Color(0xFFFFA726),
+                onTap: () => _navigateToInquiries(),
+              ),
+            ),
+          ],
+        ),
       ],
     );
   }
 
-  Widget _buildStatsGrid() {
-    final stats = BusinessDashboardConfig.getStats(_categoryGroup);
-
-    return GridView.count(
-      crossAxisCount: 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisSpacing: 12,
-      mainAxisSpacing: 12,
-      childAspectRatio: 1.3,
-      children: stats.map((stat) {
-        return _buildStatCard(
-          label: stat.label,
-          value: stat.getValue(_dashboardData),
-          icon: stat.icon,
-          color: stat.color,
-          onTap: () => _handleStatTap(stat.route),
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildStatCard({
-    required String label,
-    required String value,
+  Widget _buildMetricCard({
     required IconData icon,
+    required String value,
+    required String label,
     required Color color,
     VoidCallback? onTap,
   }) {
@@ -453,282 +473,385 @@ class _BusinessHomeTabState extends State<BusinessHomeTab> {
         HapticFeedback.lightImpact();
         onTap?.call();
       },
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  color.withValues(alpha: 0.25),
-                  color.withValues(alpha: 0.1),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.15),
-                width: 1,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: color.withValues(alpha: 0.2),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: color, size: 22),
+            const SizedBox(height: 10),
+            Text(
+              value,
+              style: const TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
               ),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.white.withValues(alpha: 0.6),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuickActionsSection() {
+    final actions = _getQuickActions();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Quick Actions',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: actions.map((action) {
+            return Expanded(
+              child: Padding(
+                padding: EdgeInsets.only(
+                  right: action != actions.last ? 10 : 0,
+                ),
+                child: _buildQuickActionButton(
+                  icon: action['icon'] as IconData,
+                  label: action['label'] as String,
+                  color: action['color'] as Color,
+                  onTap: action['onTap'] as VoidCallback,
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  List<Map<String, dynamic>> _getQuickActions() {
+    return [
+      {
+        'icon': Icons.add_circle_outline,
+        'label': 'Add Item',
+        'color': const Color(0xFF00D67D),
+        'onTap': () => widget.onSwitchTab(1),
+      },
+      {
+        'icon': Icons.receipt_long_outlined,
+        'label': 'Orders',
+        'color': const Color(0xFF42A5F5),
+        'onTap': () => _navigateToInquiries(),
+      },
+      {
+        'icon': Icons.analytics_outlined,
+        'label': 'Analytics',
+        'color': const Color(0xFF7E57C2),
+        'onTap': () => _navigateToAnalytics(),
+      },
+    ];
+  }
+
+  Widget _buildQuickActionButton({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        onTap();
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.1),
+          ),
+        ),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.15),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: color, size: 22),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRevenueCard() {
+    final weekRevenue = _dashboardData.weekRevenue;
+    final monthRevenue = _dashboardData.monthRevenue;
+
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        _navigateToAnalytics();
+      },
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              const Color(0xFF00D67D).withValues(alpha: 0.15),
+              const Color(0xFF00D67D).withValues(alpha: 0.05),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: const Color(0xFF00D67D).withValues(alpha: 0.2),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
+                const Text(
+                  'Revenue',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
                 Container(
-                  padding: const EdgeInsets.all(10),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.2),
+                    color: const Color(0xFF00D67D).withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(icon, color: color, size: 22),
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      value,
-                      style: const TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'View All',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: const Color(0xFF00D67D).withValues(alpha: 0.9),
+                        ),
                       ),
-                    ),
-                    Text(
-                      label,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.white.withValues(alpha: 0.7),
+                      const SizedBox(width: 4),
+                      Icon(
+                        Icons.arrow_forward_ios,
+                        size: 10,
+                        color: const Color(0xFF00D67D).withValues(alpha: 0.9),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ],
             ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildQuickActions() {
-    final actions = BusinessDashboardConfig.getQuickActions(_categoryGroup);
-
-    return SizedBox(
-      height: 105,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: actions.length,
-        separatorBuilder: (context, index) => const SizedBox(width: 12),
-        itemBuilder: (context, index) {
-          final action = actions[index];
-          return _buildQuickActionItem(
-            label: action.label,
-            subtitle: action.subtitle,
-            icon: action.icon,
-            color: action.color,
-            onTap: () => _handleQuickAction(action.route),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildQuickActionItem({
-    required String label,
-    required String subtitle,
-    required IconData icon,
-    required Color color,
-    VoidCallback? onTap,
-  }) {
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.lightImpact();
-        onTap?.call();
-      },
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Container(
-            width: 130,
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  color.withValues(alpha: 0.2),
-                  color.withValues(alpha: 0.1),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.15),
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            const SizedBox(height: 20),
+            Row(
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: color.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'This Week',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.white.withValues(alpha: 0.6),
+                        ),
                       ),
-                      child: Icon(icon, color: color, size: 20),
-                    ),
-                    Icon(
-                      Icons.arrow_forward_ios,
-                      size: 12,
-                      color: Colors.white.withValues(alpha: 0.5),
-                    ),
-                  ],
+                      const SizedBox(height: 4),
+                      Text(
+                        '₹${_formatAmount(weekRevenue)}',
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      label,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                      ),
+                Container(
+                  width: 1,
+                  height: 50,
+                  color: Colors.white.withValues(alpha: 0.1),
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'This Month',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.white.withValues(alpha: 0.6),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '₹${_formatAmount(monthRevenue)}',
+                          style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
                     ),
-                    Text(
-                      subtitle,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.white.withValues(alpha: 0.6),
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
+                  ),
                 ),
               ],
             ),
-          ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildRecentActivity() {
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('businesses')
-          .doc(widget.business.id)
-          .collection('activity')
-          .orderBy('timestamp', descending: true)
-          .limit(4)
-          .snapshots(),
-      builder: (context, snapshot) {
-        // Show sample data if no activity yet
-        final activities = snapshot.hasData && snapshot.data!.docs.isNotEmpty
-            ? snapshot.data!.docs
-            : null;
+  Widget _buildActivitySection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Recent Activity',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+            GestureDetector(
+              onTap: () {
+                HapticFeedback.lightImpact();
+                _navigateToInquiries();
+              },
+              child: Text(
+                'See All',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: const Color(0xFF00D67D).withValues(alpha: 0.9),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('businesses')
+              .doc(widget.business.id)
+              .collection('activity')
+              .orderBy('timestamp', descending: true)
+              .limit(3)
+              .snapshots(),
+          builder: (context, snapshot) {
+            final activities = snapshot.hasData && snapshot.data!.docs.isNotEmpty
+                ? snapshot.data!.docs
+                : null;
 
-        if (activities == null) {
-          return _buildSampleActivityList();
-        }
-
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-            child: Container(
+            return Container(
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.08),
+                color: Colors.white.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
                   color: Colors.white.withValues(alpha: 0.1),
                 ),
               ),
-              child: ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: activities.length,
-                separatorBuilder: (context, index) => Divider(
-                  height: 1,
-                  color: Colors.white.withValues(alpha: 0.1),
-                ),
-                itemBuilder: (context, activityIndex) {
-                  final activity = activities[activityIndex].data() as Map<String, dynamic>;
-                  return _buildActivityItem(
-                    icon: _getActivityIcon(activity['type'] ?? ''),
-                    color: _getActivityColor(activity['type'] ?? ''),
-                    title: activity['title'] ?? 'Activity',
-                    subtitle: activity['subtitle'] ?? '',
-                    time: _formatActivityTime(activity['timestamp']),
-                  );
-                },
-              ),
-            ),
-          ),
-        );
-      },
+              child: activities == null
+                  ? _buildEmptyActivity()
+                  : ListView.separated(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: activities.length,
+                      separatorBuilder: (_, __) => Divider(
+                        height: 1,
+                        indent: 60,
+                        color: Colors.white.withValues(alpha: 0.1),
+                      ),
+                      itemBuilder: (context, index) {
+                        final activity = activities[index].data() as Map<String, dynamic>;
+                        return _buildActivityItem(
+                          icon: _getActivityIcon(activity['type'] ?? ''),
+                          color: _getActivityColor(activity['type'] ?? ''),
+                          title: activity['title'] ?? 'Activity',
+                          subtitle: activity['subtitle'] ?? '',
+                          time: _formatActivityTime(activity['timestamp']),
+                        );
+                      },
+                    ),
+            );
+          },
+        ),
+      ],
     );
   }
 
-  Widget _buildSampleActivityList() {
-    final sampleActivities = [
-      {
-        'icon': Icons.circle,
-        'color': const Color(0xFF00D67D),
-        'title': 'Business is online',
-        'subtitle': 'Ready to receive orders',
-        'time': 'Just now',
-      },
-      {
-        'icon': Icons.storefront_outlined,
-        'color': const Color(0xFF42A5F5),
-        'title': 'Profile updated',
-        'subtitle': 'Business details saved',
-        'time': '2h ago',
-      },
-    ];
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.1),
+  Widget _buildEmptyActivity() {
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        children: [
+          Icon(
+            Icons.history,
+            size: 40,
+            color: Colors.white.withValues(alpha: 0.3),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'No recent activity',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.white.withValues(alpha: 0.5),
             ),
           ),
-          child: ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: sampleActivities.length,
-            separatorBuilder: (context, index) => Divider(
-              height: 1,
-              color: Colors.white.withValues(alpha: 0.1),
+          Text(
+            'Your business activities will appear here',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.white.withValues(alpha: 0.3),
             ),
-            itemBuilder: (context, sampleIndex) {
-              final activity = sampleActivities[sampleIndex];
-              return _buildActivityItem(
-                icon: activity['icon'] as IconData,
-                color: activity['color'] as Color,
-                title: activity['title'] as String,
-                subtitle: activity['subtitle'] as String,
-                time: activity['time'] as String,
-              );
-            },
           ),
-        ),
+        ],
       ),
     );
   }
@@ -741,18 +864,18 @@ class _BusinessHomeTabState extends State<BusinessHomeTab> {
     required String time,
   }) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(icon, color: color, size: 18),
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -765,13 +888,14 @@ class _BusinessHomeTabState extends State<BusinessHomeTab> {
                     color: Colors.white,
                   ),
                 ),
-                Text(
-                  subtitle,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.white.withValues(alpha: 0.6),
+                if (subtitle.isNotEmpty)
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.white.withValues(alpha: 0.5),
+                    ),
                   ),
-                ),
               ],
             ),
           ),
@@ -779,7 +903,7 @@ class _BusinessHomeTabState extends State<BusinessHomeTab> {
             time,
             style: TextStyle(
               fontSize: 11,
-              color: Colors.white.withValues(alpha: 0.5),
+              color: Colors.white.withValues(alpha: 0.4),
             ),
           ),
         ],
@@ -787,231 +911,25 @@ class _BusinessHomeTabState extends State<BusinessHomeTab> {
     );
   }
 
-  Widget _buildPerformanceCard() {
-    final weekRevenue = _dashboardData.weekRevenue;
-    final previousWeek = weekRevenue * 0.85; // Mock previous week
-    final percentChange = previousWeek > 0
-        ? ((weekRevenue - previousWeek) / previousWeek * 100).round()
-        : 0;
-    final isPositive = percentChange >= 0;
-
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.lightImpact();
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => BusinessAnalyticsScreen(business: widget.business),
-          ),
-        );
-      },
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  const Color(0xFF00D67D).withValues(alpha: 0.2),
-                  const Color(0xFF42A5F5).withValues(alpha: 0.1),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.15),
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF00D67D).withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(
-                        Icons.trending_up,
-                        color: Color(0xFF00D67D),
-                        size: 22,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    const Text(
-                      'This Week',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const Spacer(),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: isPositive
-                            ? const Color(0xFF00D67D).withValues(alpha: 0.2)
-                            : const Color(0xFFEF5350).withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            isPositive ? Icons.arrow_upward : Icons.arrow_downward,
-                            size: 14,
-                            color: isPositive ? const Color(0xFF00D67D) : const Color(0xFFEF5350),
-                          ),
-                          const SizedBox(width: 2),
-                          Text(
-                            '$percentChange%',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: isPositive ? const Color(0xFF00D67D) : const Color(0xFFEF5350),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      '₹${_formatAmount(weekRevenue)}',
-                      style: const TextStyle(
-                        fontSize: 32,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 4),
-                      child: Text(
-                        'Revenue',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.white.withValues(alpha: 0.6),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                // Progress bar
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: 0.75,
-                    backgroundColor: Colors.white.withValues(alpha: 0.1),
-                    valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF00D67D)),
-                    minHeight: 8,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      '75% of weekly goal',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.white.withValues(alpha: 0.6),
-                      ),
-                    ),
-                    Row(
-                      children: [
-                        Text(
-                          'View Analytics',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            color: const Color(0xFF00D67D).withValues(alpha: 0.9),
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        Icon(
-                          Icons.arrow_forward_ios,
-                          size: 12,
-                          color: const Color(0xFF00D67D).withValues(alpha: 0.9),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
+  void _navigateToInquiries() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => BusinessInquiriesScreen(
+          business: widget.business,
+          initialFilter: 'All',
         ),
       ),
     );
   }
 
-  void _handleStatTap(String? route) {
-    if (route == null) return;
-
-    switch (route) {
-      case 'orders':
-      case 'inquiries':
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => BusinessInquiriesScreen(
-              business: widget.business,
-              initialFilter: 'All',
-            ),
-          ),
-        );
-        break;
-      case 'analytics':
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => BusinessAnalyticsScreen(business: widget.business),
-          ),
-        );
-        break;
-      default:
-        // Navigate to appropriate screen or switch tab
-        break;
-    }
-  }
-
-  void _handleQuickAction(String route) {
-    switch (route) {
-      case 'orders':
-      case 'appointments':
-      case 'bookings':
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => BusinessInquiriesScreen(
-              business: widget.business,
-              initialFilter: 'All',
-            ),
-          ),
-        );
-        break;
-      case 'menu':
-      case 'products':
-      case 'services':
-      case 'rooms':
-        widget.onSwitchTab(1); // Switch to services/products tab
-        break;
-      default:
-        // Handle other routes
-        break;
-    }
+  void _navigateToAnalytics() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => BusinessAnalyticsScreen(business: widget.business),
+      ),
+    );
   }
 
   IconData _getActivityIcon(String type) {
@@ -1025,7 +943,7 @@ class _BusinessHomeTabState extends State<BusinessHomeTab> {
       case 'booking':
         return Icons.calendar_today_outlined;
       default:
-        return Icons.circle;
+        return Icons.info_outline;
     }
   }
 
@@ -1059,5 +977,14 @@ class _BusinessHomeTabState extends State<BusinessHomeTab> {
       return '${(amount / 1000).toStringAsFixed(1)}K';
     }
     return amount.toStringAsFixed(0);
+  }
+
+  String _formatCompactAmount(double amount) {
+    if (amount >= 100000) {
+      return '${(amount / 100000).toStringAsFixed(0)}L';
+    } else if (amount >= 1000) {
+      return '${(amount / 1000).toStringAsFixed(0)}K';
+    }
+    return '₹${amount.toStringAsFixed(0)}';
   }
 }

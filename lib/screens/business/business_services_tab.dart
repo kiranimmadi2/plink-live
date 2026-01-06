@@ -428,7 +428,7 @@ class _ServiceCard extends StatelessWidget {
                           child: Image.network(
                             listing.images.first,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => _buildPlaceholderIcon(isProduct),
+                            errorBuilder: (_, _, _) => _buildPlaceholderIcon(isProduct),
                           ),
                         )
                       : _buildPlaceholderIcon(isProduct),

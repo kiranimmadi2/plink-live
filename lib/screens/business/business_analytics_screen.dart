@@ -236,7 +236,7 @@ class _BusinessAnalyticsScreenState extends State<BusinessAnalyticsScreen> {
             isDarkMode: isDarkMode,
           ),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 10),
         Expanded(
           child: _buildGlassSummaryCard(
             title: 'Inquiries',
@@ -246,7 +246,7 @@ class _BusinessAnalyticsScreenState extends State<BusinessAnalyticsScreen> {
             isDarkMode: isDarkMode,
           ),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 10),
         Expanded(
           child: _buildGlassSummaryCard(
             title: 'Response',
@@ -267,46 +267,68 @@ class _BusinessAnalyticsScreenState extends State<BusinessAnalyticsScreen> {
     required Color color,
     required bool isDarkMode,
   }) {
-    return GlassmorphicCard(
-      showGlow: true,
-      glowColor: color,
-      padding: const EdgeInsets.all(14),
+    return Container(
+      height: 110,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: isDarkMode
+              ? [
+                  color.withValues(alpha: 0.15),
+                  const Color(0xFF2D2D44).withValues(alpha: 0.8),
+                ]
+              : [
+                  color.withValues(alpha: 0.1),
+                  Colors.white.withValues(alpha: 0.9),
+                ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDarkMode
+              ? color.withValues(alpha: 0.3)
+              : color.withValues(alpha: 0.2),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  color.withValues(alpha: 0.3),
-                  color.withValues(alpha: 0.1),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: color.withValues(alpha: 0.3),
-              ),
+              color: color.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(icon, color: color, size: 18),
+            child: Icon(icon, color: color, size: 16),
           ),
-          const SizedBox(height: 12),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: isDarkMode ? Colors.white : Colors.black87,
-            ),
-          ),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 12,
-              color: isDarkMode ? Colors.white54 : Colors.grey[600],
-            ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: isDarkMode ? Colors.white : Colors.black87,
+                ),
+              ),
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: isDarkMode ? Colors.white54 : Colors.grey[600],
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -537,7 +559,7 @@ class _BusinessAnalyticsScreenState extends State<BusinessAnalyticsScreen> {
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: _topServices.length,
-              separatorBuilder: (_, __) => Divider(
+              separatorBuilder: (_, _) => Divider(
                 height: 1,
                 indent: 16,
                 endIndent: 16,
