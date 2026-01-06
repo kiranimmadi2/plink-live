@@ -988,6 +988,113 @@ class _BusinessSetupScreenState extends ConsumerState<BusinessSetupScreen> {
             prefixIcon: Icons.badge_outlined,
             helperText: 'Only required if different from your business name.',
           ),
+          const SizedBox(height: 24),
+
+          // Logo Upload
+          Text(
+            'Business Logo',
+            style: TextStyle(
+              color: Colors.grey[700],
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 8),
+          GestureDetector(
+            onTap: _pickLogo,
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: _logoFile != null ? _accentColor : Colors.grey[300]!,
+                  width: _logoFile != null ? 2 : 1,
+                ),
+              ),
+              child: Column(
+                children: [
+                  if (_logoFile != null) ...[
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.file(
+                        _logoFile!,
+                        width: 100,
+                        height: 100,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        TextButton.icon(
+                          onPressed: _pickLogo,
+                          icon: const Icon(Icons.edit, size: 18),
+                          label: const Text('Change'),
+                          style: TextButton.styleFrom(
+                            foregroundColor: _accentColor,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        TextButton.icon(
+                          onPressed: () {
+                            setState(() {
+                              _logoFile = null;
+                            });
+                          },
+                          icon: const Icon(Icons.delete_outline, size: 18),
+                          label: const Text('Remove'),
+                          style: TextButton.styleFrom(
+                            foregroundColor: Colors.red[400],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ] else ...[
+                    Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        Icons.add_photo_alternate_outlined,
+                        size: 40,
+                        color: Colors.grey[400],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Tap to upload your logo',
+                      style: TextStyle(
+                        color: Colors.grey[600],
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'PNG, JPG up to 5MB',
+                      style: TextStyle(
+                        color: Colors.grey[400],
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          Text(
+            'A good logo helps customers recognize your business.',
+            style: TextStyle(
+              color: Colors.grey[500],
+              fontSize: 12,
+            ),
+          ),
           const SizedBox(height: 100),
         ],
       ),
