@@ -71,6 +71,20 @@ class _VideoBackgroundState extends State<VideoBackground> {
     return Stack(
       fit: StackFit.expand,
       children: [
+        // Gradient background (always shown as base layer)
+        Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Color(0xFF1E1E1E), // Top color
+                Color(0xFF000814), // Bottom color
+              ],
+            ),
+          ),
+        ),
+
         // Video or fallback background
         if (_isInitialized && _controller != null)
           SizedBox.expand(
@@ -82,10 +96,6 @@ class _VideoBackgroundState extends State<VideoBackground> {
                 child: VideoPlayer(_controller!),
               ),
             ),
-          )
-        else
-          Container(
-            color: widget.overlayColor,
           ),
 
         // Dark overlay for readability
@@ -100,9 +110,9 @@ class _VideoBackgroundState extends State<VideoBackground> {
   }
 }
 
-/// A wrapper that provides a shared video background controller
-/// to avoid recreating the video on every screen change
-class SharedVideoBackground extends StatefulWidget {
+/// A wrapper that provides a gradient background
+/// Simple gradient from dark gray to dark blue
+class SharedVideoBackground extends StatelessWidget {
   final Widget child;
   final String? videoUrl;
   final String? assetPath;
@@ -121,119 +131,26 @@ class SharedVideoBackground extends StatefulWidget {
   });
 
   @override
-  State<SharedVideoBackground> createState() => _SharedVideoBackgroundState();
-}
-
-class _SharedVideoBackgroundState extends State<SharedVideoBackground>
-    with WidgetsBindingObserver {
-  VideoPlayerController? _controller;
-  bool _isInitialized = false;
-  bool _hasError = false;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    _initializeVideo();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (_controller == null || !_isInitialized) return;
-
-    if (state == AppLifecycleState.paused) {
-      _controller!.pause();
-    } else if (state == AppLifecycleState.resumed && widget.showVideo) {
-      _controller!.play();
-    }
-  }
-
-  @override
-  void didUpdateWidget(SharedVideoBackground oldWidget) {
-    super.didUpdateWidget(oldWidget);
-
-    // Resume/pause video based on showVideo
-    if (_isInitialized && _controller != null) {
-      if (widget.showVideo && !oldWidget.showVideo) {
-        _controller!.play();
-      } else if (!widget.showVideo && oldWidget.showVideo) {
-        _controller!.pause();
-      }
-    }
-  }
-
-  Future<void> _initializeVideo() async {
-    try {
-      if (widget.assetPath != null) {
-        _controller = VideoPlayerController.asset(widget.assetPath!);
-      } else if (widget.videoUrl != null) {
-        _controller = VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl!));
-      } else {
-        // Default demo video
-        _controller = VideoPlayerController.networkUrl(
-          Uri.parse('https://flutter.github.io/assets-for-api-docs/assets/videos/bee.mp4'),
-        );
-      }
-
-      await _controller!.initialize();
-      _controller!.setLooping(true);
-      _controller!.setVolume(0); // Mute the video
-
-      if (widget.showVideo) {
-        _controller!.play();
-      }
-
-      if (mounted) {
-        setState(() => _isInitialized = true);
-      }
-    } catch (e) {
-      debugPrint('Video background initialization failed: $e');
-      if (mounted) {
-        setState(() => _hasError = true);
-      }
-    }
-  }
-
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    _controller?.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Stack(
       fit: StackFit.expand,
       children: [
-        // Video background (always rendered to keep state)
-        if (_isInitialized && _controller != null && !_hasError)
-          Opacity(
-            opacity: widget.showVideo ? 1.0 : 0.0,
-            child: SizedBox.expand(
-              child: FittedBox(
-                fit: BoxFit.cover,
-                child: SizedBox(
-                  width: _controller!.value.size.width,
-                  height: _controller!.value.size.height,
-                  child: VideoPlayer(_controller!),
-                ),
-              ),
+        // Gradient background only (no video, no overlay)
+        Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Color(0xFF1E1E1E), // Top color
+                Color(0xFF000814), // Bottom color
+              ],
             ),
-          )
-        else
-          Container(
-            color: widget.overlayColor,
           ),
-
-        // Dark overlay for readability
-        if (widget.showVideo)
-          Container(
-            color: widget.overlayColor.withValues(alpha: widget.overlayOpacity),
-          ),
+        ),
 
         // Child content
-        widget.child,
+        child,
       ],
     );
   }
