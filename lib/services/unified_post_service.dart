@@ -22,6 +22,7 @@ class UnifiedPostService {
   final GeminiService _geminiService = GeminiService();
 
   /// Create a new post with automatic AI processing
+  /// Supports both personal (P2P) and business posts
   Future<Map<String, dynamic>> createPost({
     required String originalPrompt,
     Map<String, dynamic>? clarificationAnswers,
@@ -33,6 +34,12 @@ class UnifiedPostService {
     String? location,
     double? latitude,
     double? longitude,
+    // Business-specific fields
+    String? businessId,
+    bool isBusinessPost = false,
+    String? businessName,
+    String? businessLogo,
+    String? businessCategory,
   }) async {
     try {
       final userId = _auth.currentUser?.uid;
@@ -102,6 +109,7 @@ class UnifiedPostService {
           'createdBy': 'UnifiedPostService',
           'version': '2.0',
           'embeddingModel': 'gemini-embedding',
+          if (isBusinessPost) 'postType': 'business',
         },
         createdAt: DateTime.now(),
         expiresAt: DateTime.now().add(const Duration(days: 30)),
@@ -118,6 +126,12 @@ class UnifiedPostService {
         matchedUserIds: [],
         userName: userName,
         userPhoto: userPhoto,
+        // Business-specific fields
+        businessId: businessId,
+        isBusinessPost: isBusinessPost,
+        businessName: businessName,
+        businessLogo: businessLogo,
+        businessCategory: businessCategory,
       );
 
       // Step 6: Validate post before storing
@@ -615,6 +629,14 @@ extension PostModelExtension on PostModel {
     String? ageRange,
     String? condition,
     String? brand,
+    String? userName,
+    String? userPhoto,
+    // Business-specific fields
+    String? businessId,
+    bool? isBusinessPost,
+    String? businessName,
+    String? businessLogo,
+    String? businessCategory,
   }) {
     return PostModel(
       id: id ?? this.id,
@@ -645,6 +667,110 @@ extension PostModelExtension on PostModel {
       ageRange: ageRange ?? this.ageRange,
       condition: condition ?? this.condition,
       brand: brand ?? this.brand,
+      userName: userName ?? this.userName,
+      userPhoto: userPhoto ?? this.userPhoto,
+      // Business-specific fields
+      businessId: businessId ?? this.businessId,
+      isBusinessPost: isBusinessPost ?? this.isBusinessPost,
+      businessName: businessName ?? this.businessName,
+      businessLogo: businessLogo ?? this.businessLogo,
+      businessCategory: businessCategory ?? this.businessCategory,
     );
+  }
+}
+
+/// Extension for creating business posts conveniently
+extension BusinessPostExtension on UnifiedPostService {
+  /// Create a business post (convenience method)
+  Future<Map<String, dynamic>> createBusinessPost({
+    required String businessId,
+    required String originalPrompt,
+    required String businessName,
+    String? businessLogo,
+    String? businessCategory,
+    Map<String, dynamic>? clarificationAnswers,
+    double? price,
+    double? priceMin,
+    double? priceMax,
+    String? currency,
+    List<String>? images,
+    String? location,
+    double? latitude,
+    double? longitude,
+  }) {
+    return createPost(
+      originalPrompt: originalPrompt,
+      clarificationAnswers: clarificationAnswers,
+      price: price,
+      priceMin: priceMin,
+      priceMax: priceMax,
+      currency: currency,
+      images: images,
+      location: location,
+      latitude: latitude,
+      longitude: longitude,
+      businessId: businessId,
+      isBusinessPost: true,
+      businessName: businessName,
+      businessLogo: businessLogo,
+      businessCategory: businessCategory,
+    );
+  }
+
+  /// Find matches including both P2P and business posts
+  Future<List<PostModel>> findAllMatches(
+    String postId, {
+    bool includeBusinesses = true,
+    bool includeP2P = true,
+  }) async {
+    final matches = await findMatches(postId);
+
+    if (includeBusinesses && includeP2P) {
+      return matches;
+    }
+
+    return matches.where((post) {
+      if (includeBusinesses && post.isBusinessPost) return true;
+      if (includeP2P && !post.isBusinessPost) return true;
+      return false;
+    }).toList();
+  }
+
+  /// Get business posts only
+  Future<List<PostModel>> getBusinessPosts(String businessId) async {
+    try {
+      final querySnapshot = await FirebaseFirestore.instance
+          .collection('posts')
+          .where('businessId', isEqualTo: businessId)
+          .where('isBusinessPost', isEqualTo: true)
+          .where('isActive', isEqualTo: true)
+          .orderBy('createdAt', descending: true)
+          .limit(50)
+          .get();
+
+      return querySnapshot.docs
+          .map((doc) => PostModel.fromFirestore(doc))
+          .toList();
+    } catch (e) {
+      debugPrint('Error getting business posts: $e');
+      return [];
+    }
+  }
+
+  /// Stream business posts
+  Stream<List<PostModel>> streamBusinessPosts(String businessId) {
+    return FirebaseFirestore.instance
+        .collection('posts')
+        .where('businessId', isEqualTo: businessId)
+        .where('isBusinessPost', isEqualTo: true)
+        .where('isActive', isEqualTo: true)
+        .orderBy('createdAt', descending: true)
+        .limit(50)
+        .snapshots()
+        .map((snapshot) {
+          return snapshot.docs
+              .map((doc) => PostModel.fromFirestore(doc))
+              .toList();
+        });
   }
 }

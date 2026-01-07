@@ -34,6 +34,13 @@ class PostModel {
   final String? userName;
   final String? userPhoto;
 
+  // Business-related fields
+  final String? businessId;
+  final bool isBusinessPost;
+  final String? businessName;
+  final String? businessLogo;
+  final String? businessCategory;
+
   PostModel({
     required this.id,
     required this.userId,
@@ -65,6 +72,11 @@ class PostModel {
     this.brand,
     this.userName,
     this.userPhoto,
+    this.businessId,
+    this.isBusinessPost = false,
+    this.businessName,
+    this.businessLogo,
+    this.businessCategory,
   });
 
   factory PostModel.fromFirestore(DocumentSnapshot doc) {
@@ -108,6 +120,11 @@ class PostModel {
       brand: data['brand'],
       userName: data['userName'],
       userPhoto: data['userPhoto'],
+      businessId: data['businessId'],
+      isBusinessPost: data['isBusinessPost'] ?? false,
+      businessName: data['businessName'],
+      businessLogo: data['businessLogo'],
+      businessCategory: data['businessCategory'],
     );
   }
 
@@ -142,6 +159,11 @@ class PostModel {
       'brand': brand,
       'userName': userName,
       'userPhoto': userPhoto,
+      'businessId': businessId,
+      'isBusinessPost': isBusinessPost,
+      'businessName': businessName,
+      'businessLogo': businessLogo,
+      'businessCategory': businessCategory,
       'lastUpdated': FieldValue.serverTimestamp(),
     };
   }
