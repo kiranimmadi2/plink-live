@@ -98,15 +98,38 @@ class _BusinessHomeTabState extends State<BusinessHomeTab> {
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        // Background
+        // Premium black gradient background
         Positioned.fill(
-          child: Image.asset(
-            AppAssets.homeBackgroundImage,
-            fit: BoxFit.cover,
+          child: Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFF0D0D0D),
+                  Color(0xFF1A1A2E),
+                  Color(0xFF16213E),
+                  Color(0xFF0F0F0F),
+                ],
+                stops: [0.0, 0.3, 0.7, 1.0],
+              ),
+            ),
           ),
         ),
+        // Subtle premium overlay
         Positioned.fill(
-          child: Container(color: AppColors.darkOverlay()),
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: RadialGradient(
+                center: Alignment.topRight,
+                radius: 1.5,
+                colors: [
+                  const Color(0xFF00D67D).withValues(alpha: 0.05),
+                  Colors.transparent,
+                ],
+              ),
+            ),
+          ),
         ),
 
         // Main content
@@ -120,7 +143,7 @@ class _BusinessHomeTabState extends State<BusinessHomeTab> {
             child: CustomScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               slivers: [
-                // Header
+                // Header with toggle and notification
                 SliverToBoxAdapter(child: _buildHeader()),
 
                 // Content
@@ -128,10 +151,6 @@ class _BusinessHomeTabState extends State<BusinessHomeTab> {
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
                   sliver: SliverList(
                     delegate: SliverChildListDelegate([
-                      // Welcome Card with Status
-                      _buildWelcomeCard(),
-                      const SizedBox(height: 20),
-
                       // Key Metrics Row
                       _buildMetricsSection(),
                       const SizedBox(height: 20),
@@ -224,17 +243,97 @@ class _BusinessHomeTabState extends State<BusinessHomeTab> {
                       color: Colors.white.withValues(alpha: 0.6),
                     ),
                     const SizedBox(width: 2),
-                    Text(
-                      _getLocationText(),
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.white.withValues(alpha: 0.6),
+                    Flexible(
+                      child: Text(
+                        _getLocationText(),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.white.withValues(alpha: 0.6),
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],
                 ),
               ],
             ),
+          ),
+
+          // Online Status Toggle (compact)
+          GestureDetector(
+            onTap: _toggleOnlineStatus,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: _isOnline
+                    ? const Color(0xFF00D67D).withValues(alpha: 0.2)
+                    : Colors.grey.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: _isOnline
+                      ? const Color(0xFF00D67D).withValues(alpha: 0.5)
+                      : Colors.grey.withValues(alpha: 0.3),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: _isOnline ? const Color(0xFF00D67D) : Colors.grey,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Icon(
+                    _isOnline ? Icons.toggle_on : Icons.toggle_off,
+                    size: 20,
+                    color: _isOnline ? const Color(0xFF00D67D) : Colors.grey,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+
+          // Notification Bell
+          Stack(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.notifications_outlined,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ),
+              if (_dashboardData.pendingOrders > 0)
+                Positioned(
+                  right: 0,
+                  top: 0,
+                  child: Container(
+                    padding: const EdgeInsets.all(3),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFEF5350),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Text(
+                      _dashboardData.pendingOrders > 9 ? '9+' : '${_dashboardData.pendingOrders}',
+                      style: const TextStyle(
+                        fontSize: 8,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
         ],
       ),
@@ -267,7 +366,7 @@ class _BusinessHomeTabState extends State<BusinessHomeTab> {
 
   Widget _buildWelcomeCard() {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
@@ -283,83 +382,60 @@ class _BusinessHomeTabState extends State<BusinessHomeTab> {
         ),
       ),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _getGreeting(),
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.white.withValues(alpha: 0.7),
-                  ),
+          // Online Status Toggle
+          GestureDetector(
+            onTap: _toggleOnlineStatus,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: _isOnline
+                    ? const Color(0xFF00D67D).withValues(alpha: 0.2)
+                    : Colors.grey.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: _isOnline
+                      ? const Color(0xFF00D67D).withValues(alpha: 0.5)
+                      : Colors.grey.withValues(alpha: 0.3),
                 ),
-                const SizedBox(height: 4),
-                const Text(
-                  'Your business dashboard',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                // Online Status Toggle
-                GestureDetector(
-                  onTap: _toggleOnlineStatus,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
                     decoration: BoxDecoration(
-                      color: _isOnline
-                          ? const Color(0xFF00D67D).withValues(alpha: 0.2)
-                          : Colors.grey.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: _isOnline
-                            ? const Color(0xFF00D67D).withValues(alpha: 0.5)
-                            : Colors.grey.withValues(alpha: 0.3),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 8,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: _isOnline ? const Color(0xFF00D67D) : Colors.grey,
-                            boxShadow: _isOnline
-                                ? [
-                                    BoxShadow(
-                                      color: const Color(0xFF00D67D).withValues(alpha: 0.6),
-                                      blurRadius: 6,
-                                    ),
-                                  ]
-                                : null,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          _isOnline ? 'Online' : 'Offline',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: _isOnline ? const Color(0xFF00D67D) : Colors.grey,
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        Icon(
-                          _isOnline ? Icons.toggle_on : Icons.toggle_off,
-                          size: 24,
-                          color: _isOnline ? const Color(0xFF00D67D) : Colors.grey,
-                        ),
-                      ],
+                      shape: BoxShape.circle,
+                      color: _isOnline ? const Color(0xFF00D67D) : Colors.grey,
+                      boxShadow: _isOnline
+                          ? [
+                              BoxShadow(
+                                color: const Color(0xFF00D67D).withValues(alpha: 0.6),
+                                blurRadius: 6,
+                              ),
+                            ]
+                          : null,
                     ),
                   ),
-                ),
-              ],
+                  const SizedBox(width: 8),
+                  Text(
+                    _isOnline ? 'Online' : 'Offline',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: _isOnline ? const Color(0xFF00D67D) : Colors.grey,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(
+                    _isOnline ? Icons.toggle_on : Icons.toggle_off,
+                    size: 24,
+                    color: _isOnline ? const Color(0xFF00D67D) : Colors.grey,
+                  ),
+                ],
+              ),
             ),
           ),
           // Notification Bell

@@ -208,92 +208,156 @@ class _MenuCategoryScreenState extends State<MenuCategoryScreen> {
   Future<void> _showAddCategoryDialog(BuildContext context, bool isDarkMode) async {
     final nameController = TextEditingController();
     final descController = TextEditingController();
+    String? selectedCategory;
+    bool showCustomField = false;
+
+    // Combine all default categories
+    final allCategories = [
+      ...DefaultMenuCategories.restaurant,
+      ...DefaultMenuCategories.cafe.where(
+        (c) => !DefaultMenuCategories.restaurant.contains(c),
+      ),
+      'Custom',
+    ];
 
     await showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: isDarkMode ? const Color(0xFF2D2D44) : Colors.white,
-        title: Text(
-          'Add Category',
-          style: TextStyle(
-            color: isDarkMode ? Colors.white : Colors.black87,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: isDarkMode ? const Color(0xFF2D2D44) : Colors.white,
+          title: Text(
+            'Add Category',
+            style: TextStyle(
+              color: isDarkMode ? Colors.white : Colors.black87,
+            ),
           ),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              autofocus: true,
-              style: TextStyle(
-                color: isDarkMode ? Colors.white : Colors.black87,
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Dropdown for category selection
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: const Color(0xFF00D67D),
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: selectedCategory,
+                    hint: Text(
+                      'Select Category',
+                      style: TextStyle(
+                        color: isDarkMode ? Colors.white54 : Colors.grey[600],
+                      ),
+                    ),
+                    isExpanded: true,
+                    dropdownColor: isDarkMode ? const Color(0xFF2D2D44) : Colors.white,
+                    icon: Icon(
+                      Icons.keyboard_arrow_down,
+                      color: isDarkMode ? Colors.white54 : Colors.grey[600],
+                    ),
+                    items: allCategories.map((category) {
+                      return DropdownMenuItem<String>(
+                        value: category,
+                        child: Text(
+                          category,
+                          style: TextStyle(
+                            color: isDarkMode ? Colors.white : Colors.black87,
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      setDialogState(() {
+                        selectedCategory = value;
+                        showCustomField = value == 'Custom';
+                        if (!showCustomField && value != null) {
+                          nameController.text = value;
+                        } else if (showCustomField) {
+                          nameController.clear();
+                        }
+                      });
+                    },
+                  ),
+                ),
               ),
-              decoration: InputDecoration(
-                labelText: 'Category Name',
-                hintText: 'e.g., Starters, Main Course',
-                labelStyle: TextStyle(
+              // Custom name field (shown when "Custom" is selected)
+              if (showCustomField) ...[
+                const SizedBox(height: 16),
+                TextField(
+                  controller: nameController,
+                  autofocus: true,
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.white : Colors.black87,
+                  ),
+                  decoration: InputDecoration(
+                    labelText: 'Custom Category Name',
+                    hintText: 'Enter category name',
+                    labelStyle: TextStyle(
+                      color: isDarkMode ? Colors.white54 : Colors.grey[600],
+                    ),
+                    hintStyle: TextStyle(
+                      color: isDarkMode ? Colors.white38 : Colors.grey[400],
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFF00D67D)),
+                    ),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 16),
+              TextField(
+                controller: descController,
+                style: TextStyle(
+                  color: isDarkMode ? Colors.white : Colors.black87,
+                ),
+                decoration: InputDecoration(
+                  labelText: 'Description (Optional)',
+                  labelStyle: TextStyle(
+                    color: isDarkMode ? Colors.white54 : Colors.grey[600],
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFF00D67D)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(
+                'Cancel',
+                style: TextStyle(
                   color: isDarkMode ? Colors.white54 : Colors.grey[600],
-                ),
-                hintStyle: TextStyle(
-                  color: isDarkMode ? Colors.white38 : Colors.grey[400],
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Color(0xFF00D67D)),
                 ),
               ),
             ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: descController,
-              style: TextStyle(
-                color: isDarkMode ? Colors.white : Colors.black87,
+            ElevatedButton(
+              onPressed: () async {
+                final name = nameController.text.trim();
+                if (name.isEmpty) return;
+                await _addCategory(name, descController.text.trim());
+                if (context.mounted) Navigator.pop(context);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF00D67D),
+                foregroundColor: Colors.white,
               ),
-              decoration: InputDecoration(
-                labelText: 'Description (Optional)',
-                labelStyle: TextStyle(
-                  color: isDarkMode ? Colors.white54 : Colors.grey[600],
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Color(0xFF00D67D)),
-                ),
-              ),
+              child: const Text('Add'),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Cancel',
-              style: TextStyle(
-                color: isDarkMode ? Colors.white54 : Colors.grey[600],
-              ),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (nameController.text.trim().isEmpty) return;
-              await _addCategory(
-                nameController.text.trim(),
-                descController.text.trim(),
-              );
-              if (context.mounted) Navigator.pop(context);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF00D67D),
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Add'),
-          ),
-        ],
       ),
     );
   }
