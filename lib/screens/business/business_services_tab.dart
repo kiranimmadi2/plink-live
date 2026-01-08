@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../models/business_model.dart';
 import '../../models/business_post_model.dart';
+import '../../config/dynamic_business_ui_config.dart' as dynamic_config;
 import '../../services/business_service.dart';
 import '../../widgets/business/business_widgets.dart';
 
@@ -25,13 +26,30 @@ class _BusinessServicesTabState extends State<BusinessServicesTab>
   final BusinessService _businessService = BusinessService();
   late TabController _tabController;
   String _selectedFilter = 'All';
-
-  final List<String> _filters = ['All', 'Products', 'Services'];
+  late dynamic_config.CategoryTerminology _terminology;
+  late List<String> _filters;
+  bool _hasListings = false;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+
+    // Get category-specific terminology
+    if (widget.business.category != null) {
+      _terminology = dynamic_config.CategoryTerminology.getForCategory(widget.business.category!);
+      _filters = ['All', _terminology.filter1Label, _terminology.filter2Label];
+    } else {
+      _terminology = const dynamic_config.CategoryTerminology(
+        screenTitle: 'Services & Products',
+        filter1Label: 'Products',
+        filter1Icon: 'shopping_bag',
+        filter2Label: 'Services',
+        filter2Icon: 'handyman',
+        emptyStateMessage: 'Start adding products or services to showcase to your customers',
+      );
+      _filters = ['All', 'Products', 'Services'];
+    }
   }
 
   @override
@@ -51,7 +69,7 @@ class _BusinessServicesTabState extends State<BusinessServicesTab>
         elevation: 0,
         automaticallyImplyLeading: false,
         title: Text(
-          'Services & Products',
+          _terminology.screenTitle,
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.bold,
@@ -85,6 +103,19 @@ class _BusinessServicesTabState extends State<BusinessServicesTab>
 
           final allListings = snapshot.data ?? [];
           final listings = _filterListings(allListings);
+          final hasAnyListings = allListings.isNotEmpty;
+          final hasFilteredResults = listings.isNotEmpty;
+
+          // Update state to control FAB visibility
+          // Show FAB only when there are listings AND current filter shows results
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            final shouldShowFAB = hasAnyListings && hasFilteredResults;
+            if (_hasListings != shouldShowFAB) {
+              setState(() {
+                _hasListings = shouldShowFAB;
+              });
+            }
+          });
 
           if (allListings.isEmpty) {
             return _buildEmptyState(isDarkMode);
@@ -115,13 +146,15 @@ class _BusinessServicesTabState extends State<BusinessServicesTab>
           );
         },
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showAddSheet(),
-        backgroundColor: const Color(0xFF00D67D),
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.add),
-        label: const Text('Add New'),
-      ),
+      floatingActionButton: _hasListings
+          ? FloatingActionButton.extended(
+              onPressed: () => _showAddSheet(),
+              backgroundColor: const Color(0xFF00D67D),
+              foregroundColor: Colors.white,
+              icon: const Icon(Icons.add),
+              label: const Text('Add New'),
+            )
+          : null,
     );
   }
 
@@ -131,13 +164,18 @@ class _BusinessServicesTabState extends State<BusinessServicesTab>
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: BusinessFilterBar(
         chips: _filters.map((filter) {
+          IconData? icon;
+          if (filter == _terminology.filter1Label) {
+            icon = _terminology.getFilter1Icon();
+          } else if (filter == _terminology.filter2Label) {
+            icon = _terminology.getFilter2Icon();
+          }
+
           return BusinessFilterChip(
             label: filter,
             isSelected: _selectedFilter == filter,
             onTap: () => setState(() => _selectedFilter = filter),
-            icon: filter == 'Products'
-                ? Icons.shopping_bag_outlined
-                : (filter == 'Services' ? Icons.handyman_outlined : null),
+            icon: icon,
           );
         }).toList(),
       ),
@@ -146,7 +184,7 @@ class _BusinessServicesTabState extends State<BusinessServicesTab>
 
   List<BusinessListing> _filterListings(List<BusinessListing> listings) {
     if (_selectedFilter == 'All') return listings;
-    if (_selectedFilter == 'Products') {
+    if (_selectedFilter == _terminology.filter1Label) {
       return listings.where((l) => l.type == 'product').toList();
     }
     return listings.where((l) => l.type == 'service').toList();
@@ -182,7 +220,7 @@ class _BusinessServicesTabState extends State<BusinessServicesTab>
             ),
             const SizedBox(height: 8),
             Text(
-              'Start adding products or services to showcase to your customers',
+              _terminology.emptyStateMessage,
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14,
@@ -190,11 +228,51 @@ class _BusinessServicesTabState extends State<BusinessServicesTab>
               ),
             ),
             const SizedBox(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                ElevatedButton.icon(
-                  onPressed: () => _showAddSheet(type: 'product'),
+            _buildDynamicAddButtons(isDarkMode),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDynamicAddButtons(bool isDarkMode) {
+    // Get dynamic configuration based on business category
+    if (widget.business.category == null) {
+      return _buildDefaultAddButtons(isDarkMode);
+    }
+
+    final config = dynamic_config.DynamicUIConfig.getConfigForCategory(widget.business.category!);
+
+    // Find relevant "add" actions from quick actions
+    final addActions = config.quickActions.where((action) {
+      return action == dynamic_config.QuickAction.addProduct ||
+             action == dynamic_config.QuickAction.addService ||
+             action == dynamic_config.QuickAction.addMenuItem ||
+             action == dynamic_config.QuickAction.addRoom ||
+             action == dynamic_config.QuickAction.addProperty ||
+             action == dynamic_config.QuickAction.addVehicle ||
+             action == dynamic_config.QuickAction.addCourse ||
+             action == dynamic_config.QuickAction.addMembership ||
+             action == dynamic_config.QuickAction.addPackage ||
+             action == dynamic_config.QuickAction.addPortfolioItem;
+    }).take(2).toList(); // Show max 2 buttons
+
+    if (addActions.isEmpty) {
+      return _buildDefaultAddButtons(isDarkMode);
+    }
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: addActions.asMap().entries.map((entry) {
+        final index = entry.key;
+        final action = entry.value;
+        final isPrimary = index == 0;
+
+        return Padding(
+          padding: EdgeInsets.only(left: index > 0 ? 12 : 0),
+          child: isPrimary
+              ? ElevatedButton.icon(
+                  onPressed: () => _handleAddAction(action),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF00D67D),
                     foregroundColor: Colors.white,
@@ -207,11 +285,10 @@ class _BusinessServicesTabState extends State<BusinessServicesTab>
                     ),
                   ),
                   icon: const Icon(Icons.add),
-                  label: const Text('Add Product'),
-                ),
-                const SizedBox(width: 12),
-                OutlinedButton.icon(
-                  onPressed: () => _showAddSheet(type: 'service'),
+                  label: Text(action.label),
+                )
+              : OutlinedButton.icon(
+                  onPressed: () => _handleAddAction(action),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: const Color(0xFF00D67D),
                     padding: const EdgeInsets.symmetric(
@@ -224,41 +301,157 @@ class _BusinessServicesTabState extends State<BusinessServicesTab>
                     ),
                   ),
                   icon: const Icon(Icons.add),
-                  label: const Text('Add Service'),
+                  label: Text(action.label),
                 ),
-              ],
-            ),
-          ],
-        ),
-      ),
+        );
+      }).toList(),
     );
+  }
+
+  Widget _buildDefaultAddButtons(bool isDarkMode) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        ElevatedButton.icon(
+          onPressed: () => _showAddSheet(type: 'product'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF00D67D),
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(
+              horizontal: 20,
+              vertical: 12,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          icon: const Icon(Icons.add),
+          label: const Text('Add Product'),
+        ),
+        const SizedBox(width: 12),
+        OutlinedButton.icon(
+          onPressed: () => _showAddSheet(type: 'service'),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: const Color(0xFF00D67D),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 20,
+              vertical: 12,
+            ),
+            side: const BorderSide(color: Color(0xFF00D67D)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          icon: const Icon(Icons.add),
+          label: const Text('Add Service'),
+        ),
+      ],
+    );
+  }
+
+  void _handleAddAction(dynamic_config.QuickAction action) {
+    String type;
+    switch (action) {
+      case dynamic_config.QuickAction.addMenuItem:
+        type = 'menu_item';
+        break;
+      case dynamic_config.QuickAction.addProduct:
+        type = 'product';
+        break;
+      case dynamic_config.QuickAction.addService:
+        type = 'service';
+        break;
+      case dynamic_config.QuickAction.addRoom:
+        type = 'room';
+        break;
+      case dynamic_config.QuickAction.addProperty:
+        type = 'property';
+        break;
+      case dynamic_config.QuickAction.addVehicle:
+        type = 'vehicle';
+        break;
+      case dynamic_config.QuickAction.addCourse:
+        type = 'course';
+        break;
+      case dynamic_config.QuickAction.addMembership:
+        type = 'membership';
+        break;
+      case dynamic_config.QuickAction.addPackage:
+        type = 'package';
+        break;
+      case dynamic_config.QuickAction.addPortfolioItem:
+        type = 'portfolio';
+        break;
+      default:
+        type = 'service';
+    }
+    _showAddSheet(type: type);
   }
 
   Widget _buildNoResultsState(bool isDarkMode) {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.search_off,
-            size: 64,
-            color: isDarkMode ? Colors.white24 : Colors.grey[300],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'No $_selectedFilter found',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: isDarkMode ? Colors.white70 : Colors.grey[700],
+      child: Padding(
+        padding: const EdgeInsets.all(40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: const Color(0xFF00D67D).withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.add_circle_outline,
+                size: 64,
+                color: isDarkMode ? Colors.white24 : Colors.grey[300],
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          TextButton(
-            onPressed: () => setState(() => _selectedFilter = 'All'),
-            child: const Text('View All'),
-          ),
-        ],
+            const SizedBox(height: 24),
+            Text(
+              'No $_selectedFilter Yet',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: isDarkMode ? Colors.white : Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Add your first ${_selectedFilter.toLowerCase()} to get started',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                color: isDarkMode ? Colors.white54 : Colors.grey[600],
+              ),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: () => _showAddSheet(),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF00D67D),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              icon: const Icon(Icons.add),
+              label: Text('Add ${_selectedFilter == 'All' ? 'New' : _selectedFilter}'),
+            ),
+            const SizedBox(height: 16),
+            TextButton(
+              onPressed: () => setState(() => _selectedFilter = 'All'),
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFF00D67D),
+              ),
+              child: const Text('View All'),
+            ),
+          ],
+        ),
       ),
     );
   }

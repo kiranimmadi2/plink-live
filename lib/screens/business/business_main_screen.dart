@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/business_model.dart';
 import '../../models/business_category_config.dart';
 import '../../models/conversation_model.dart';
+import '../../config/dynamic_business_ui_config.dart' as dynamic_config;
 import '../../services/business_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/chat services/conversation_service.dart';
@@ -35,6 +36,14 @@ class _BusinessMainScreenState extends ConsumerState<BusinessMainScreen> {
   final ConversationService _conversationService = ConversationService();
   BusinessModel? _business;
   bool _isLoading = true;
+
+  /// Get dynamic label for the services/listings tab based on category
+  String _getServicesTabLabel(BusinessCategory category) {
+    final terminology = dynamic_config.CategoryTerminology.getForCategory(category);
+    // Extract first word from screen title (e.g., "Packages & Tours" -> "Packages")
+    final firstWord = terminology.screenTitle.split(' ')[0];
+    return firstWord;
+  }
 
   /// Get navigation items based on business category
   List<_NavItem> get _navItems {
@@ -86,14 +95,14 @@ class _BusinessMainScreenState extends ConsumerState<BusinessMainScreen> {
       case BusinessCategory.realEstate:
       case BusinessCategory.travelTourism:
       case BusinessCategory.entertainment:
-      case BusinessCategory.financial:
       case BusinessCategory.transportation:
       case BusinessCategory.agriculture:
       case BusinessCategory.manufacturing:
       case BusinessCategory.weddingEvents:
-        // Other service categories - services only
+        // Other categories with dynamic labels
+        final label = category != null ? _getServicesTabLabel(category) : 'Services';
         items.addAll([
-          _NavItem(icon: Icons.miscellaneous_services_outlined, activeIcon: Icons.miscellaneous_services, label: 'Services'),
+          _NavItem(icon: Icons.miscellaneous_services_outlined, activeIcon: Icons.miscellaneous_services, label: label),
         ]);
         break;
       default:
@@ -166,7 +175,6 @@ class _BusinessMainScreenState extends ConsumerState<BusinessMainScreen> {
       case BusinessCategory.realEstate:
       case BusinessCategory.travelTourism:
       case BusinessCategory.entertainment:
-      case BusinessCategory.financial:
       case BusinessCategory.transportation:
       case BusinessCategory.agriculture:
       case BusinessCategory.manufacturing:
@@ -207,10 +215,10 @@ class _BusinessMainScreenState extends ConsumerState<BusinessMainScreen> {
   @override
   void initState() {
     super.initState();
-    _loadBusinessData();
+    _loadBusinessData(resetTab: true);
   }
 
-  Future<void> _loadBusinessData() async {
+  Future<void> _loadBusinessData({bool resetTab = false}) async {
     setState(() => _isLoading = true);
 
     final business = await _businessService.getMyBusiness();
@@ -218,14 +226,16 @@ class _BusinessMainScreenState extends ConsumerState<BusinessMainScreen> {
       setState(() {
         _business = business;
         _isLoading = false;
-        // Reset to home tab when business loads to avoid index out of bounds
-        _currentIndex = 0;
+        // Reset to home tab only on initial load to avoid index out of bounds
+        if (resetTab) {
+          _currentIndex = 0;
+        }
       });
     }
   }
 
   void _refreshBusiness() {
-    _loadBusinessData();
+    _loadBusinessData(resetTab: false);
   }
 
   @override

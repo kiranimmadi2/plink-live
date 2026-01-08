@@ -23,6 +23,7 @@ class RoomsTab extends StatefulWidget {
 class _RoomsTabState extends State<RoomsTab> {
   final BusinessService _businessService = BusinessService();
   String _filterType = 'all'; // all, available, unavailable
+  bool _hasRooms = false;
 
   @override
   Widget build(BuildContext context) {
@@ -39,18 +40,20 @@ class _RoomsTabState extends State<RoomsTab> {
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _addRoom,
-        backgroundColor: const Color(0xFF00D67D),
-        icon: const Icon(Icons.add, color: Colors.white),
-        label: const Text(
-          'Add Room',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ),
+      floatingActionButton: _hasRooms
+          ? FloatingActionButton.extended(
+              onPressed: _addRoom,
+              backgroundColor: const Color(0xFF00D67D),
+              icon: const Icon(Icons.add, color: Colors.white),
+              label: const Text(
+                'Add Room',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            )
+          : null,
     );
   }
 
@@ -168,6 +171,15 @@ class _RoomsTabState extends State<RoomsTab> {
 
         final allRooms = snapshot.data ?? [];
         final rooms = _filterRooms(allRooms);
+
+        // Update state to control FAB visibility
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (_hasRooms != allRooms.isNotEmpty) {
+            setState(() {
+              _hasRooms = allRooms.isNotEmpty;
+            });
+          }
+        });
 
         if (rooms.isEmpty) {
           return _buildEmptyState(isDarkMode, allRooms.isEmpty);
