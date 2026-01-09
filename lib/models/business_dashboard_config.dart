@@ -121,7 +121,6 @@ CategoryGroup getCategoryGroup(BusinessCategory? category) {
     case BusinessCategory.homeServices:
     case BusinessCategory.petServices:
     case BusinessCategory.weddingEvents:
-    case BusinessCategory.financial:
     case BusinessCategory.realEstate:
     case BusinessCategory.technology:
     case BusinessCategory.entertainment:

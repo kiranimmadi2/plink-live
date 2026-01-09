@@ -16,7 +16,6 @@ enum BusinessCategory {
   petServices,       // Pet Shops, Grooming, Boarding
   homeServices,      // Plumbing, Electrical, Cleaning
   technology,        // IT Services, Software, Tech Repair
-  financial,         // Banking, Insurance, Investments
   legal,             // Lawyers, Notaries, Legal Services
   professional,      // Consultants, HR, Marketing Agencies
   transportation,    // Courier, Logistics, Taxi
@@ -86,7 +85,6 @@ class BusinessCategoryConfig {
         petServices,
         homeServices,
         technology,
-        financial,
         legal,
         professional,
         transportation,
@@ -859,53 +857,6 @@ class BusinessCategoryConfig {
     ],
   );
 
-  // ============ FINANCIAL ============
-  static const financial = BusinessCategoryConfig(
-    category: BusinessCategory.financial,
-    id: 'financial',
-    displayName: 'Financial Services',
-    description: 'Banking, Insurance & Investments',
-    icon: Icons.account_balance,
-    color: Color(0xFF059669), // Emerald Dark
-    subTypes: [
-      'Bank',
-      'Insurance Agent',
-      'Investment Advisor',
-      'Loan Agent',
-      'CA Firm',
-      'Tax Consultant',
-      'Stock Broker',
-      'Mutual Fund Distributor',
-      'Money Exchange',
-    ],
-    features: [
-      BusinessFeature.services,
-      BusinessFeature.appointments,
-    ],
-    setupFields: [
-      CategorySetupField(
-        id: 'financialServices',
-        label: 'Services',
-        type: FieldType.multiSelect,
-        options: [
-          'Savings Account',
-          'Loans',
-          'Insurance',
-          'Investments',
-          'Tax Filing',
-          'Accounting',
-          'Financial Planning',
-        ],
-      ),
-      CategorySetupField(
-        id: 'clientType',
-        label: 'Client Type',
-        type: FieldType.multiSelect,
-        options: ['Individuals', 'Businesses', 'Corporates', 'NRIs'],
-      ),
-    ],
-  );
-
   // ============ LEGAL ============
   static const legal = BusinessCategoryConfig(
     category: BusinessCategory.legal,
@@ -1312,7 +1263,6 @@ class BusinessCategoryConfig {
     'Transportation & Logistics': BusinessCategory.transportation,
     'Entertainment & Media': BusinessCategory.entertainment,
     'Hospitality & Tourism': BusinessCategory.hospitality,
-    'Financial Services': BusinessCategory.financial,
     'Non-Profit Organization': BusinessCategory.professional,
     'Home Services': BusinessCategory.homeServices,
     'Automotive': BusinessCategory.automotive,
@@ -1384,8 +1334,6 @@ extension BusinessCategoryExtension on BusinessCategory {
         return 'home_services';
       case BusinessCategory.technology:
         return 'technology';
-      case BusinessCategory.financial:
-        return 'financial';
       case BusinessCategory.legal:
         return 'legal';
       case BusinessCategory.professional:
@@ -1445,8 +1393,6 @@ extension BusinessCategoryExtension on BusinessCategory {
         return BusinessCategory.homeServices;
       case 'technology':
         return BusinessCategory.technology;
-      case 'financial':
-        return BusinessCategory.financial;
       case 'legal':
         return BusinessCategory.legal;
       case 'professional':

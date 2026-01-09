@@ -362,25 +362,6 @@ class CategoryUIConfig {
       bookingIcon: Icons.work,
     ),
 
-    // FINANCIAL
-    BusinessCategory.financial: CategoryUIConfig(
-      category: BusinessCategory.financial,
-      itemsTabLabel: 'Services',
-      bookingsTabLabel: 'Appointments',
-      itemSingular: 'Service',
-      itemPlural: 'Services',
-      bookingSingular: 'Appointment',
-      bookingPlural: 'Appointments',
-      addItemLabel: 'Add Service',
-      newBookingLabel: 'New Appointment',
-      noItemsMessage: 'No services added yet',
-      noBookingsMessage: 'No appointments yet',
-      defaultItemType: ItemType.service,
-      defaultBookingType: BookingType.appointment,
-      itemIcon: Icons.account_balance,
-      bookingIcon: Icons.event_note,
-    ),
-
     // LEGAL
     BusinessCategory.legal: CategoryUIConfig(
       category: BusinessCategory.legal,
