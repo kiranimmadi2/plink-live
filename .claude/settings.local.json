@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(flutter clean:*)",
-      "Read(/C:\\Desktop\\Plink\\flutter6\\lib\\services/**)"
+      "Read(/C:\\Desktop\\Plink\\flutter6\\lib\\services/**)",
+      "Bash(cd c:/Desktop/plink/flutter 11)",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []
