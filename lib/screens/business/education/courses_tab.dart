@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../models/business_model.dart';
-import '../../../widgets/business/business_widgets.dart';
 
 /// Education course categories
 class CourseCategories {

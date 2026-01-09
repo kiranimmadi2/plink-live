@@ -9,7 +9,6 @@ import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../../services/universal_intent_service.dart';
 import '../../models/user_profile.dart';
 import '../chat/enhanced_chat_screen.dart';
-import '../../widgets/other widgets/user_avatar.dart';
 import '../../widgets/match_result_card.dart';
 import '../../services/realtime_matching_service.dart';
 import '../../services/profile services/photo_cache_service.dart';
