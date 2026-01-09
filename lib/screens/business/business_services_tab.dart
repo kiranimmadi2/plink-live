@@ -463,14 +463,16 @@ class _BusinessServicesTabState extends State<BusinessServicesTab>
       backgroundColor: Colors.transparent,
       builder: (context) => _AddServiceSheet(
         businessId: widget.business.id,
+        business: widget.business,
         initialType: type,
         onSave: (listing) async {
           final id = await _businessService.createListing(listing);
           if (id != null && mounted) {
             widget.onRefresh();
             if (!mounted) return;
+            final typeLabel = listing.type == 'product' ? _terminology.filter1Label : _terminology.filter2Label;
             ScaffoldMessenger.of(this.context).showSnackBar(
-              SnackBar(content: Text('${listing.type == 'product' ? 'Product' : 'Service'} added successfully')),
+              SnackBar(content: Text('$typeLabel added successfully')),
             );
           }
         },
@@ -485,6 +487,7 @@ class _BusinessServicesTabState extends State<BusinessServicesTab>
       backgroundColor: Colors.transparent,
       builder: (context) => _AddServiceSheet(
         businessId: widget.business.id,
+        business: widget.business,
         existingListing: listing,
         onSave: (updatedListing) async {
           final success = await _businessService.updateListing(listing.id, updatedListing);
@@ -783,12 +786,14 @@ class _AddServiceSheet extends StatefulWidget {
   final String? initialType;
   final BusinessListing? existingListing;
   final Function(BusinessListing) onSave;
+  final BusinessModel business;
 
   const _AddServiceSheet({
     required this.businessId,
     this.initialType,
     this.existingListing,
     required this.onSave,
+    required this.business,
   });
 
   @override
@@ -804,10 +809,26 @@ class _AddServiceSheetState extends State<_AddServiceSheet> {
   String _selectedPricingType = PricingTypes.fixed;
   bool _isAvailable = true;
   bool _isSaving = false;
+  late dynamic_config.CategoryTerminology _terminology;
 
   @override
   void initState() {
     super.initState();
+
+    // Get category-specific terminology
+    if (widget.business.category != null) {
+      _terminology = dynamic_config.CategoryTerminology.getForCategory(widget.business.category!);
+    } else {
+      _terminology = const dynamic_config.CategoryTerminology(
+        screenTitle: 'Services & Products',
+        filter1Label: 'Products',
+        filter1Icon: 'shopping_bag',
+        filter2Label: 'Services',
+        filter2Icon: 'handyman',
+        emptyStateMessage: 'Start adding products or services to showcase to your customers',
+      );
+    }
+
     _selectedType = widget.existingListing?.type ?? widget.initialType ?? 'product';
 
     if (widget.existingListing != null) {
@@ -852,20 +873,38 @@ class _AddServiceSheetState extends State<_AddServiceSheet> {
           // Header
           Padding(
             padding: const EdgeInsets.all(20),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  isEditing ? 'Edit Listing' : 'Add New Listing',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: isDarkMode ? Colors.white : Colors.black87,
-                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        isEditing ? 'Edit' : _terminology.screenTitle,
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: isDarkMode ? Colors.white : Colors.black87,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
                 ),
-                const Spacer(),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.pop(context),
+                const SizedBox(height: 4),
+                Text(
+                  isEditing
+                      ? 'Update ${_selectedType == 'product' ? _terminology.filter1Label.toLowerCase() : _terminology.filter2Label.toLowerCase()} details'
+                      : 'Choose type and fill in the details',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: isDarkMode ? Colors.white54 : Colors.grey[600],
+                  ),
                 ),
               ],
             ),
@@ -894,8 +933,8 @@ class _AddServiceSheetState extends State<_AddServiceSheet> {
                         Expanded(
                           child: _buildTypeOption(
                             type: 'product',
-                            icon: Icons.shopping_bag_outlined,
-                            label: 'Product',
+                            icon: _terminology.getFilter1Icon(),
+                            label: _terminology.filter1Label,
                             color: Colors.blue,
                             isDarkMode: isDarkMode,
                           ),
@@ -904,8 +943,8 @@ class _AddServiceSheetState extends State<_AddServiceSheet> {
                         Expanded(
                           child: _buildTypeOption(
                             type: 'service',
-                            icon: Icons.handyman_outlined,
-                            label: 'Service',
+                            icon: _terminology.getFilter2Icon(),
+                            label: _terminology.filter2Label,
                             color: Colors.purple,
                             isDarkMode: isDarkMode,
                           ),
@@ -919,7 +958,7 @@ class _AddServiceSheetState extends State<_AddServiceSheet> {
                       controller: _nameController,
                       decoration: InputDecoration(
                         labelText: 'Name',
-                        hintText: 'Enter ${_selectedType == 'product' ? 'product' : 'service'} name',
+                        hintText: 'Enter ${_selectedType == 'product' ? _terminology.filter1Label.toLowerCase() : _terminology.filter2Label.toLowerCase()} name',
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -939,7 +978,7 @@ class _AddServiceSheetState extends State<_AddServiceSheet> {
                       maxLines: 3,
                       decoration: InputDecoration(
                         labelText: 'Description',
-                        hintText: 'Describe your ${_selectedType == 'product' ? 'product' : 'service'}',
+                        hintText: 'Describe your ${_selectedType == 'product' ? _terminology.filter1Label.toLowerCase() : _terminology.filter2Label.toLowerCase()}',
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
