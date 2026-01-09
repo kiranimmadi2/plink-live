@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import '../../models/business_model.dart';
 import '../../models/business_dashboard_config.dart';
+import '../../config/dynamic_business_ui_config.dart' as dynamic_config;
 import '../../services/business_service.dart';
 import '../../res/config/app_assets.dart';
 import '../../res/config/app_colors.dart';
@@ -621,6 +622,25 @@ class _BusinessHomeTabState extends State<BusinessHomeTab> {
   }
 
   List<Map<String, dynamic>> _getQuickActions() {
+    // Get dynamic configuration based on business category
+    if (widget.business.category == null) {
+      return _getDefaultQuickActions();
+    }
+
+    final config = dynamic_config.DynamicUIConfig.getConfigForCategory(widget.business.category!);
+    final quickActions = config.quickActions.take(3).toList(); // Show max 3 actions
+
+    return quickActions.map((action) {
+      return {
+        'icon': action.icon,
+        'label': action.label,
+        'color': _getColorForAction(action),
+        'onTap': () => _handleQuickAction(action),
+      };
+    }).toList();
+  }
+
+  List<Map<String, dynamic>> _getDefaultQuickActions() {
     return [
       {
         'icon': Icons.add_circle_outline,
@@ -641,6 +661,77 @@ class _BusinessHomeTabState extends State<BusinessHomeTab> {
         'onTap': () => _navigateToAnalytics(),
       },
     ];
+  }
+
+  Color _getColorForAction(dynamic_config.QuickAction action) {
+    switch (action) {
+      case dynamic_config.QuickAction.addMenuItem:
+      case dynamic_config.QuickAction.addProduct:
+      case dynamic_config.QuickAction.addService:
+      case dynamic_config.QuickAction.addRoom:
+      case dynamic_config.QuickAction.addProperty:
+      case dynamic_config.QuickAction.addVehicle:
+      case dynamic_config.QuickAction.addCourse:
+      case dynamic_config.QuickAction.addMembership:
+      case dynamic_config.QuickAction.addPackage:
+      case dynamic_config.QuickAction.addPortfolioItem:
+        return const Color(0xFF00D67D);
+      case dynamic_config.QuickAction.manageOrders:
+      case dynamic_config.QuickAction.manageBookings:
+      case dynamic_config.QuickAction.manageAppointments:
+      case dynamic_config.QuickAction.manageClasses:
+      case dynamic_config.QuickAction.manageInventory:
+      case dynamic_config.QuickAction.manageInquiries:
+        return const Color(0xFF42A5F5);
+      case dynamic_config.QuickAction.createPost:
+        return const Color(0xFFFF6B6B);
+      case dynamic_config.QuickAction.viewAnalytics:
+        return const Color(0xFF7E57C2);
+    }
+  }
+
+  void _handleQuickAction(dynamic_config.QuickAction action) {
+    HapticFeedback.lightImpact();
+
+    switch (action) {
+      // Add actions - switch to appropriate tab
+      case dynamic_config.QuickAction.addMenuItem:
+      case dynamic_config.QuickAction.addProduct:
+      case dynamic_config.QuickAction.addService:
+      case dynamic_config.QuickAction.addRoom:
+      case dynamic_config.QuickAction.addProperty:
+      case dynamic_config.QuickAction.addVehicle:
+      case dynamic_config.QuickAction.addCourse:
+      case dynamic_config.QuickAction.addMembership:
+      case dynamic_config.QuickAction.addPackage:
+      case dynamic_config.QuickAction.addPortfolioItem:
+        widget.onSwitchTab(1); // Switch to items/services tab
+        break;
+
+      // Manage actions
+      case dynamic_config.QuickAction.manageOrders:
+      case dynamic_config.QuickAction.manageBookings:
+      case dynamic_config.QuickAction.manageAppointments:
+        _navigateToInquiries();
+        break;
+
+      case dynamic_config.QuickAction.manageClasses:
+      case dynamic_config.QuickAction.manageInventory:
+      case dynamic_config.QuickAction.manageInquiries:
+        _navigateToInquiries();
+        break;
+
+      case dynamic_config.QuickAction.createPost:
+        // Navigate to post creation
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Post creation coming soon')),
+        );
+        break;
+
+      case dynamic_config.QuickAction.viewAnalytics:
+        _navigateToAnalytics();
+        break;
+    }
   }
 
   Widget _buildQuickActionButton({
