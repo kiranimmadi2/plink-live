@@ -6,8 +6,6 @@ import '../../models/business_model.dart';
 import '../../models/business_dashboard_config.dart';
 import '../../config/dynamic_business_ui_config.dart' as dynamic_config;
 import '../../services/business_service.dart';
-import '../../res/config/app_assets.dart';
-import '../../res/config/app_colors.dart';
 import 'business_analytics_screen.dart';
 import 'business_inquiries_screen.dart';
 import 'gallery_screen.dart';
