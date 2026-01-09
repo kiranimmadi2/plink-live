@@ -155,7 +155,37 @@ class _BusinessSetupScreenState extends ConsumerState<BusinessSetupScreen> {
     _businessNameController.text = business.businessName;
     _legalNameController.text = business.legalName ?? '';
 
-    _phoneController.text = business.contact.phone ?? '';
+    // Parse phone number to extract country code and number separately
+    final phoneStr = business.contact.phone ?? '';
+    if (phoneStr.isNotEmpty) {
+      // Phone may be saved as "+91 9876543210" or corrupted as "+91 +91 +91 9876543210"
+      // We need to extract the country code and clean the phone number
+
+      // First, extract the first valid country code
+      final countryCodeMatch = RegExp(r'^\+\d{1,4}').firstMatch(phoneStr.trim());
+      if (countryCodeMatch != null) {
+        final countryCode = countryCodeMatch.group(0)!; // e.g., "+91"
+
+        // Remove ALL country codes from the phone string to get clean number
+        final phoneNumber = phoneStr
+            .replaceAll(RegExp(r'\+\d{1,4}\s*'), '') // Remove all +XX patterns
+            .trim();
+
+        // Find matching country in our list
+        final countryData = _countryCodes.firstWhere(
+          (country) => country['code'] == countryCode,
+          orElse: () => _countryCodes[0], // Default to India if not found
+        );
+
+        _selectedCountryCode = countryData['code']!;
+        _selectedCountryFlag = countryData['flag']!;
+        _phoneController.text = phoneNumber;
+      } else {
+        // If no country code found, treat entire string as phone number
+        _phoneController.text = phoneStr.trim();
+      }
+    }
+
     _emailController.text = business.contact.email ?? '';
     _websiteController.text = business.contact.website ?? '';
     _whatsappController.text = business.contact.whatsapp ?? '';
@@ -497,10 +527,17 @@ class _BusinessSetupScreenState extends ConsumerState<BusinessSetupScreen> {
         logoUrl = widget.existingBusiness!.logo;
       }
 
+      // Clean phone number to ensure no duplicate country codes
+      String? cleanedPhone;
+      if (_phoneController.text.trim().isNotEmpty) {
+        final phoneNumber = _phoneController.text.trim();
+        // Remove any existing country codes from the phone number before adding the selected one
+        final phoneWithoutCode = phoneNumber.replaceAll(RegExp(r'^\+\d{1,4}\s*'), '');
+        cleanedPhone = '$_selectedCountryCode $phoneWithoutCode';
+      }
+
       final contact = BusinessContact(
-        phone: _phoneController.text.trim().isEmpty
-            ? null
-            : '$_selectedCountryCode ${_phoneController.text.trim()}',
+        phone: cleanedPhone,
         email: _emailController.text.trim().isEmpty
             ? null
             : _emailController.text.trim(),
