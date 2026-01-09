@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../../../models/product_model.dart';
 import '../../../models/business_model.dart';
 import '../../../services/business_service.dart';
+import '../../../config/dynamic_business_ui_config.dart' as dynamic_config;
 import 'product_form_screen.dart';
 import 'product_category_screen.dart';
 
@@ -25,6 +26,18 @@ class _ProductsTabState extends State<ProductsTab> {
   final BusinessService _businessService = BusinessService();
   String? _selectedCategoryId;
   String _filterType = 'all'; // all, inStock, outOfStock, featured
+  dynamic_config.CategoryTerminology? _terminology;
+
+  @override
+  void initState() {
+    super.initState();
+    // Get category-specific terminology
+    if (widget.business.category != null) {
+      _terminology = dynamic_config.CategoryTerminology.getForCategory(
+        widget.business.category!,
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -46,9 +59,11 @@ class _ProductsTabState extends State<ProductsTab> {
         onPressed: _addProduct,
         backgroundColor: const Color(0xFF00D67D),
         icon: const Icon(Icons.add, color: Colors.white),
-        label: const Text(
-          'Add Product',
-          style: TextStyle(
+        label: Text(
+          _terminology != null
+              ? 'Add ${_terminology!.filter1Label}'
+              : 'Add Product',
+          style: const TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.w600,
           ),
@@ -80,7 +95,7 @@ class _ProductsTabState extends State<ProductsTab> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Products',
+                  _terminology?.filter1Label ?? 'Products',
                   style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
@@ -88,7 +103,9 @@ class _ProductsTabState extends State<ProductsTab> {
                   ),
                 ),
                 Text(
-                  'Manage your inventory',
+                  _terminology != null
+                      ? 'Manage your ${_terminology!.filter1Label.toLowerCase()}'
+                      : 'Manage your inventory',
                   style: TextStyle(
                     fontSize: 14,
                     color: isDarkMode ? Colors.white54 : Colors.grey[600],
@@ -136,7 +153,9 @@ class _ProductsTabState extends State<ProductsTab> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Create categories to organize your products',
+                    _terminology != null
+                        ? 'Create categories to organize your ${_terminology!.filter1Label.toLowerCase()}'
+                        : 'Create categories to organize your products',
                     style: TextStyle(
                       color: isDarkMode ? Colors.white70 : Colors.grey[700],
                     ),
@@ -329,7 +348,13 @@ class _ProductsTabState extends State<ProductsTab> {
           ),
           const SizedBox(height: 24),
           Text(
-            noProductsAtAll ? 'No Products Yet' : 'No Matching Products',
+            noProductsAtAll
+                ? (_terminology != null
+                    ? 'No ${_terminology!.filter1Label} Yet'
+                    : 'No Products Yet')
+                : (_terminology != null
+                    ? 'No Matching ${_terminology!.filter1Label}'
+                    : 'No Matching Products'),
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
@@ -339,7 +364,9 @@ class _ProductsTabState extends State<ProductsTab> {
           const SizedBox(height: 8),
           Text(
             noProductsAtAll
-                ? 'Add your first product to get started'
+                ? (_terminology != null
+                    ? 'Add your first ${_terminology!.filter1Label.toLowerCase()} to get started'
+                    : 'Add your first product to get started')
                 : 'Try a different filter or category',
             style: TextStyle(
               fontSize: 14,
@@ -362,7 +389,9 @@ class _ProductsTabState extends State<ProductsTab> {
                 ),
               ),
               icon: const Icon(Icons.add),
-              label: const Text('Add Product'),
+              label: Text(_terminology != null
+                  ? 'Add ${_terminology!.filter1Label}'
+                  : 'Add Product'),
             ),
           ],
         ],
@@ -378,6 +407,7 @@ class _ProductsTabState extends State<ProductsTab> {
         builder: (_) => ProductFormScreen(
           businessId: widget.business.id,
           categoryId: _selectedCategoryId,
+          business: widget.business,
           onSaved: () {
             Navigator.pop(context);
             widget.onRefresh?.call();
@@ -395,6 +425,7 @@ class _ProductsTabState extends State<ProductsTab> {
         builder: (_) => ProductFormScreen(
           businessId: widget.business.id,
           product: product,
+          business: widget.business,
           onSaved: () {
             Navigator.pop(context);
             widget.onRefresh?.call();
