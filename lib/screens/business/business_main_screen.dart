@@ -57,21 +57,25 @@ class _BusinessMainScreenState extends ConsumerState<BusinessMainScreen> {
     // Add category-specific tabs
     switch (category) {
       case BusinessCategory.hospitality:
+        final roomsLabel = category != null ? _getServicesTabLabel(category) : 'Rooms';
         items.addAll([
-          _NavItem(icon: Icons.hotel_outlined, activeIcon: Icons.hotel, label: 'Rooms'),
+          _NavItem(icon: Icons.hotel_outlined, activeIcon: Icons.hotel, label: roomsLabel),
           _NavItem(icon: Icons.calendar_today_outlined, activeIcon: Icons.calendar_today, label: 'Bookings'),
         ]);
         break;
       case BusinessCategory.foodBeverage:
+        final menuLabel = category != null ? _getServicesTabLabel(category) : 'Menu';
         items.addAll([
-          _NavItem(icon: Icons.restaurant_menu_outlined, activeIcon: Icons.restaurant_menu, label: 'Menu'),
+          _NavItem(icon: Icons.restaurant_menu_outlined, activeIcon: Icons.restaurant_menu, label: menuLabel),
           _NavItem(icon: Icons.receipt_long_outlined, activeIcon: Icons.receipt_long, label: 'Orders'),
         ]);
         break;
       case BusinessCategory.retail:
       case BusinessCategory.grocery:
+        // Use dynamic label based on category terminology
+        final label = category != null ? _getServicesTabLabel(category) : 'Products';
         items.addAll([
-          _NavItem(icon: Icons.inventory_2_outlined, activeIcon: Icons.inventory_2, label: 'Products'),
+          _NavItem(icon: Icons.inventory_2_outlined, activeIcon: Icons.inventory_2, label: label),
         ]);
         break;
       case BusinessCategory.beautyWellness:
@@ -80,9 +84,10 @@ class _BusinessMainScreenState extends ConsumerState<BusinessMainScreen> {
       case BusinessCategory.education:
       case BusinessCategory.homeServices:
       case BusinessCategory.petServices:
-        // Services-based businesses with appointments
+        // Services-based businesses with appointments - use dynamic label
+        final servicesLabel = category != null ? _getServicesTabLabel(category) : 'Services';
         items.addAll([
-          _NavItem(icon: Icons.build_outlined, activeIcon: Icons.build, label: 'Services'),
+          _NavItem(icon: Icons.build_outlined, activeIcon: Icons.build, label: servicesLabel),
           _NavItem(icon: Icons.calendar_month_outlined, activeIcon: Icons.calendar_month, label: 'Bookings'),
         ]);
         break;
