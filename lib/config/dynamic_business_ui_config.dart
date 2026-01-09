@@ -90,6 +90,39 @@ class DynamicUIConfig {
     }
   }
 
+  // ============ DEFAULT CONFIG (FALLBACK) ============
+  static const _defaultConfig = DynamicUIConfig(
+    category: BusinessCategory.retail, // Use retail as generic default
+    profileTemplate: 'generic_template',
+    profileSections: [
+      ProfileSection.hero,
+      ProfileSection.quickActions,
+      ProfileSection.highlights,
+      ProfileSection.services,
+      ProfileSection.gallery,
+      ProfileSection.reviews,
+      ProfileSection.hours,
+      ProfileSection.location,
+    ],
+    dashboardWidgets: [
+      DashboardWidget.stats,
+      DashboardWidget.upcomingBookings,
+      DashboardWidget.earnings,
+    ],
+    quickActions: [
+      QuickAction.addProduct,
+      QuickAction.manageBookings,
+      QuickAction.createPost,
+    ],
+    bottomTabs: [
+      BusinessTab.home,
+      BusinessTab.services,
+      BusinessTab.messages,
+      BusinessTab.profile,
+    ],
+    customization: {},
+  );
+
   // ============ FOOD & BEVERAGE CONFIG ============
   static const _foodBeverageConfig = DynamicUIConfig(
     category: BusinessCategory.foodBeverage,
