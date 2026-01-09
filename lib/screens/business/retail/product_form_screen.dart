@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../models/product_model.dart';
+import '../../../models/business_model.dart';
 import '../../../services/business_service.dart';
+import '../../../config/dynamic_business_ui_config.dart' as dynamic_config;
 
 /// Screen for adding/editing a product
 class ProductFormScreen extends StatefulWidget {
@@ -9,6 +11,7 @@ class ProductFormScreen extends StatefulWidget {
   final String? categoryId;
   final ProductModel? product;
   final VoidCallback onSaved;
+  final BusinessModel? business;
 
   const ProductFormScreen({
     super.key,
@@ -16,6 +19,7 @@ class ProductFormScreen extends StatefulWidget {
     this.categoryId,
     this.product,
     required this.onSaved,
+    this.business,
   });
 
   @override
@@ -39,8 +43,10 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   List<String> _selectedTags = [];
   Map<String, String> _attributes = {};
   bool _isSaving = false;
+  dynamic_config.CategoryTerminology? _terminology;
 
   bool get isEditing => widget.product != null;
+  String get _productLabel => _terminology?.filter1Label ?? 'Product';
 
   final List<String> _availableTags = [
     'New Arrival',
@@ -57,6 +63,13 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   void initState() {
     super.initState();
     final product = widget.product;
+
+    // Get category-specific terminology
+    if (widget.business?.category != null) {
+      _terminology = dynamic_config.CategoryTerminology.getForCategory(
+        widget.business!.category!,
+      );
+    }
 
     _nameController = TextEditingController(text: product?.name ?? '');
     _descriptionController = TextEditingController(text: product?.description ?? '');
@@ -109,7 +122,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          isEditing ? 'Edit Product' : 'Add Product',
+          isEditing ? 'Edit $_productLabel' : 'Add $_productLabel',
           style: TextStyle(
             color: isDarkMode ? Colors.white : Colors.black87,
             fontWeight: FontWeight.bold,
@@ -127,12 +140,12 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
             const SizedBox(height: 16),
             _buildTextField(
               controller: _nameController,
-              label: 'Product Name',
+              label: '$_productLabel Name',
               hint: 'e.g., Blue Denim Jacket',
               isDarkMode: isDarkMode,
               validator: (value) {
                 if (value == null || value.isEmpty) {
-                  return 'Please enter product name';
+                  return 'Please enter $_productLabel name';
                 }
                 return null;
               },
@@ -205,7 +218,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
             _buildSectionTitle('Attributes', isDarkMode),
             const SizedBox(height: 8),
             Text(
-              'Add product variants like size, color, etc.',
+              'Add ${_productLabel.toLowerCase()} variants like size, color, etc.',
               style: TextStyle(
                 fontSize: 13,
                 color: isDarkMode ? Colors.white54 : Colors.grey[600],
@@ -244,7 +257,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
         final categories = snapshot.data ?? [];
 
         return DropdownButtonFormField<String>(
-          value: _selectedCategoryId,
+          initialValue: _selectedCategoryId,
           decoration: InputDecoration(
             labelText: 'Category',
             labelStyle: TextStyle(
@@ -559,8 +572,8 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
         _StatusToggle(
           title: 'In Stock',
           subtitle: _inStock
-              ? 'This product is available for purchase'
-              : 'This product is marked as out of stock',
+              ? 'This $_productLabel is available for purchase'
+              : 'This $_productLabel is marked as out of stock',
           value: _inStock,
           onChanged: (value) => setState(() => _inStock = value),
           isDarkMode: isDarkMode,
@@ -569,7 +582,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
         const SizedBox(height: 12),
         _StatusToggle(
           title: 'Featured',
-          subtitle: 'Show this product in featured section',
+          subtitle: 'Show this $_productLabel in featured section',
           value: _isFeatured,
           onChanged: (value) => setState(() => _isFeatured = value),
           isDarkMode: isDarkMode,
@@ -602,7 +615,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
               ),
             )
           : Text(
-              isEditing ? 'Save Changes' : 'Add Product',
+              isEditing ? 'Save Changes' : 'Add $_productLabel',
               style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
@@ -654,7 +667,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error saving product: $e'),
+            content: Text('Error saving $_productLabel: $e'),
             backgroundColor: Colors.red,
           ),
         );
