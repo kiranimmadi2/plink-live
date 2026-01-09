@@ -10,6 +10,7 @@ import '../../services/universal_intent_service.dart';
 import '../../models/user_profile.dart';
 import '../chat/enhanced_chat_screen.dart';
 import '../../widgets/other widgets/user_avatar.dart';
+import '../../widgets/match_result_card.dart';
 import '../../services/realtime_matching_service.dart';
 import '../../services/profile services/photo_cache_service.dart';
 import 'product_detail_screen.dart';
@@ -4021,245 +4022,48 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Widget _buildMatchCard(Map<String, dynamic> match, bool isDarkMode) {
+    final matchScore = match['matchScore'] ?? 0.0;
     final userProfile = match['userProfile'] ?? {};
-    final matchScore = (match['matchScore'] ?? 0.0) * 100;
-    final userName = userProfile['name'] ?? 'Unknown User';
     final userId = match['userId'];
 
-    final cachedPhoto = userId != null
-        ? _photoCache.getCachedPhotoUrl(userId)
-        : null;
-    final photoUrl = cachedPhoto ?? userProfile['photoUrl'];
+    // Use cached photo if available
+    if (userId != null) {
+      final cachedPhoto = _photoCache.getCachedPhotoUrl(userId);
+      if (cachedPhoto != null && userProfile is Map) {
+        (userProfile as Map<String, dynamic>)['photoUrl'] = cachedPhoto;
+      }
+    }
 
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      elevation: 2,
-      color: Colors.grey.shade800,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: InkWell(
-        onTap: () async {
-          HapticFeedback.lightImpact();
-
-          final otherUser = UserProfile.fromMap(userProfile, match['userId']);
-
+    return MatchResultCard(
+      matchData: match,
+      matchScore: matchScore is double ? matchScore : (matchScore as num).toDouble(),
+      onTap: () {
+        HapticFeedback.lightImpact();
+        if (match['isBusinessPost'] == true) {
+          // Business match - handled by MatchResultCard internally
+        } else {
+          // P2P user match
+          final otherUser = UserProfile.fromMap(userProfile, userId);
           Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => EnhancedChatScreen(otherUser: otherUser),
             ),
           );
-        },
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  UserAvatar(
-                    profileImageUrl: photoUrl,
-                    radius: 24,
-                    fallbackText: userName,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Wrap(
-                      spacing: 8,
-                      runSpacing: 4,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).primaryColor,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            userName.toUpperCase(),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.blue.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.auto_awesome,
-                                size: 14,
-                                color: Colors.blue[600],
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                '${matchScore.toStringAsFixed(0)}% match',
-                                style: TextStyle(
-                                  color: Colors.blue[600],
-                                  fontWeight: FontWeight.w500,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        if (userProfile['city'] != null &&
-                            userProfile['city'].toString().isNotEmpty)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.green.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.location_on,
-                                  size: 14,
-                                  color: Colors.green[600],
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  userProfile['city'].toString(),
-                                  style: TextStyle(
-                                    color: Colors.green[600],
-                                    fontWeight: FontWeight.w500,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        if (match['distance'] != null)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.orange.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.near_me,
-                                  size: 14,
-                                  color: Colors.orange[600],
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  _formatDistance(match['distance'] as double),
-                                  style: TextStyle(
-                                    color: Colors.orange[600],
-                                    fontWeight: FontWeight.w500,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: isDarkMode ? Colors.grey[850] : Colors.grey[100],
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Posted:',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
-                        color: Theme.of(context).primaryColor,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      match['title'] ??
-                          match['description'] ??
-                          'Looking for match',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: isDarkMode ? Colors.white : Colors.black,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    if (match['description'] != null &&
-                        match['description'] != match['title'])
-                      Padding(
-                        padding: const EdgeInsets.only(top: 4),
-                        child: Text(
-                          match['description'],
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: isDarkMode
-                                ? Colors.grey[400]
-                                : Colors.grey[600],
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              if (match['lookingFor'] != null &&
-                  match['lookingFor'].toString().isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.check_circle,
-                        size: 14,
-                        color: Colors.green[600],
-                      ),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          'Matches your search',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.green[600],
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
+        }
+      },
+      onMessage: () {
+        HapticFeedback.lightImpact();
+        if (match['isBusinessPost'] != true) {
+          final otherUser = UserProfile.fromMap(userProfile, userId);
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => EnhancedChatScreen(otherUser: otherUser),
+            ),
+          );
+        }
+      },
     );
   }
 }
